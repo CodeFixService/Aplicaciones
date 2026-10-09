@@ -3,7 +3,7 @@
 --  Pega este archivo en Supabase → SQL Editor → Run (después de schema.sql
 --  y de crear la Edge Function "enviar").
 -- =====================================================================
-create extension if not exists pg_cron;
+create extension if not exists pg_cron with schema pg_catalog;
 create extension if not exists pg_net with schema extensions;
 
 select cron.unschedule(jobid) from cron.job where jobname = 'enviar-notificaciones';

@@ -1,51 +1,40 @@
 # Configurar el servidor (una sola vez)
 
-Todo se hace desde el navegador del celular o la PC, en https://supabase.com/dashboard → proyecto **CodeFix**.
-Tiempo: unos 15 minutos.
+Guía con botones para copiar cada código: https://claude.ai/artifact/4pBSteVv3Wve8snYTEW9R1
+Todo se hace en https://supabase.com/dashboard → proyecto **CodeFix**. Unos 15 minutos.
 
 ## 1. Crear la base de datos
-1. Menú izquierdo → **SQL Editor** → **New query**.
-2. Copia **todo** el archivo [`supabase/schema.sql`](../supabase/schema.sql) y pégalo.
-3. Toca **Run**. Debe decir *Success*.
+**SQL Editor** → **+ New query** → pega **todo** [`supabase/instalar.sql`](../supabase/instalar.sql) → **Run**.
+Si aparece un aviso de operación destructiva, toca **Run this query** (es normal).
 
-## 2. Crear el enviador de notificaciones
-1. Menú izquierdo → **Edge Functions** → **Deploy a new function** → **Via Editor**.
-2. Nombre: `enviar` (exacto, en minúsculas).
-3. Borra el código de ejemplo, pega **todo** [`supabase/functions/enviar/index.ts`](../supabase/functions/enviar/index.ts) y toca **Deploy**.
-4. Entra a la función → **Settings** (Details) → desactiva **Verify JWT** / **Enforce JWT verification** → **Save**.
+## 2. Configurar el inicio de sesión
+- **Authentication → Sign In / Providers → Email**: apaga **Confirm email** → Save.
+- **Authentication → URL Configuration**: Site URL `https://codefixservice.github.io/Aplicaciones/` →
+  Save. Redirect URLs → Add URL `https://codefixservice.github.io/Aplicaciones/**` → Save URLs.
 
-## 3. Activar el envío automático (cada minuto)
-1. **SQL Editor** → **New query**.
-2. Pega [`supabase/cron.sql`](../supabase/cron.sql) → **Run**.
+## 3. Crear la cuenta de administrador (después del paso 1)
+**Authentication → Users → Add user → Create new user**: email `juanjosuecastilloloyola@gmail.com`,
+una contraseña nueva solo tuya, **Auto Confirm User** marcado → Create user.
 
-## 4. Inicio de sesión y correos de confirmación
-1. **Authentication** → **URL Configuration**:
-   - **Site URL**: `https://codefixservice.github.io/Aplicaciones/`
-   - **Redirect URLs** → Add: `https://codefixservice.github.io/Aplicaciones/**`
-2. **Authentication** → **Emails** → **SMTP Settings** → activa **Enable custom SMTP**:
-   - Host `smtp.gmail.com` · Port `465`
-   - Username: tu Gmail · Password: la **contraseña de aplicación** de Google (paso 5)
-   - Sender email: tu Gmail · Sender name: `CodeFix`
-   - Sin esto Supabase solo envía 2 correos por hora y a nadie fuera de tu equipo: tus clientes no podrían confirmar su cuenta.
+## 4. Crear el enviador de notificaciones
+**Edge Functions → Deploy a new function → Via Editor** → borra el ejemplo → pega
+[`supabase/functions/enviar/index.ts`](../supabase/functions/enviar/index.ts) → nombre `enviar` → **Deploy function**.
+Luego en la función: **Details/Settings** → apaga **Verify JWT** → Save changes.
 
-## 5. Contraseña de aplicación de Gmail
-1. https://myaccount.google.com/security → activa **Verificación en 2 pasos** (si no la tienes).
-2. https://myaccount.google.com/apppasswords → nombre `CodeFix` → **Crear**.
-3. Copia las 16 letras. Se usan en el paso 4 y en el paso 7. **No las compartas con nadie.**
+## 5. Enviar la clave pública
+**Project Settings → API Keys → Legacy API Keys** → copia **anon public** (empieza con `eyJ`) y envíala por el chat.
+Nunca compartas la **service_role** ni la **secret key**.
 
-## 6. Enviar la clave pública
-**Project Settings** → **API Keys** → pestaña **Legacy API Keys** → copia la clave **anon / public**
-(empieza con `eyJ…`). Es pública, se puede compartir: envíala por el chat para conectar la app.
+## 6. Cuando la app esté publicada
+1. Abre la app, instálala e ingresa con la cuenta del paso 3 (verás **ADMIN**).
+2. **Administración → Ajustes → Generar claves push** (una sola vez).
+3. Inicio → **Activar notificaciones**. Luego **Avisos → Prueba: solo a mí → Enviar**.
 
-> La clave **service_role** es secreta: no la compartas nunca.
-
-## 7. Activar tu cuenta de administrador (cuando la app esté publicada)
-1. Abre la app → **Crear cuenta** con `juanjosuecastilloloyola@gmail.com` y una contraseña nueva.
-2. Confirma el correo con el enlace que te llega e inicia sesión. Verás la etiqueta **ADMIN**.
-3. **Administración → Ajustes**:
-   - **Generar claves push** (una sola vez).
-   - **Gmail**: tu correo + la contraseña de aplicación + nombre del remitente → Guardar.
-4. **Avisos** → *Prueba: solo a mí* → Enviar. Debe llegarte la notificación y el correo.
+## 7. (Opcional) Correos con Gmail
+1. Crea una contraseña de aplicación en https://myaccount.google.com/apppasswords (requiere verificación en 2 pasos).
+2. App → **Administración → Ajustes → Correo (Gmail)** → tu Gmail + las 16 letras → Guardar.
+3. Para "¿Olvidaste tu contraseña?": Supabase → **Authentication → Emails → SMTP Settings** → Enable custom SMTP:
+   `smtp.gmail.com`, puerto `465`, usuario tu Gmail, contraseña las 16 letras, nombre `CodeFix`.
 
 ## Límites del plan gratis (suficientes para empezar)
 - Supabase Free: 50 000 usuarios, 500 MB de datos, 1 GB de imágenes. Se pausa si no hay actividad en 7 días
