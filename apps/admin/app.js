@@ -35,6 +35,31 @@
       item('Celulares con push', s.dispositivos);
   }
 
+  /* ---------- Invitar ---------- */
+  const appLink = Core.rootUrl();
+  const invitacion = '📲 Te invito a la app de ' + (window.CFX_CONFIG.MARCA || 'CodeFix') + ' (FichaPro y Caja Rápida).\n\n' +
+    '1. Abre este enlace en Chrome (Android) o Safari (iPhone):\n' + appLink + '\n' +
+    '2. Toca "Instalar" (en iPhone: Compartir → Agregar a inicio).\n' +
+    '3. Crea tu cuenta gratis y activa las notificaciones.';
+  function qrGrande(text, px) {
+    const q = qrcode(0, 'M'); q.addData(text); q.make();
+    const n = q.getModuleCount(), m = 4, c = document.createElement('canvas'), k = Math.floor(px / (n + 2 * m));
+    c.width = c.height = k * (n + 2 * m);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let j = 0; j < n; j++) if (q.isDark(r, j)) g.fillRect((j + m) * k, (r + m) * k, k, k);
+    return c;
+  }
+  $('appLink').value = appLink;
+  $('appQr').src = qrGrande(appLink, 400).toDataURL();
+  $('bInvWA').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(invitacion), '_blank');
+  $('bInvShare').onclick = async () => {
+    if (navigator.share) { try { await navigator.share({ title: 'App CodeFix', text: invitacion }); } catch (e) { /* cancelado */ } }
+    else $('bInvWA').onclick();
+  };
+  $('bInvQr').onclick = () => qrGrande(appLink, 1000).toBlob((b) => Core.download('qr-app-codefix.png', b));
+  $('bInvCopy').onclick = () => navigator.clipboard.writeText(invitacion).then(() => Core.toast('Mensaje copiado'));
+
   /* ---------- Licencias ---------- */
   let licencias = [], perfiles = {};
   async function cargarLicencias() {

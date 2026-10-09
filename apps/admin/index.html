@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#111111">
-<meta name="robots" content="noindex">
+<meta name="robots" content="noindex, nofollow">
 <title>Administración</title>
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="icon" href="../../icons/icon-192.png">
@@ -27,6 +27,19 @@
   <!-- RESUMEN -->
   <section class="view on" id="v-resumen">
     <div class="stats" id="stats"></div>
+    <div class="card">
+      <h2>📲 Compartir la app</h2>
+      <p class="muted">Envía este enlace o muestra el QR. Cada persona abre el enlace, instala la app, crea su cuenta
+        (entra en Free) y tú la ves en <b>Usuarios</b>.</p>
+      <div style="text-align:center"><img id="appQr" alt="QR de la app" style="width:200px;height:200px;image-rendering:pixelated;background:#fff;border-radius:10px;padding:6px"></div>
+      <input id="appLink" readonly>
+      <div class="btns">
+        <button class="ok small" id="bInvWA">💬 Enviar por WhatsApp</button>
+        <button class="alt small" id="bInvShare">📤 Compartir</button>
+        <button class="alt small" id="bInvQr">⬇️ Descargar QR</button>
+        <button class="alt small" id="bInvCopy">Copiar mensaje</button>
+      </div>
+    </div>
     <p class="muted">Solo tú (administrador general) puedes ver esta pantalla. Cada acción se valida en el servidor.</p>
   </section>
 
@@ -134,6 +147,7 @@
 
 <script src="../../shared/config.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
+<script src="../../shared/vendor/qrcode.js"></script>
 <script src="../../shared/core.js"></script>
 <script src="../../shared/cuenta.js"></script>
 <script src="app.js"></script>

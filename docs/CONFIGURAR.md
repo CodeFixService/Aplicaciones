@@ -51,3 +51,27 @@ Tiempo: unos 15 minutos.
 - Supabase Free: 50 000 usuarios, 500 MB de datos, 1 GB de imágenes. Se pausa si no hay actividad en 7 días
   (se reactiva con un clic en el panel).
 - Gmail: ~500 correos al día. La app se detiene en 450 y lo avisa en el historial.
+
+## 8. Compartir la app con otras personas
+**Administración → Resumen → Compartir la app**: envía el enlace por WhatsApp o muestra el QR.
+Cada persona abre el enlace → toca **Instalar** (iPhone: Compartir → Agregar a inicio) → crea su cuenta
+(entra en Free) → activa las notificaciones. Tú la ves en **Usuarios** y le das Pro con una key.
+
+## 9. Ocultar el código (recomendado antes de vender)
+Hoy el repositorio es público. Para que nadie pueda ver ni copiar el proyecto:
+1. Crea una cuenta gratis en https://dash.cloudflare.com → **Workers & Pages** → **Create** → pestaña **Pages**
+   → **Connect to Git** → autoriza GitHub y elige `CodeFixService/Aplicaciones`.
+2. Configuración: *Framework preset* **None**, *Build command* vacío, *Build output directory* `/` → **Save and Deploy**.
+   Te da una dirección gratis tipo `https://aplicaciones.pages.dev`.
+3. En GitHub: **Settings → General → Danger Zone → Change visibility → Private**.
+   (GitHub Pages deja de funcionar; Cloudflare sigue publicando cada cambio en `main`.)
+4. En Supabase → **Authentication → URL Configuration**: cambia **Site URL** y **Redirect URLs** a la nueva dirección.
+5. Vuelve a compartir el enlace nuevo (Administración → Compartir la app ya lo muestra solo).
+
+> Toda app web descarga su código al celular para funcionar, eso no se puede evitar. Lo que protege tu
+> negocio es el servidor: sin tu cuenta de administrador nadie puede activar Pro ni enviar notificaciones.
+
+## 10. (Opcional) Archivo APK para Android
+No hace falta (la app instalada desde el enlace ya recibe notificaciones), pero si quieres un archivo `.apk`:
+https://www.pwabuilder.com → pega la dirección de la app → **Package for stores** → **Android** → descarga.
+Para publicarla en Google Play se necesita una cuenta de desarrollador (pago único de 25 USD).
