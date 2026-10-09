@@ -13,11 +13,12 @@ No necesitan servidor, base de datos, hosting de pago ni dominio.
 ## Cómo tenerlas en tu celular (sin pagar hosting ni dominio)
 
 ### Opción A — GitHub Pages (recomendada, gratis)
-1. Une esta rama a `main`.
-2. En GitHub: **Settings → Pages → Source: GitHub Actions**. El workflow `.github/workflows/pages.yml` publica solo.
-3. Abre en el celular `https://<usuario>.github.io/<repo>/` (es una dirección gratuita de GitHub, no compras dominio).
-4. Chrome (Android): menú ⋮ → **Instalar app**. Safari (iPhone): Compartir → **Agregar a inicio**.
-5. Listo: desde ahí abre sin internet. Solo necesitas conexión para recibir actualizaciones.
+1. En GitHub abre **Settings → Pages**.
+2. En **Build and deployment → Source** elige **Deploy from a branch**.
+3. En **Branch** elige **main** y carpeta **/ (root)** → **Save**.
+4. Espera 1–2 minutos y abre en el celular `https://codefixservice.github.io/Aplicaciones/`.
+5. Chrome (Android): menú ⋮ → **Instalar app**. Safari (iPhone): Compartir → **Agregar a inicio**.
+6. Listo: desde ahí abre sin internet. Cada cambio que subas a `main` se publica solo.
 
 > Si el repositorio es privado, GitHub Pages requiere un plan de pago. Alternativa gratis: hacerlo público
 > (los datos de tus clientes **no** están en el repositorio, viven en tu teléfono).

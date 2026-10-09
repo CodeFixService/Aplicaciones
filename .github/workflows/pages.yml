@@ -1,8 +1,8 @@
 name: Publicar en GitHub Pages
 
+# Opcional: solo se usa si en Settings → Pages eliges "GitHub Actions".
+# Con "Deploy from a branch" (main / root) no hace falta.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
