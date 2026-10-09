@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6d28d9">
+<title>Caja Rápida</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/core.css">
+<style>
+  .prods { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .prod { flex-direction: column; align-items: flex-start; padding: 14px; background: var(--card); color: var(--text);
+    border: 1px solid var(--line); text-align: left; min-height: 86px; }
+  .prod b { font-size: 15px; }
+  .prod .muted { font-size: 13px; }
+  .prod.low { border-color: var(--bad); }
+  .total { font-size: 32px; font-weight: 800; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .kpis .card { margin: 0; text-align: center; }
+  .kpis b { display: block; font-size: 20px; }
+</style>
+</head>
+<body>
+<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Caja Rápida</h1></header>
+<main>
+  <section class="view on" id="v-vender">
+    <div class="card">
+      <div class="row" style="align-items:center">
+        <div><div class="muted">Venta actual</div><div class="total" id="ticketTotal">$0.00</div></div>
+        <div style="flex:0 0 auto" class="btns">
+          <button class="ok" id="bCobrar">Cobrar</button>
+          <button class="alt" id="bLimpiar">✕</button>
+        </div>
+      </div>
+      <ul class="list" id="ticket"></ul>
+    </div>
+    <div class="prods" id="prods"></div>
+  </section>
+
+  <section class="view" id="v-productos">
+    <div class="card">
+      <h2>Producto</h2>
+      <label>Nombre</label><input id="p-nombre">
+      <div class="row">
+        <div><label>Precio</label><input id="p-precio" inputmode="decimal"></div>
+        <div><label>Costo</label><input id="p-costo" inputmode="decimal"></div>
+        <div><label>Stock</label><input id="p-stock" inputmode="numeric"></div>
+      </div>
+      <div class="btns"><button id="bGuardarProd">Guardar</button><button class="alt" id="bCancelarProd">Cancelar</button></div>
+    </div>
+    <div class="card"><ul class="list" id="listaProds"></ul></div>
+  </section>
+
+  <section class="view" id="v-reporte">
+    <div class="card">
+      <label>Día</label><input type="date" id="r-dia">
+    </div>
+    <div class="kpis">
+      <div class="card"><span class="muted">Ventas</span><b id="k-ventas">0</b></div>
+      <div class="card"><span class="muted">Ingreso</span><b id="k-ingreso">$0</b></div>
+      <div class="card"><span class="muted">Ganancia</span><b id="k-ganancia">$0</b></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>Detalle</h2>
+      <ul class="list" id="r-lista"></ul>
+      <div class="btns">
+        <button class="alt" id="bCSV">⬇️ CSV del día</button>
+        <button class="alt" id="bBackup">💾 Respaldo</button>
+        <label class="btn alt" style="margin:0;color:var(--brand)">⬆️ Restaurar<input type="file" accept=".json" id="restore" hidden></label>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-v="vender" class="on"><span>🛒</span>Vender</button>
+  <button data-v="productos"><span>📦</span>Productos</button>
+  <button data-v="reporte"><span>📊</span>Reporte</button>
+</nav>
+
+<script src="../../shared/core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

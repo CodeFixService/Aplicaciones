@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6d28d9">
+<title>Mis Aplicaciones</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="shared/core.css">
+<style>
+  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .app {
+    display: block; text-decoration: none; color: var(--text);
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
+  }
+  .app .ico { font-size: 34px; }
+  .app b { display: block; margin-top: 6px; }
+  .app small { color: var(--muted); }
+  #install { display: none; }
+</style>
+</head>
+<body>
+<header class="top"><h1>Mis Aplicaciones</h1></header>
+<main>
+  <div class="apps">
+    <a class="app" href="apps/fichas/">
+      <div class="ico">📣</div><b>FichaPro</b>
+      <small>Fichas publicitarias, clientes, campañas por WhatsApp y recordatorios</small>
+    </a>
+    <a class="app" href="apps/caja/">
+      <div class="ico">💵</div><b>Caja Rápida</b>
+      <small>Ventas del día, productos y stock</small>
+    </a>
+    <a class="app" href="apps/licencias/">
+      <div class="ico">🔑</div><b>Licencias</b>
+      <small>Genera claves para vender FichaPro (uso interno)</small>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Instalar en el celular</h2>
+    <p class="muted">Android (Chrome): menú ⋮ → <b>Instalar app</b> o <b>Agregar a pantalla principal</b>.
+      iPhone (Safari): botón Compartir → <b>Agregar a inicio</b>.
+      Tras la primera carga funciona <b>sin internet</b> y los datos se quedan en tu teléfono.</p>
+    <button id="install">Instalar ahora</button>
+  </div>
+</main>
+<script src="shared/core.js"></script>
+<script>
+  Core.registerSW('./');
+  let deferred;
+  addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); deferred = e;
+    document.getElementById('install').style.display = 'inline-flex';
+  });
+  document.getElementById('install').onclick = async () => {
+    if (!deferred) return;
+    deferred.prompt(); await deferred.userChoice; deferred = null;
+  };
+</script>
+</body>
+</html>
