@@ -1,9 +1,7 @@
 /* Núcleo compartido por todas las apps: almacenamiento local, avisos,
-   notificaciones, copias de seguridad y licencias. Sin servidor. */
+   notificaciones, copias de seguridad y marca. */
 (function (global) {
   'use strict';
-
-  const LICENSE_SALT = 'CFS-2026-cambia-esta-frase'; // cámbiala antes de vender
 
   function store(ns) {
     const key = (k) => ns + ':' + k;
@@ -141,33 +139,18 @@
     });
   }
 
-  // Licencias offline: la clave se deriva del nombre del cliente.
-  // Es un freno para copias casuales, no una protección criptográfica.
-  function hash53(str, seed) {
-    let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
-    for (let i = 0; i < str.length; i++) {
-      const ch = str.charCodeAt(i);
-      h1 = Math.imul(h1 ^ ch, 2654435761);
-      h2 = Math.imul(h2 ^ ch, 1597334677);
-    }
-    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-    return 4294967296 * (2097151 & h2) + (h1 >>> 0);
-  }
-
-  function licenseKey(product, owner) {
-    const base = product.toUpperCase() + '|' + owner.trim().toUpperCase() + '|' + LICENSE_SALT;
-    const raw = (hash53(base, 7).toString(36) + hash53(base, 13).toString(36)).toUpperCase();
-    const k = raw.replace(/[^A-Z0-9]/g, '').padEnd(16, 'X').slice(0, 16);
-    return k.match(/.{4}/g).join('-');
-  }
-
-  function checkLicense(product, owner, key) {
-    return !!owner && !!key && licenseKey(product, owner) === key.trim().toUpperCase();
+  // Pie de página con la marca del autor en todas las pantallas.
+  function marca() {
+    const cfg = global.CFX_CONFIG || {};
+    const el = document.createElement('footer');
+    el.className = 'marca';
+    el.innerHTML = '© ' + new Date().getFullYear() + ' <b>' + esc(cfg.MARCA || 'CodeFix') + '</b> · ' +
+      esc(cfg.AUTOR || '') + '. Todos los derechos reservados. Prohibida su reventa.';
+    (document.querySelector('main') || document.body).appendChild(el);
   }
 
   global.Core = {
     store, uid, money, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, licenseKey, checkLicense, rootUrl
+    backup, restore, readImage, rootUrl, marca
   };
 })(window);

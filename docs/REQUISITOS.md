@@ -1,42 +1,40 @@
 # Requisitos — versión 2 (cuentas, Free/Pro, push)
 
-Anotado a partir de lo que pidió Josué (administrador general). Estado: **pendiente de decidir el servidor**.
+Pedido por Josué (administrador general). Servidor elegido: **Supabase (gratis)**. Correo: **Gmail**.
 
 ## Cuentas y roles
-- [ ] Cada persona crea su cuenta e inicia sesión con **usuario (correo) y contraseña**; el servidor valida si son correctos.
-- [ ] Cada usuario ve **solo sus propios datos** (clientes, fichas, campañas, ventas).
-- [ ] Un único **administrador general**: Josué (juanjosuecastilloloyola@gmail.com).
-  La contraseña se define al crear la cuenta en el servidor; **no se guarda en el código ni en el repositorio**.
-- [ ] Solo el administrador ve el panel de **Licencias**: escribe el nombre de la empresa, genera la key y se la envía.
-- [ ] Los usuarios **no pueden crear keys** ni ver el panel de administración (bloqueado en el servidor, no solo escondido).
+- [x] Cada persona crea su cuenta e inicia sesión con **correo y contraseña**; el servidor valida si son correctos.
+- [x] Recuperar contraseña por correo.
+- [x] Cada usuario ve **solo sus propios datos** (en el servidor y separados por usuario en el celular).
+- [x] Un único **administrador general**: Josué (juanjosuecastilloloyola@gmail.com), reconocido solo con el correo confirmado.
+  La contraseña no está en el código.
+- [x] Solo el administrador ve y usa el panel de **Administración** (keys, usuarios, avisos, ajustes).
+- [x] Usuarios y empresas **no pueden ver ni crear keys** (bloqueado en el servidor, probado).
 
 ## Free y Pro
-- [ ] Al registrarse el usuario entra en **Free**: misma app, con buenas opciones pero limitadas.
-- [ ] Al pegar la key que le da el administrador, su cuenta pasa a **Pro** al instante (en todos sus dispositivos).
-- [ ] El administrador puede ver, activar, suspender o renovar cuentas.
-- Propuesta de reparto (por confirmar):
-
-| Función | Free | Pro |
-|---|---|---|
-| Diseñar fichas | 4 plantillas, máx. 5 guardadas, marca de agua | Todas las plantillas, ilimitadas, sin marca de agua, kit de marca |
-| Clientes | máx. 30 | Ilimitados, importación masiva, segmentos |
-| Envío por WhatsApp (manual) | Sí | Sí |
-| **Notificaciones push automáticas** a suscriptores | No | Sí, programadas |
-| **Campañas por correo** | No | Sí |
-| Estadísticas (entregas, aperturas, clics) | No | Sí |
-| Sincronización en la nube / varios dispositivos | No | Sí |
-| Caja Rápida | Básica | Reportes avanzados, inventario, exportación |
+- [x] Al registrarse el usuario entra en **Free**.
+- [x] Con la key del administrador su cuenta pasa a **Pro** al instante, en todos sus dispositivos.
+- [x] Keys aleatorias, de un solo uso, con duración (1/3/6/12 meses o permanente) y precio registrado.
+- [x] El administrador puede dar/quitar Pro, renovar, suspender y revocar keys.
+- [x] Reparto Free/Pro aplicado (ver README).
 
 ## Notificaciones
-- [ ] Notificaciones **push reales**: el administrador (y los usuarios Pro) programan un aviso y a la hora indicada **les llega a todos automáticamente**, sin pasar por WhatsApp, aunque la app esté cerrada.
-- [ ] Opcional: el mismo aviso también por **correo**.
-- [ ] Notificaciones entre usuarios (por definir quién puede enviar a quién).
+- [x] **Push real** programado: el administrador avisa a todos / Pro / Free y les llega automáticamente aunque la app esté cerrada.
+- [x] El mismo aviso también por **correo** (Gmail).
+- [x] Entre usuarios: cada negocio Pro tiene un enlace/QR; sus clientes se suscriben y reciben sus campañas por push y correo.
+- [x] Bandeja de avisos dentro de la app.
 
 ## Marca y protección
-- [ ] App marcada como de **CodeFix / Josué** de forma visible y fija.
-- [ ] Que no se pueda revender: licencia validada en el servidor y código fuente fuera de un repositorio público.
+- [x] Marca **CodeFix · Josué Castillo** fija en todas las pantallas y en las fichas Free.
+- [x] Licencia propietaria (LICENSE).
+- [x] La versión Pro depende del servidor: una copia de la app no puede activar Pro sin el administrador.
+- [ ] Pendiente: pasar el repositorio a **privado** y publicar desde Cloudflare Pages (gratis) para que nadie copie el código.
 
-## Decisiones pendientes
-1. Servidor: Supabase (gratis, recomendado) / Firebase / computador propio encendido.
-2. ¿Quién puede enviar notificaciones entre usuarios?
-3. Confirmar el reparto Free/Pro y los precios.
+## Pendiente del lado de Josué
+- [ ] Seguir `docs/CONFIGURAR.md` y enviar la clave **anon public**.
+- [ ] Definir precios de la versión Pro.
+
+## Ideas para después (si va bien)
+- Plan Supabase Pro para más capacidad; dominio propio (y correo con Resend en vez de Gmail).
+- Estadísticas de clics de las campañas.
+- Más apps dentro de la misma cuenta.

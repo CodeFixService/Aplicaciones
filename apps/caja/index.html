@@ -22,7 +22,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Caja Rápida</h1></header>
+<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Caja Rápida</h1><span id="planTag" class="pill" style="background:#fff3;color:#fff">FREE</span></header>
 <main>
   <section class="view on" id="v-vender">
     <div class="card">
@@ -54,6 +54,12 @@
 
   <section class="view" id="v-reporte">
     <div class="card">
+      <div class="seg" id="r-rango">
+        <button class="small on" data-r="dia">Día</button>
+        <button class="small alt" data-r="7">7 días</button>
+        <button class="small alt" data-r="30">30 días</button>
+        <button class="small alt" data-r="mes">Este mes</button>
+      </div>
       <label>Día</label><input type="date" id="r-dia">
     </div>
     <div class="kpis">
@@ -61,11 +67,16 @@
       <div class="card"><span class="muted">Ingreso</span><b id="k-ingreso">$0</b></div>
       <div class="card"><span class="muted">Ganancia</span><b id="k-ganancia">$0</b></div>
     </div>
+    <div class="card" style="margin-top:14px" id="r-top-card">
+      <h2>🏆 Más vendidos <span class="pill pro">PRO</span></h2>
+      <ul class="list" id="r-top"></ul>
+    </div>
     <div class="card" style="margin-top:14px">
       <h2>Detalle</h2>
       <ul class="list" id="r-lista"></ul>
       <div class="btns">
-        <button class="alt" id="bCSV">⬇️ CSV del día</button>
+        <button class="alt" id="bCSV">⬇️ CSV</button>
+        <button class="alt" id="bNube">☁️ Nube</button>
         <button class="alt" id="bBackup">💾 Respaldo</button>
         <label class="btn alt" style="margin:0;color:var(--brand)">⬆️ Restaurar<input type="file" accept=".json" id="restore" hidden></label>
       </div>
@@ -79,7 +90,10 @@
   <button data-v="reporte"><span>📊</span>Reporte</button>
 </nav>
 
+<script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/supabase.js"></script>
 <script src="../../shared/core.js"></script>
+<script src="../../shared/cuenta.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

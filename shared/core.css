@@ -97,3 +97,17 @@ nav.tabs button.on { color: var(--brand); }
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .empty { text-align: center; color: var(--muted); padding: 24px 8px; }
+footer.marca { text-align: center; font-size: 12px; color: var(--muted); padding: 18px 8px 8px; }
+.pill.pro { background: var(--brand-2); color: #1c1830; font-weight: 700; }
+.pill.admin { background: #111; color: #fff; font-weight: 700; }
+.lock { opacity: .55; }
+.lock::after { content: ' 🔒 Pro'; font-size: 12px; }
+.hidden { display: none !important; }
+.err { color: var(--bad); font-size: 14px; min-height: 1.2em; margin: 8px 0 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stats .card { margin: 0; }
+.stats b { display: block; font-size: 22px; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button.on { background: var(--brand-2); color: #1c1830; }
+code.key { font: 600 18px/1.3 ui-monospace, monospace; letter-spacing: 1px; word-break: break-all; }
+.upsell { border: 2px dashed var(--brand-2); }

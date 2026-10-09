@@ -1,7 +1,7 @@
 {
-  "name": "Mis Aplicaciones",
-  "short_name": "MisApps",
-  "description": "Herramientas internas offline: FichaPro, Caja Rápida y Licencias.",
+  "name": "CodeFix Apps",
+  "short_name": "CodeFix",
+  "description": "FichaPro y Caja Rápida de CodeFix: publicidad, clientes, notificaciones y ventas.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

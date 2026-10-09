@@ -52,12 +52,18 @@
         <div><label>Precio</label><input id="f-precio" inputmode="decimal" placeholder="19.99"></div>
         <div><label>Precio antes</label><input id="f-antes" inputmode="decimal" placeholder="29.99"></div>
       </div>
+      <div id="rowLista" class="hidden">
+        <label>Productos y precios (uno por línea: <i>Producto = precio</i>)</label>
+        <textarea id="f-lista" placeholder="Hamburguesa clásica = 12.90&#10;Papas grandes = 6.50&#10;Gaseosa 500 ml = 3.00"></textarea>
+      </div>
       <label>Llamado a la acción</label><input id="f-cta" maxlength="40" placeholder="¡Pide ya por WhatsApp!">
       <div class="row">
         <div><label>Color principal</label><input type="color" id="f-color1"></div>
         <div><label>Color acento</label><input type="color" id="f-color2"></div>
       </div>
       <label>Foto del producto</label><input type="file" accept="image/*" id="f-foto">
+      <label style="display:flex;gap:8px;align-items:center;color:var(--text)" id="lblQr">
+        <input type="checkbox" id="f-qr"> Agregar código QR a mi WhatsApp <span class="pill pro">PRO</span></label>
       <div class="btns"><button class="alt small" id="bQuitarFoto">Quitar foto</button></div>
     </div>
   </section>
@@ -92,6 +98,20 @@
 
   <!-- CAMPAÑAS -->
   <section class="view" id="v-campanas">
+    <div class="card" id="cSubs">
+      <h2>🔔 Mis suscriptores <span class="pill pro">PRO</span></h2>
+      <div id="subsPro">
+        <p class="muted">Comparte este enlace o QR con tus clientes. Al aceptar, les llegan tus ofertas
+          como notificación (y por correo si lo dejan), sin WhatsApp.</p>
+        <div style="text-align:center"><img id="subsQr" alt="QR" style="width:180px;height:180px;image-rendering:pixelated;background:#fff;border-radius:10px;padding:6px"></div>
+        <input id="subsLink" readonly>
+        <div class="btns"><button class="small" id="bSubsShare">📤 Compartir enlace</button>
+          <button class="small alt" id="bSubsQr">⬇️ Descargar QR</button></div>
+        <ul class="list" id="subsLista"></ul>
+      </div>
+      <p class="muted" id="subsFree">Con la versión Pro tus clientes se suscriben con un QR y les llegan tus campañas
+        automáticamente por notificación y correo. <a href="../../">Activar Pro</a></p>
+    </div>
     <div class="card">
       <h2>Nueva campaña</h2>
       <label>Nombre</label><input id="k-nombre" placeholder="Promo fin de semana">
@@ -99,7 +119,13 @@
       <label>Para</label><select id="k-tag"></select>
       <label>Mensaje (usa {nombre} para personalizar)</label>
       <textarea id="k-msg">Hola {nombre} 👋 Tenemos una oferta especial para ti.</textarea>
-      <label>Recordarme enviarla el</label><input type="datetime-local" id="k-fecha">
+      <label>Fecha y hora</label><input type="datetime-local" id="k-fecha">
+      <label>Envío automático a suscriptores <span class="pill pro">PRO</span></label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--text)"><input type="checkbox" id="k-push"> 🔔 Notificación push</label>
+        <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--text)"><input type="checkbox" id="k-mail"> ✉️ Correo</label>
+      </div>
+      <p class="muted">Sin envío automático, la app te recuerda a la hora y envías por WhatsApp.</p>
       <div class="btns"><button id="bAddCampana">📅 Programar</button></div>
     </div>
     <div class="card"><ul class="list" id="campanas"></ul></div>
@@ -127,11 +153,17 @@
       <div class="btns"><button id="bNotif">🔔 Activar</button><button class="alt" id="bProbar">Probar</button></div>
     </div>
     <div class="card">
-      <h2>Licencia</h2>
+      <h2>Tu plan</h2>
       <p class="muted" id="licEstado"></p>
-      <label>Titular</label><input id="l-owner">
-      <label>Clave</label><input id="l-key" placeholder="XXXX-XXXX-XXXX-XXXX" autocapitalize="characters">
-      <div class="btns"><button id="bActivar">Activar</button></div>
+      <div id="rowKey">
+        <label>Key Pro</label><input id="l-key" placeholder="CFX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off">
+        <div class="btns"><button id="bActivar">Activar Pro</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>☁️ Respaldo en la nube <span class="pill pro">PRO</span></h2>
+      <p class="muted" id="nubeEstado">Guarda tus fichas y clientes en tu cuenta para recuperarlos en otro celular.</p>
+      <div class="btns"><button id="bNubeSubir">⬆️ Guardar en la nube</button><button class="alt" id="bNubeBajar">⬇️ Recuperar</button></div>
     </div>
     <div class="card">
       <h2>Copia de seguridad</h2>
@@ -153,7 +185,11 @@
   <button data-v="ajustes"><span>⚙️</span>Ajustes</button>
 </nav>
 
+<script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/supabase.js"></script>
+<script src="../../shared/vendor/qrcode.js"></script>
 <script src="../../shared/core.js"></script>
+<script src="../../shared/cuenta.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* Service worker: guarda todas las apps en el teléfono para usarlas sin internet.
    Sube VERSION cada vez que cambies archivos para que los celulares se actualicen. */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = 'misapps-' + VERSION;
 const FILES = [
   './',
@@ -10,14 +10,21 @@ const FILES = [
   'icons/icon-512.png',
   'shared/core.css',
   'shared/core.js',
+  'shared/config.js',
+  'shared/cuenta.js',
+  'shared/vendor/supabase.js',
+  'shared/vendor/qrcode.js',
   'apps/fichas/',
   'apps/fichas/index.html',
   'apps/fichas/app.js',
   'apps/caja/',
   'apps/caja/index.html',
   'apps/caja/app.js',
-  'apps/licencias/',
-  'apps/licencias/index.html'
+  'apps/admin/',
+  'apps/admin/index.html',
+  'apps/admin/app.js',
+  'apps/suscribirse/',
+  'apps/suscribirse/index.html'
 ];
 
 self.addEventListener('install', (e) => {
@@ -45,6 +52,21 @@ self.addEventListener('fetch', (e) => {
       })
     )
   );
+});
+
+// Notificación push enviada por el servidor (llega aunque la app esté cerrada).
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: e.data && e.data.text() }; }
+  const opts = {
+    body: d.body || '',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-192.png',
+    tag: d.tag,
+    data: { url: d.url || './' }
+  };
+  if (d.image) opts.image = d.image;
+  e.waitUntil(self.registration.showNotification(d.title || 'Nuevo aviso', opts));
 });
 
 self.addEventListener('notificationclick', (e) => {

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6d28d9">
+<title>Recibe nuestras ofertas</title>
+<link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/core.css">
+<style>
+  body { padding-bottom: 24px; }
+  .hero { text-align: center; padding: 28px 16px 8px; }
+  .hero .ico { font-size: 54px; }
+  .hero h1 { margin: 8px 0 4px; font-size: 24px; }
+  .box { max-width: 440px; margin: 0 auto; }
+  #ok { text-align: center; }
+</style>
+</head>
+<body>
+<main class="box">
+  <div class="hero"><div class="ico">🔔</div><h1 id="titulo">Ofertas exclusivas</h1>
+    <p class="muted" id="sub">Recibe promociones directo en tu celular.</p></div>
+
+  <div class="card" id="form">
+    <label>Tu nombre</label><input id="nombre" maxlength="60" autocomplete="given-name">
+    <label>Correo (opcional)</label><input id="email" type="email" autocomplete="email" placeholder="para recibir también por correo">
+    <p class="err" id="err"></p>
+    <div class="btns"><button id="btn" style="flex:1">🔔 Quiero recibir ofertas</button></div>
+    <p class="muted" id="ios" hidden>En iPhone: toca Compartir → <b>Agregar a inicio</b>, abre desde ahí y vuelve a tocar el botón.
+      O deja tu correo y te llegarán por email.</p>
+  </div>
+
+  <div class="card hidden" id="ok">
+    <div style="font-size:48px">✅</div>
+    <h2>¡Listo!</h2>
+    <p class="muted" id="okTxt"></p>
+  </div>
+
+  <div class="card hidden" id="off">
+    <p class="muted">Este enlace no está activo.</p>
+  </div>
+</main>
+<script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/supabase.js"></script>
+<script src="../../shared/core.js"></script>
+<script src="../../shared/cuenta.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  Core.registerSW('../../');
+  Core.marca();
+  const negocio = new URLSearchParams(location.search).get('n');
+  const valido = /^[0-9a-f-]{36}$/i.test(negocio || '');
+  if (!Cuenta.configured || !valido) { $('form').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
+
+  let info = null;
+  try { info = await Cuenta.rpc('negocio_publico', { p_id: negocio }); } catch (e) { /* sin red */ }
+  if (!info) { $('form').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
+  $('titulo').textContent = info.empresa || 'Ofertas exclusivas';
+  document.title = 'Ofertas de ' + (info.empresa || 'nuestro negocio');
+  $('sub').textContent = 'Recibe las promociones de ' + (info.empresa || 'nuestro negocio') + ' directo en tu celular.';
+  if (!Cuenta.pushSupported() && /iPhone|iPad/.test(navigator.userAgent)) $('ios').hidden = false;
+
+  $('btn').onclick = async () => {
+    $('err').textContent = '';
+    const email = $('email').value.trim();
+    let s = null;
+    $('btn').disabled = true;
+    try {
+      try { s = await Cuenta.pushSubscription(); }
+      catch (e) { if (!email) throw e; } // sin push pero con correo: también vale
+      const r = await Cuenta.rpc('subscribe_negocio', {
+        p_negocio: negocio, p_nombre: $('nombre').value.trim(), p_email: email || null,
+        p_endpoint: s ? s.endpoint : null, p_p256dh: s ? s.keys.p256dh : null, p_auth: s ? s.keys.auth : null
+      });
+      if (!r.ok) throw new Error(r.error);
+      $('form').classList.add('hidden');
+      $('ok').classList.remove('hidden');
+      $('okTxt').textContent = (s ? 'Te avisaremos con una notificación' : 'Te escribiremos') +
+        (s && email ? ' y por correo' : '') + ' cuando haya ofertas de ' + (info.empresa || 'nosotros') + '.';
+    } catch (e) {
+      $('err').textContent = e.message;
+    } finally { $('btn').disabled = false; }
+  };
+})();
+</script>
+</body>
+</html>

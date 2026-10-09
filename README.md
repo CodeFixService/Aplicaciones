@@ -1,58 +1,42 @@
-# Aplicaciones
+# CodeFix Apps
 
-Varias apps en un solo repositorio. Son **PWA**: páginas web que se instalan en el celular
-como una app, funcionan **sin internet** y guardan los datos **solo en el teléfono**.
-No necesitan servidor, base de datos, hosting de pago ni dominio.
+Apps web instalables en el celular (PWA), con cuentas de usuario, versión **Free** y **Pro**,
+y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICENSE](LICENSE).
 
 | App | Para qué sirve |
 |-----|----------------|
-| **FichaPro** (`apps/fichas`) | Diseña fichas publicitarias (4 plantillas, foto, precio, logo), guarda tus clientes con etiquetas, programa campañas con recordatorio y envíalas por WhatsApp con mensaje personalizado `{nombre}`. Es la app pensada para **vender**. |
-| **Caja Rápida** (`apps/caja`) | Punto de venta de bolsillo: productos, stock, cobro con un toque, aviso de stock bajo, reporte del día y CSV. |
-| **Licencias** (`apps/licencias`) | Herramienta interna: genera la clave que le entregas a cada cliente que compra FichaPro y lleva el registro de lo vendido. |
+| **Inicio** (`index.html`) | Iniciar sesión / crear cuenta / recuperar contraseña, activar Pro con una key, bandeja de avisos. |
+| **FichaPro** (`apps/fichas`) | Fichas publicitarias, clientes, campañas por WhatsApp y, en Pro, envío automático por push y correo a suscriptores. |
+| **Caja Rápida** (`apps/caja`) | Ventas, productos, stock y reportes. |
+| **Administración** (`apps/admin`) | Solo el administrador general: usuarios, keys Pro, avisos a todos, ajustes de push y Gmail. |
+| **Suscribirse** (`apps/suscribirse`) | Página pública (sin cuenta) donde los clientes de un negocio Pro se suscriben a sus ofertas. |
 
-## Cómo tenerlas en tu celular (sin pagar hosting ni dominio)
+## Free vs Pro
 
-### Opción A — GitHub Pages (recomendada, gratis)
-1. En GitHub abre **Settings → Pages**.
-2. En **Build and deployment → Source** elige **Deploy from a branch**.
-3. En **Branch** elige **main** y carpeta **/ (root)** → **Save**.
-4. Espera 1–2 minutos y abre en el celular `https://codefixservice.github.io/Aplicaciones/`.
-5. Chrome (Android): menú ⋮ → **Instalar app**. Safari (iPhone): Compartir → **Agregar a inicio**.
-6. Listo: desde ahí abre sin internet. Cada cambio que subas a `main` se publica solo.
+| | Free | Pro |
+|---|---|---|
+| Plantillas de fichas | 2 (Oferta, Producto) | 5 (+ Evento, Foto completa, Menú/Precios) |
+| Fichas guardadas / clientes | 5 / 30 | Ilimitados |
+| Marca de agua | Sí | No |
+| QR de WhatsApp en la ficha | — | ✅ |
+| Envío por WhatsApp uno a uno + recordatorio | ✅ | ✅ |
+| Enlace/QR para que los clientes se suscriban | — | ✅ |
+| Campañas automáticas por **push** y **correo** con la imagen de la ficha | — | ✅ |
+| Estado de envío (notificaciones y correos enviados) | — | ✅ |
+| Respaldo en la nube (recuperar en otro celular) | — | ✅ |
+| Caja: productos | 15 | Ilimitados |
+| Caja: reportes 7 días / 30 días / mes, más vendidos, margen | — | ✅ |
 
-> Si el repositorio es privado, GitHub Pages requiere un plan de pago. Alternativa gratis: hacerlo público
-> (los datos de tus clientes **no** están en el repositorio, viven en tu teléfono).
+## Cómo funciona la seguridad
+- El servidor es **Supabase** (plan gratis). Todas las reglas están en [`supabase/schema.sql`](supabase/schema.sql):
+  cada usuario solo puede leer sus datos; el plan y el rol solo los cambia el administrador.
+- **Solo el administrador** (`juanjosuecastilloloyola@gmail.com`, con el correo confirmado) puede crear keys,
+  ver usuarios y avisar a todos. Las keys son aleatorias, de un solo uso y se bloquean 10 intentos fallidos por hora.
+- Las claves de push y la contraseña de Gmail se guardan en el servidor y ninguna pantalla puede leerlas.
+- Las notificaciones las envía la Edge Function [`enviar`](supabase/functions/enviar/index.ts), cada minuto.
 
-### Opción B — 100 % local
-Copia la carpeta al teléfono o a tu PC y sírvela en tu red con `python3 -m http.server 8080`;
-abre `http://<ip-de-tu-pc>:8080` desde el celular. Abrir el `index.html` directo como archivo funciona,
-pero sin modo offline ni notificaciones (el navegador las bloquea en `file://`).
+## Puesta en marcha
+Sigue [`docs/CONFIGURAR.md`](docs/CONFIGURAR.md) (una sola vez). Después, cada cambio en `main` se publica solo en
+`https://codefixservice.github.io/Aplicaciones/`.
 
-## Notificaciones: qué se puede y qué no sin servidor
-- ✅ **A ti**: recordatorios de campañas y avisos de stock bajo como notificación del sistema.
-  Se disparan con la app abierta o en segundo plano reciente; al abrirla se revisan las pendientes
-  y aparece un aviso “Tienes campañas por enviar”.
-- ✅ **A tus clientes**: la ficha se envía por WhatsApp (imagen + mensaje personalizado, uno por uno,
-  marcando quién ya la recibió) o a tu Estado/grupos.
-- ❌ Notificaciones push automáticas a celulares de terceros con la app cerrada: eso exige un servidor
-  push (p. ej. Firebase). Se puede añadir después sin cambiar el resto.
-
-## Vender FichaPro
-- La versión sin licencia funciona completa con **marca de agua**, máximo 5 fichas y 30 clientes.
-- Cobras, abres **Licencias**, escribes el nombre del cliente, y le envías la clave por WhatsApp.
-  El cliente la pega en *FichaPro → Ajustes → Licencia* y se quitan los límites.
-- **Antes de vender** cambia `LICENSE_SALT` en `shared/core.js` por una frase secreta tuya.
-- Importante: la clave se valida en el propio teléfono, así que es un freno para copias casuales,
-  no una protección fuerte. Y como **Licencias** se publica junto a las demás apps, para vender
-  conviene publicar a tus clientes un repositorio/sitio con solo `apps/fichas` + `shared` + `icons`
-  (o quitar `apps/licencias` del paso “Preparar sitio” del workflow y usarla en local).
-
-## Respaldo
-Cada app tiene **Exportar / Restaurar** (archivo `.json`). Guárdalo en Google Drive o envíatelo:
-si borras los datos del navegador o cambias de teléfono, así no pierdes nada.
-
-## Agregar otra app
-1. Crea `apps/<nombre>/index.html` usando `../../shared/core.css` y `../../shared/core.js`
-   (`Core.store`, `Core.notify`, `Core.backup`, etc.).
-2. Agrega sus archivos a `FILES` en `sw.js` y sube `VERSION`.
-3. Añade su tarjeta en `index.html`.
+Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares descarguen la versión nueva.
