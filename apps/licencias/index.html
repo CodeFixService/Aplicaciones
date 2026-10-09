@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6d28d9">
+<title>Licencias</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/core.css">
+</head>
+<body>
+<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Licencias (interno)</h1></header>
+<main>
+  <div class="card">
+    <h2>Generar clave de FichaPro</h2>
+    <label>Nombre del cliente / negocio (titular)</label><input id="owner" placeholder="Bodega Don Lucho">
+    <label>Precio cobrado</label><input id="precio" inputmode="decimal" placeholder="15">
+    <div class="btns"><button id="bGen">🔑 Generar</button></div>
+    <div id="res" hidden style="margin-top:12px">
+      <label>Clave</label><input id="key" readonly style="font-family:monospace;font-size:20px">
+      <div class="btns"><button class="ok" id="bWA">💬 Enviar por WhatsApp</button><button class="alt" id="bCopy">Copiar</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Vendidas</h2>
+    <ul class="list" id="lista"></ul>
+    <p class="muted" id="total"></p>
+  </div>
+</main>
+<script src="../../shared/core.js"></script>
+<script>
+(function () {
+  const db = Core.store('licencias');
+  const $ = (id) => document.getElementById(id);
+  let ventas = db.get('ventas', []);
+  Core.registerSW('../../');
+
+  function msg(v) {
+    return 'Gracias por comprar FichaPro 🎉\nAbre FichaPro → Ajustes → Licencia y escribe:\n' +
+      'Titular: ' + v.owner + '\nClave: ' + v.key;
+  }
+  function render() {
+    $('lista').innerHTML = ventas.length ? ventas.slice().reverse().map((v) =>
+      '<li><div class="grow"><b>' + Core.esc(v.owner) + '</b><div class="muted" style="font-family:monospace">' + v.key +
+      '</div></div><span class="pill">' + Core.money(v.precio) + '</span></li>').join('') : '<li class="empty">Aún no hay ventas</li>';
+    $('total').textContent = 'Total vendido: ' + Core.money(ventas.reduce((s, v) => s + (+v.precio || 0), 0));
+  }
+  let actual;
+  $('bGen').onclick = () => {
+    const owner = $('owner').value.trim();
+    if (!owner) return Core.toast('Escribe el titular');
+    actual = { owner, key: Core.licenseKey('FICHAPRO', owner), precio: parseFloat($('precio').value) || 0, t: Date.now() };
+    if (!ventas.some((v) => v.key === actual.key)) { ventas.push(actual); db.set('ventas', ventas); }
+    $('key').value = actual.key; $('res').hidden = false; render();
+  };
+  $('bCopy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(msg(actual)).then(() => Core.toast('Copiado'));
+  $('bWA').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(msg(actual)), '_blank');
+  render();
+})();
+</script>
+</body>
+</html>

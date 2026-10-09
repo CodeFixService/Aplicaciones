@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6d28d9">
+<title>FichaPro</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/core.css">
+<style>
+  #lienzo { width: 100%; height: auto; border-radius: 12px; display: block; background: #ddd; }
+  .tpls { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .tpls button { flex: 0 0 auto; }
+  .tpls button.on { background: var(--brand-2); color: #1c1830; }
+  .gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .gal figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .gal img { width: 100%; display: block; aspect-ratio: 4/5; object-fit: cover; }
+  .gal figcaption { padding: 6px 8px; font-size: 13px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .thumb { width: 48px; height: 60px; object-fit: cover; border-radius: 6px; }
+  .sent { text-decoration: line-through; opacity: .6; }
+  .banner { background: var(--brand-2); color: #1c1830; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a href="../../" aria-label="Volver">‹</a>
+  <h1>FichaPro</h1>
+  <span id="licTag" class="pill" style="background:#fff3;color:#fff">Prueba</span>
+</header>
+
+<main>
+  <div id="pendientes"></div>
+
+  <!-- DISEÑAR -->
+  <section class="view on" id="v-disenar">
+    <div class="card">
+      <canvas id="lienzo" width="1080" height="1350"></canvas>
+      <div class="btns">
+        <button id="bGuardar">💾 Guardar</button>
+        <button class="warn" id="bCompartir">📤 Compartir</button>
+        <button class="alt" id="bDescargar">⬇️ PNG</button>
+        <button class="alt" id="bNueva">✨ Nueva</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Plantilla</h2>
+      <div class="tpls" id="tpls"></div>
+      <label>Título</label><input id="f-titulo" maxlength="60">
+      <label>Subtítulo</label><input id="f-subtitulo" maxlength="90">
+      <div class="row">
+        <div><label>Precio</label><input id="f-precio" inputmode="decimal" placeholder="19.99"></div>
+        <div><label>Precio antes</label><input id="f-antes" inputmode="decimal" placeholder="29.99"></div>
+      </div>
+      <label>Llamado a la acción</label><input id="f-cta" maxlength="40" placeholder="¡Pide ya por WhatsApp!">
+      <div class="row">
+        <div><label>Color principal</label><input type="color" id="f-color1"></div>
+        <div><label>Color acento</label><input type="color" id="f-color2"></div>
+      </div>
+      <label>Foto del producto</label><input type="file" accept="image/*" id="f-foto">
+      <div class="btns"><button class="alt small" id="bQuitarFoto">Quitar foto</button></div>
+    </div>
+  </section>
+
+  <!-- GALERÍA -->
+  <section class="view" id="v-galeria">
+    <div class="gal" id="gal"></div>
+  </section>
+
+  <!-- CLIENTES -->
+  <section class="view" id="v-clientes">
+    <div class="card">
+      <h2>Agregar cliente</h2>
+      <div class="row">
+        <div><label>Nombre</label><input id="c-nombre"></div>
+        <div><label>WhatsApp (con código país)</label><input id="c-tel" inputmode="tel" placeholder="51987654321"></div>
+      </div>
+      <label>Etiqueta (ej. vip, mayorista)</label><input id="c-tag" list="tagsList">
+      <datalist id="tagsList"></datalist>
+      <div class="btns">
+        <button id="bAddCliente">➕ Agregar</button>
+        <button class="alt" id="bContactos" hidden>📇 Desde contactos</button>
+        <label class="btn alt" style="margin:0;color:var(--brand)">📄 Importar CSV<input type="file" accept=".csv,text/csv" id="c-csv" hidden></label>
+      </div>
+      <p class="muted">CSV: una línea por cliente → <code>nombre,telefono,etiqueta</code></p>
+    </div>
+    <div class="card">
+      <input id="c-buscar" placeholder="Buscar…">
+      <ul class="list" id="clientes"></ul>
+    </div>
+  </section>
+
+  <!-- CAMPAÑAS -->
+  <section class="view" id="v-campanas">
+    <div class="card">
+      <h2>Nueva campaña</h2>
+      <label>Nombre</label><input id="k-nombre" placeholder="Promo fin de semana">
+      <label>Ficha</label><select id="k-ficha"></select>
+      <label>Para</label><select id="k-tag"></select>
+      <label>Mensaje (usa {nombre} para personalizar)</label>
+      <textarea id="k-msg">Hola {nombre} 👋 Tenemos una oferta especial para ti.</textarea>
+      <label>Recordarme enviarla el</label><input type="datetime-local" id="k-fecha">
+      <div class="btns"><button id="bAddCampana">📅 Programar</button></div>
+    </div>
+    <div class="card"><ul class="list" id="campanas"></ul></div>
+    <div class="card" id="envio" hidden>
+      <h2 id="envioTitulo"></h2>
+      <p class="muted">Toca cada cliente: <b>📷</b> envía la imagen + mensaje (elige WhatsApp y el contacto),
+        <b>💬</b> abre su chat directo con el mensaje.</p>
+      <ul class="list" id="envioLista"></ul>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="view" id="v-ajustes">
+    <div class="card">
+      <h2>Mi negocio</h2>
+      <label>Nombre del negocio</label><input id="a-negocio">
+      <label>WhatsApp / teléfono que sale en la ficha</label><input id="a-tel" inputmode="tel">
+      <label>Logo</label><input type="file" accept="image/*" id="a-logo">
+      <div class="btns"><button id="bGuardarAjustes">Guardar</button><button class="alt small" id="bQuitarLogo">Quitar logo</button></div>
+    </div>
+    <div class="card">
+      <h2>Notificaciones</h2>
+      <p class="muted">Te avisa cuando llega la hora de una campaña. Funcionan mientras la app esté abierta
+        o en segundo plano reciente; al abrirla se revisan las pendientes.</p>
+      <div class="btns"><button id="bNotif">🔔 Activar</button><button class="alt" id="bProbar">Probar</button></div>
+    </div>
+    <div class="card">
+      <h2>Licencia</h2>
+      <p class="muted" id="licEstado"></p>
+      <label>Titular</label><input id="l-owner">
+      <label>Clave</label><input id="l-key" placeholder="XXXX-XXXX-XXXX-XXXX" autocapitalize="characters">
+      <div class="btns"><button id="bActivar">Activar</button></div>
+    </div>
+    <div class="card">
+      <h2>Copia de seguridad</h2>
+      <p class="muted">Todo se guarda solo en este teléfono. Exporta una copia de vez en cuando
+        (guárdala en Drive o envíatela por WhatsApp).</p>
+      <div class="btns">
+        <button id="bBackup">⬇️ Exportar</button>
+        <label class="btn alt" style="margin:0;color:var(--brand)">⬆️ Restaurar<input type="file" accept=".json" id="restore" hidden></label>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-v="disenar" class="on"><span>🎨</span>Diseñar</button>
+  <button data-v="galeria"><span>🖼️</span>Galería</button>
+  <button data-v="clientes"><span>👥</span>Clientes</button>
+  <button data-v="campanas"><span>📅</span>Campañas</button>
+  <button data-v="ajustes"><span>⚙️</span>Ajustes</button>
+</nav>
+
+<script src="../../shared/core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
