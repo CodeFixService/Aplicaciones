@@ -124,6 +124,31 @@
     return data;
   }
 
+  // Crea una cuenta desde el panel (admin: empresas y clientes; empresa: sus clientes).
+  async function crearUsuario(d) {
+    const { data, error } = await sb.functions.invoke('enviar', {
+      body: { accion: 'crear_usuario', email: d.email, password: d.password, nombre: d.nombre, tipo: d.tipo, negocio: d.negocio || null }
+    });
+    if (error) throw new Error('No se pudo conectar con el servidor. Revisa que la función "enviar" esté actualizada.');
+    if (!data || !data.ok) throw new Error((data && data.error) || 'No se pudo crear la cuenta');
+    return data;
+  }
+
+  // Contraseña fácil de dictar: 3 letras + 4 números + 2 letras.
+  function claveAleatoria() {
+    const L = 'abcdefghjkmnpqrstuvwxyz', r = crypto.getRandomValues(new Uint32Array(9));
+    const l = (i) => L[r[i] % L.length], n = (i) => String(r[i] % 10);
+    return l(0).toUpperCase() + l(1) + l(2) + n(3) + n(4) + n(5) + n(6) + l(7) + l(8);
+  }
+
+  // Mensaje con los datos de acceso para enviar por WhatsApp.
+  function mensajeAcceso(d) {
+    return 'Hola ' + d.nombre + ' 👋\nTe creamos tu cuenta en ' + (d.tienda || 'CodeFix Apps') + '.\n\n' +
+      '📲 Entra aquí e instala la app: ' + rootUrl() + '\n' +
+      '👤 Correo: ' + d.email + '\n🔑 Contraseña: ' + d.password + '\n\n' +
+      'Te recomendamos cambiar la contraseña en "Mi cuenta" la primera vez que entres.';
+  }
+
   async function redeem(key) {
     const r = await rpc('redeem_license', { p_key: key });
     if (!r.ok) throw new Error(r.error);
@@ -177,7 +202,7 @@
   }
 
   global.Cuenta = {
-    configured, sb, refresh, require, settings, signIn, signUp, signOut, resetPassword, setPassword, redeem, rpc,
+    configured, sb, refresh, require, settings, signIn, crearUsuario, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, pushSubscription, pushSupported, friendly,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),

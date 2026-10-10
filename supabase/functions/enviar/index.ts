@@ -1,5 +1,8 @@
-// Edge Function "enviar": cada minuto busca las notificaciones programadas que ya
-// llegaron a su hora y las envía por push y/o correo (Gmail).
+// Edge Function "enviar":
+//  1) cada minuto busca las notificaciones programadas que ya llegaron a su hora y las
+//     envía por push y/o correo (Gmail);
+//  2) crea cuentas desde el panel ({accion: 'crear_usuario'}): el admin crea empresas y
+//     clientes; cada empresa crea sus propios clientes. El registro libre está cerrado.
 // Se despliega en Supabase → Edge Functions → nombre "enviar".
 import webpush from 'npm:web-push@3.6.7';
 import nodemailer from 'npm:nodemailer@6.9.16';
@@ -101,10 +104,42 @@ export async function deliver(
   return { pushSent, pushFailed, emailSent, error: errors.length ? errors.slice(0, 5).join(' | ').slice(0, 900) : null };
 }
 
-async function run() {
-  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-    auth: { persistSession: false },
+function adminDb() {
+  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+type NuevoUsuario = { email?: string; password?: string; nombre?: string; tipo?: string; negocio?: string | null };
+
+export async function crearUsuario(jwt: string, b: NuevoUsuario) {
+  const db = adminDb();
+  if (!jwt) return { ok: false, error: 'Inicia sesión de nuevo' };
+  const { data: who, error: e0 } = await db.auth.getUser(jwt);
+  if (e0 || !who?.user) return { ok: false, error: 'Inicia sesión de nuevo' };
+  const email = String(b.email || '').trim().toLowerCase();
+  const password = String(b.password || '');
+  if (password.length < 6) return { ok: false, error: 'La contraseña debe tener al menos 6 caracteres' };
+  const negocio = b.negocio && /^[0-9a-f-]{36}$/i.test(b.negocio) ? b.negocio : null;
+  const { data: prep, error: e1 } = await db.rpc('prepare_user_invite', {
+    p_caller: who.user.id, p_email: email, p_nombre: String(b.nombre || ''), p_rol: b.tipo === 'user' ? 'user' : 'client',
+    p_negocio: negocio,
+  });
+  if (e1) return { ok: false, error: e1.message };
+  if (!prep?.ok) return prep;
+  const { data: nu, error: e2 } = await db.auth.admin.createUser({
+    email, password, email_confirm: true, user_metadata: { empresa: String(b.nombre || '').trim() },
+  });
+  if (e2 || !nu?.user) {
+    await db.rpc('cancel_user_invite', { p_email: email });
+    const m = (e2 && e2.message) || 'No se pudo crear la cuenta';
+    return { ok: false, error: /already|registered|exists/i.test(m) ? 'Ese correo ya tiene cuenta' : m };
+  }
+  return { ok: true, id: nu.user.id };
+}
+
+async function run() {
+  const db = adminDb();
   const { data: due, error } = await db.rpc('claim_due_notifications');
   if (error) throw error;
   if (!due?.length) return { processed: 0 };
@@ -112,7 +147,7 @@ async function run() {
   const { data: secrets } = await db.rpc('get_secrets');
   const { data: sentToday } = await db.rpc('emails_sent_today');
   let emailsLeft = EMAIL_DAILY_LIMIT - (sentToday || 0);
-  const removeEndpoint = (e: string) => db.rpc('remove_endpoint', { p_endpoint: e });
+  const removeEndpoint = async (e: string) => { await db.rpc('remove_endpoint', { p_endpoint: e }); };
 
   const results = [];
   for (const n of due as Notif[]) {
@@ -138,6 +173,12 @@ if (Deno.env.get('SUPABASE_URL')) {
   Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
     try {
+      const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+      if (body && body.accion === 'crear_usuario') {
+        const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+        const out = await crearUsuario(jwt, body);
+        return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+      }
       const out = await run();
       return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json' } });
     } catch (e) {

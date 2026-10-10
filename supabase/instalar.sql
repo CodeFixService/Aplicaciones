@@ -39,29 +39,42 @@ alter table public.profiles enable row level security;
 create or replace function public.admin_email() returns text
 language sql immutable as $$ select 'juanjosuecastilloloyola@gmail.com'::text $$;
 
+-- Invitaciones de alta (las crea el servidor al crear una cuenta desde el panel).
+create table if not exists public.user_invites (
+  email       text primary key,
+  nombre      text not null default '',
+  role        text not null check (role in ('user', 'client')),
+  negocio_id  uuid references public.profiles (id) on delete cascade,
+  created_by  uuid references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+alter table public.user_invites enable row level security;  -- sin políticas: solo el servidor
+alter table public.profiles add column if not exists created_by uuid references public.profiles (id) on delete set null;
+
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
   meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
-  neg uuid;
-  es_cliente boolean := false;
+  inv public.user_invites;
+  es_admin boolean := lower(new.email) = public.admin_email();
 begin
-  if meta ->> 'rol' = 'client' and (meta ->> 'negocio') ~* '^[0-9a-f-]{36}$' then
-    select p.id into neg from public.profiles p
-    where p.id = (meta ->> 'negocio')::uuid and p.role = 'user' and not p.suspended;
-    es_cliente := neg is not null;
+  -- Registro cerrado: solo entran cuentas creadas desde el panel (admin o empresa).
+  select * into inv from public.user_invites
+  where email = lower(new.email) and created_at > now() - interval '1 hour';
+  if not es_admin and inv.email is null then
+    raise exception 'El registro está cerrado. Pide tu acceso a tu tienda o al administrador.';
   end if;
-  insert into public.profiles (id, email, empresa, role, negocio_id, terms_at)
+  insert into public.profiles (id, email, empresa, role, negocio_id, created_by)
   values (
     new.id,
     lower(new.email),
-    left(coalesce(meta ->> 'empresa', ''), 80),
-    case when lower(new.email) = public.admin_email() then 'admin'
-         when es_cliente then 'client' else 'user' end,
-    case when es_cliente and lower(new.email) <> public.admin_email() then neg end,
-    case when meta ->> 'acepta' = 'si' then now() end
+    left(coalesce(nullif(meta ->> 'empresa', ''), inv.nombre, ''), 80),
+    case when es_admin then 'admin' else inv.role end,
+    case when not es_admin and inv.role = 'client' then inv.negocio_id end,
+    inv.created_by
   )
   on conflict (id) do nothing;
+  delete from public.user_invites where email = lower(new.email);
   return new;
 end $$;
 
@@ -462,7 +475,8 @@ language sql stable security definer set search_path = '' as $$
                or (n.audience = 'pro_users' and public.is_pro(me.id))
                or (n.audience = 'free_users' and not public.is_pro(me.id))))
          or (me.role = 'client' and (n.audience = 'all_clients'
-               or (n.audience = 'my_subscribers' and n.owner_id = me.negocio_id and not me.mute_offers))))
+               or (n.audience = 'my_subscribers' and n.owner_id = me.negocio_id and not me.mute_offers)))
+         or (n.audience = 'direct' and n.target_id = me.id and coalesce(n.url, '') not like 'apps/mensajes/%'))
   order by n.sent_at desc limit 40
 $$;
 
@@ -1082,6 +1096,76 @@ revoke insert, update, delete, truncate on public.app_settings, public.notificat
 revoke select on public.app_settings, public.notification_reads, public.blocks, public.catalog_items from anon, authenticated;
 revoke select on public.requests, public.messages, public.reports from anon;
 grant select on public.requests, public.messages, public.reports to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 3.1: cuentas creadas desde el panel (registro cerrado)
+-- =====================================================================
+-- Valida quién puede crear qué cuenta. La llama SOLO el servidor (función "enviar").
+--   Admin   → crea empresas y clientes de cualquier empresa.
+--   Empresa → crea solo clientes propios (Free: 30, Pro: 2000).
+create or replace function public.prepare_user_invite(p_caller uuid, p_email text, p_nombre text, p_rol text, p_negocio uuid)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  c public.profiles;
+  em text := lower(trim(coalesce(p_email, '')));
+  nom text := left(trim(coalesce(p_nombre, '')), 80);
+  neg uuid := p_negocio;
+  admin boolean;
+begin
+  select * into c from public.profiles where id = p_caller;
+  if c.id is null or c.suspended then return jsonb_build_object('ok', false, 'error', 'Sin permiso'); end if;
+  admin := c.role = 'admin' and c.email = public.admin_email();
+  if em !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then return jsonb_build_object('ok', false, 'error', 'Correo no válido'); end if;
+  if nom = '' then return jsonb_build_object('ok', false, 'error', 'Escribe el nombre'); end if;
+  if exists (select 1 from auth.users where lower(email) = em) then
+    return jsonb_build_object('ok', false, 'error', 'Ese correo ya tiene cuenta');
+  end if;
+  if admin then
+    if p_rol not in ('user', 'client') then return jsonb_build_object('ok', false, 'error', 'Tipo de cuenta no válido'); end if;
+    if p_rol = 'client' and not exists (select 1 from public.profiles where id = neg and role = 'user' and not suspended) then
+      return jsonb_build_object('ok', false, 'error', 'Elige la empresa del cliente');
+    end if;
+  elsif c.role = 'user' then
+    if p_rol <> 'client' then return jsonb_build_object('ok', false, 'error', 'Solo puedes crear clientes'); end if;
+    neg := c.id;
+    if (select count(*) from public.profiles where negocio_id = c.id and role = 'client')
+       >= (case when public.is_pro(c.id) then 2000 else 30 end) then
+      return jsonb_build_object('ok', false, 'error', 'Llegaste al máximo de clientes de tu plan (Free: 30)');
+    end if;
+    if (select count(*) from public.profiles where created_by = c.id and created_at > now() - interval '1 day') >= 100 then
+      return jsonb_build_object('ok', false, 'error', 'Máximo 100 cuentas nuevas por día');
+    end if;
+  else
+    return jsonb_build_object('ok', false, 'error', 'Sin permiso');
+  end if;
+  insert into public.user_invites (email, nombre, role, negocio_id, created_by)
+  values (em, nom, p_rol, case when p_rol = 'client' then neg end, c.id)
+  on conflict (email) do update
+    set nombre = excluded.nombre, role = excluded.role, negocio_id = excluded.negocio_id,
+        created_by = excluded.created_by, created_at = now();
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.cancel_user_invite(p_email text) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.user_invites where email = lower(trim(p_email))
+$$;
+
+-- Clientes de mi empresa (para la empresa) — solo nombre y fecha.
+create or replace function public.my_clients()
+returns table (id uuid, nombre text, email text, creado timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select p.id, p.empresa, p.email, p.created_at from public.profiles p
+  where p.role = 'client' and p.negocio_id = auth.uid()
+  order by p.created_at desc limit 2000
+$$;
+
+revoke all on function public.prepare_user_invite(uuid, text, text, text, uuid) from public, anon, authenticated;
+revoke all on function public.cancel_user_invite(text) from public, anon, authenticated;
+revoke all on function public.my_clients() from public, anon;
+grant execute on function public.my_clients() to authenticated;
+revoke all on public.user_invites from anon, authenticated;
 
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".

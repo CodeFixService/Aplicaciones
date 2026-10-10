@@ -26,20 +26,20 @@
 <main>
   <!-- RESUMEN -->
   <section class="view on" id="v-resumen">
-    <div class="stats" id="stats"></div>
     <div class="card" id="cSolicitudes">
       <h2>🔔 Solicitudes pendientes <span class="pill" id="nSol">0</span></h2>
       <p class="muted">Pruebas de 7 días y avisos de pago. Revisa tu Mercado Pago antes de aprobar un pago.</p>
       <ul class="list" id="solicitudes"></ul>
     </div>
+    <div class="stats" id="stats"></div>
     <div class="card" id="cReportes">
       <h2>🚩 Reportes <span class="pill" id="nRep">0</span></h2>
       <ul class="list" id="reportes"></ul>
     </div>
     <div class="card">
       <h2>📲 Compartir la app</h2>
-      <p class="muted">Envía este enlace o muestra el QR. Cada persona abre el enlace, instala la app, crea su cuenta
-        (entra en Free) y tú la ves en <b>Usuarios</b>.</p>
+      <p class="muted">Primero crea la cuenta en <b>Usuarios → Crear usuario</b>. Después envía este enlace o muestra el QR:
+        la persona abre el enlace, instala la app e ingresa con los datos que le diste.</p>
       <div style="text-align:center"><img id="appQr" alt="QR de la app" style="width:200px;height:200px;image-rendering:pixelated;background:#fff;border-radius:10px;padding:6px"></div>
       <input id="appLink" readonly>
       <div class="btns">
@@ -85,6 +85,23 @@
 
   <!-- USUARIOS -->
   <section class="view" id="v-usuarios">
+    <div class="card">
+      <h2>➕ Crear usuario</h2>
+      <p class="muted">La app no permite registrarse sola: aquí creas cada cuenta y le envías sus datos.</p>
+      <div class="row" style="flex-wrap:wrap">
+        <div style="min-width:140px"><label for="nTipo">Tipo</label>
+          <select id="nTipo"><option value="user">Empresa</option><option value="client">Cliente de una empresa</option></select></div>
+        <div style="min-width:160px" class="hidden" id="rowNEmp"><label for="nEmpresa">Empresa</label><select id="nEmpresa"></select></div>
+      </div>
+      <label for="nNombre" id="lblNNombre">Nombre de la empresa</label><input id="nNombre" maxlength="80" autocomplete="off">
+      <label for="nEmail">Correo</label><input id="nEmail" type="email" autocomplete="off">
+      <label for="nClave">Contraseña</label>
+      <div class="row"><input id="nClave" autocomplete="off" style="flex:2"><button class="alt small" id="nGen" type="button" style="flex:none">Generar</button></div>
+      <p class="err" id="nErr"></p>
+      <div class="btns"><button id="bNuevo">Crear cuenta</button></div>
+      <div class="lic-new hidden" id="nCred" style="white-space:pre-line;font-size:14px"></div>
+      <div class="btns hidden" id="nCredBtns"><button class="ok small" id="nWsp">💬 Enviar por WhatsApp</button><button class="alt small" id="nCopiar">Copiar</button></div>
+    </div>
     <div class="card">
       <div class="row" style="flex-wrap:wrap">
         <div style="min-width:140px"><label for="uTipo">Tipo</label>

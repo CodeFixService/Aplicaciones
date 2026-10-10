@@ -63,6 +63,11 @@
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 14px; }
   .grid2 > * { min-width: 0; }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+  .solicitudes { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--text);
+    border: 2px solid var(--premium); background: linear-gradient(160deg, color-mix(in srgb, var(--premium) 14%, var(--card)), var(--card) 70%); }
+  .solicitudes .num { font-size: 30px; font-weight: 800; min-width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center;
+    background: var(--premium); color: var(--premium-ink); }
+  .cred { background: var(--field); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-top: 12px; white-space: pre-line; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -85,7 +90,7 @@
       <div class="marcaLogo" id="loginLogo">C</div>
       <h2 id="loginTitulo">Ingresa a tu cuenta</h2>
       <p class="sub" id="loginSub">Publicidad, clientes, ventas y notificaciones en un solo lugar.</p>
-      <div class="tabs2">
+      <div class="tabs2 hidden">
         <button id="tIn" class="on small" type="button">Ingresar</button>
         <button id="tUp" class="small" type="button">Crear cuenta</button>
       </div>
@@ -100,6 +105,7 @@
         <div class="btns"><button id="lBtn" type="submit" style="flex:1">Ingresar</button></div>
       </form>
       <p class="muted" style="text-align:center"><a href="#" id="lOlvide">¿Olvidaste tu contraseña?</a></p>
+      <p class="muted" style="text-align:center;font-size:13px">¿No tienes cuenta? Pídela a tu tienda o a CodeFix.</p>
     </div>
   </section>
 
@@ -112,12 +118,30 @@
     </div>
   </section>
 
+  <section id="v-terms" class="hidden">
+    <div class="card login">
+      <div class="marcaLogo">✓</div>
+      <h2>Antes de empezar</h2>
+      <p class="sub">Lee y acepta los términos de uso y la política de privacidad de la app.</p>
+      <label class="terms"><input type="checkbox" id="tAcepto">
+        <span>Acepto los <a href="apps/legal/" target="_blank">Términos de uso y la Política de privacidad</a>.</span></label>
+      <p class="err" id="tErr"></p>
+      <div class="btns"><button id="tBtn" style="flex:1">Continuar</button></div>
+    </div>
+  </section>
+
   <!-- Con sesión -->
   <section id="v-home" class="hidden">
     <div class="card hola">
       <div class="avatar" id="avatar">C</div>
       <div><h2 id="hola"></h2><p class="muted" id="estadoPlan"></p></div>
     </div>
+
+    <a class="card solicitudes hidden" id="cSol" href="apps/admin/#solicitudes">
+      <div class="num" id="solNum">0</div>
+      <div class="grow"><b>Solicitudes pendientes</b><div class="muted">Pruebas de 7 días y avisos de pago. Toca para revisarlas.</div></div>
+      <span style="font-size:22px">›</span>
+    </a>
 
     <div class="apps" id="apps"></div>
 
@@ -150,16 +174,19 @@
         <ul class="list inbox" id="inbox"></ul>
       </div>
 
-      <div class="card invitar hidden" id="cInvitar">
-        <h2>👥 Invita a tus clientes</h2>
-        <p class="muted">Con este enlace tus clientes crean su cuenta gratis, ven tus productos y ofertas, y te escriben por el chat.
-          Solo tú ves a tus clientes.</p>
-        <img id="invQr" alt="Código QR de invitación">
-        <input id="invLink" readonly aria-label="Enlace de invitación">
-        <div class="btns">
-          <button class="small" id="bInvShare">📤 Compartir</button>
-          <button class="small alt" id="bInvCopy">Copiar</button>
-        </div>
+      <div class="card hidden" id="cInvitar">
+        <h2>👥 Mis clientes <span class="pill" id="nClientes">0</span></h2>
+        <p class="muted">Crea la cuenta de tu cliente y envíale sus datos por WhatsApp. Verá tus productos y ofertas,
+          y podrá escribirte. Solo tú ves a tus clientes.</p>
+        <label for="cNombre">Nombre del cliente</label><input id="cNombre" maxlength="80" autocomplete="off">
+        <label for="cEmail">Correo</label><input id="cEmail" type="email" autocomplete="off">
+        <label for="cClave">Contraseña</label>
+        <div class="row"><input id="cClave" autocomplete="off" style="flex:2"><button class="alt small" id="cGen" type="button" style="flex:none">Generar</button></div>
+        <p class="err" id="cErr"></p>
+        <div class="btns"><button id="cCrear">➕ Crear cliente</button></div>
+        <div class="cred hidden" id="cCred"></div>
+        <div class="btns hidden" id="cCredBtns"><button class="ok small" id="cWsp">💬 Enviar por WhatsApp</button><button class="alt small" id="cCopiar">Copiar</button></div>
+        <details style="margin-top:12px"><summary class="muted" style="cursor:pointer">Ver mis clientes</summary><ul class="list" id="lClientes"></ul></details>
       </div>
     </div>
 
@@ -175,6 +202,10 @@
           <input type="color" id="eColor" aria-label="Color personalizado">
         </div>
       </div>
+      <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">🔑 Cambiar mi contraseña</summary>
+        <label for="nPass">Contraseña nueva (mínimo 6 caracteres)</label><input id="nPass" type="password" autocomplete="new-password" minlength="6">
+        <div class="btns"><button class="small" id="bPass">Cambiar contraseña</button></div>
+      </details>
       <label class="terms hidden" id="rowMute"><input type="checkbox" id="eMute"> <span>Silenciar ofertas de la tienda (los mensajes del chat siguen llegando)</span></label>
       <p class="muted" style="margin-top:14px"><a href="apps/legal/">Términos de uso y privacidad</a></p>
     </div>
@@ -192,12 +223,11 @@
 </main>
 <script src="shared/config.js"></script>
 <script src="shared/vendor/supabase.js"></script>
-<script src="shared/vendor/qrcode.js"></script>
 <script src="shared/cuenta.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  const views = ['v-setup', 'v-login', 'v-reset', 'v-home'];
+  const views = ['v-setup', 'v-login', 'v-reset', 'v-terms', 'v-home'];
   const showView = (v) => views.forEach((x) => $(x).classList.toggle('hidden', x !== v));
   const params = new URLSearchParams(location.search);
   Core.registerSW('./');
@@ -228,7 +258,7 @@
   /* ---------- Ingresar / registrarse ---------- */
   // ?cliente=<id de la empresa>: registro como cliente de esa empresa.
   const clienteDe = /^[0-9a-f-]{36}$/i.test(params.get('cliente') || '') ? params.get('cliente') : null;
-  let modo = clienteDe ? 'up' : 'in';
+  let modo = 'in'; // el registro está cerrado: las cuentas se crean desde el panel
   function setModo(m) {
     modo = m;
     $('tIn').classList.toggle('on', m === 'in');
@@ -249,7 +279,7 @@
   if (clienteDe) {
     Cuenta.rpc('negocio_publico', { p_id: clienteDe }).then((n) => {
       if (!n) return;
-      $('loginSub').textContent = 'Te invita ' + n.empresa + ': mira sus productos y ofertas, y escríbele directo.';
+      $('loginSub').textContent = 'Ingresa con el correo y la contraseña que te dio ' + n.empresa + '.';
       $('loginLogo').textContent = (n.empresa || 'C').charAt(0).toUpperCase();
     }).catch(() => {});
   }
@@ -299,14 +329,60 @@
     const volver = params.get('volver');
     if (volver && volver.startsWith('/') && !volver.startsWith('//')) { location.replace(volver); return; }
     if (params.get('cliente')) history.replaceState(null, '', location.pathname);
+    if (!acc.terms_at) { showView('v-terms'); return; }
     pintar(acc);
     showView('v-home');
     cargarInbox();
     revisarPush();
     contarMensajes();
     Cuenta.settings().then((s) => { ajustes = s || {}; pintarPro(Cuenta.account); });
-    if (!acc.terms_at) Cuenta.rpc('accept_terms').catch(() => {}); // cuentas creadas antes de los términos
+    if (acc.is_admin) contarSolicitudes();
+    if (acc.role === 'user' || acc.is_admin) cargarClientes();
   }
+
+  $('tBtn').onclick = async () => {
+    if (!$('tAcepto').checked) { $('tErr').textContent = 'Marca la casilla para continuar'; return; }
+    try { entrar(await Cuenta.rpc('accept_terms')); } catch (err) { $('tErr').textContent = err.message; }
+  };
+
+  async function contarSolicitudes() {
+    try {
+      const st = await Cuenta.rpc('admin_stats');
+      $('solNum').textContent = st.pendientes;
+      $('cSol').classList.toggle('hidden', !st.pendientes);
+    } catch (e) { /* sin red */ }
+  }
+
+  /* ---------- Mis clientes (empresa) ---------- */
+  async function cargarClientes() {
+    try {
+      const l = await Cuenta.rpc('my_clients');
+      $('nClientes').textContent = l.length;
+      $('lClientes').innerHTML = l.length ? l.map((c) => '<li><div class="grow"><b>' + Core.esc(c.nombre || '—') + '</b><div class="muted">' +
+        Core.esc(c.email) + ' · desde ' + new Date(c.creado).toLocaleDateString('es') + '</div></div>' +
+        '<a class="btn small alt" href="apps/mensajes/?con=' + c.id + '">💬</a></li>').join('') : '<li class="empty">Aún no tienes clientes</li>';
+    } catch (e) { /* sin red */ }
+  }
+  $('cGen').onclick = () => { $('cClave').value = Cuenta.claveAleatoria(); };
+  let ultimoAcceso = '';
+  $('cCrear').onclick = async () => {
+    $('cErr').textContent = '';
+    if (!$('cClave').value) $('cClave').value = Cuenta.claveAleatoria();
+    const d = { nombre: $('cNombre').value.trim(), email: $('cEmail').value.trim(), password: $('cClave').value, tipo: 'client' };
+    if (!d.nombre || !d.email) { $('cErr').textContent = 'Escribe el nombre y el correo'; return; }
+    $('cCrear').disabled = true;
+    try {
+      await Cuenta.crearUsuario(d);
+      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: Cuenta.account.empresa }, d));
+      $('cCred').textContent = ultimoAcceso;
+      $('cCred').classList.remove('hidden'); $('cCredBtns').classList.remove('hidden');
+      $('cNombre').value = ''; $('cEmail').value = ''; $('cClave').value = '';
+      Core.toast('✅ Cliente creado');
+      cargarClientes();
+    } catch (err) { $('cErr').textContent = err.message; } finally { $('cCrear').disabled = false; }
+  };
+  $('cWsp').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(ultimoAcceso), '_blank');
+  $('cCopiar').onclick = () => navigator.clipboard.writeText(ultimoAcceso).then(() => Core.toast('Copiado'));
 
   const APPS = {
     fichas: ['apps/fichas/', '📣', 'FichaPro', 'Fichas publicitarias, campañas y avisos a tus clientes'],
@@ -345,12 +421,7 @@
     $('eMute').checked = !!acc.mute_offers;
     if (!cliente) pintarColores(acc.id);
 
-    $('cInvitar').classList.toggle('hidden', cliente);
-    if (!cliente) {
-      const link = Core.rootUrl() + '?cliente=' + acc.id;
-      $('invLink').value = link;
-      if (!$('invQr').dataset.ok) { $('invQr').src = qrImg(link); $('invQr').dataset.ok = '1'; }
-    }
+    $('cInvitar').classList.toggle('hidden', cliente || acc.is_admin);
     pintarPro(acc);
   }
 
@@ -375,16 +446,6 @@
     $('proNota').textContent = link
       ? 'Después de pagar toca "Ya pagué" y lo activamos a la brevedad.'
       : 'Toca "Ya pagué" o escríbenos por Mensajes para activarlo.';
-  }
-
-  function qrImg(text) {
-    const q = qrcode(0, 'M'); q.addData(text); q.make();
-    const n = q.getModuleCount(), m = 2, c = document.createElement('canvas');
-    c.width = c.height = n + m * 2;
-    const g = c.getContext('2d');
-    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
-    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect(k + m, r + m, 1, 1);
-    return c.toDataURL();
   }
 
   function pintarColores(uid) {
@@ -412,7 +473,8 @@
         '<div class="muted">' + Core.esc(n.de || '') + ' · ' + new Date(n.sent_at).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + '</div>' +
         '<div class="cuerpo">' + Core.esc(n.body || '') +
         (/^https?:\/\//i.test(n.image || '') ? '<img src="' + Core.esc(n.image) + '" alt="" loading="lazy">' : '') +
-        (/^https?:\/\//i.test(n.url || '') ? '<div class="btns"><a class="btn small alt" href="' + Core.esc(n.url) + '" target="_blank" rel="noopener">Ver más</a></div>' : '') +
+        (/^https?:\/\//i.test(n.url || '') ? '<div class="btns"><a class="btn small alt" href="' + Core.esc(n.url) + '" target="_blank" rel="noopener">Ver más</a></div>'
+          : /^(apps\/[a-z]+\/|\.\/)/.test(n.url || '') ? '<div class="btns"><a class="btn small alt" href="' + Core.esc(n.url) + '">Abrir</a></div>' : '') +
         '</div></div></li>'
       ).join('') : '<li class="empty">Sin avisos por ahora</li>';
     } catch (e) { $('inbox').innerHTML = '<li class="empty">Sin conexión</li>'; }
@@ -442,6 +504,7 @@
     try {
       const r = await Cuenta.rpc('request_pro', { p_kind: kind, p_note: null });
       if (!r.ok) throw new Error(r.error);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato al administrador
       Core.toast(kind === 'trial' ? '✅ Solicitud enviada. Te avisaremos cuando esté activa.' : '✅ Aviso enviado. Activaremos tu cuenta apenas confirmemos el pago.');
     } catch (err) { Core.toast(err.message); } finally { btn.disabled = false; }
   }
@@ -467,14 +530,6 @@
     catch (err) { Core.toast(err.message); }
   };
 
-  /* ---------- Invitar clientes ---------- */
-  $('bInvShare').onclick = async () => {
-    const text = '🛍️ Te invito a ' + (Cuenta.account.empresa || 'mi tienda') + ': mira mis productos y ofertas, y escríbeme directo aquí: ' + $('invLink').value;
-    if (navigator.share) { try { await navigator.share({ text }); } catch (e) { /* cancelado */ } return; }
-    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-  };
-  $('bInvCopy').onclick = () => navigator.clipboard.writeText($('invLink').value).then(() => Core.toast('Enlace copiado'));
-
   /* ---------- Cuenta ---------- */
   $('eBtn').onclick = async () => {
     try { pintar(await Cuenta.rpc('update_my_company', { p_empresa: $('eNombre').value })); Core.toast('Guardado'); }
@@ -482,6 +537,12 @@
   };
   $('eMute').onchange = async (e) => {
     try { pintar(await Cuenta.rpc('set_mute_offers', { p_mute: e.target.checked })); Core.toast(e.target.checked ? 'Ofertas silenciadas' : 'Ofertas activadas'); cargarInbox(); }
+    catch (err) { Core.toast(err.message); }
+  };
+  $('bPass').onclick = async () => {
+    const v = $('nPass').value;
+    if (v.length < 6) return Core.toast('Mínimo 6 caracteres');
+    try { await Cuenta.setPassword(v); $('nPass').value = ''; Core.toast('✅ Contraseña cambiada'); }
     catch (err) { Core.toast(err.message); }
   };
   $('bSalir').onclick = async () => { await Cuenta.signOut(); location.replace('./'); };
