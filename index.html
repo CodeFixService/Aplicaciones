@@ -3,62 +3,342 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#6d28d9">
-<title>Mis Aplicaciones</title>
+<meta name="theme-color" content="#2563eb">
+<meta name="robots" content="noindex, nofollow">
+<title>CodeFix Apps</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="shared/core.css">
+<script src="shared/core.js"></script>
 <style>
-  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
   .app {
-    display: block; text-decoration: none; color: var(--text);
+    display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--text);
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
+    box-shadow: var(--shadow); transition: transform .12s, border-color .15s;
   }
-  .app .ico { font-size: 34px; }
-  .app b { display: block; margin-top: 6px; }
-  .app small { color: var(--muted); }
-  #install { display: none; }
+  .app:active { transform: scale(.98); }
+  .app:hover { border-color: var(--brand-line); }
+  .app .ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 26px;
+    background: var(--brand-soft); margin-bottom: 6px; }
+  .app b { font-size: 16px; }
+  .app small { color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .app.admin .ico { background: var(--text); }
+  .login { max-width: 420px; margin: 8px auto 0; padding: 26px 22px; }
+  .marcaLogo { width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 14px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 55%, #000)); color: var(--brand-ink);
+    font-size: 30px; font-weight: 800; box-shadow: 0 10px 30px color-mix(in srgb, var(--brand) 35%, transparent); }
+  .login h2 { justify-content: center; text-align: center; font-size: 22px; margin-bottom: 4px; }
+  .login .sub { text-align: center; color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+  .tabs2 { display: flex; gap: 4px; padding: 4px; background: var(--field); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 4px; }
+  .tabs2 button { flex: 1; background: transparent; color: var(--muted); box-shadow: none; padding: 9px; border-radius: 10px; }
+  .tabs2 button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+  #bInstalar { display: none; }
+  .instalar { display: flex; align-items: center; gap: 12px; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px;
+    background: var(--brand); color: var(--brand-ink); box-shadow: var(--shadow); }
+  .instalar .grow { flex: 1; font-size: 14px; }
+  .instalar button { background: var(--brand-ink); color: var(--brand); }
+  .hola { display: flex; align-items: center; gap: 14px; }
+  .avatar { width: 52px; height: 52px; border-radius: 16px; flex: none; display: grid; place-items: center; font-size: 22px; font-weight: 800;
+    background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 55%, #000)); color: var(--brand-ink); }
+  .hola h2 { margin: 0 0 2px; font-size: 19px; }
+  .hola p { margin: 0; }
+  .avisoPush { border-color: var(--brand-line); background: linear-gradient(160deg, var(--brand-soft), var(--card) 70%); }
+  .inbox li b { display: block; }
+  ul.feat { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--muted); font-size: 14px; }
+  ul.feat li::before { content: '✓'; color: var(--premium); font-weight: 800; margin-right: 8px; }
 </style>
 </head>
 <body>
-<header class="top"><h1>Mis Aplicaciones</h1></header>
+<header class="top"><h1>CodeFix Apps</h1><span id="planTag" class="pill hidden"></span></header>
 <main>
-  <div class="apps">
-    <a class="app" href="apps/fichas/">
-      <div class="ico">📣</div><b>FichaPro</b>
-      <small>Fichas publicitarias, clientes, campañas por WhatsApp y recordatorios</small>
-    </a>
-    <a class="app" href="apps/caja/">
-      <div class="ico">💵</div><b>Caja Rápida</b>
-      <small>Ventas del día, productos y stock</small>
-    </a>
-    <a class="app" href="apps/licencias/">
-      <div class="ico">🔑</div><b>Licencias</b>
-      <small>Genera claves para vender FichaPro (uso interno)</small>
-    </a>
+  <div class="instalar hidden" id="cInstalar">
+    <div style="font-size:30px">📲</div>
+    <div class="grow"><b>Instala la app</b><br><span id="instTxt">Para usarla como app y recibir notificaciones.</span></div>
+    <button class="small" id="bInstalar">Instalar</button>
+  </div>
+  <!-- Sin configurar -->
+  <div id="v-setup" class="card hidden">
+    <h2>Servidor pendiente</h2>
+    <p class="muted">Falta conectar el servidor (archivo <code>shared/config.js</code>). Mira <code>docs/CONFIGURAR.md</code>.</p>
   </div>
 
-  <div class="card" style="margin-top:16px">
-    <h2>Instalar en el celular</h2>
-    <p class="muted">Android (Chrome): menú ⋮ → <b>Instalar app</b> o <b>Agregar a pantalla principal</b>.
-      iPhone (Safari): botón Compartir → <b>Agregar a inicio</b>.
-      Tras la primera carga funciona <b>sin internet</b> y los datos se quedan en tu teléfono.</p>
-    <button id="install">Instalar ahora</button>
-  </div>
+  <!-- Ingresar / registrarse -->
+  <section id="v-login" class="hidden">
+    <div class="card login">
+      <div class="marcaLogo">C</div>
+      <h2 id="loginTitulo">Ingresa a tu cuenta</h2>
+      <p class="sub">Publicidad, clientes, ventas y notificaciones en un solo lugar.</p>
+      <div class="tabs2">
+        <button id="tIn" class="on small">Ingresar</button>
+        <button id="tUp" class="small">Crear cuenta</button>
+      </div>
+      <form id="fLogin" autocomplete="on">
+        <div id="rowEmpresa" class="hidden"><label>Nombre de tu empresa</label><input id="lEmpresa" autocomplete="organization" maxlength="80"></div>
+        <label>Correo (usuario)</label><input id="lEmail" type="email" autocomplete="username" required>
+        <div id="rowPass"><label>Contraseña</label><input id="lPass" type="password" autocomplete="current-password" minlength="6" required></div>
+        <p class="err" id="lErr"></p>
+        <div class="btns"><button id="lBtn" type="submit" style="flex:1">Ingresar</button></div>
+      </form>
+      <p class="muted" style="text-align:center"><a href="#" id="lOlvide">¿Olvidaste tu contraseña?</a></p>
+    </div>
+  </section>
+
+  <!-- Nueva contraseña (desde el correo de recuperación) -->
+  <section id="v-reset" class="hidden">
+    <div class="card login">
+      <h2>Nueva contraseña</h2>
+      <label>Contraseña nueva</label><input id="rPass" type="password" minlength="6" autocomplete="new-password">
+      <p class="err" id="rErr"></p>
+      <div class="btns"><button id="rBtn">Guardar</button></div>
+    </div>
+  </section>
+
+  <!-- Inicio con sesión -->
+  <section id="v-home" class="hidden">
+    <div class="card hola">
+      <div class="avatar" id="avatar">C</div>
+      <div><h2 id="hola"></h2><p class="muted" id="estadoPlan"></p></div>
+    </div>
+
+    <div class="apps">
+      <a class="app" href="apps/fichas/"><div class="ico">📣</div><b>FichaPro</b>
+        <small>Fichas publicitarias, clientes, campañas y notificaciones</small></a>
+      <a class="app" href="apps/caja/"><div class="ico">💵</div><b>Caja Rápida</b>
+        <small>Ventas, productos, stock y reportes</small></a>
+      <a class="app admin hidden" id="appAdmin" href="apps/admin/"><div class="ico">🛡️</div><b>Administración</b>
+        <small>Usuarios, keys Pro, avisos y ajustes</small></a>
+    </div>
+
+    <div class="card upsell hidden" id="cPro">
+      <h2>⭐ Activar versión Pro</h2>
+      <p class="muted">Pega la key que te entregó el vendedor.</p>
+      <input id="kKey" placeholder="CFX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off">
+      <p class="err" id="kErr"></p>
+      <div class="btns"><button id="kBtn">Activar</button></div>
+      <ul class="feat">
+        <li>Fichas y clientes ilimitados, sin marca de agua</li>
+        <li>Todas las plantillas, menú de precios y código QR</li>
+        <li>Notificaciones push y correos automáticos a tus clientes</li>
+        <li>Respaldo en la nube y reportes avanzados de caja</li>
+      </ul>
+    </div>
+
+    <div class="card avisoPush hidden" id="cPush">
+      <h2>🔔 Activa las notificaciones</h2>
+      <p class="muted">Así te llegan los avisos y ofertas aunque tengas la app cerrada.</p>
+      <div class="btns"><button id="bPush">Activar notificaciones</button></div>
+    </div>
+
+    <div class="card">
+      <h2>🔔 Avisos</h2>
+      <ul class="list inbox" id="inbox"></ul>
+    </div>
+
+    <div class="card">
+      <h2>🏢 Mi empresa</h2>
+      <label>Nombre</label><input id="eNombre" maxlength="80">
+      <div class="btns"><button class="small" id="eBtn">Guardar</button></div>
+      <label>Color de tu marca</label>
+      <div class="swatches" id="swatches"></div>
+      <div class="row" style="margin-top:10px;align-items:center">
+        <span class="muted" style="flex:2">O elige cualquier color:</span>
+        <input type="color" id="eColor" aria-label="Color personalizado">
+      </div>
+      <p class="muted">Toda la app se adapta a tu color en este celular.</p>
+    </div>
+
+    <div class="btns"><button class="alt" id="bSalir">Cerrar sesión</button></div>
+  </section>
 </main>
-<script src="shared/core.js"></script>
+<script src="shared/config.js"></script>
+<script src="shared/vendor/supabase.js"></script>
+<script src="shared/cuenta.js"></script>
 <script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const views = ['v-setup', 'v-login', 'v-reset', 'v-home'];
+  const showView = (v) => views.forEach((x) => $(x).classList.toggle('hidden', x !== v));
   Core.registerSW('./');
+  Core.marca();
+
+  /* ---------- Instalar como app ---------- */
+  const instalada = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   let deferred;
+  if (!instalada) {
+    if (ios) {
+      $('instTxt').innerHTML = 'En Safari toca <b>Compartir ⬆️</b> y luego <b>Agregar a inicio</b>.';
+      $('cInstalar').classList.remove('hidden');
+    } else if (/Android/.test(navigator.userAgent)) {
+      $('instTxt').innerHTML = 'Toca <b>Instalar</b> (o menú ⋮ → <b>Instalar app</b>).';
+      $('cInstalar').classList.remove('hidden');
+    }
+  }
   addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault(); deferred = e;
-    document.getElementById('install').style.display = 'inline-flex';
+    $('cInstalar').classList.remove('hidden');
+    $('bInstalar').style.display = 'inline-flex';
   });
-  document.getElementById('install').onclick = async () => {
+  addEventListener('appinstalled', () => $('cInstalar').classList.add('hidden'));
+  $('bInstalar').onclick = async () => {
     if (!deferred) return;
-    deferred.prompt(); await deferred.userChoice; deferred = null;
+    deferred.prompt();
+    if ((await deferred.userChoice).outcome === 'accepted') $('cInstalar').classList.add('hidden');
+    deferred = null;
   };
+
+  if (!Cuenta.configured) { showView('v-setup'); return; }
+
+  /* ---------- Ingresar / registrarse ---------- */
+  let modo = 'in';
+  function setModo(m) {
+    modo = m;
+    $('tIn').classList.toggle('on', m === 'in');
+    $('tUp').classList.toggle('on', m === 'up');
+    $('rowEmpresa').classList.toggle('hidden', m !== 'up');
+    $('rowPass').classList.toggle('hidden', m === 'olvide');
+    $('lPass').required = m !== 'olvide';
+    $('lPass').autocomplete = m === 'up' ? 'new-password' : 'current-password';
+    $('loginTitulo').textContent = { in: 'Ingresa a tu cuenta', up: 'Crea tu cuenta gratis', olvide: 'Recuperar contraseña' }[m];
+    $('lBtn').textContent = { in: 'Ingresar', up: 'Crear cuenta', olvide: 'Enviar enlace' }[m];
+    $('lErr').textContent = '';
+  }
+  $('tIn').onclick = () => setModo('in');
+  $('tUp').onclick = () => setModo('up');
+  $('lOlvide').onclick = (e) => { e.preventDefault(); setModo('olvide'); };
+
+  $('fLogin').onsubmit = async (e) => {
+    e.preventDefault();
+    $('lErr').textContent = '';
+    $('lBtn').disabled = true;
+    try {
+      const email = $('lEmail').value, pass = $('lPass').value;
+      if (modo === 'olvide') {
+        await Cuenta.resetPassword(email);
+        $('lErr').textContent = '';
+        Core.toast('Te enviamos un enlace a ' + email);
+        setModo('in');
+      } else if (modo === 'up') {
+        const acc = await Cuenta.signUp(email, pass, $('lEmpresa').value);
+        if (acc) return entrar(acc);
+        setModo('in');
+        $('lErr').textContent = '✅ Cuenta creada. Confirma tu correo con el enlace que te enviamos y luego ingresa.';
+      } else {
+        entrar(await Cuenta.signIn(email, pass));
+      }
+    } catch (err) {
+      $('lErr').textContent = err.message;
+    } finally {
+      $('lBtn').disabled = false;
+    }
+  };
+
+  /* ---------- Recuperación de contraseña ---------- */
+  let recuperando = /type=recovery/.test(location.hash);
+  if (recuperando) showView('v-reset');
+  Cuenta.sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') { recuperando = true; showView('v-reset'); } });
+  $('rBtn').onclick = async () => {
+    try {
+      await Cuenta.setPassword($('rPass').value);
+      Core.toast('Contraseña actualizada');
+      recuperando = false;
+      entrar(await Cuenta.refresh());
+    } catch (err) { $('rErr').textContent = err.message; }
+  };
+
+  /* ---------- Inicio ---------- */
+  function entrar(acc) {
+    if (recuperando) return;
+    if (!acc) { showView('v-login'); return; }
+    const volver = new URLSearchParams(location.search).get('volver');
+    if (volver && volver.startsWith('/') && !volver.startsWith('//')) { location.replace(volver); return; }
+    pintar(acc);
+    showView('v-home');
+    cargarInbox();
+    revisarPush();
+  }
+
+  function pintar(acc) {
+    const tag = $('planTag');
+    tag.classList.remove('hidden', 'pro', 'admin');
+    tag.textContent = acc.is_admin ? 'ADMIN' : acc.is_pro ? 'PRO' : 'FREE';
+    if (acc.is_admin) tag.classList.add('admin'); else if (acc.is_pro) tag.classList.add('pro');
+    $('hola').textContent = 'Hola' + (acc.empresa ? ', ' + acc.empresa : '') + ' 👋';
+    $('estadoPlan').textContent = acc.email + ' · ' + (acc.is_admin ? 'Administrador general'
+      : acc.is_pro ? 'Versión Pro' + (acc.pro_until ? ' hasta el ' + new Date(acc.pro_until).toLocaleDateString('es') : ' permanente')
+      : 'Versión Free');
+    $('cPro').classList.toggle('hidden', acc.is_pro);
+    $('appAdmin').classList.toggle('hidden', !acc.is_admin);
+    $('eNombre').value = acc.empresa || '';
+    $('avatar').textContent = (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
+    pintarColores(acc.id);
+  }
+
+  function pintarColores(uid) {
+    const actual = Core.tema.get(uid).toLowerCase();
+    $('swatches').innerHTML = Core.tema.colores.map(([n, c]) =>
+      '<button class="' + (c === actual ? 'on' : '') + '" data-c="' + c + '" title="' + n + '" aria-label="' + n +
+      '" style="background:' + c + '"></button>').join('');
+    $('eColor').value = actual;
+  }
+  $('swatches').onclick = (e) => {
+    const c = e.target.dataset.c;
+    if (!c) return;
+    Core.tema.set(Cuenta.uid(), c);
+    pintarColores(Cuenta.uid());
+  };
+  $('eColor').oninput = (e) => { Core.tema.set(Cuenta.uid(), e.target.value); };
+  $('eColor').onchange = () => pintarColores(Cuenta.uid());
+
+  async function cargarInbox() {
+    try {
+      const list = await Cuenta.rpc('my_inbox');
+      $('inbox').innerHTML = list.length ? list.map((n) =>
+        '<li><div class="grow"><b>' + Core.esc(n.title) + '</b><div class="muted">' + Core.esc(n.body) +
+        '</div><small class="muted">' + new Date(n.sent_at).toLocaleString('es') + '</small></div>' +
+        (/^https?:\/\//i.test(n.url || '') ? '<a class="btn small alt" href="' + Core.esc(n.url) + '" target="_blank" rel="noopener">Ver</a>' : '') + '</li>'
+      ).join('') : '<li class="empty">Sin avisos por ahora</li>';
+    } catch (e) {
+      $('inbox').innerHTML = '<li class="empty">Sin conexión</li>';
+    }
+  }
+
+  $('kBtn').onclick = async () => {
+    $('kErr').textContent = '';
+    try {
+      const acc = await Cuenta.redeem($('kKey').value);
+      pintar(acc);
+      Core.toast('🎉 ¡Versión Pro activada!');
+    } catch (err) { $('kErr').textContent = err.message; }
+  };
+
+  async function revisarPush() {
+    let activo = false;
+    try {
+      const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
+      activo = !!(reg && reg.pushManager && await reg.pushManager.getSubscription()) && Notification.permission === 'granted';
+    } catch (e) { /* sin soporte */ }
+    $('cPush').classList.toggle('hidden', activo);
+  }
+  $('bPush').onclick = async () => {
+    try {
+      await Cuenta.enablePush();
+      Core.toast('✅ Notificaciones activadas en este celular');
+      $('cPush').classList.add('hidden');
+    } catch (err) { Core.toast(err.message); }
+  };
+
+  $('eBtn').onclick = async () => {
+    try { pintar(await Cuenta.rpc('update_my_company', { p_empresa: $('eNombre').value })); Core.toast('Guardado'); }
+    catch (err) { Core.toast(err.message); }
+  };
+
+  $('bSalir').onclick = async () => { await Cuenta.signOut(); location.replace('./'); };
+
+  Cuenta.refresh().then(entrar).catch(() => entrar(Cuenta.account));
+})();
 </script>
 </body>
 </html>

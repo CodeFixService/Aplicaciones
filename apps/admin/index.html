@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="robots" content="noindex, nofollow">
+<title>Administración</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/core.css">
+<script src="../../shared/core.js"></script>
+<style>
+  .lic-new { background: var(--bg); border-radius: 10px; padding: 12px; margin-top: 10px; }
+  .st-scheduled { background: color-mix(in srgb, #3b82f6 16%, transparent); color: #3b82f6; border-color: transparent; }
+  .st-sending { background: color-mix(in srgb, #f59e0b 18%, transparent); color: #d97706; border-color: transparent; }
+  .st-sent { background: color-mix(in srgb, #10b981 16%, transparent); color: #059669; border-color: transparent; }
+  .st-failed { background: color-mix(in srgb, #ef4444 16%, transparent); color: #dc2626; border-color: transparent; }
+  .st-cancelled { background: var(--line); }
+  .chk { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+  .chk label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-size: 15px; }
+</style>
+</head>
+<body>
+<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Administración</h1></header>
+<main>
+  <!-- RESUMEN -->
+  <section class="view on" id="v-resumen">
+    <div class="stats" id="stats"></div>
+    <div class="card">
+      <h2>📲 Compartir la app</h2>
+      <p class="muted">Envía este enlace o muestra el QR. Cada persona abre el enlace, instala la app, crea su cuenta
+        (entra en Free) y tú la ves en <b>Usuarios</b>.</p>
+      <div style="text-align:center"><img id="appQr" alt="QR de la app" style="width:200px;height:200px;image-rendering:pixelated;background:#fff;border-radius:10px;padding:6px"></div>
+      <input id="appLink" readonly>
+      <div class="btns">
+        <button class="ok small" id="bInvWA">💬 Enviar por WhatsApp</button>
+        <button class="alt small" id="bInvShare">📤 Compartir</button>
+        <button class="alt small" id="bInvQr">⬇️ Descargar QR</button>
+        <button class="alt small" id="bInvCopy">Copiar mensaje</button>
+      </div>
+    </div>
+    <p class="muted">Solo tú (administrador general) puedes ver esta pantalla. Cada acción se valida en el servidor.</p>
+  </section>
+
+  <!-- LICENCIAS -->
+  <section class="view" id="v-licencias">
+    <div class="card">
+      <h2>Crear key Pro</h2>
+      <label>Empresa / cliente</label><input id="lEmpresa" maxlength="80" placeholder="Bodega Don Lucho">
+      <div class="row">
+        <div><label>Duración</label>
+          <select id="lMeses">
+            <option value="1">1 mes</option><option value="3">3 meses</option><option value="6">6 meses</option>
+            <option value="12" selected>1 año</option><option value="">Permanente</option>
+          </select></div>
+        <div><label>Precio cobrado</label><input id="lPrecio" inputmode="decimal" placeholder="15"></div>
+      </div>
+      <label>Nota (opcional)</label><input id="lNota" maxlength="120" placeholder="Pagó por Yape">
+      <div class="btns"><button id="bCrear">🔑 Generar key</button></div>
+      <div id="lNueva" class="lic-new hidden">
+        <div class="muted">Key para <b id="lnEmpresa"></b>:</div>
+        <code class="key" id="lnKey"></code>
+        <div class="btns">
+          <button class="ok small" id="lnWA">💬 WhatsApp</button>
+          <button class="alt small" id="lnMail">✉️ Correo</button>
+          <button class="alt small" id="lnCopy">Copiar</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <input id="lBuscar" placeholder="Buscar empresa o key…">
+      <ul class="list" id="licencias"></ul>
+    </div>
+  </section>
+
+  <!-- USUARIOS -->
+  <section class="view" id="v-usuarios">
+    <div class="card">
+      <input id="uBuscar" placeholder="Buscar correo o empresa…">
+      <ul class="list" id="usuarios"></ul>
+    </div>
+  </section>
+
+  <!-- AVISOS -->
+  <section class="view" id="v-avisos">
+    <div class="card">
+      <h2>Enviar aviso</h2>
+      <label>Para</label>
+      <select id="aPara">
+        <option value="all_users">Todos los usuarios</option>
+        <option value="pro_users">Solo usuarios Pro</option>
+        <option value="free_users">Solo usuarios Free</option>
+        <option value="self">Prueba: solo a mí</option>
+      </select>
+      <label>Título</label><input id="aTitulo" maxlength="80" placeholder="¡Nueva función disponible!">
+      <label>Mensaje</label><textarea id="aCuerpo" maxlength="400"></textarea>
+      <label>Enlace (opcional)</label><input id="aUrl" type="url" placeholder="https://…">
+      <label>Canales</label>
+      <div class="chk">
+        <label><input type="checkbox" id="aPush" checked> Notificación push</label>
+        <label><input type="checkbox" id="aMail"> Correo</label>
+      </div>
+      <label>Cuándo</label>
+      <div class="row">
+        <select id="aCuando"><option value="ya">Ahora</option><option value="luego">Programar</option></select>
+        <input type="datetime-local" id="aFecha" class="hidden">
+      </div>
+      <p class="err" id="aErr"></p>
+      <div class="btns"><button id="bAviso">📣 Enviar</button></div>
+    </div>
+    <div class="card">
+      <h2>Historial (todos los avisos, incluidos los de negocios)</h2>
+      <ul class="list" id="avisos"></ul>
+    </div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="view" id="v-ajustes">
+    <div class="card">
+      <h2>Notificaciones push</h2>
+      <p class="muted" id="pushEstado"></p>
+      <div class="btns"><button id="bVapid">Generar claves push</button></div>
+      <p class="muted">Solo se hace una vez. Si las regeneras, todos tendrán que volver a activar las notificaciones.</p>
+    </div>
+    <div class="card">
+      <h2>Correo (Gmail)</h2>
+      <p class="muted" id="mailEstado"></p>
+      <label>Cuenta Gmail que envía</label><input id="gUser" type="email" placeholder="tucorreo@gmail.com">
+      <label>Contraseña de aplicación de Google (16 letras)</label>
+      <input id="gPass" type="password" autocomplete="off" placeholder="xxxx xxxx xxxx xxxx">
+      <label>Nombre del remitente</label><input id="gNombre" placeholder="CodeFix">
+      <div class="btns"><button id="bGmail">Guardar</button></div>
+      <p class="muted">Se crea en tu cuenta Google → Seguridad → Verificación en 2 pasos → Contraseñas de aplicaciones.
+        Se guarda protegida en el servidor: nadie puede leerla desde la app, ni siquiera tú.</p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-v="resumen" class="on"><span>📊</span>Resumen</button>
+  <button data-v="licencias"><span>🔑</span>Keys</button>
+  <button data-v="usuarios"><span>👥</span>Usuarios</button>
+  <button data-v="avisos"><span>📣</span>Avisos</button>
+  <button data-v="ajustes"><span>⚙️</span>Ajustes</button>
+</nav>
+
+<script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/supabase.js"></script>
+<script src="../../shared/vendor/qrcode.js"></script>
+<script src="../../shared/cuenta.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

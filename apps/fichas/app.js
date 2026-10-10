@@ -1,16 +1,28 @@
-(function () {
+(async function () {
   'use strict';
-  const PRODUCT = 'FICHAPRO';
-  const db = Core.store('fichas');
   const $ = (id) => document.getElementById(id);
   const W = 1080, H = 1350;
 
   Core.registerSW('../../');
+  Core.marca();
+  const cuenta = await Cuenta.require('../../');
+  const sb = Cuenta.sb;
+  // Datos separados por usuario en este celular.
+  const db = Core.store('fichas:' + cuenta.id);
+  migrarDatosViejos();
+
+  function migrarDatosViejos() {
+    if (localStorage.getItem('fichas:migrado')) return;
+    const viejo = Core.store('fichas').dump();
+    Object.keys(viejo).forEach((k) => localStorage.setItem(k.replace(/^fichas:/, 'fichas:' + cuenta.id + ':'), viejo[k]));
+    Object.keys(viejo).forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem('fichas:migrado', '1');
+  }
 
   const DEFAULT = {
     plantilla: 'oferta', titulo: 'GRAN OFERTA', subtitulo: 'Solo por esta semana',
     precio: '19.99', antes: '29.99', cta: '¡Pide ya por WhatsApp!',
-    color1: '#6d28d9', color2: '#f59e0b', foto: null
+    color1: Core.tema.get(cuenta.id), color2: '#f59e0b', foto: null, lista: '', qr: false
   };
 
   let ficha = db.get('borrador', Object.assign({}, DEFAULT));
@@ -18,11 +30,12 @@
   let clientes = db.get('clientes', []);
   let campanas = db.get('campanas', []);
   let ajustes = db.get('ajustes', { negocio: 'Mi Negocio', tel: '', logo: null });
-  let licencia = db.get('licencia', { owner: '', key: '' });
   let editId = null;
 
-  const licensed = () => Core.checkLicense(PRODUCT, licencia.owner, licencia.key);
+  const licensed = () => Cuenta.isPro();
   const FREE_LIMIT = { fichas: 5, clientes: 30 };
+  const FREE_TEMPLATES = ['oferta', 'nuevo'];
+  const soloPro = (que) => Core.toast('⭐ ' + que + ' es de la versión Pro. Actívala en Ajustes.');
 
   /* ---------- Navegación ---------- */
   document.querySelectorAll('nav.tabs button').forEach((b) => {
@@ -34,7 +47,7 @@
     scrollTo(0, 0);
     if (v === 'galeria') renderGaleria();
     if (v === 'clientes') renderClientes();
-    if (v === 'campanas') renderCampanas();
+    if (v === 'campanas') { renderCampanas(); cargarAuto(); renderSubs(); }
   }
 
   /* ---------- Dibujo de la ficha ---------- */
@@ -112,12 +125,31 @@
       ctx.save(); rounded(x, y + 15, 80, 80, 16); ctx.clip(); cover(logo, x, y + 15, 80, 80); ctx.restore();
       x += 100;
     }
+    const qr = f.qr && licensed() && ajustes.tel ? qrCanvas('https://wa.me/' + ajustes.tel.replace(/[^\d]/g, ''), 96) : null;
+    const maxW = W - x - 40 - (qr ? 120 : 0);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'left';
     ctx.font = font('800', 36);
-    ctx.fillText(ajustes.negocio || '', x, y + 50, W - x - 40);
+    ctx.fillText(ajustes.negocio || '', x, y + 50, maxW);
     ctx.font = font('500', 30);
-    ctx.fillText(ajustes.tel ? '📲 ' + ajustes.tel : '', x, y + 90, W - x - 40);
+    ctx.fillText(ajustes.tel ? '📲 ' + ajustes.tel : '', x, y + 90, maxW);
+    if (qr) {
+      ctx.fillStyle = '#fff'; ctx.fillRect(W - 40 - 104, y + 3, 104, 104);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(qr, W - 40 - 100, y + 7, 96, 96);
+      ctx.imageSmoothingEnabled = true;
+    }
+  }
+
+  function qrCanvas(text, size) {
+    const q = qrcode(0, 'M');
+    q.addData(text); q.make();
+    const n = q.getModuleCount(), c = document.createElement('canvas');
+    c.width = c.height = n;
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, n, n); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect(k, r, 1, 1);
+    return c;
   }
 
   const TEMPLATES = {
@@ -192,6 +224,39 @@
         ctx.fillText(f.cta, 360, 1168, 560);
       }
       footer(f, logo, true);
+    } },
+    lista: { nombre: 'Menú / Precios', draw(f, foto, logo) {
+      ctx.fillStyle = '#fffaf2'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = f.color1; ctx.fillRect(0, 0, W, 300);
+      if (foto) { ctx.save(); ctx.globalAlpha = 0.3; cover(foto, 0, 0, W, 300); ctx.restore(); }
+      ctx.fillStyle = '#fff'; ctx.font = font('900', 90);
+      wrap(f.titulo.toUpperCase(), W / 2, 150, W - 100, 92, 1);
+      ctx.font = font('500', 42); ctx.fillStyle = 'rgba(255,255,255,.9)';
+      wrap(f.subtitulo, W / 2, 230, W - 120, 48, 1);
+      const items = String(f.lista || '').split(/\n/).map((l) => l.split(/=|:|\t/)).filter((p) => p[0] && p[0].trim()).slice(0, 9);
+      const top = 380, step = Math.min(90, 640 / Math.max(items.length, 1));
+      items.forEach((p, i) => {
+        const y = top + i * step;
+        const nombre = p[0].trim(), precio = (p[1] || '').trim();
+        ctx.font = font('700', 44); ctx.fillStyle = '#1c1830'; ctx.textAlign = 'left';
+        ctx.fillText(nombre, 70, y, 640);
+        if (precio) {
+          ctx.textAlign = 'right'; ctx.fillStyle = f.color1; ctx.font = font('900', 46);
+          ctx.fillText(fmtPrice(precio), W - 70, y);
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 2; ctx.setLineDash([6, 8]);
+        ctx.beginPath(); ctx.moveTo(70, y + 22); ctx.lineTo(W - 70, y + 22); ctx.stroke(); ctx.setLineDash([]);
+      });
+      if (!items.length) {
+        ctx.font = font('500', 40); ctx.fillStyle = '#999'; ctx.textAlign = 'center';
+        ctx.fillText('Escribe tus productos y precios', W / 2, 600);
+      }
+      if (f.cta) {
+        ctx.fillStyle = f.color2; rounded(110, 1090, W - 220, 100, 50); ctx.fill();
+        ctx.fillStyle = '#1c1830'; ctx.font = font('800', 42); ctx.textAlign = 'center';
+        ctx.fillText(f.cta, W / 2, 1155, W - 280);
+      }
+      footer(f, logo, false);
     } }
   };
 
@@ -207,25 +272,39 @@
     const [foto, logo] = await Promise.all([loadImg(f.foto), loadImg(ajustes.logo)]);
     if (token !== drawToken) return;
     ctx.clearRect(0, 0, W, H);
-    (TEMPLATES[f.plantilla] || TEMPLATES.oferta).draw(f, foto, logo);
+    const tpl = licensed() || FREE_TEMPLATES.includes(f.plantilla) ? f.plantilla : 'oferta';
+    (TEMPLATES[tpl] || TEMPLATES.oferta).draw(f, foto, logo);
     if (!licensed()) {
-      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = font('700', 26); ctx.textAlign = 'right';
-      ctx.fillText('Hecho con FichaPro · versión de prueba', W - 30, H - 125);
+      ctx.save();
+      ctx.font = font('700', 26); ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillText('Hecho con FichaPro · CodeFix · versión Free', W - 28, H - 123);
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillText('Hecho con FichaPro · CodeFix · versión Free', W - 30, H - 125);
+      ctx.restore();
     }
   }
 
   /* ---------- Formulario ---------- */
-  const fields = ['titulo', 'subtitulo', 'precio', 'antes', 'cta', 'color1', 'color2'];
+  const fields = ['titulo', 'subtitulo', 'precio', 'antes', 'cta', 'color1', 'color2', 'lista'];
   function fillForm() {
     fields.forEach((k) => { $('f-' + k).value = ficha[k] || ''; });
-    $('tpls').innerHTML = Object.keys(TEMPLATES).map((k) =>
-      '<button class="small ' + (ficha.plantilla === k ? 'on' : 'alt') + '" data-t="' + k + '">' + TEMPLATES[k].nombre + '</button>'
-    ).join('');
+    $('f-qr').checked = !!ficha.qr && licensed();
+    $('rowLista').classList.toggle('hidden', ficha.plantilla !== 'lista');
+    $('tpls').innerHTML = Object.keys(TEMPLATES).map((k) => {
+      const lock = !licensed() && !FREE_TEMPLATES.includes(k);
+      return '<button class="small ' + (ficha.plantilla === k ? 'on' : 'alt') + (lock ? ' lock' : '') + '" data-t="' + k + '">' +
+        TEMPLATES[k].nombre + '</button>';
+    }).join('');
   }
   $('tpls').onclick = (e) => {
     const t = e.target.dataset.t;
     if (!t) return;
+    if (!licensed() && !FREE_TEMPLATES.includes(t)) return soloPro('La plantilla ' + TEMPLATES[t].nombre);
     ficha.plantilla = t; changed(); fillForm();
+  };
+  $('f-qr').onchange = (e) => {
+    if (e.target.checked && !licensed()) { e.target.checked = false; return soloPro('El código QR'); }
+    if (e.target.checked && !ajustes.tel) { e.target.checked = false; return Core.toast('Primero escribe tu WhatsApp en Ajustes'); }
+    ficha.qr = e.target.checked; changed();
   };
   fields.forEach((k) => { $('f-' + k).addEventListener('input', (e) => { ficha[k] = e.target.value; changed(); }); });
   $('f-foto').onchange = async (e) => {
@@ -412,9 +491,13 @@
       const dest = destinatarios(k);
       const enviados = dest.filter((c) => k.enviados.includes(c.id)).length;
       const f = fichas.find((x) => x.id === k.fichaId);
+      const n = k.notifId && estadoAuto[k.notifId];
+      const auto = k.notifId ? '<div class="muted">' + (k.canales || []).map((c) => c === 'push' ? '🔔' : '✉️').join('') + ' ' +
+        (!n ? 'Automática' : n.status === 'sent' ? 'Enviada: ' + n.push_sent + ' notificaciones, ' + n.email_sent + ' correos'
+          : n.status === 'failed' ? 'Falló: ' + Core.esc(n.error || '') : n.status === 'cancelled' ? 'Cancelada' : 'Programada') + '</div>' : '';
       return '<li>' + (f ? '<img class="thumb" src="' + f.thumb + '" alt="">' : '') +
         '<div class="grow"><b>' + Core.esc(k.nombre) + '</b><div class="muted">' +
-        new Date(k.fecha).toLocaleString('es') + ' · ' + enviados + '/' + dest.length + ' enviados</div></div>' +
+        new Date(k.fecha).toLocaleString('es') + ' · WhatsApp ' + enviados + '/' + dest.length + '</div>' + auto + '</div>' +
         '<button class="small ok" data-a="send" data-id="' + k.id + '">Enviar</button>' +
         '<button class="small danger" data-a="del" data-id="' + k.id + '">✕</button></li>';
     }).join('') : '<li class="empty">No hay campañas programadas</li>';
@@ -427,24 +510,62 @@
   };
   const destinatarios = (k) => clientes.filter((c) => !k.tag || c.tag === k.tag);
 
+  ['k-push', 'k-mail'].forEach((id) => {
+    $(id).onchange = (e) => { if (e.target.checked && !licensed()) { e.target.checked = false; soloPro('El envío automático'); } };
+  });
+
   $('bAddCampana').onclick = async () => {
     const fichaId = $('k-ficha').value;
     const fecha = new Date($('k-fecha').value).getTime();
     if (!fichaId) return Core.toast('Guarda una ficha primero');
     if (!fecha) return Core.toast('Elige fecha y hora');
-    campanas.push({
+    const canales = [$('k-push').checked && 'push', $('k-mail').checked && 'email'].filter(Boolean);
+    const k = {
       id: Core.uid(), nombre: $('k-nombre').value.trim() || 'Campaña', fichaId,
-      tag: $('k-tag').value, msg: $('k-msg').value, fecha, avisado: fecha <= Date.now(), enviados: []
-    });
-    db.set('campanas', campanas);
-    $('k-nombre').value = '';
-    renderCampanas();
-    if (await Core.askNotify()) Core.toast('Te avisaré a la hora programada');
+      tag: $('k-tag').value, msg: $('k-msg').value, fecha, avisado: fecha <= Date.now(), enviados: [], canales
+    };
+    $('bAddCampana').disabled = true;
+    try {
+      if (canales.length) {
+        Core.toast('Subiendo la ficha…');
+        k.notifId = await programarAutomatico(k);
+        k.avisado = true; // el servidor la envía solo; no hace falta recordatorio
+      }
+      campanas.push(k);
+      db.set('campanas', campanas);
+      $('k-nombre').value = ''; $('k-push').checked = false; $('k-mail').checked = false;
+      renderCampanas();
+      if (canales.length) Core.toast('✅ Programada: se enviará sola a tus suscriptores');
+      else if (await Core.askNotify()) Core.toast('Te avisaré a la hora programada');
+    } catch (err) {
+      Core.toast(err.message);
+    } finally { $('bAddCampana').disabled = false; }
   };
+
+  // Sube la imagen de la ficha y deja la notificación programada en el servidor.
+  async function programarAutomatico(k) {
+    const f = fichas.find((x) => x.id === k.fichaId);
+    await draw(f);
+    const blob = await new Promise((r) => cv.toBlob(r, 'image/jpeg', 0.85));
+    await draw(ficha);
+    const path = cuenta.id + '/' + k.id + '.jpg';
+    const up = await sb.storage.from('fichas').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    if (up.error) throw new Error('No se pudo subir la imagen: ' + up.error.message);
+    const image = sb.storage.from('fichas').getPublicUrl(path).data.publicUrl;
+    const n = await Cuenta.rpc('schedule_notification', {
+      p_title: f.titulo + (f.precio ? ' · ' + fmtPrice(f.precio) : ''),
+      p_body: k.msg.replace(/\{nombre\}\s*/g, ''), p_image: image,
+      p_url: ajustes.tel ? 'https://wa.me/' + ajustes.tel.replace(/[^\d]/g, '') + '?text=' + encodeURIComponent('Hola, vi su oferta: ' + f.titulo) : image,
+      p_audience: 'my_subscribers', p_channels: k.canales, p_send_at: new Date(k.fecha).toISOString()
+    });
+    return n.id;
+  }
 
   $('campanas').onclick = (e) => {
     const { a, id } = e.target.dataset;
     if (a === 'del' && confirm('¿Eliminar campaña?')) {
+      const k = campanas.find((x) => x.id === id);
+      if (k && k.notifId) Cuenta.rpc('cancel_notification', { p_id: k.notifId }).catch(() => {});
       campanas = campanas.filter((k) => k.id !== id);
       db.set('campanas', campanas); $('envio').hidden = true; renderCampanas();
     }
@@ -529,13 +650,14 @@
   function fillAjustes() {
     $('a-negocio').value = ajustes.negocio || '';
     $('a-tel').value = ajustes.tel || '';
-    $('l-owner').value = licencia.owner || '';
-    $('l-key').value = licencia.key || '';
-    const ok = licensed();
+    const ok = licensed(), a = Cuenta.account;
     $('licEstado').textContent = ok
-      ? '✅ Licencia activa para ' + licencia.owner
-      : 'Versión de prueba: marca de agua, ' + FREE_LIMIT.fichas + ' fichas y ' + FREE_LIMIT.clientes + ' clientes.';
-    $('licTag').textContent = ok ? 'PRO' : 'Prueba';
+      ? '⭐ Versión Pro' + (a.is_admin ? ' (administrador)' : a.pro_until ? ' hasta el ' + new Date(a.pro_until).toLocaleDateString('es') : ' permanente') + ' · ' + a.email
+      : 'Versión Free: marca de agua, ' + FREE_TEMPLATES.length + ' plantillas, ' + FREE_LIMIT.fichas + ' fichas y ' +
+        FREE_LIMIT.clientes + ' clientes. Pide tu key Pro para desbloquear todo.';
+    $('rowKey').classList.toggle('hidden', ok);
+    $('licTag').textContent = ok ? 'PRO' : 'FREE';
+    $('licTag').classList.toggle('pro', ok);
   }
   $('bGuardarAjustes').onclick = () => {
     ajustes.negocio = $('a-negocio').value.trim();
@@ -551,16 +673,83 @@
   $('bQuitarLogo').onclick = () => { ajustes.logo = null; db.set('ajustes', ajustes); draw(ficha); };
   $('bNotif').onclick = async () => Core.toast(await Core.askNotify() ? 'Notificaciones activadas' : 'Permiso denegado');
   $('bProbar').onclick = () => Core.notify('FichaPro', { body: 'Así te avisaré de tus campañas 📣' });
-  $('bActivar').onclick = () => {
-    const l = { owner: $('l-owner').value.trim(), key: $('l-key').value.trim().toUpperCase() };
-    if (Core.checkLicense(PRODUCT, l.owner, l.key)) {
-      licencia = l; db.set('licencia', l); Core.toast('¡Licencia activada!');
-    } else Core.toast('Clave no válida para ese titular');
-    fillAjustes(); draw(ficha);
+  $('bActivar').onclick = async () => {
+    try {
+      await Cuenta.redeem($('l-key').value);
+      Core.toast('🎉 ¡Versión Pro activada!');
+      fillAjustes(); fillForm(); draw(ficha);
+    } catch (err) { Core.toast(err.message); }
   };
-  $('bBackup').onclick = () => Core.backup('fichas', 'fichapro');
+
+  /* ---------- Suscriptores (Pro) ---------- */
+  const linkSubs = Core.rootUrl() + 'apps/suscribirse/?n=' + cuenta.id;
+  async function renderSubs() {
+    const pro = licensed();
+    $('subsPro').classList.toggle('hidden', !pro);
+    $('subsFree').classList.toggle('hidden', pro);
+    if (!pro) return;
+    $('subsLink').value = linkSubs;
+    if (!$('subsQr').src) $('subsQr').src = qrCanvas(linkSubs).toDataURL();
+    try {
+      const { data, error } = await sb.from('subscribers').select('id,nombre,email,endpoint,created_at').order('created_at', { ascending: false });
+      if (error) throw error;
+      $('subsLista').innerHTML = '<li class="muted">' + data.length + ' suscriptor(es) · 🔔 ' +
+        data.filter((x) => x.endpoint).length + ' con notificaciones · ✉️ ' + data.filter((x) => x.email).length + ' con correo</li>' +
+        data.slice(0, 50).map((x) => '<li><div class="grow"><b>' + Core.esc(x.nombre || 'Sin nombre') + '</b><div class="muted">' +
+          (x.endpoint ? '🔔 ' : '') + Core.esc(x.email || '') + '</div></div>' +
+          '<button class="small danger" data-id="' + x.id + '">✕</button></li>').join('');
+    } catch (e) { $('subsLista').innerHTML = '<li class="empty">Sin conexión</li>'; }
+  }
+  $('subsLista').onclick = async (e) => {
+    const id = e.target.dataset.id;
+    if (!id || !confirm('¿Quitar este suscriptor?')) return;
+    await sb.from('subscribers').delete().eq('id', id);
+    renderSubs();
+  };
+  $('bSubsShare').onclick = async () => {
+    const text = '🔔 Recibe nuestras ofertas exclusivas de ' + (ajustes.negocio || cuenta.empresa || 'nuestro negocio') + ' aquí: ' + linkSubs;
+    if (navigator.share) { try { await navigator.share({ text }); return; } catch (e) { return; } }
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  };
+  $('bSubsQr').onclick = () => {
+    const c = qrCanvas(linkSubs), big = document.createElement('canvas');
+    big.width = big.height = 800;
+    const g = big.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 800, 800); g.imageSmoothingEnabled = false;
+    g.drawImage(c, 40, 40, 720, 720);
+    big.toBlob((b) => Core.download('qr-suscripcion.png', b));
+  };
+
+  let estadoAuto = {};
+  async function cargarAuto() {
+    const ids = campanas.filter((k) => k.notifId).map((k) => k.notifId);
+    if (!ids.length) return;
+    const { data } = await sb.from('notifications').select('id,status,push_sent,email_sent,error').in('id', ids);
+    (data || []).forEach((n) => { estadoAuto[n.id] = n; });
+    renderCampanas();
+  }
+
+  /* ---------- Respaldo en la nube (Pro) ---------- */
+  const nubePath = cuenta.id + '/fichapro.json';
+  $('bNubeSubir').onclick = async () => {
+    if (!licensed()) return soloPro('El respaldo en la nube');
+    const blob = new Blob([JSON.stringify({ app: 'fichas', fecha: new Date().toISOString(), datos: db.dump() })], { type: 'application/json' });
+    const { error } = await sb.storage.from('respaldos').upload(nubePath, blob, { upsert: true, contentType: 'application/json' });
+    Core.toast(error ? 'No se pudo guardar: ' + error.message : '☁️ Respaldo guardado en la nube');
+    if (!error) $('nubeEstado').textContent = 'Último respaldo: ' + new Date().toLocaleString('es');
+  };
+  $('bNubeBajar').onclick = async () => {
+    if (!licensed()) return soloPro('El respaldo en la nube');
+    if (!confirm('Esto reemplaza los datos de este celular por los de la nube. ¿Seguir?')) return;
+    const { data, error } = await sb.storage.from('respaldos').download(nubePath);
+    if (error) return Core.toast('No hay respaldo en la nube todavía');
+    const obj = JSON.parse(await data.text());
+    db.load(obj.datos);
+    location.reload();
+  };
+  $('bBackup').onclick = () => Core.backup('fichas:' + cuenta.id, 'fichapro');
   $('restore').onchange = (e) => {
-    if (e.target.files[0]) Core.restore('fichas', e.target.files[0], () => location.reload());
+    if (e.target.files[0]) Core.restore('fichas:' + cuenta.id, e.target.files[0], () => location.reload());
   };
 
   /* ---------- Inicio ---------- */
