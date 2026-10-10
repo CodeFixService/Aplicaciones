@@ -22,7 +22,7 @@
   const DEFAULT = {
     plantilla: 'oferta', titulo: 'GRAN OFERTA', subtitulo: 'Solo por esta semana',
     precio: '19.99', antes: '29.99', cta: '¡Pide ya por WhatsApp!',
-    color1: '#6d28d9', color2: '#f59e0b', foto: null, lista: '', qr: false
+    color1: Core.tema.get(cuenta.id), color2: '#f59e0b', foto: null, lista: '', qr: false
   };
 
   let ficha = db.get('borrador', Object.assign({}, DEFAULT));

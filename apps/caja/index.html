@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#6d28d9">
+<meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
 <title>Caja Rápida</title>
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="icon" href="../../icons/icon-192.png">
 <link rel="stylesheet" href="../../shared/core.css">
+<script src="../../shared/core.js"></script>
 <style>
   .prods { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
   .prod { flex-direction: column; align-items: flex-start; padding: 14px; background: var(--card); color: var(--text);
@@ -23,7 +24,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Caja Rápida</h1><span id="planTag" class="pill" style="background:#fff3;color:#fff">FREE</span></header>
+<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Caja Rápida</h1><span id="planTag" class="pill">FREE</span></header>
 <main>
   <section class="view on" id="v-vender">
     <div class="card">
@@ -93,7 +94,6 @@
 
 <script src="../../shared/config.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
-<script src="../../shared/core.js"></script>
 <script src="../../shared/cuenta.js"></script>
 <script src="app.js"></script>
 </body>

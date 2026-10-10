@@ -54,6 +54,7 @@
     if (!acc) { writeCache(null); return null; }
     acc.checkedAt = Date.now();
     writeCache(acc);
+    if (global.Core) global.Core.tema.usar(acc.id);
     return acc;
   }
 

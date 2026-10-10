@@ -139,6 +139,46 @@
     });
   }
 
+  /* ---------- Color de marca de cada empresa ---------- */
+  const COLORES = [
+    ['Azul', '#2563eb'], ['Índigo', '#4f46e5'], ['Violeta', '#7c3aed'], ['Rosa', '#db2777'],
+    ['Rojo', '#dc2626'], ['Naranja', '#ea580c'], ['Ámbar', '#d97706'], ['Verde', '#16a34a'],
+    ['Esmeralda', '#059669'], ['Turquesa', '#0891b2'], ['Grafito', '#334155'], ['Negro', '#111827']
+  ];
+  const TEMA_KEY = 'cfx:tema';
+
+  // Texto blanco o negro según lo claro que sea el color elegido.
+  function tinta(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+    return l > 0.62 ? '#0f172a' : '#ffffff';
+  }
+
+  function aplicarTema(color) {
+    if (!/^#[0-9a-f]{6}$/i.test(color || '')) return;
+    const r = document.documentElement.style;
+    r.setProperty('--brand', color);
+    r.setProperty('--brand-ink', tinta(color));
+    let m = document.querySelector('meta[name=theme-color]');
+    if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
+    m.content = color;
+  }
+
+  const tema = {
+    colores: COLORES,
+    get(uid) {
+      try { return localStorage.getItem(TEMA_KEY + (uid ? ':' + uid : '')) || localStorage.getItem(TEMA_KEY) || COLORES[0][1]; }
+      catch (e) { return COLORES[0][1]; }
+    },
+    set(uid, color) {
+      try { localStorage.setItem(TEMA_KEY + ':' + uid, color); localStorage.setItem(TEMA_KEY, color); } catch (e) { /* sin espacio */ }
+      aplicarTema(color);
+    },
+    // Al iniciar sesión: aplica el color guardado de ese usuario.
+    usar(uid) { aplicarTema(this.get(uid)); }
+  };
+  aplicarTema(tema.get()); // antes de pintar, sin parpadeo
+
   // Pie de página con la marca del autor en todas las pantallas.
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -151,6 +191,6 @@
 
   global.Core = {
     store, uid, money, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, rootUrl, marca
+    backup, restore, readImage, rootUrl, marca, tema
   };
 })(window);
