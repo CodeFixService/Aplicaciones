@@ -427,10 +427,16 @@ begin
   if p_audience in ('all_users', 'all_businesses', 'pro_users', 'free_users', 'all_clients') and not admin then
     raise exception 'Solo el administrador puede avisar a todos los usuarios';
   end if;
-  if p_audience = 'my_subscribers' and not (public.is_business(auth.uid()) and public.is_pro(auth.uid())) then
-    raise exception 'Avisar a tus clientes es de la versión Pro para empresas';
+  p_channels := coalesce(p_channels, '{}');
+  -- Campañas de una empresa: siempre se publican en "Ofertas" de sus clientes (sin canales = solo en la app).
+  -- El envío automático (push y correo) es de la versión Pro.
+  if p_audience = 'my_subscribers' and not public.is_business(auth.uid()) then
+    raise exception 'Solo las empresas publican ofertas a sus clientes';
   end if;
-  if p_channels is null or cardinality(p_channels) = 0 or not (p_channels <@ array['push', 'email']) then
+  if p_audience = 'my_subscribers' and cardinality(p_channels) > 0 and not public.is_pro(auth.uid()) then
+    raise exception 'El envío automático (push y correo) es de la versión Pro';
+  end if;
+  if not (p_channels <@ array['push', 'email']) or (cardinality(p_channels) = 0 and p_audience <> 'my_subscribers') then
     raise exception 'Elige push y/o correo';
   end if;
   if 'email' = any(p_channels) and not public.is_pro(auth.uid()) then
@@ -455,8 +461,10 @@ end $$;
 create or replace function public.cancel_notification(p_id uuid) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
+  -- Una oferta ya publicada también se puede quitar (deja de verse en "Ofertas").
   update public.notifications set status = 'cancelled'
-  where id = p_id and status = 'scheduled' and (owner_id = auth.uid() or public.is_admin());
+  where id = p_id and (status = 'scheduled' or (status = 'sent' and audience = 'my_subscribers'))
+    and (owner_id = auth.uid() or public.is_admin());
 end $$;
 
 -- Avisos del admin que le corresponden al usuario (bandeja dentro de la app).
@@ -637,7 +645,7 @@ on conflict (id) do nothing;
 drop policy if exists "fichas: subir propias (pro)" on storage.objects;
 create policy "fichas: subir propias (pro)" on storage.objects for insert to authenticated
   with check (bucket_id = 'fichas' and (storage.foldername(name))[1] = auth.uid()::text
-              and public.is_pro(auth.uid()) and public.is_business(auth.uid()));
+              and public.is_business(auth.uid()));
 drop policy if exists "fichas: reemplazar propias" on storage.objects;
 create policy "fichas: reemplazar propias" on storage.objects for update to authenticated
   using (bucket_id = 'fichas' and (storage.foldername(name))[1] = auth.uid()::text);
@@ -1152,20 +1160,77 @@ language sql security definer set search_path = '' as $$
   delete from public.user_invites where email = lower(trim(p_email))
 $$;
 
--- Clientes de mi empresa (para la empresa) — solo nombre y fecha.
+-- (my_clients: ver versión 3.3)
+
+revoke all on function public.prepare_user_invite(uuid, text, text, text, uuid) from public, anon, authenticated;
+revoke all on function public.cancel_user_invite(text) from public, anon, authenticated;
+revoke all on public.user_invites from anon, authenticated;
+
+-- =====================================================================
+--  VERSIÓN 3.3: ofertas para clientes, WhatsApp de clientes, push por cuenta
+-- =====================================================================
+alter table public.profiles add column if not exists telefono text;
+
+-- WhatsApp del cliente (lo escribe su empresa o el admin). Vacío = sin WhatsApp.
+create or replace function public.set_client_phone(p_email text, p_tel text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare t text := left(regexp_replace(coalesce(p_tel, ''), '\D', '', 'g'), 15);
+begin
+  if t <> '' and length(t) < 7 then raise exception 'WhatsApp no válido (incluye el código de país)'; end if;
+  update public.profiles set telefono = nullif(t, '')
+  where email = lower(trim(coalesce(p_email, ''))) and role = 'client'
+    and (negocio_id = auth.uid() or public.is_admin());
+  if not found then raise exception 'Cliente no encontrado'; end if;
+end $$;
+
+-- Clientes de mi empresa (para la empresa): nombre, correo, fecha y WhatsApp.
+drop function if exists public.my_clients();
 create or replace function public.my_clients()
-returns table (id uuid, nombre text, email text, creado timestamptz)
+returns table (id uuid, nombre text, email text, creado timestamptz, telefono text)
 language sql stable security definer set search_path = '' as $$
-  select p.id, p.empresa, p.email, p.created_at from public.profiles p
+  select p.id, p.empresa, p.email, p.created_at, p.telefono from public.profiles p
   where p.role = 'client' and p.negocio_id = auth.uid()
   order by p.created_at desc limit 2000
 $$;
 
-revoke all on function public.prepare_user_invite(uuid, text, text, text, uuid) from public, anon, authenticated;
-revoke all on function public.cancel_user_invite(text) from public, anon, authenticated;
+-- Este celular deja de recibir avisos de la cuenta que cierra sesión.
+create or replace function public.remove_my_push(p_endpoint text) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.push_subscriptions where endpoint = p_endpoint and user_id = auth.uid()
+$$;
+
+-- Ofertas (campañas) de la tienda del cliente. La empresa ve las suyas.
+-- Las campañas solo en la app (sin push ni correo) se muestran apenas llega su hora.
+create or replace function public.my_offers()
+returns table (id uuid, title text, body text, url text, image text, fecha timestamptz, leido boolean)
+language sql stable security definer set search_path = '' as $$
+  select n.id, n.title, n.body, n.url, n.image, coalesce(n.sent_at, n.send_at),
+         exists (select 1 from public.notification_reads r where r.notification_id = n.id and r.user_id = me.id)
+  from public.profiles me
+  join public.notifications n
+    on n.audience = 'my_subscribers'
+   and n.owner_id = case when me.role = 'client' then me.negocio_id else me.id end
+  where me.id = auth.uid()
+    and (n.status = 'sent' or (n.status in ('scheduled', 'sending') and cardinality(n.channels) = 0 and n.send_at <= now()))
+    and coalesce(n.sent_at, n.send_at) > now() - interval '60 days'
+  order by coalesce(n.sent_at, n.send_at) desc limit 30
+$$;
+
+create or replace function public.mark_notification_read(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null or not (exists (select 1 from public.my_inbox() i where i.id = p_id)
+                                or exists (select 1 from public.my_offers() o where o.id = p_id)) then return; end if;
+  insert into public.notification_reads (notification_id, user_id) values (p_id, auth.uid())
+  on conflict do nothing;
+end $$;
+
+revoke all on function public.set_client_phone(text, text) from public, anon;
 revoke all on function public.my_clients() from public, anon;
-grant execute on function public.my_clients() to authenticated;
-revoke all on public.user_invites from anon, authenticated;
+revoke all on function public.remove_my_push(text) from public, anon;
+revoke all on function public.my_offers() from public, anon;
+grant execute on function public.set_client_phone(text, text), public.my_clients(), public.remove_my_push(text),
+  public.my_offers() to authenticated;
 
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".

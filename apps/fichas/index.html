@@ -23,6 +23,10 @@
   .sent { text-decoration: line-through; opacity: .6; }
   .banner { background: var(--brand); color: var(--brand-ink); padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 14px; box-shadow: var(--shadow); }
   .banner a { color: inherit; font-weight: 700; }
+  .cred { background: var(--field); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-top: 12px; white-space: pre-line; font-size: 14px; }
+  #clientes li { flex-wrap: wrap; }
+  #clientes .grow { min-width: 160px; }
+  #clientes .muted { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -79,22 +83,35 @@
   <!-- CLIENTES -->
   <section class="view" id="v-clientes">
     <div class="card">
-      <h2>Agregar cliente</h2>
-      <div class="row">
-        <div><label>Nombre</label><input id="c-nombre"></div>
-        <div><label>WhatsApp (con código país)</label><input id="c-tel" inputmode="tel" placeholder="51987654321"></div>
+      <h2>➕ Nuevo cliente</h2>
+      <p class="muted">Crea su cuenta en la app y envíale sus datos: verá tus productos y ofertas, y podrá escribirte.
+        Si le pones WhatsApp, también te sirve para las campañas por WhatsApp. Solo tú ves a tus clientes.</p>
+      <label for="c-nombre">Nombre</label><input id="c-nombre" maxlength="80" autocomplete="off">
+      <label for="c-email">Correo (será su usuario)</label><input id="c-email" type="email" autocomplete="off">
+      <label for="c-clave">Contraseña</label>
+      <div class="row"><input id="c-clave" autocomplete="off" style="flex:2"><button class="alt small" id="c-gen" type="button" style="flex:none">Generar</button></div>
+      <div class="row" style="flex-wrap:wrap">
+        <div style="min-width:180px"><label for="c-tel">WhatsApp (opcional, con código de país)</label><input id="c-tel" inputmode="tel" placeholder="56912345678"></div>
+        <div style="min-width:140px"><label for="c-tag">Etiqueta (opcional)</label><input id="c-tag" list="tagsList" placeholder="vip, mayorista"></div>
       </div>
-      <label>Etiqueta (ej. vip, mayorista)</label><input id="c-tag" list="tagsList">
       <datalist id="tagsList"></datalist>
-      <div class="btns">
-        <button id="bAddCliente">➕ Agregar</button>
-        <button class="alt" id="bContactos" hidden>📇 Desde contactos</button>
-        <label class="btn alt" style="margin:0;color:var(--brand)">📄 Importar CSV<input type="file" accept=".csv,text/csv" id="c-csv" hidden></label>
-      </div>
-      <p class="muted">CSV: una línea por cliente → <code>nombre,telefono,etiqueta</code></p>
+      <p class="err" id="c-err"></p>
+      <div class="btns"><button id="bAddCliente">➕ Crear cliente</button></div>
+      <div class="cred hidden" id="c-cred"></div>
+      <div class="btns hidden" id="c-credBtns"><button class="ok small" id="c-wsp">💬 Enviarle sus datos por WhatsApp</button><button class="alt small" id="c-copiar">Copiar</button></div>
+      <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">Contactos solo de WhatsApp (sin cuenta en la app)</summary>
+        <p class="muted">Para enviar campañas por WhatsApp a quien no usa la app: escribe nombre y WhatsApp arriba y toca
+          "Agregar solo WhatsApp", o impórtalos. CSV: una línea por cliente → <code>nombre,telefono,etiqueta</code></p>
+        <div class="btns">
+          <button class="alt small" id="bAddWsp">Agregar solo WhatsApp</button>
+          <button class="alt small" id="bContactos" hidden>📇 Desde contactos</button>
+          <label class="btn alt small" style="margin:0;color:var(--brand)">📄 Importar CSV<input type="file" accept=".csv,text/csv" id="c-csv" hidden></label>
+        </div>
+      </details>
     </div>
     <div class="card">
-      <input id="c-buscar" placeholder="Buscar…">
+      <h2>👥 Mis clientes <span class="pill" id="nClientes">0</span></h2>
+      <input id="c-buscar" placeholder="Buscar…" aria-label="Buscar cliente">
       <ul class="list" id="clientes"></ul>
     </div>
   </section>
@@ -123,12 +140,13 @@
       <label>Mensaje (usa {nombre} para personalizar)</label>
       <textarea id="k-msg">Hola {nombre} 👋 Tenemos una oferta especial para ti.</textarea>
       <label>Fecha y hora</label><input type="datetime-local" id="k-fecha">
-      <label>Envío automático a suscriptores <span class="pill pro">PRO</span></label>
+      <p class="muted">🏷️ Toda campaña se publica en <b>Ofertas</b> de tus clientes con cuenta a la hora programada.</p>
+      <label>Además, enviar automáticamente <span class="pill pro">PRO</span></label>
       <div style="display:flex;gap:14px;flex-wrap:wrap">
         <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--text)"><input type="checkbox" id="k-push"> 🔔 Notificación push</label>
         <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--text)"><input type="checkbox" id="k-mail"> ✉️ Correo</label>
       </div>
-      <p class="muted">Sin envío automático, la app te recuerda a la hora y envías por WhatsApp.</p>
+      <p class="muted">Sin envío automático, la app también te recuerda a la hora para enviarla por WhatsApp.</p>
       <div class="btns"><button id="bAddCampana">📅 Programar</button></div>
     </div>
     <div class="card"><ul class="list" id="campanas"></ul></div>

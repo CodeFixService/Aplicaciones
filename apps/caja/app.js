@@ -101,8 +101,9 @@
     if ($('oGuardar').checked) {
       if (!pro && productos.length >= FREE_PRODUCTOS) soloPro('Tener más de ' + FREE_PRODUCTOS + ' productos');
       else {
-        const p = { id: Core.uid(), nombre, precio, costo: 0, stock: '', categoria: $('oCat').value.trim(), publicado: false, premium: null };
+        const p = { id: Core.uid(), nombre, precio, costo: 0, stock: '', categoria: $('oCat').value.trim(), publicado: true, premium: null };
         productos.push(p); guardarProductos(); id = p.id;
+        sincronizar(p).then((ok) => { if (!ok) { p.publicado = false; guardarProductos(); } });
       }
     }
     agregar({ id, nombre, precio, costo: 0 });
@@ -174,12 +175,33 @@
         '<button class="small danger" data-a="del" data-id="' + p.id + '" aria-label="Eliminar">✕</button></div>';
     }).join('') : '<p class="empty">Sin productos</p>';
     $('formTitulo').textContent = editId ? 'Editar producto' : 'Nuevo producto (' + productos.length + (pro ? '' : '/' + FREE_PRODUCTOS) + ')';
+    const sinPublicar = productos.filter((p) => !p.publicado).length;
+    $('rowPublicar').classList.toggle('hidden', !sinPublicar);
+    $('txtPublicar').textContent = sinPublicar + ' producto(s) no aparecen en el catálogo de tus clientes.';
   }
+
+  // Publica de una vez los productos que aún no están en el catálogo.
+  $('bPublicarTodos').onclick = async () => {
+    const l = productos.filter((p) => !p.publicado);
+    if (!l.length) return;
+    $('bPublicarTodos').disabled = true;
+    let n = 0;
+    try {
+      for (const p of l) {
+        try {
+          await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria });
+        } catch (e) { Core.toast('Se publicaron ' + n + '. ' + e.message); break; }
+        p.publicado = true; n++;
+      }
+      guardarProductos();
+      if (n === l.length) Core.toast('✅ ' + n + ' producto(s) publicados: tus clientes ya los ven');
+    } finally { $('bPublicarTodos').disabled = false; renderLista(); }
+  };
   $('p-pub').onchange = (e) => $('rowPrem').classList.toggle('hidden', !e.target.checked);
   function limpiarForm() {
     editId = null;
     ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem'].forEach((k) => { $('p-' + k).value = ''; });
-    $('p-pub').checked = false; $('rowPrem').classList.add('hidden');
+    $('p-pub').checked = true; $('rowPrem').classList.remove('hidden'); // lo nuevo se publica por defecto
     renderLista();
   }
   $('bCancelarProd').onclick = limpiarForm;
