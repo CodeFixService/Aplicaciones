@@ -238,6 +238,7 @@
 
   await cargarLista();
   const con = new URLSearchParams(location.search).get('con');
+  const txt = (new URLSearchParams(location.search).get('txt') || '').slice(0, 300); // mensaje sugerido (desde una oferta o producto)
   if (/^[0-9a-f-]{36}$/i.test(con || '')) {
     const c = convs.find((x) => x.other === con);
     if (c) abrir({ id: c.other, nombre: c.nombre, rol: c.rol, bloqueado: c.bloqueado });
@@ -248,6 +249,7 @@
         if (k) abrir({ id: k.id, nombre: k.nombre, rol: k.rol, bloqueado: false });
       } catch (e) { /* sin red */ }
     }
+    if (txt && actual && !$('texto').value) { $('texto').value = txt; $('texto').focus(); }
   }
   setInterval(() => { if (!document.hidden && !actual) cargarLista(); }, 20000);
 })();

@@ -22,11 +22,29 @@
   .item .p.tachado { font-size: 14px; font-weight: 500; color: var(--muted); text-decoration: line-through; }
   .item .prem { font-size: 13px; font-weight: 700; color: var(--premium); }
   .item .cat { font-size: 12px; color: var(--muted); }
+  .item .btn, .oferta .btn { margin-top: auto; }
+  .seg { display: flex; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; padding: 4px; margin-bottom: 14px; }
+  .seg button { flex: 1; border-radius: 99px; background: transparent; color: var(--muted); box-shadow: none; }
+  .seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  .ofertas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .oferta { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; min-width: 0; }
+  .oferta img { width: 100%; aspect-ratio: 4/5; object-fit: cover; display: block; background: var(--field); }
+  .oferta .txt { padding: 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .oferta b { overflow-wrap: anywhere; }
+  .oferta .nueva { align-self: flex-start; }
+  .oferta p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
 <header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1 id="titulo">Productos</h1><span id="tag" class="pill hidden"></span></header>
 <main>
+  <div class="seg" role="tablist">
+    <button id="tOfertas" class="small" role="tab">🏷️ Ofertas</button>
+    <button id="tProductos" class="small on" role="tab">🛍️ Productos</button>
+  </div>
+  <section id="vOfertas" class="hidden"><div class="ofertas" id="ofertas"></div></section>
+  <section id="vProductos">
   <input id="buscar" placeholder="Buscar producto…" aria-label="Buscar producto" style="margin-bottom:12px">
   <div class="cats" id="cats"></div>
   <div class="grid" id="grid"></div>
@@ -35,6 +53,7 @@
     <p class="muted">Algunos productos tienen un precio especial para clientes Premium. Actívalo desde el inicio.</p>
     <div class="btns"><a class="btn warn" href="../../">Ver Premium</a></div>
   </div>
+  </section>
 </main>
 <script src="../../shared/config.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
@@ -47,7 +66,7 @@
   const yo = await Cuenta.require('../../');
   // Clientes: catálogo de su tienda. Empresas: vista previa del propio.
   const negocio = yo.role === 'client' ? yo.negocio_id : yo.id;
-  $('titulo').textContent = yo.role === 'client' ? (yo.negocio || 'Productos') : 'Mi catálogo (vista del cliente)';
+  $('titulo').textContent = yo.role === 'client' ? (yo.negocio || 'Tienda') : 'Vista del cliente';
   if (yo.is_pro) { $('tag').textContent = yo.role === 'client' ? 'PREMIUM' : 'PRO'; $('tag').classList.add('pro'); $('tag').classList.remove('hidden'); }
   const cacheKey = 'cfx:catalogo:' + negocio;
   let items = [];
@@ -66,10 +85,46 @@
       const prem = i.precio_premium != null;
       return '<div class="item"><span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
         (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
-              : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Tiene precio Premium</span>' : '')) + '</div>';
+              : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Tiene precio Premium</span>' : '')) +
+        escribir('Hola, me interesa: ' + i.nombre) + '</div>';
     }).join('') : '<p class="empty" style="grid-column:1/-1">' + (items.length ? 'Sin resultados' : 'La tienda aún no publica productos.') + '</p>';
     $('cPrem').classList.toggle('hidden', yo.is_pro || !items.some((i) => i.tiene_premium));
   }
+  /* ---------- Ofertas (campañas de la tienda) ---------- */
+  const esCliente = yo.role === 'client';
+  // Abre el chat con la tienda con un mensaje listo para enviar.
+  const escribir = (txt) => esCliente ? '<a class="btn small ok" href="../mensajes/?con=' + negocio + '&txt=' +
+    encodeURIComponent(txt) + '">💬 Escribir a la tienda</a>' : '';
+  let ofertas = null;
+  const ofKey = 'cfx:ofertas:' + negocio;
+  async function cargarOfertas() {
+    try { ofertas = await Cuenta.rpc('my_offers'); localStorage.setItem(ofKey, JSON.stringify(ofertas)); }
+    catch (e) { try { ofertas = JSON.parse(localStorage.getItem(ofKey)) || []; } catch (e2) { ofertas = []; } }
+    pintarOfertas();
+    ofertas.filter((o) => !o.leido && esCliente).forEach((o) => Cuenta.rpc('mark_notification_read', { p_id: o.id }).catch(() => {}));
+  }
+  function pintarOfertas() {
+    $('ofertas').innerHTML = ofertas.length ? ofertas.map((o) =>
+      '<article class="oferta">' + (/^https?:\/\//i.test(o.image || '') ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
+      '<div class="txt">' + (!o.leido && esCliente ? '<span class="pill pro nueva">Nueva</span>' : '') +
+      '<b>' + Core.esc(o.title) + '</b>' + (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
+      '<span class="cat">' + new Date(o.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' }) + '</span>' +
+      escribir('Hola, vi su oferta "' + o.title + '" y me interesa.') + '</div></article>'
+    ).join('') : '<p class="empty" style="grid-column:1/-1">' + (esCliente ? 'La tienda aún no publica ofertas.'
+      : 'Aún no publicas ofertas. Programa una campaña en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
+  }
+  function vista(v) {
+    $('tOfertas').classList.toggle('on', v === 'ofertas');
+    $('tProductos').classList.toggle('on', v !== 'ofertas');
+    $('vOfertas').classList.toggle('hidden', v !== 'ofertas');
+    $('vProductos').classList.toggle('hidden', v === 'ofertas');
+    history.replaceState(null, '', v === 'ofertas' ? '?v=ofertas' : location.pathname);
+    if (v === 'ofertas' && !ofertas) cargarOfertas();
+  }
+  $('tOfertas').onclick = () => vista('ofertas');
+  $('tProductos').onclick = () => vista('productos');
+  vista(new URLSearchParams(location.search).get('v') === 'ofertas' ? 'ofertas' : 'productos');
+
   $('cats').onclick = (e) => { if (e.target.dataset.c !== undefined) { cat = e.target.dataset.c; pintar(); } };
   $('buscar').oninput = pintar;
   pintar();

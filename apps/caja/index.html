@@ -103,11 +103,15 @@
       </div>
       <label for="p-cat">Categoría</label><input id="p-cat" list="listaCats" maxlength="40" placeholder="Ej: Bebidas, Ropa, Cumpleaños">
       <datalist id="listaCats"></datalist>
-      <label class="chk"><input type="checkbox" id="p-pub"> Mostrar en mi catálogo para clientes</label>
-      <div id="rowPrem" class="hidden"><label for="p-prem">Precio para clientes Premium (opcional)</label><input id="p-prem" inputmode="decimal"></div>
+      <label class="chk"><input type="checkbox" id="p-pub" checked> Mostrar en mi catálogo para clientes</label>
+      <div id="rowPrem"><label for="p-prem">Precio para clientes Premium (opcional)</label><input id="p-prem" inputmode="decimal"></div>
       <div class="btns"><button id="bGuardarProd">Guardar</button><button class="alt" id="bCancelarProd">Cancelar</button></div>
     </div>
     <div class="card">
+      <div class="hidden" id="rowPublicar" style="margin-bottom:12px">
+        <p class="muted" id="txtPublicar" style="margin:0 0 8px"></p>
+        <div class="btns" style="margin:0"><button class="ok small" id="bPublicarTodos">🛍️ Publicar todos en mi catálogo</button></div>
+      </div>
       <input id="pq" placeholder="Buscar en mis productos…" aria-label="Buscar en mis productos">
       <div id="listaProds"></div>
     </div>

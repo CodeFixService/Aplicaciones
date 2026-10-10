@@ -59,7 +59,6 @@
   ul.feat { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--muted); font-size: 14px; }
   ul.feat li::before { content: '✓'; color: var(--premium); font-weight: 800; margin-right: 8px; }
   details.key summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-top: 14px; }
-  .invitar img { width: 170px; height: 170px; image-rendering: pixelated; background: #fff; border-radius: 12px; padding: 6px; display: block; margin: 0 auto 10px; }
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 14px; }
   .grid2 > * { min-width: 0; }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
@@ -67,7 +66,6 @@
     border: 2px solid var(--premium); background: linear-gradient(160deg, color-mix(in srgb, var(--premium) 14%, var(--card)), var(--card) 70%); }
   .solicitudes .num { font-size: 30px; font-weight: 800; min-width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center;
     background: var(--premium); color: var(--premium-ink); }
-  .cred { background: var(--field); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-top: 12px; white-space: pre-line; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -172,21 +170,6 @@
       <div class="card">
         <h2 id="inboxTitulo">🔔 Avisos</h2>
         <ul class="list inbox" id="inbox"></ul>
-      </div>
-
-      <div class="card hidden" id="cInvitar">
-        <h2>👥 Mis clientes <span class="pill" id="nClientes">0</span></h2>
-        <p class="muted">Crea la cuenta de tu cliente y envíale sus datos por WhatsApp. Verá tus productos y ofertas,
-          y podrá escribirte. Solo tú ves a tus clientes.</p>
-        <label for="cNombre">Nombre del cliente</label><input id="cNombre" maxlength="80" autocomplete="off">
-        <label for="cEmail">Correo</label><input id="cEmail" type="email" autocomplete="off">
-        <label for="cClave">Contraseña</label>
-        <div class="row"><input id="cClave" autocomplete="off" style="flex:2"><button class="alt small" id="cGen" type="button" style="flex:none">Generar</button></div>
-        <p class="err" id="cErr"></p>
-        <div class="btns"><button id="cCrear">➕ Crear cliente</button></div>
-        <div class="cred hidden" id="cCred"></div>
-        <div class="btns hidden" id="cCredBtns"><button class="ok small" id="cWsp">💬 Enviar por WhatsApp</button><button class="alt small" id="cCopiar">Copiar</button></div>
-        <details style="margin-top:12px"><summary class="muted" style="cursor:pointer">Ver mis clientes</summary><ul class="list" id="lClientes"></ul></details>
       </div>
     </div>
 
@@ -337,7 +320,6 @@
     contarMensajes();
     Cuenta.settings().then((s) => { ajustes = s || {}; pintarPro(Cuenta.account); });
     if (acc.is_admin) contarSolicitudes();
-    if (acc.role === 'user' || acc.is_admin) cargarClientes();
   }
 
   $('tBtn').onclick = async () => {
@@ -353,41 +335,11 @@
     } catch (e) { /* sin red */ }
   }
 
-  /* ---------- Mis clientes (empresa) ---------- */
-  async function cargarClientes() {
-    try {
-      const l = await Cuenta.rpc('my_clients');
-      $('nClientes').textContent = l.length;
-      $('lClientes').innerHTML = l.length ? l.map((c) => '<li><div class="grow"><b>' + Core.esc(c.nombre || '—') + '</b><div class="muted">' +
-        Core.esc(c.email) + ' · desde ' + new Date(c.creado).toLocaleDateString('es') + '</div></div>' +
-        '<a class="btn small alt" href="apps/mensajes/?con=' + c.id + '">💬</a></li>').join('') : '<li class="empty">Aún no tienes clientes</li>';
-    } catch (e) { /* sin red */ }
-  }
-  $('cGen').onclick = () => { $('cClave').value = Cuenta.claveAleatoria(); };
-  let ultimoAcceso = '';
-  $('cCrear').onclick = async () => {
-    $('cErr').textContent = '';
-    if (!$('cClave').value) $('cClave').value = Cuenta.claveAleatoria();
-    const d = { nombre: $('cNombre').value.trim(), email: $('cEmail').value.trim(), password: $('cClave').value, tipo: 'client' };
-    if (!d.nombre || !d.email) { $('cErr').textContent = 'Escribe el nombre y el correo'; return; }
-    $('cCrear').disabled = true;
-    try {
-      await Cuenta.crearUsuario(d);
-      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: Cuenta.account.empresa }, d));
-      $('cCred').textContent = ultimoAcceso;
-      $('cCred').classList.remove('hidden'); $('cCredBtns').classList.remove('hidden');
-      $('cNombre').value = ''; $('cEmail').value = ''; $('cClave').value = '';
-      Core.toast('✅ Cliente creado');
-      cargarClientes();
-    } catch (err) { $('cErr').textContent = err.message; } finally { $('cCrear').disabled = false; }
-  };
-  $('cWsp').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(ultimoAcceso), '_blank');
-  $('cCopiar').onclick = () => navigator.clipboard.writeText(ultimoAcceso).then(() => Core.toast('Copiado'));
-
   const APPS = {
     fichas: ['apps/fichas/', '📣', 'FichaPro', 'Fichas publicitarias, campañas y avisos a tus clientes'],
     caja: ['apps/caja/', '💵', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
     mensajes: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con tus clientes y con soporte'],
+    ofertas: ['apps/catalogo/?v=ofertas', '🏷️', 'Ofertas', 'Promociones de la tienda'],
     catalogo: ['apps/catalogo/', '🛍️', 'Productos', 'Catálogo y precios de la tienda'],
     admin: ['apps/admin/', '🛡️', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
   };
@@ -405,7 +357,7 @@
     $('estadoPlan').textContent = acc.email + ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : '');
     $('avatar').textContent = (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
 
-    const lista = cliente ? ['catalogo', 'mensajes'] : ['fichas', 'caja', 'mensajes'].concat(acc.is_admin ? ['admin'] : []);
+    const lista = cliente ? ['ofertas', 'catalogo', 'mensajes'] : ['fichas', 'caja', 'mensajes'].concat(acc.is_admin ? ['admin'] : []);
     $('apps').innerHTML = lista.map((k) => {
       const a = APPS[k];
       return '<a class="app' + (k === 'admin' ? ' admin' : '') + '" href="' + a[0] + '"><div class="ico">' + a[1] + '</div><b>' + a[2] +
@@ -421,7 +373,6 @@
     $('eMute').checked = !!acc.mute_offers;
     if (!cliente) pintarColores(acc.id);
 
-    $('cInvitar').classList.toggle('hidden', cliente || acc.is_admin);
     pintarPro(acc);
   }
 
@@ -524,6 +475,7 @@
       activo = !!(reg && reg.pushManager && await reg.pushManager.getSubscription()) && Notification.permission === 'granted';
     } catch (e) { /* sin soporte */ }
     $('cPush').classList.toggle('hidden', activo);
+    if (activo) Cuenta.syncPush(); // el celular queda a nombre de esta cuenta
   }
   $('bPush').onclick = async () => {
     try { await Cuenta.enablePush(); Core.toast('✅ Notificaciones activadas en este celular'); $('cPush').classList.add('hidden'); }

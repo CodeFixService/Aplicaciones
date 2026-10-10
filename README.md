@@ -16,14 +16,20 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 |---|---|
 | **Administrador** (solo Josué) | Todo: empresas, clientes de cada empresa (con filtros), keys, solicitudes de prueba/pago, reportes, avisos a todos, link de pago y precios. Mensajes sin límite. |
 | **Empresa** | FichaPro, Caja Rápida, Mensajes con sus clientes y con soporte, enlace/QR para invitar clientes. Free o Pro. |
-| **Cliente** | Su cuenta la crea su empresa (o el admin). Ve los productos publicados, las ofertas y avisos, y chatea con su empresa. Normal o Premium (precios especiales). |
+| **Cliente** | Su cuenta la crea su empresa (o el admin). Ve **Ofertas** (las campañas de su tienda, con la ficha) y **Productos**, y escribe a la tienda con un toque (💬 Escribir a la tienda). Normal o Premium (precios especiales). |
 
 ## Cuentas (registro cerrado)
 - La app solo muestra **Iniciar sesión**. Nadie puede registrarse solo: el servidor rechaza cualquier alta sin invitación.
 - **Administración → Usuarios → Crear usuario**: el admin crea empresas y clientes de cualquier empresa.
-- **Inicio → Mis clientes**: cada empresa crea sus propios clientes (Free: 30, Pro: 2000).
+- **FichaPro → Clientes**: cada empresa crea sus propios clientes (Free: 30, Pro: 2000), con WhatsApp opcional.
+  Esa misma lista se usa para las campañas por WhatsApp (también admite contactos solo de WhatsApp).
 - Al crear la cuenta se arma el mensaje con el enlace, el correo y la contraseña para enviarlo por WhatsApp.
 - En el primer ingreso cada persona acepta los términos; luego puede cambiar su contraseña en **Mi cuenta**.
+
+## Ofertas y productos para clientes
+- Todo producto nuevo de **Caja** se publica en el catálogo (casilla marcada); **Publicar todos** sube los que faltaban.
+- Toda campaña de **FichaPro** se publica en **Ofertas** de los clientes a su hora (Free: dentro de la app; Pro: además push y correo).
+- Cada celular recibe solo los avisos de la cuenta con sesión abierta: al cerrar sesión deja de recibirlos.
 
 ## Reglas del chat
 - Hasta **3 mensajes seguidos**; luego hay que esperar la respuesta. El administrador no tiene límite.

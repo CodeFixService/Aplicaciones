@@ -407,27 +407,73 @@
   };
 
   /* ---------- Clientes ---------- */
+  // Un solo listado: clientes con cuenta en la app (servidor) + contactos solo de WhatsApp (este celular).
   const normTel = (t) => String(t || '').replace(/[^\d]/g, '');
-  function tags() { return [...new Set(clientes.map((c) => c.tag).filter(Boolean))].sort(); }
+  let appClientes = db.get('appClientes', []);
+  let tagsApp = db.get('tagsApp', {});
+  function todos() {
+    const app = appClientes.map((c) => ({ id: c.id, nombre: c.nombre || c.email, tel: c.telefono || '', email: c.email, tag: tagsApp[c.id] || '', app: true }));
+    const tels = new Set(app.map((c) => c.tel).filter(Boolean));
+    return app.concat(clientes.filter((c) => !tels.has(c.tel)));
+  }
+  function tags() { return [...new Set(todos().map((c) => c.tag).filter(Boolean))].sort(); }
+
+  async function cargarAppClientes() {
+    try {
+      appClientes = await Cuenta.rpc('my_clients');
+      db.set('appClientes', appClientes);
+    } catch (e) { /* sin red: copia local */ }
+    renderClientes();
+  }
 
   function addCliente(nombre, tel, tag) {
     nombre = (nombre || '').trim(); tel = normTel(tel);
     if (!nombre || tel.length < 7) return false;
-    if (clientes.some((c) => c.tel === tel)) return false;
+    if (todos().some((c) => c.tel === tel)) return false;
     if (!licensed() && clientes.length >= FREE_LIMIT.clientes) {
-      Core.toast('La prueba admite ' + FREE_LIMIT.clientes + ' clientes. Activa tu licencia.');
+      Core.toast('La versión Free admite ' + FREE_LIMIT.clientes + ' contactos de WhatsApp. Activa Pro.');
       return false;
     }
     clientes.push({ id: Core.uid(), nombre, tel, tag: (tag || '').trim().toLowerCase() });
     return true;
   }
 
-  $('bAddCliente').onclick = () => {
+  $('c-gen').onclick = () => { $('c-clave').value = Cuenta.claveAleatoria(); };
+  let ultimoAcceso = '', ultimoTel = '';
+  $('bAddCliente').onclick = async () => {
+    $('c-err').textContent = '';
+    const d = { nombre: $('c-nombre').value.trim(), email: $('c-email').value.trim(), password: $('c-clave').value, tipo: 'client' };
+    const tel = normTel($('c-tel').value), tag = $('c-tag').value.trim().toLowerCase();
+    if (!d.nombre || !d.email) { $('c-err').textContent = 'Escribe el nombre y el correo del cliente'; return; }
+    if (tel && tel.length < 7) { $('c-err').textContent = 'Revisa el WhatsApp (con código de país)'; return; }
+    if (!d.password) d.password = $('c-clave').value = Cuenta.claveAleatoria();
+    $('bAddCliente').disabled = true;
+    try {
+      await Cuenta.crearUsuario(d);
+      if (tel) {
+        try { await Cuenta.rpc('set_client_phone', { p_email: d.email, p_tel: tel }); }
+        catch (e) { Core.toast('Cliente creado, pero no se guardó el WhatsApp: ' + e.message); }
+      }
+      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: cuenta.empresa || ajustes.negocio }, d));
+      ultimoTel = tel;
+      $('c-cred').textContent = ultimoAcceso;
+      $('c-cred').classList.remove('hidden'); $('c-credBtns').classList.remove('hidden');
+      ['c-nombre', 'c-email', 'c-clave', 'c-tel'].forEach((id) => { $(id).value = ''; });
+      Core.toast('✅ Cliente creado');
+      await cargarAppClientes();
+      const nuevo = appClientes.find((c) => c.email === d.email.toLowerCase());
+      if (nuevo && tag) { tagsApp[nuevo.id] = tag; db.set('tagsApp', tagsApp); renderClientes(); }
+    } catch (err) { $('c-err').textContent = err.message; } finally { $('bAddCliente').disabled = false; }
+  };
+  $('c-wsp').onclick = () => window.open('https://wa.me/' + ultimoTel + '?text=' + encodeURIComponent(ultimoAcceso), '_blank');
+  $('c-copiar').onclick = () => navigator.clipboard.writeText(ultimoAcceso).then(() => Core.toast('Copiado'));
+
+  $('bAddWsp').onclick = () => {
     if (addCliente($('c-nombre').value, $('c-tel').value, $('c-tag').value)) {
       db.set('clientes', clientes);
       $('c-nombre').value = ''; $('c-tel').value = '';
-      renderClientes(); Core.toast('Cliente agregado');
-    } else Core.toast('Revisa nombre y teléfono (o ya existe)');
+      renderClientes(); Core.toast('Contacto de WhatsApp agregado');
+    } else Core.toast('Revisa nombre y WhatsApp (o ya existe)');
   };
 
   if ('contacts' in navigator && 'select' in navigator.contacts) {
@@ -452,7 +498,7 @@
         const [nom, tel, tag] = line.split(/[,;\t]/);
         if (addCliente(nom, tel, tag)) n++;
       });
-      db.set('clientes', clientes); renderClientes(); Core.toast(n + ' clientes importados');
+      db.set('clientes', clientes); renderClientes(); Core.toast(n + ' contactos importados');
     };
     r.readAsText(file);
     e.target.value = '';
@@ -462,18 +508,37 @@
   function renderClientes() {
     $('tagsList').innerHTML = tags().map((t) => '<option value="' + Core.esc(t) + '">').join('');
     const q = $('c-buscar').value.toLowerCase();
-    const list = clientes.filter((c) => !q || (c.nombre + c.tel + c.tag).toLowerCase().includes(q));
+    const all = todos();
+    $('nClientes').textContent = all.length;
+    const list = all.filter((c) => !q || (c.nombre + c.tel + c.tag + (c.email || '')).toLowerCase().includes(q));
     $('clientes').innerHTML = list.length ? list.map((c) =>
-      '<li><div class="grow"><b>' + Core.esc(c.nombre) + '</b><div class="muted">+' + c.tel + '</div></div>' +
+      '<li><div class="grow"><b>' + Core.esc(c.nombre) + '</b> ' + (c.app ? '<span class="pill pro">📲 App</span>' : '<span class="pill">Solo WhatsApp</span>') +
+      '<div class="muted">' + (c.tel ? '+' + c.tel : 'Sin WhatsApp') + (c.email ? ' · ' + Core.esc(c.email) : '') + '</div></div>' +
       (c.tag ? '<span class="pill">' + Core.esc(c.tag) + '</span>' : '') +
-      '<button class="small danger" data-id="' + c.id + '">✕</button></li>'
-    ).join('') : '<li class="empty">Sin clientes todavía</li>';
+      (c.app ? '<a class="btn small alt" href="../mensajes/?con=' + c.id + '" aria-label="Chat">💬</a>' +
+               '<button class="small alt" data-a="edit" data-id="' + c.id + '" aria-label="Editar">✏️</button>'
+             : '<button class="small danger" data-a="del" data-id="' + c.id + '" aria-label="Eliminar">✕</button>') + '</li>'
+    ).join('') : '<li class="empty">' + (all.length ? 'Sin resultados' : 'Aún no tienes clientes. Crea el primero arriba.') + '</li>';
   }
-  $('clientes').onclick = (e) => {
-    const id = e.target.dataset.id;
-    if (!id || !confirm('¿Eliminar cliente?')) return;
-    clientes = clientes.filter((c) => c.id !== id);
-    db.set('clientes', clientes); renderClientes();
+  $('clientes').onclick = async (e) => {
+    const { a, id } = e.target.dataset;
+    if (a === 'del' && confirm('¿Eliminar este contacto de WhatsApp?')) {
+      clientes = clientes.filter((c) => c.id !== id);
+      db.set('clientes', clientes); renderClientes();
+    }
+    if (a === 'edit') {
+      const c = todos().find((x) => x.id === id);
+      if (!c) return;
+      const tel = prompt('WhatsApp de ' + c.nombre + ' (con código de país, vacío = sin WhatsApp):', c.tel);
+      if (tel === null) return;
+      const tag = prompt('Etiqueta (opcional):', c.tag);
+      try {
+        if (normTel(tel) !== c.tel) await Cuenta.rpc('set_client_phone', { p_email: c.email, p_tel: normTel(tel) });
+        if (tag !== null) { tagsApp[id] = tag.trim().toLowerCase(); db.set('tagsApp', tagsApp); }
+        Core.toast('Guardado');
+        cargarAppClientes();
+      } catch (err) { Core.toast(err.message); }
+    }
   };
 
   /* ---------- Campañas ---------- */
@@ -481,9 +546,10 @@
     $('k-ficha').innerHTML = fichas.length
       ? fichas.map((f) => '<option value="' + f.id + '">' + Core.esc(f.titulo) + '</option>').join('')
       : '<option value="">Primero guarda una ficha</option>';
-    $('k-tag').innerHTML = '<option value="">Todos los clientes (' + clientes.length + ')</option>' +
+    const conWsp = todos().filter((c) => c.tel);
+    $('k-tag').innerHTML = '<option value="">Todos los clientes (' + conWsp.length + ' con WhatsApp)</option>' +
       tags().map((t) => '<option value="' + Core.esc(t) + '">Etiqueta: ' + Core.esc(t) + ' (' +
-        clientes.filter((c) => c.tag === t).length + ')</option>').join('');
+        conWsp.filter((c) => c.tag === t).length + ')</option>').join('');
     if (!$('k-fecha').value) $('k-fecha').value = localInput(Date.now() + 3600e3);
 
     const sorted = campanas.slice().sort((a, b) => a.fecha - b.fecha);
@@ -492,9 +558,14 @@
       const enviados = dest.filter((c) => k.enviados.includes(c.id)).length;
       const f = fichas.find((x) => x.id === k.fichaId);
       const n = k.notifId && estadoAuto[k.notifId];
-      const auto = k.notifId ? '<div class="muted">' + (k.canales || []).map((c) => c === 'push' ? '🔔' : '✉️').join('') + ' ' +
-        (!n ? 'Automática' : n.status === 'sent' ? 'Enviada: ' + n.push_sent + ' notificaciones, ' + n.email_sent + ' correos · 👁 ' + (n.vistos || 0) + ' vistos'
-          : n.status === 'failed' ? 'Falló: ' + Core.esc(n.error || '') : n.status === 'cancelled' ? 'Cancelada' : 'Programada') + '</div>' : '';
+      const canales = k.canales || [];
+      const publicada = n && (n.status === 'sent' || (!canales.length && n.status !== 'cancelled' && k.fecha <= Date.now()));
+      const auto = k.notifId ? '<div class="muted">🏷️' + canales.map((c) => c === 'push' ? '🔔' : '✉️').join('') + ' ' +
+        (!n ? 'En Ofertas' : n.status === 'failed' ? 'Falló: ' + Core.esc(n.error || '')
+          : n.status === 'cancelled' ? 'Cancelada'
+          : publicada ? 'Publicada en Ofertas' + (canales.length && n.status === 'sent' ? ' · ' + n.push_sent + ' notificaciones, ' + n.email_sent + ' correos' : '') +
+            ' · 👁 ' + (n.vistos || 0) + ' vistos'
+          : 'Programada') + '</div>' : '';
       return '<li>' + (f ? '<img class="thumb" src="' + f.thumb + '" alt="">' : '') +
         '<div class="grow"><b>' + Core.esc(k.nombre) + '</b><div class="muted">' +
         new Date(k.fecha).toLocaleString('es') + ' · WhatsApp ' + enviados + '/' + dest.length + '</div>' + auto + '</div>' +
@@ -508,7 +579,7 @@
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 16);
   };
-  const destinatarios = (k) => clientes.filter((c) => !k.tag || c.tag === k.tag);
+  const destinatarios = (k) => todos().filter((c) => c.tel && (!k.tag || c.tag === k.tag));
 
   ['k-push', 'k-mail'].forEach((id) => {
     $(id).onchange = (e) => { if (e.target.checked && !licensed()) { e.target.checked = false; soloPro('El envío automático'); } };
@@ -526,17 +597,26 @@
     };
     $('bAddCampana').disabled = true;
     try {
-      if (canales.length) {
-        Core.toast('Subiendo la ficha…');
+      // Siempre se publica en "Ofertas" de los clientes con cuenta; Pro además envía push y/o correo.
+      Core.toast('Publicando la ficha…');
+      let aviso = '';
+      try {
         k.notifId = await programarAutomatico(k);
-        k.avisado = true; // el servidor la envía solo; no hace falta recordatorio
+        if (canales.length) k.avisado = true; // el servidor la envía solo; no hace falta recordatorio
+      } catch (err) {
+        if (canales.length) throw err;
+        aviso = 'Campaña guardada, pero no se publicó en Ofertas: ' + err.message;
       }
       campanas.push(k);
       db.set('campanas', campanas);
       $('k-nombre').value = ''; $('k-push').checked = false; $('k-mail').checked = false;
       renderCampanas();
-      if (canales.length) Core.toast('✅ Programada: se enviará sola a tus suscriptores');
-      else if (await Core.askNotify()) Core.toast('Te avisaré a la hora programada');
+      if (aviso) Core.toast(aviso);
+      else if (canales.length) Core.toast('✅ Programada: se publicará en Ofertas y se enviará sola a tus clientes');
+      else {
+        Core.toast('✅ Programada: aparecerá en Ofertas de tus clientes a esa hora');
+        Core.askNotify();
+      }
     } catch (err) {
       Core.toast(err.message);
     } finally { $('bAddCampana').disabled = false; }
@@ -563,7 +643,7 @@
 
   $('campanas').onclick = (e) => {
     const { a, id } = e.target.dataset;
-    if (a === 'del' && confirm('¿Eliminar campaña?')) {
+    if (a === 'del' && confirm('¿Eliminar campaña? También se quita de Ofertas de tus clientes.')) {
       const k = campanas.find((x) => x.id === id);
       if (k && k.notifId) Cuenta.rpc('cancel_notification', { p_id: k.notifId }).catch(() => {});
       campanas = campanas.filter((k) => k.id !== id);
@@ -610,7 +690,8 @@
     const k = campanas.find((x) => x.id === envioId);
     if (!a || !k) return;
     if (a === 'estado') { if (envioBlob) shareImage(envioBlob, k.nombre, k.msg.replace(/\{nombre\}/g, '')); return; }
-    const c = clientes.find((x) => x.id === id);
+    const c = todos().find((x) => x.id === id);
+    if (!c) return;
     const text = k.msg.replace(/\{nombre\}/g, c.nombre.split(' ')[0]);
     let ok = true;
     if (a === 'wa') window.open('https://wa.me/' + c.tel + '?text=' + encodeURIComponent(text), '_blank');
@@ -757,7 +838,7 @@
   };
 
   /* ---------- Inicio ---------- */
-  fillForm(); fillAjustes(); draw(ficha); revisar();
+  fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes();
   const m = location.hash.match(/camp=([\w]+)/);
   if (m) { show('campanas'); abrirEnvio(m[1]); }
 })();

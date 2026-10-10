@@ -88,7 +88,9 @@
   async function signIn(email, password) {
     const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
     if (error) throw new Error(friendly(error));
-    return refresh();
+    const acc = await refresh();
+    syncPush();
+    return acc;
   }
 
   // extra: { rol: 'client', negocio: '<id>' } para clientes de una empresa.
@@ -114,6 +116,11 @@
   }
 
   async function signOut() {
+    // Este celular deja de recibir los avisos de la cuenta que sale.
+    try {
+      const sub = await suscripcionActual();
+      if (sub) await sb.rpc('remove_my_push', { p_endpoint: sub.endpoint });
+    } catch (e) { /* sin red */ }
     try { await sb.auth.signOut(); } catch (e) { /* sin red */ }
     writeCache(null);
   }
@@ -222,6 +229,23 @@
     return sub.toJSON();
   }
 
+  async function suscripcionActual() {
+    if (!pushSupported() || Notification.permission !== 'granted') return null;
+    const reg = await navigator.serviceWorker.getRegistration();
+    return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
+  }
+
+  // Si este celular ya tiene notificaciones activas, quedan a nombre de la cuenta que tiene la sesión.
+  async function syncPush() {
+    try {
+      const sub = await suscripcionActual();
+      if (!sub) return false;
+      const s = sub.toJSON();
+      await rpc('save_my_push', { p_endpoint: s.endpoint, p_p256dh: s.keys.p256dh, p_auth: s.keys.auth });
+      return true;
+    } catch (e) { return false; }
+  }
+
   async function enablePush() {
     const s = await pushSubscription();
     await rpc('save_my_push', { p_endpoint: s.endpoint, p_p256dh: s.keys.p256dh, p_auth: s.keys.auth });
@@ -230,7 +254,7 @@
 
   global.Cuenta = {
     configured, sb, refresh, require, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
-    enablePush, pushSubscription, pushSupported, friendly,
+    enablePush, syncPush, pushSubscription, pushSupported, friendly,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
     isAdmin: () => !!(account && account.is_admin),
