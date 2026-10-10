@@ -1,6 +1,6 @@
 /* Service worker: guarda todas las apps en el teléfono para usarlas sin internet.
    Sube VERSION cada vez que cambies archivos para que los celulares se actualicen. */
-const VERSION = 'v9';
+const VERSION = 'v10';
 const CACHE = 'misapps-' + VERSION;
 const FILES = [
   './',
@@ -34,7 +34,10 @@ const FILES = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: 'reload' evita guardar copias viejas que el navegador tenga en su caché HTTP.
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -45,18 +48,18 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Primero la copia local (rápido y offline); en segundo plano se refresca.
+// Con internet: siempre lo último (así cada cambio se ve al instante).
+// Sin internet: la copia guardada en el teléfono.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    caches.open(CACHE).then((cache) =>
-      cache.match(e.request, { ignoreSearch: true }).then((hit) => {
-        const net = fetch(e.request)
-          .then((res) => { if (res.ok) cache.put(e.request, res.clone()); return res; })
-          .catch(() => hit);
-        return hit || net;
+    fetch(e.request, { cache: 'no-cache' })
+      .then((res) => {
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
+        return res;
       })
-    )
+      .catch(() => caches.open(CACHE).then((c) => c.match(e.request, { ignoreSearch: true }))
+        .then((hit) => hit || Response.error()))
   );
 });
 

@@ -30,6 +30,10 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 - Todo producto nuevo de **Caja** se publica en el catálogo (casilla marcada); **Publicar todos** sube los que faltaban.
 - Toda campaña de **FichaPro** se publica en **Ofertas** de los clientes a su hora (Free: dentro de la app; Pro: además push y correo).
 - Cada celular recibe solo los avisos de la cuenta con sesión abierta: al cerrar sesión deja de recibirlos.
+- El cliente tiene **Ofertas**, **Productos** y **Pedidos**: marca ❤️ favoritos (gratis: 5; Premium: ilimitados), ve los ✨ nuevos,
+  arma un 🛒 pedido que llega a la tienda por el chat y puede repetir pedidos anteriores.
+- **Ofertas exclusivas Premium**: la empresa marca la campaña como ⭐ exclusiva; los clientes normales la ven bloqueada con "Hazte Premium".
+- La versión de la app se ve al pie de cada pantalla. Con internet siempre se carga lo último; sin internet, la copia guardada.
 
 ## Reglas del chat
 - Hasta **3 mensajes seguidos**; luego hay que esperar la respuesta. El administrador no tiene límite.

@@ -5,56 +5,97 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
-<title>Productos</title>
+<title>Tienda</title>
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="icon" href="../../icons/icon-192.png">
 <link rel="stylesheet" href="../../shared/core.css">
 <script src="../../shared/core.js"></script>
 <style>
-  body { padding-bottom: 24px; }
+  body { padding-bottom: 96px; }
+  .seg { display: flex; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; padding: 4px; margin-bottom: 14px; }
+  .seg button { flex: 1; border-radius: 99px; background: transparent; color: var(--muted); box-shadow: none; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
+  .seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
   .cats { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 12px; }
   .cats button { flex: none; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .item { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
+  .item { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
     display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .item b { overflow-wrap: anywhere; }
+  .item b { overflow-wrap: anywhere; padding-right: 30px; }
   .item .p { font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
   .item .p.tachado { font-size: 14px; font-weight: 500; color: var(--muted); text-decoration: line-through; }
   .item .prem { font-size: 13px; font-weight: 700; color: var(--premium); }
   .item .cat { font-size: 12px; color: var(--muted); }
-  .item .btn, .oferta .btn { margin-top: auto; }
-  .seg { display: flex; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; padding: 4px; margin-bottom: 14px; }
-  .seg button { flex: 1; border-radius: 99px; background: transparent; color: var(--muted); box-shadow: none; }
-  .seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  .item .acc { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
+  .item .acc .btn, .item .acc button { flex: 1; padding: 8px 6px; font-size: 13px; }
+  .fav { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 18px;
+    background: var(--field); box-shadow: none; color: var(--text); }
+  .fav.on { background: color-mix(in srgb, #ef4444 16%, var(--card)); }
+  .nuevo { align-self: flex-start; font-size: 11px; }
   .ofertas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
   .oferta { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
     display: flex; flex-direction: column; min-width: 0; }
   .oferta img { width: 100%; aspect-ratio: 4/5; object-fit: cover; display: block; background: var(--field); }
   .oferta .txt { padding: 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
   .oferta b { overflow-wrap: anywhere; }
-  .oferta .nueva { align-self: flex-start; }
+  .oferta .pills { display: flex; gap: 6px; flex-wrap: wrap; }
   .oferta p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+  .oferta .btn { margin-top: auto; }
+  .bloq { aspect-ratio: 4/5; display: grid; place-items: center; text-align: center; padding: 20px; color: var(--premium-ink);
+    background: linear-gradient(150deg, var(--premium), color-mix(in srgb, var(--premium) 45%, #000)); }
+  .bloq div { font-size: 46px; }
+  .carro { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); }
+  .carro button { width: 100%; max-width: 640px; margin: 0 auto; display: flex; justify-content: space-between; }
+  .linea { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .linea .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .qty { display: flex; align-items: center; gap: 8px; }
+  .qty button { width: 34px; height: 34px; padding: 0; border-radius: 10px; }
+  .total { display: flex; justify-content: space-between; font-size: 20px; font-weight: 800; margin: 12px 0; }
+  .ped li { flex-wrap: wrap; }
+  .ped .grow { min-width: 180px; }
+  .ped pre { white-space: pre-wrap; font: inherit; font-size: 14px; color: var(--muted); margin: 6px 0 0; }
 </style>
 </head>
 <body>
-<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1 id="titulo">Productos</h1><span id="tag" class="pill hidden"></span></header>
+<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1 id="titulo">Tienda</h1><span id="tag" class="pill hidden"></span></header>
 <main>
   <div class="seg" role="tablist">
     <button id="tOfertas" class="small" role="tab">🏷️ Ofertas</button>
     <button id="tProductos" class="small on" role="tab">🛍️ Productos</button>
+    <button id="tPedidos" class="small" role="tab">🧾 Pedidos</button>
   </div>
+
   <section id="vOfertas" class="hidden"><div class="ofertas" id="ofertas"></div></section>
+
   <section id="vProductos">
-  <input id="buscar" placeholder="Buscar producto…" aria-label="Buscar producto" style="margin-bottom:12px">
-  <div class="cats" id="cats"></div>
-  <div class="grid" id="grid"></div>
-  <div class="card upsell hidden" id="cPrem" style="margin-top:16px">
-    <h2>⭐ Precios Premium</h2>
-    <p class="muted">Algunos productos tienen un precio especial para clientes Premium. Actívalo desde el inicio.</p>
-    <div class="btns"><a class="btn warn" href="../../">Ver Premium</a></div>
-  </div>
+    <input id="buscar" placeholder="Buscar producto…" aria-label="Buscar producto" style="margin-bottom:12px">
+    <div class="cats" id="cats"></div>
+    <div class="grid" id="grid"></div>
+    <div class="card upsell hidden" id="cPrem" style="margin-top:16px">
+      <h2>⭐ Hazte Premium</h2>
+      <p class="muted" id="premTxt">Precios especiales, ofertas exclusivas y favoritos ilimitados.</p>
+      <div class="btns"><a class="btn warn" href="../../#premium">Ver Premium</a></div>
+    </div>
+  </section>
+
+  <section id="vPedidos" class="hidden">
+    <div class="card hidden" id="cCarro">
+      <h2>🛒 Mi pedido</h2>
+      <div id="lineas"></div>
+      <div class="total"><span>Total</span><span id="carTotal">$0</span></div>
+      <label for="nota">Nota para la tienda (opcional)</label>
+      <textarea id="nota" maxlength="200" placeholder="Ej: lo retiro el sábado en la mañana"></textarea>
+      <div class="btns"><button class="ok" id="bEnviarPed" style="flex:1">📨 Enviar pedido a la tienda</button><button class="alt" id="bVaciar">Vaciar</button></div>
+      <p class="muted">El pedido le llega a la tienda por el chat. Ahí coordinan el pago y la entrega.</p>
+    </div>
+    <div class="card">
+      <h2>🧾 Mis pedidos</h2>
+      <ul class="list ped" id="pedidos"></ul>
+    </div>
   </section>
 </main>
+<div class="carro hidden" id="barra"><button class="ok" id="bVerCarro"><span id="barTxt">🛒 Ver pedido</span><span id="barTotal"></span></button></div>
+
 <script src="../../shared/config.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
 <script src="../../shared/cuenta.js"></script>
@@ -64,70 +105,181 @@
   Core.registerSW('../../');
   Core.marca();
   const yo = await Cuenta.require('../../');
-  // Clientes: catálogo de su tienda. Empresas: vista previa del propio.
-  const negocio = yo.role === 'client' ? yo.negocio_id : yo.id;
-  $('titulo').textContent = yo.role === 'client' ? (yo.negocio || 'Tienda') : 'Vista del cliente';
-  if (yo.is_pro) { $('tag').textContent = yo.role === 'client' ? 'PREMIUM' : 'PRO'; $('tag').classList.add('pro'); $('tag').classList.remove('hidden'); }
-  const cacheKey = 'cfx:catalogo:' + negocio;
-  let items = [];
-  try { items = await Cuenta.rpc('catalog_of', { p_negocio: negocio }); localStorage.setItem(cacheKey, JSON.stringify(items)); }
-  catch (e) { try { items = JSON.parse(localStorage.getItem(cacheKey)) || []; } catch (e2) { items = []; } }
-
-  let cat = '';
-  const precio = (n) => '$' + Number(n).toLocaleString('es-CL');
-  function pintar() {
-    const cats = [...new Set(items.map((i) => i.categoria).filter(Boolean))];
-    $('cats').innerHTML = cats.length ? ['<button class="small ' + (cat ? 'alt' : 'on') + '" data-c="">Todo</button>']
-      .concat(cats.map((c) => '<button class="small ' + (cat === c ? 'on' : 'alt') + '" data-c="' + Core.esc(c) + '">' + Core.esc(c) + '</button>')).join('') : '';
-    const q = $('buscar').value.toLowerCase();
-    const l = items.filter((i) => (!cat || i.categoria === cat) && (!q || i.nombre.toLowerCase().includes(q)));
-    $('grid').innerHTML = l.length ? l.map((i) => {
-      const prem = i.precio_premium != null;
-      return '<div class="item"><span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
-        (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
-              : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Tiene precio Premium</span>' : '')) +
-        escribir('Hola, me interesa: ' + i.nombre) + '</div>';
-    }).join('') : '<p class="empty" style="grid-column:1/-1">' + (items.length ? 'Sin resultados' : 'La tienda aún no publica productos.') + '</p>';
-    $('cPrem').classList.toggle('hidden', yo.is_pro || !items.some((i) => i.tiene_premium));
-  }
-  /* ---------- Ofertas (campañas de la tienda) ---------- */
+  // Clientes: su tienda. Empresas: vista previa de lo que ven sus clientes.
   const esCliente = yo.role === 'client';
-  // Abre el chat con la tienda con un mensaje listo para enviar.
-  const escribir = (txt) => esCliente ? '<a class="btn small ok" href="../mensajes/?con=' + negocio + '&txt=' +
-    encodeURIComponent(txt) + '">💬 Escribir a la tienda</a>' : '';
+  const negocio = esCliente ? yo.negocio_id : yo.id;
+  const premium = !!yo.is_pro;
+  $('titulo').textContent = esCliente ? (yo.negocio || 'Tienda') : 'Vista del cliente';
+  if (premium) { $('tag').textContent = esCliente ? 'PREMIUM' : 'PRO'; $('tag').classList.add('pro'); $('tag').classList.remove('hidden'); }
+  const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
+  const db = Core.store('tienda:' + yo.id + ':' + negocio);
+  const FAV_FREE = 5;
+
+  /* ---------- Datos (con copia para usar sin internet) ---------- */
+  async function traer(fn, args, key) {
+    try { const d = await Cuenta.rpc(fn, args); db.set(key, d); return d; }
+    catch (e) { return db.get(key, []); }
+  }
+  let items = await traer('catalog_of', { p_negocio: negocio }, 'catalogo');
+  items.forEach((i) => { if (!i.clave) i.clave = i.nombre; });
+  let favs = db.get('favs', []);
+  let carro = db.get('carro', []);       // [{clave, cant}]
+  let pedidos = db.get('pedidos', []);   // historial en este celular
   let ofertas = null;
-  const ofKey = 'cfx:ofertas:' + negocio;
-  async function cargarOfertas() {
-    try { ofertas = await Cuenta.rpc('my_offers'); localStorage.setItem(ofKey, JSON.stringify(ofertas)); }
-    catch (e) { try { ofertas = JSON.parse(localStorage.getItem(ofKey)) || []; } catch (e2) { ofertas = []; } }
-    pintarOfertas();
-    ofertas.filter((o) => !o.leido && esCliente).forEach((o) => Cuenta.rpc('mark_notification_read', { p_id: o.id }).catch(() => {}));
-  }
-  function pintarOfertas() {
-    $('ofertas').innerHTML = ofertas.length ? ofertas.map((o) =>
-      '<article class="oferta">' + (/^https?:\/\//i.test(o.image || '') ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
-      '<div class="txt">' + (!o.leido && esCliente ? '<span class="pill pro nueva">Nueva</span>' : '') +
-      '<b>' + Core.esc(o.title) + '</b>' + (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
-      '<span class="cat">' + new Date(o.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' }) + '</span>' +
-      escribir('Hola, vi su oferta "' + o.title + '" y me interesa.') + '</div></article>'
-    ).join('') : '<p class="empty" style="grid-column:1/-1">' + (esCliente ? 'La tienda aún no publica ofertas.'
-      : 'Aún no publicas ofertas. Programa una campaña en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
-  }
+
+  const precioDe = (i) => i.precio_premium != null ? i.precio_premium : i.precio;
+  const escribir = (txt, txtBtn) => esCliente ? '<a class="btn small alt" href="../mensajes/?con=' + negocio + '&txt=' +
+    encodeURIComponent(txt) + '">' + (txtBtn || '💬 Escribir a la tienda') + '</a>' : '';
+
+  /* ---------- Pestañas ---------- */
   function vista(v) {
-    $('tOfertas').classList.toggle('on', v === 'ofertas');
-    $('tProductos').classList.toggle('on', v !== 'ofertas');
-    $('vOfertas').classList.toggle('hidden', v !== 'ofertas');
-    $('vProductos').classList.toggle('hidden', v === 'ofertas');
-    history.replaceState(null, '', v === 'ofertas' ? '?v=ofertas' : location.pathname);
+    ['Ofertas', 'Productos', 'Pedidos'].forEach((k) => {
+      $('t' + k).classList.toggle('on', v === k.toLowerCase());
+      $('v' + k).classList.toggle('hidden', v !== k.toLowerCase());
+    });
+    history.replaceState(null, '', v === 'productos' ? location.pathname : '?v=' + v);
     if (v === 'ofertas' && !ofertas) cargarOfertas();
+    if (v === 'pedidos') pintarPedidos();
+    scrollTo(0, 0);
   }
   $('tOfertas').onclick = () => vista('ofertas');
   $('tProductos').onclick = () => vista('productos');
-  vista(new URLSearchParams(location.search).get('v') === 'ofertas' ? 'ofertas' : 'productos');
+  $('tPedidos').onclick = () => vista('pedidos');
 
+  /* ---------- Ofertas ---------- */
+  async function cargarOfertas() {
+    ofertas = await traer('my_offers', {}, 'ofertas');
+    pintarOfertas();
+    if (esCliente) ofertas.filter((o) => !o.leido && !o.bloqueada).forEach((o) => Cuenta.rpc('mark_notification_read', { p_id: o.id }).catch(() => {}));
+  }
+  function pintarOfertas() {
+    $('ofertas').innerHTML = ofertas.length ? ofertas.map((o) => {
+      const fecha = new Date(o.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+      if (o.bloqueada) {
+        return '<article class="oferta"><div class="bloq"><span><div>⭐</div><b>Oferta exclusiva Premium</b></span></div>' +
+          '<div class="txt"><b>' + Core.esc(o.title) + '</b><span class="muted">Solo para clientes Premium · ' + fecha + '</span>' +
+          '<a class="btn warn" href="../../#premium">⭐ Hazte Premium para verla</a></div></article>';
+      }
+      return '<article class="oferta">' + (/^https?:\/\//i.test(o.image || '') ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
+        '<div class="txt"><div class="pills">' + (!o.leido && esCliente ? '<span class="pill pro">Nueva</span>' : '') +
+        (o.solo_premium ? '<span class="pill pro">⭐ Exclusiva Premium</span>' : '') + '</div>' +
+        '<b>' + Core.esc(o.title) + '</b>' + (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
+        '<span class="cat muted">' + fecha + '</span>' +
+        escribir('Hola, vi su oferta "' + o.title + '" y me interesa.') + '</div></article>';
+    }).join('') : '<p class="empty" style="grid-column:1/-1">' + (esCliente ? 'La tienda aún no publica ofertas.'
+      : 'Aún no publicas ofertas. Programa una campaña en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
+  }
+
+  /* ---------- Productos ---------- */
+  let cat = '';
+  function pintar() {
+    const cats = [...new Set(items.map((i) => i.categoria).filter(Boolean))];
+    const chips = [['', 'Todo']].concat(favs.length ? [['__fav', '❤️ Favoritos']] : [], items.some((i) => i.nuevo) ? [['__nuevo', '✨ Nuevos']] : [], cats.map((c) => [c, c]));
+    $('cats').innerHTML = chips.length > 1 ? chips.map(([v, t]) =>
+      '<button class="small ' + (cat === v ? 'on' : 'alt') + '" data-c="' + Core.esc(v) + '">' + Core.esc(t) + '</button>').join('') : '';
+    const q = $('buscar').value.toLowerCase();
+    const l = items.filter((i) => (!cat || (cat === '__fav' ? favs.includes(i.clave) : cat === '__nuevo' ? i.nuevo : i.categoria === cat)) &&
+      (!q || i.nombre.toLowerCase().includes(q)));
+    $('grid').innerHTML = l.length ? l.map((i) => {
+      const prem = i.precio_premium != null, fav = favs.includes(i.clave);
+      return '<div class="item">' + (esCliente ? '<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>' : '') +
+        (i.nuevo ? '<span class="pill ok nuevo">✨ Nuevo</span>' : '') +
+        '<span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
+        (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
+              : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Más barato con Premium</span>' : '')) +
+        (esCliente ? '<div class="acc"><button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>' +
+          escribir('Hola, me interesa: ' + i.nombre, '💬 Preguntar') + '</div>' : '') + '</div>';
+    }).join('') : '<p class="empty" style="grid-column:1/-1">' + (items.length ? (cat === '__fav' ? 'Aún no marcas favoritos' : 'Sin resultados')
+      : 'La tienda aún no publica productos.') + '</p>';
+    $('cPrem').classList.toggle('hidden', premium || !esCliente);
+  }
   $('cats').onclick = (e) => { if (e.target.dataset.c !== undefined) { cat = e.target.dataset.c; pintar(); } };
   $('buscar').oninput = pintar;
-  pintar();
+  $('grid').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.fav !== undefined) {
+      const k = b.dataset.fav;
+      if (favs.includes(k)) favs = favs.filter((x) => x !== k);
+      else if (!premium && favs.length >= FAV_FREE) return Core.toast('⭐ Con Premium guardas favoritos ilimitados (gratis: ' + FAV_FREE + ')');
+      else favs.push(k);
+      db.set('favs', favs); pintar();
+    }
+    if (b.dataset.add !== undefined) {
+      const l = carro.find((x) => x.clave === b.dataset.add);
+      if (l) l.cant++; else carro.push({ clave: b.dataset.add, cant: 1 });
+      guardarCarro();
+      Core.toast('🛒 Agregado al pedido');
+    }
+  };
+
+  /* ---------- Pedido (carrito) ---------- */
+  const lineasCarro = () => carro.map((l) => ({ l, i: items.find((x) => x.clave === l.clave) })).filter((x) => x.i);
+  const totalCarro = () => lineasCarro().reduce((s, x) => s + precioDe(x.i) * x.l.cant, 0);
+  function guardarCarro() {
+    carro = carro.filter((l) => l.cant > 0 && items.some((i) => i.clave === l.clave));
+    db.set('carro', carro);
+    const n = carro.reduce((s, l) => s + l.cant, 0);
+    $('barra').classList.toggle('hidden', !n || !esCliente);
+    $('barTxt').textContent = '🛒 Ver pedido (' + n + ')';
+    $('barTotal').textContent = precio(totalCarro());
+    pintarCarro();
+  }
+  function pintarCarro() {
+    const ls = lineasCarro();
+    $('cCarro').classList.toggle('hidden', !ls.length);
+    $('lineas').innerHTML = ls.map(({ l, i }) =>
+      '<div class="linea"><div class="grow"><b>' + Core.esc(i.nombre) + '</b><div class="muted">' + precio(precioDe(i)) + ' c/u</div></div>' +
+      '<div class="qty"><button class="alt" data-k="' + Core.esc(l.clave) + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
+      '</b><button class="alt" data-k="' + Core.esc(l.clave) + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('');
+    $('carTotal').textContent = precio(totalCarro());
+  }
+  $('lineas').onclick = (e) => {
+    const { k, d } = e.target.dataset;
+    if (!k) return;
+    const l = carro.find((x) => x.clave === k);
+    if (l) { l.cant += Number(d); guardarCarro(); }
+  };
+  $('bVerCarro').onclick = () => vista('pedidos');
+  $('bVaciar').onclick = () => { if (confirm('¿Vaciar el pedido?')) { carro = []; guardarCarro(); } };
+  $('bEnviarPed').onclick = async () => {
+    const ls = lineasCarro();
+    if (!ls.length) return;
+    let txt = '🛒 Pedido\n' + ls.map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
+      '\nTotal: ' + precio(totalCarro()) + (premium ? ' (precios Premium)' : '');
+    const nota = $('nota').value.trim();
+    if (nota) txt += '\nNota: ' + nota;
+    if (txt.length > 1000) return Core.toast('El pedido es muy largo: envíalo en dos partes');
+    $('bEnviarPed').disabled = true;
+    try {
+      const r = await Cuenta.rpc('send_message', { p_to: negocio, p_body: txt });
+      if (!r.ok) throw new Error(r.error);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato a la tienda
+      pedidos.unshift({ fecha: Date.now(), texto: txt, carro: carro.slice(), total: totalCarro() });
+      db.set('pedidos', pedidos.slice(0, 30));
+      carro = []; $('nota').value = ''; guardarCarro(); pintarPedidos();
+      Core.toast('✅ Pedido enviado. La tienda te responderá por el chat.');
+    } catch (err) { Core.toast(err.message); } finally { $('bEnviarPed').disabled = false; }
+  };
+  function pintarPedidos() {
+    $('pedidos').innerHTML = pedidos.length ? pedidos.map((p, n) =>
+      '<li><div class="grow"><b>' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) + ' · ' + precio(p.total) + '</b>' +
+      '<pre>' + Core.esc(p.texto.replace(/^🛒 Pedido\n/, '')) + '</pre></div>' +
+      '<button class="small alt" data-rep="' + n + '">🔁 Repetir</button>' +
+      '<a class="btn small alt" href="../mensajes/?con=' + negocio + '">💬 Chat</a></li>').join('')
+      : '<li class="empty">' + (esCliente ? 'Aún no envías pedidos. Agrega productos con ➕ y envíalos desde aquí.' : 'Tus clientes arman pedidos desde aquí y te llegan por Mensajes.') + '</li>';
+  }
+  $('pedidos').onclick = (e) => {
+    const n = e.target.dataset.rep;
+    if (n === undefined) return;
+    carro = pedidos[n].carro.map((l) => ({ clave: l.clave, cant: l.cant }));
+    guardarCarro();
+    Core.toast(lineasCarro().length ? '🛒 Pedido cargado: revísalo y envíalo' : 'Esos productos ya no están disponibles');
+  };
+
+  pintar(); guardarCarro();
+  const v = new URLSearchParams(location.search).get('v');
+  vista(['ofertas', 'pedidos'].includes(v) ? v : 'productos');
 })();
 </script>
 </body>

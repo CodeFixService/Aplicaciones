@@ -143,7 +143,7 @@
 
     <div class="apps" id="apps"></div>
 
-    <div class="card upsell hidden" id="cPro">
+    <div class="card upsell hidden" id="cPro"><span id="premium"></span>
       <h2 id="proTitulo">⭐ Versión Pro</h2>
       <div class="precio hidden" id="proPrecio"></div>
       <ul class="feat" id="proFeat"></ul>
@@ -315,9 +315,11 @@
     if (!acc.terms_at) { showView('v-terms'); return; }
     pintar(acc);
     showView('v-home');
+    if (location.hash === '#premium') setTimeout(() => $('cPro').scrollIntoView({ behavior: 'smooth' }), 300);
     cargarInbox();
     revisarPush();
     contarMensajes();
+    if (acc.role === 'client') contarOfertas();
     Cuenta.settings().then((s) => { ajustes = s || {}; pintarPro(Cuenta.account); });
     if (acc.is_admin) contarSolicitudes();
   }
@@ -339,8 +341,8 @@
     fichas: ['apps/fichas/', '📣', 'FichaPro', 'Fichas publicitarias, campañas y avisos a tus clientes'],
     caja: ['apps/caja/', '💵', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
     mensajes: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con tus clientes y con soporte'],
-    ofertas: ['apps/catalogo/?v=ofertas', '🏷️', 'Ofertas', 'Promociones de la tienda'],
-    catalogo: ['apps/catalogo/', '🛍️', 'Productos', 'Catálogo y precios de la tienda'],
+    ofertas: ['apps/catalogo/?v=ofertas', '🏷️', 'Ofertas', 'Promociones y ofertas exclusivas'],
+    catalogo: ['apps/catalogo/', '🛍️', 'Productos', 'Catálogo, favoritos y pedidos'],
     admin: ['apps/admin/', '🛡️', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
   };
   function pintar(acc) {
@@ -361,10 +363,10 @@
     $('apps').innerHTML = lista.map((k) => {
       const a = APPS[k];
       return '<a class="app' + (k === 'admin' ? ' admin' : '') + '" href="' + a[0] + '"><div class="ico">' + a[1] + '</div><b>' + a[2] +
-        '</b><small>' + a[3] + '</small>' + (k === 'mensajes' ? '<span class="badge hidden" id="badgeMsg"></span>' : '') + '</a>';
+        '</b><small>' + a[3] + '</small>' + (k === 'mensajes' ? '<span class="badge hidden" id="badgeMsg"></span>' : k === 'ofertas' ? '<span class="badge hidden" id="badgeOf"></span>' : '') + '</a>';
     }).join('');
 
-    $('inboxTitulo').textContent = cliente ? '🏷️ Ofertas y avisos' : '🔔 Avisos';
+    $('inboxTitulo').textContent = '🔔 Avisos';
     $('cuentaTitulo').textContent = cliente ? '👤 Mi cuenta' : '🏢 Mi empresa';
     $('lblNombre').textContent = cliente ? 'Tu nombre' : 'Nombre de la empresa';
     $('eNombre').value = acc.empresa || '';
@@ -386,7 +388,8 @@
     $('proPrecio').classList.toggle('hidden', !precio);
     if (precio) $('proPrecio').innerHTML = '$' + Number(precio).toLocaleString('es-CL') + ' <small>' + (cliente ? 'pago único' : 'por mes') + '</small>';
     $('proFeat').innerHTML = (cliente
-      ? ['Precios especiales Premium en los productos', 'Ofertas exclusivas de la tienda', 'Insignia de cliente Premium']
+      ? ['Ofertas exclusivas que solo ven los clientes Premium', 'Precios especiales Premium en los productos y pedidos',
+         'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
       : ['Fichas, clientes y productos ilimitados, sin marca de agua', 'Avisos push y correos automáticos a tus clientes',
          'Plantillas extra, menú de precios y código QR', 'Reportes avanzados de caja y respaldo en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
@@ -439,6 +442,15 @@
       Cuenta.rpc('mark_notification_read', { p_id: li.dataset.id }).catch(() => {});
     }
   };
+
+  async function contarOfertas() {
+    try {
+      const l = await Cuenta.rpc('my_offers');
+      const n = l.filter((o) => !o.leido && !o.bloqueada).length;
+      const b = $('badgeOf');
+      if (b) { b.textContent = n; b.classList.toggle('hidden', !n); }
+    } catch (e) { /* sin red */ }
+  }
 
   async function contarMensajes() {
     try {

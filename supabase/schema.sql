@@ -386,6 +386,7 @@ create table if not exists public.notifications (
   created_at   timestamptz not null default now()
 );
 alter table public.notifications add column if not exists target_id uuid references public.profiles (id) on delete cascade;
+alter table public.notifications add column if not exists solo_premium boolean not null default false;
 alter table public.notifications drop constraint if exists notifications_audience_check;
 alter table public.notifications add constraint notifications_audience_check
   check (audience in ('all_users', 'all_businesses', 'pro_users', 'free_users', 'all_clients',
@@ -476,8 +477,7 @@ language sql stable security definer set search_path = '' as $$
          or (me.role = 'user' and (n.audience = 'all_businesses'
                or (n.audience = 'pro_users' and public.is_pro(me.id))
                or (n.audience = 'free_users' and not public.is_pro(me.id))))
-         or (me.role = 'client' and (n.audience = 'all_clients'
-               or (n.audience = 'my_subscribers' and n.owner_id = me.negocio_id and not me.mute_offers)))
+         or (me.role = 'client' and n.audience = 'all_clients')
          or (n.audience = 'direct' and n.target_id = me.id and coalesce(n.url, '') not like 'apps/mensajes/%'))
   order by n.sent_at desc limit 40
 $$;
@@ -521,14 +521,16 @@ begin
   if n.audience = 'my_subscribers' then
     return query
       select s.endpoint, s.p256dh, s.auth, s.email, s.nombre
-        from public.subscribers s where s.negocio_id = n.owner_id
+        from public.subscribers s where s.negocio_id = n.owner_id and not coalesce(n.solo_premium, false)
       union all
       select ps.endpoint, ps.p256dh, ps.auth, null::text, c.empresa
         from public.profiles c join public.push_subscriptions ps on ps.user_id = c.id
         where c.negocio_id = n.owner_id and c.role = 'client' and not c.suspended and not c.mute_offers
+          and (not coalesce(n.solo_premium, false) or public.is_pro(c.id))
       union all
       select null, null, null, c.email, c.empresa from public.profiles c
-        where c.negocio_id = n.owner_id and c.role = 'client' and not c.suspended and not c.mute_offers;
+        where c.negocio_id = n.owner_id and c.role = 'client' and not c.suspended and not c.mute_offers
+          and (not coalesce(n.solo_premium, false) or public.is_pro(c.id));
   elsif n.audience = 'direct' then
     return query select ps.endpoint, ps.p256dh, ps.auth, null::text, null::text
       from public.push_subscriptions ps where ps.user_id = n.target_id;
@@ -988,6 +990,10 @@ create table if not exists public.catalog_items (
   updated_at      timestamptz not null default now(),
   unique (owner_id, client_key)
 );
+alter table public.catalog_items add column if not exists created_at timestamptz;
+update public.catalog_items set created_at = updated_at where created_at is null;
+alter table public.catalog_items alter column created_at set default now();
+alter table public.catalog_items alter column created_at set not null;
 alter table public.catalog_items enable row level security;
 
 create or replace function public.catalog_upsert(p_key text, p_nombre text, p_precio numeric, p_premium numeric, p_categoria text)
@@ -1014,12 +1020,15 @@ language sql security definer set search_path = '' as $$
 $$;
 
 -- El cliente ve el catálogo de SU empresa. El precio Premium solo si es Premium.
+-- Catálogo con clave (para favoritos y pedidos) y marca de producto nuevo (últimos 7 días).
+drop function if exists public.catalog_of(uuid);
 create or replace function public.catalog_of(p_negocio uuid)
-returns table (nombre text, precio numeric, precio_premium numeric, tiene_premium boolean, categoria text)
+returns table (nombre text, precio numeric, precio_premium numeric, tiene_premium boolean, categoria text,
+               clave text, nuevo boolean)
 language sql stable security definer set search_path = '' as $$
   select c.nombre, c.precio,
          case when public.is_pro(auth.uid()) or c.owner_id = auth.uid() or public.is_admin() then c.precio_premium end,
-         c.precio_premium is not null, c.categoria
+         c.precio_premium is not null, c.categoria, c.client_key, c.created_at > now() - interval '7 days'
   from public.catalog_items c
   where c.owner_id = p_negocio
     and (c.owner_id = auth.uid() or public.is_admin()
@@ -1193,17 +1202,24 @@ language sql security definer set search_path = '' as $$
   delete from public.push_subscriptions where endpoint = p_endpoint and user_id = auth.uid()
 $$;
 
--- Ofertas (campañas) de la tienda del cliente. La empresa ve las suyas.
--- Las campañas solo en la app (sin push ni correo) se muestran apenas llega su hora.
+-- Ofertas de la tienda. Las exclusivas se ven bloqueadas para clientes que no son Premium.
+drop function if exists public.my_offers();
 create or replace function public.my_offers()
-returns table (id uuid, title text, body text, url text, image text, fecha timestamptz, leido boolean)
+returns table (id uuid, title text, body text, url text, image text, fecha timestamptz, leido boolean,
+               solo_premium boolean, bloqueada boolean)
 language sql stable security definer set search_path = '' as $$
-  select n.id, n.title, n.body, n.url, n.image, coalesce(n.sent_at, n.send_at),
-         exists (select 1 from public.notification_reads r where r.notification_id = n.id and r.user_id = me.id)
+  select n.id, n.title,
+         case when x.bloq then '' else n.body end,
+         case when x.bloq then null else n.url end,
+         case when x.bloq then null else n.image end,
+         coalesce(n.sent_at, n.send_at),
+         exists (select 1 from public.notification_reads r where r.notification_id = n.id and r.user_id = me.id),
+         n.solo_premium, x.bloq
   from public.profiles me
   join public.notifications n
     on n.audience = 'my_subscribers'
    and n.owner_id = case when me.role = 'client' then me.negocio_id else me.id end
+  cross join lateral (select n.solo_premium and me.role = 'client' and not public.is_pro(me.id) as bloq) x
   where me.id = auth.uid()
     and (n.status = 'sent' or (n.status in ('scheduled', 'sending') and cardinality(n.channels) = 0 and n.send_at <= now()))
     and coalesce(n.sent_at, n.send_at) > now() - interval '60 days'
@@ -1225,3 +1241,23 @@ revoke all on function public.remove_my_push(text) from public, anon;
 revoke all on function public.my_offers() from public, anon;
 grant execute on function public.set_client_phone(text, text), public.my_clients(), public.remove_my_push(text),
   public.my_offers() to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 3.4: ofertas exclusivas Premium, productos nuevos, favoritos y pedidos
+-- =====================================================================
+
+-- La empresa marca una oferta como exclusiva para clientes Premium.
+create or replace function public.set_offer_premium(p_id uuid, p_premium boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.notifications set solo_premium = coalesce(p_premium, false)
+  where id = p_id and owner_id = auth.uid() and audience = 'my_subscribers' and status in ('scheduled', 'sent');
+  if not found then raise exception 'Oferta no encontrada'; end if;
+end $$;
+
+
+
+revoke all on function public.set_offer_premium(uuid, boolean) from public, anon;
+revoke all on function public.my_offers() from public, anon;
+revoke all on function public.catalog_of(uuid) from public, anon;
+grant execute on function public.set_offer_premium(uuid, boolean), public.my_offers(), public.catalog_of(uuid) to authenticated;

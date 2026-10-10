@@ -567,7 +567,7 @@
             ' · 👁 ' + (n.vistos || 0) + ' vistos'
           : 'Programada') + '</div>' : '';
       return '<li>' + (f ? '<img class="thumb" src="' + f.thumb + '" alt="">' : '') +
-        '<div class="grow"><b>' + Core.esc(k.nombre) + '</b><div class="muted">' +
+        '<div class="grow"><b>' + (k.vip ? '⭐ ' : '') + Core.esc(k.nombre) + '</b><div class="muted">' +
         new Date(k.fecha).toLocaleString('es') + ' · WhatsApp ' + enviados + '/' + dest.length + '</div>' + auto + '</div>' +
         '<button class="small ok" data-a="send" data-id="' + k.id + '">Enviar</button>' +
         '<button class="small danger" data-a="del" data-id="' + k.id + '">✕</button></li>';
@@ -593,7 +593,7 @@
     const canales = [$('k-push').checked && 'push', $('k-mail').checked && 'email'].filter(Boolean);
     const k = {
       id: Core.uid(), nombre: $('k-nombre').value.trim() || 'Campaña', fichaId,
-      tag: $('k-tag').value, msg: $('k-msg').value, fecha, avisado: fecha <= Date.now(), enviados: [], canales
+      tag: $('k-tag').value, msg: $('k-msg').value, fecha, avisado: fecha <= Date.now(), enviados: [], canales, vip: $('k-vip').checked
     };
     $('bAddCampana').disabled = true;
     try {
@@ -602,6 +602,7 @@
       let aviso = '';
       try {
         k.notifId = await programarAutomatico(k);
+        if (k.vip) await Cuenta.rpc('set_offer_premium', { p_id: k.notifId, p_premium: true });
         if (canales.length) k.avisado = true; // el servidor la envía solo; no hace falta recordatorio
       } catch (err) {
         if (canales.length) throw err;
@@ -609,7 +610,7 @@
       }
       campanas.push(k);
       db.set('campanas', campanas);
-      $('k-nombre').value = ''; $('k-push').checked = false; $('k-mail').checked = false;
+      $('k-nombre').value = ''; $('k-push').checked = false; $('k-mail').checked = false; $('k-vip').checked = false;
       renderCampanas();
       if (aviso) Core.toast(aviso);
       else if (canales.length) Core.toast('✅ Programada: se publicará en Ofertas y se enviará sola a tus clientes');
