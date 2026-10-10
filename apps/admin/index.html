@@ -17,6 +17,10 @@
   .st-sent { background: color-mix(in srgb, #10b981 16%, transparent); color: #059669; border-color: transparent; }
   .st-failed { background: color-mix(in srgb, #ef4444 16%, transparent); color: #dc2626; border-color: transparent; }
   .st-cancelled { background: var(--line); }
+  #solicitudes li, #reportes li { flex-wrap: wrap; }
+  #solicitudes li > .grow, #reportes li > .grow { flex: 1 1 100%; }
+  .acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
+  .acc button, .acc select { width: auto; padding: 7px 12px; font-size: 13px; border-radius: 10px; }
   .chk { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
   .chk label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-size: 15px; }
 </style>
@@ -151,6 +155,12 @@
 
   <!-- AJUSTES -->
   <section class="view" id="v-ajustes">
+    <div class="card">
+      <h2>🛰️ Servidor (función "enviar")</h2>
+      <p class="muted">Comprueba que la función que envía notificaciones, correos y crea usuarios esté instalada y actualizada.</p>
+      <div class="btns"><button class="alt" id="bPing">Probar conexión</button></div>
+      <p class="muted" id="pingRes"></p>
+    </div>
     <div class="card">
       <h2>💳 Venta de Pro / Premium</h2>
       <p class="muted">Pega tu link de Mercado Pago. Aparece en el botón "Comprar" de empresas y clientes.

@@ -50,12 +50,12 @@
       const u = perfiles[r.user_id] || {};
       const tipo = r.kind === 'trial' ? '🎁 Prueba 7 días' : '💰 Avisa que pagó';
       return '<li><div class="grow"><b>' + Core.esc(u.empresa || u.email || '') + '</b> <span class="pill">' + (u.role === 'client' ? 'Cliente' : 'Empresa') + '</span>' +
-        '<div class="muted">' + tipo + ' · ' + Core.esc(u.email || '') + ' · ' + fechaHora(r.created_at) + '</div></div>' +
-        (r.kind === 'trial'
-          ? '<button class="small ok" data-a="si" data-id="' + r.id + '" data-d="7">Dar 7 días</button>'
-          : '<select class="small" data-a="pago" data-id="' + r.id + '" style="width:auto"><option value="">Activar…</option>' +
+        '<div>' + tipo + '</div><div class="muted">' + Core.esc(u.email || '') + ' · ' + fechaHora(r.created_at) + '</div></div>' +
+        '<div class="acc">' + (r.kind === 'trial'
+          ? '<button class="ok" data-a="si" data-id="' + r.id + '" data-d="7">Dar 7 días</button>'
+          : '<select data-a="pago" data-id="' + r.id + '" aria-label="Activar plan"><option value="">Activar…</option>' +
             '<option value="30">1 mes</option><option value="90">3 meses</option><option value="365">1 año</option><option value="0">Permanente</option></select>') +
-        '<button class="small danger" data-a="no" data-id="' + r.id + '">Rechazar</button></li>';
+        '<button class="danger" data-a="no" data-id="' + r.id + '">Rechazar</button></div></li>';
     }).join('') : '<li class="empty">Nada pendiente 🎉</li>';
   }
   async function resolver(id, aprobar, dias) {
@@ -87,8 +87,8 @@
       const de = perfiles[r.reporter] || {}, a = perfiles[r.reported] || {};
       return '<li><div class="grow"><b>' + Core.esc(a.empresa || a.email || 'Usuario') + '</b> reportado por ' + Core.esc(de.empresa || de.email || '') +
         '<div class="muted">Motivo: ' + Core.esc(r.reason) + '</div><div class="muted">“' + Core.esc(r.excerpt || '') + '”</div></div>' +
-        '<button class="small alt" data-a="ok" data-id="' + r.id + '">Descartar</button>' +
-        '<button class="small danger" data-a="susp" data-id="' + r.id + '">Suspender</button></li>';
+        '<div class="acc"><button class="alt" data-a="ok" data-id="' + r.id + '">Descartar</button>' +
+        '<button class="danger" data-a="susp" data-id="' + r.id + '">Suspender</button></div></li>';
     }).join('');
   }
   $('reportes').onclick = async (e) => {
@@ -380,6 +380,14 @@
       Core.toast('Claves push listas');
       cargarAjustes();
     } catch (err) { fallo(err); }
+  };
+
+  $('bPing').onclick = async () => {
+    $('pingRes').textContent = 'Probando…';
+    try {
+      const r = await Cuenta.probarServidor();
+      $('pingRes').textContent = '✅ Conectado. Versión ' + r.version + (r.servicio ? '' : ' · ⚠️ falta la clave de servidor');
+    } catch (err) { $('pingRes').textContent = '❌ ' + err.message; }
   };
 
   $('bVenta').onclick = async () => {

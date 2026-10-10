@@ -8,6 +8,7 @@ import webpush from 'npm:web-push@3.6.7';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
+const VERSION = '3.2';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
 const BRAND = 'FichaPro · CodeFix';
@@ -174,10 +175,15 @@ if (Deno.env.get('SUPABASE_URL')) {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
     try {
       const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+      const json = (o: unknown) => new Response(JSON.stringify(o), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+      if (body && body.accion === 'ping') {
+        // Diagnóstico: confirma versión y que la clave de servidor esté disponible.
+        return json({ ok: true, version: VERSION, servicio: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') });
+      }
       if (body && body.accion === 'crear_usuario') {
         const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-        const out = await crearUsuario(jwt, body);
-        return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+        try { return json(await crearUsuario(jwt, body)); }
+        catch (e) { return json({ ok: false, error: 'Error del servidor: ' + String((e as Error).message || e) }); }
       }
       const out = await run();
       return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json' } });
