@@ -34,7 +34,7 @@
     if (/Password should be at least/i.test(m)) return 'La contraseña debe tener al menos 6 caracteres';
     if (/rate limit|too many/i.test(m)) return 'Demasiados intentos. Espera unos minutos.';
     if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Sin conexión con el servidor';
-    return m.replace(/^.*?:\s*/, '') || 'Error';
+    return m.replace(/^\w*Error:\s*/, '') || 'Error';
   }
 
   async function refresh() {
@@ -59,6 +59,17 @@
   }
 
   // Úsalo al abrir cada app: si no hay sesión, vuelve al inicio para ingresar.
+  // Ajustes públicos del admin (link de pago, precios). Se guardan para usarlos sin internet.
+  async function settings() {
+    try {
+      const s = await rpc('public_settings');
+      localStorage.setItem('cfx:ajustes', JSON.stringify(s));
+      return s;
+    } catch (e) {
+      try { return JSON.parse(localStorage.getItem('cfx:ajustes')) || {}; } catch (e2) { return {}; }
+    }
+  }
+
   async function require(rootPath, opts) {
     let a = null;
     try { a = await refresh(); } catch (e) { a = account; }
@@ -67,7 +78,7 @@
       return new Promise(() => {});
     }
     if (a.suspended) { alert('Tu cuenta está suspendida. Contacta a ' + (cfg.MARCA || 'soporte') + '.'); }
-    if (opts && opts.admin && !a.is_admin) {
+    if ((opts && opts.admin && !a.is_admin) || (opts && opts.empresa && a.role === 'client')) {
       location.replace(rootPath);
       return new Promise(() => {});
     }
@@ -80,10 +91,12 @@
     return refresh();
   }
 
-  async function signUp(email, password, empresa) {
+  // extra: { rol: 'client', negocio: '<id>' } para clientes de una empresa.
+  async function signUp(email, password, empresa, extra) {
+    const meta = Object.assign({ empresa: (empresa || '').trim(), acepta: 'si' }, extra || {});
     const { data, error } = await sb.auth.signUp({
       email: email.trim(), password,
-      options: { data: { empresa: (empresa || '').trim() }, emailRedirectTo: rootUrl() }
+      options: { data: meta, emailRedirectTo: rootUrl() }
     });
     if (error) throw new Error(friendly(error));
     if (data.session) return refresh();
@@ -164,11 +177,12 @@
   }
 
   global.Cuenta = {
-    configured, sb, refresh, require, signIn, signUp, signOut, resetPassword, setPassword, redeem, rpc,
+    configured, sb, refresh, require, settings, signIn, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, pushSubscription, pushSupported, friendly,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
     isAdmin: () => !!(account && account.is_admin),
+    isClient: () => !!(account && account.role === 'client'),
     uid: () => account && account.id
   };
 })(window);

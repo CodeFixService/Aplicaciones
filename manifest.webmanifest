@@ -34,6 +34,16 @@
       ]
     },
     {
+      "name": "Mensajes",
+      "url": "apps/mensajes/",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
       "name": "Caja Rápida",
       "url": "apps/caja/",
       "icons": [

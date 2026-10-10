@@ -27,6 +27,15 @@
   <!-- RESUMEN -->
   <section class="view on" id="v-resumen">
     <div class="stats" id="stats"></div>
+    <div class="card" id="cSolicitudes">
+      <h2>🔔 Solicitudes pendientes <span class="pill" id="nSol">0</span></h2>
+      <p class="muted">Pruebas de 7 días y avisos de pago. Revisa tu Mercado Pago antes de aprobar un pago.</p>
+      <ul class="list" id="solicitudes"></ul>
+    </div>
+    <div class="card" id="cReportes">
+      <h2>🚩 Reportes <span class="pill" id="nRep">0</span></h2>
+      <ul class="list" id="reportes"></ul>
+    </div>
     <div class="card">
       <h2>📲 Compartir la app</h2>
       <p class="muted">Envía este enlace o muestra el QR. Cada persona abre el enlace, instala la app, crea su cuenta
@@ -77,7 +86,13 @@
   <!-- USUARIOS -->
   <section class="view" id="v-usuarios">
     <div class="card">
-      <input id="uBuscar" placeholder="Buscar correo o empresa…">
+      <div class="row" style="flex-wrap:wrap">
+        <div style="min-width:140px"><label for="uTipo">Tipo</label>
+          <select id="uTipo"><option value="">Todos</option><option value="user">Empresas</option><option value="client">Clientes</option></select></div>
+        <div style="min-width:160px"><label for="uEmpresa">Clientes de</label><select id="uEmpresa"><option value="">Todas las empresas</option></select></div>
+      </div>
+      <input id="uBuscar" placeholder="Buscar correo o nombre…" style="margin-top:10px" aria-label="Buscar usuario">
+      <p class="muted" id="uCuenta"></p>
       <ul class="list" id="usuarios"></ul>
     </div>
   </section>
@@ -88,9 +103,11 @@
       <h2>Enviar aviso</h2>
       <label>Para</label>
       <select id="aPara">
-        <option value="all_users">Todos los usuarios</option>
-        <option value="pro_users">Solo usuarios Pro</option>
-        <option value="free_users">Solo usuarios Free</option>
+        <option value="all_users">Todos (empresas y clientes)</option>
+        <option value="all_businesses">Todas las empresas</option>
+        <option value="pro_users">Empresas Pro</option>
+        <option value="free_users">Empresas Free</option>
+        <option value="all_clients">Todos los clientes</option>
         <option value="self">Prueba: solo a mí</option>
       </select>
       <label>Título</label><input id="aTitulo" maxlength="80" placeholder="¡Nueva función disponible!">
@@ -117,6 +134,18 @@
 
   <!-- AJUSTES -->
   <section class="view" id="v-ajustes">
+    <div class="card">
+      <h2>💳 Venta de Pro / Premium</h2>
+      <p class="muted">Pega tu link de Mercado Pago. Aparece en el botón "Comprar" de empresas y clientes.
+        Si el link vence, crea otro y pégalo aquí: se actualiza al instante para todos.</p>
+      <label for="sLink">Link de pago</label><input id="sLink" type="url" placeholder="https://mpago.la/…">
+      <div class="row">
+        <div><label for="sPrecioE">Precio empresas ($/mes)</label><input id="sPrecioE" inputmode="numeric" placeholder="7000"></div>
+        <div><label for="sPrecioC">Precio clientes ($)</label><input id="sPrecioC" inputmode="numeric" placeholder="1000"></div>
+      </div>
+      <label for="sWsp">Tu WhatsApp de contacto (con código de país, opcional)</label><input id="sWsp" inputmode="tel" placeholder="56912345678">
+      <div class="btns"><button id="bVenta">Guardar</button><a class="btn alt hidden" id="sProbar" target="_blank" rel="noopener">Probar link</a></div>
+    </div>
     <div class="card">
       <h2>Notificaciones push</h2>
       <p class="muted" id="pushEstado"></p>

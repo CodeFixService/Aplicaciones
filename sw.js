@@ -1,6 +1,6 @@
 /* Service worker: guarda todas las apps en el teléfono para usarlas sin internet.
    Sube VERSION cada vez que cambies archivos para que los celulares se actualicen. */
-const VERSION = 'v5';
+const VERSION = 'v6';
 const CACHE = 'misapps-' + VERSION;
 const FILES = [
   './',
@@ -24,7 +24,13 @@ const FILES = [
   'apps/admin/index.html',
   'apps/admin/app.js',
   'apps/suscribirse/',
-  'apps/suscribirse/index.html'
+  'apps/suscribirse/index.html',
+  'apps/mensajes/',
+  'apps/mensajes/index.html',
+  'apps/catalogo/',
+  'apps/catalogo/index.html',
+  'apps/legal/',
+  'apps/legal/index.html'
 ];
 
 self.addEventListener('install', (e) => {
