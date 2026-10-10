@@ -129,8 +129,35 @@
     const { data, error } = await sb.functions.invoke('enviar', {
       body: { accion: 'crear_usuario', email: d.email, password: d.password, nombre: d.nombre, tipo: d.tipo, negocio: d.negocio || null }
     });
-    if (error) throw new Error('No se pudo conectar con el servidor. Revisa que la función "enviar" esté actualizada.');
-    if (!data || !data.ok) throw new Error((data && data.error) || 'No se pudo crear la cuenta');
+    if (error) throw new Error(await errorFuncion(error));
+    if (!data || !data.ok) {
+      if (data && data.processed !== undefined) throw new Error('La función "enviar" está desactualizada: pega el código nuevo en Supabase (guía, paso 2).');
+      throw new Error((data && data.error) || 'No se pudo crear la cuenta');
+    }
+    return data;
+  }
+
+  // Traduce los errores de la función "enviar" a algo accionable.
+  async function errorFuncion(error) {
+    let status = 0, det = '';
+    try {
+      const r = error.context;
+      if (r && typeof r.status === 'number') status = r.status;
+      if (r && r.text) { const t = await r.text(); try { const j = JSON.parse(t); det = j.error || j.message || j.msg || t; } catch (e) { det = t; } }
+    } catch (e) { /* sin detalle */ }
+    det = String(det || '').slice(0, 160);
+    if (error.name === 'FunctionsFetchError') return 'No se pudo conectar con la función "enviar": revisa que esté desplegada en Supabase (Edge Functions).';
+    if (status === 404) return 'La función "enviar" no existe en Supabase. Créala con el código de la guía (paso 2).';
+    if (status === 401) return 'Supabase rechazó la llamada (401). En la función "enviar" apaga "Verify JWT" o vuelve a iniciar sesión.';
+    if (status >= 500) return 'La función "enviar" falló al iniciar' + (det ? ': ' + det : '') + '. Vuelve a pegar el código completo de la guía (paso 2).';
+    return 'Error de la función "enviar"' + (status ? ' (' + status + ')' : '') + (det ? ': ' + det : '');
+  }
+
+  // Prueba la conexión con la función del servidor.
+  async function probarServidor() {
+    const { data, error } = await sb.functions.invoke('enviar', { body: { accion: 'ping' } });
+    if (error) throw new Error(await errorFuncion(error));
+    if (!data || !data.version) throw new Error('La función "enviar" responde, pero es una versión antigua. Pega el código nuevo (guía, paso 2).');
     return data;
   }
 
@@ -202,7 +229,7 @@
   }
 
   global.Cuenta = {
-    configured, sb, refresh, require, settings, signIn, crearUsuario, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
+    configured, sb, refresh, require, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, pushSubscription, pushSupported, friendly,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
