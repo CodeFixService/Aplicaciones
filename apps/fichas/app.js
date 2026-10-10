@@ -5,7 +5,7 @@
 
   Core.registerSW('../../');
   Core.marca();
-  const cuenta = await Cuenta.require('../../');
+  const cuenta = await Cuenta.require('../../', { empresa: true });
   const sb = Cuenta.sb;
   // Datos separados por usuario en este celular.
   const db = Core.store('fichas:' + cuenta.id);
@@ -493,7 +493,7 @@
       const f = fichas.find((x) => x.id === k.fichaId);
       const n = k.notifId && estadoAuto[k.notifId];
       const auto = k.notifId ? '<div class="muted">' + (k.canales || []).map((c) => c === 'push' ? '🔔' : '✉️').join('') + ' ' +
-        (!n ? 'Automática' : n.status === 'sent' ? 'Enviada: ' + n.push_sent + ' notificaciones, ' + n.email_sent + ' correos'
+        (!n ? 'Automática' : n.status === 'sent' ? 'Enviada: ' + n.push_sent + ' notificaciones, ' + n.email_sent + ' correos · 👁 ' + (n.vistos || 0) + ' vistos'
           : n.status === 'failed' ? 'Falló: ' + Core.esc(n.error || '') : n.status === 'cancelled' ? 'Cancelada' : 'Programada') + '</div>' : '';
       return '<li>' + (f ? '<img class="thumb" src="' + f.thumb + '" alt="">' : '') +
         '<div class="grow"><b>' + Core.esc(k.nombre) + '</b><div class="muted">' +
@@ -726,6 +726,10 @@
     if (!ids.length) return;
     const { data } = await sb.from('notifications').select('id,status,push_sent,email_sent,error').in('id', ids);
     (data || []).forEach((n) => { estadoAuto[n.id] = n; });
+    try {
+      const v = await Cuenta.rpc('notification_views', { p_ids: ids });
+      v.forEach((x) => { if (estadoAuto[x.id]) estadoAuto[x.id].vistos = x.vistos; });
+    } catch (e) { /* sin red */ }
     renderCampanas();
   }
 

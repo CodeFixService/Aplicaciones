@@ -11,49 +11,109 @@
 <link rel="stylesheet" href="../../shared/core.css">
 <script src="../../shared/core.js"></script>
 <style>
-  .prods { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-  .prod { flex-direction: column; align-items: flex-start; padding: 14px; background: var(--card); color: var(--text);
-    border: 1px solid var(--line); text-align: left; min-height: 86px; }
-  .prod b { font-size: 15px; }
-  .prod .muted { font-size: 13px; }
-  .prod.low { border-color: var(--bad); }
-  .total { font-size: 32px; font-weight: 800; }
-  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  main { max-width: 1100px; }
+  .vender { display: grid; gap: 14px; grid-template-columns: 1fr; }
+  @media (min-width: 900px) { .vender { grid-template-columns: 1fr 380px; align-items: start; } .ticketCard { position: sticky; top: 80px; } }
+  .vender > * { min-width: 0; }
+  .buscar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .buscar input { flex: 1; min-width: 0; }
+  .cats { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+  .cats button { flex: none; }
+  .prods { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .prod { flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 2px; padding: 12px; min-height: 78px;
+    background: var(--card); color: var(--text); border: 1px solid var(--line); text-align: left; box-shadow: none; }
+  .prod b { font-size: 14px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+  .prod span { font-size: 15px; font-weight: 700; color: var(--brand); }
+  .prod small { font-size: 11px; color: var(--muted); }
+  .prod.low small { color: var(--bad); font-weight: 600; }
+  .prod.otro { border-style: dashed; border-color: var(--brand-line); background: var(--brand-soft); color: var(--brand); justify-content: center; align-items: center; }
+  .prod:active { transform: scale(.96); }
+  .total { font-size: 34px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .linea { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .linea .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+  .qty { display: flex; align-items: center; gap: 4px; }
+  .qty button { width: 32px; height: 32px; padding: 0; border-radius: 10px; }
+  .qty b { min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+  .pago { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+  .pago button { padding: 10px 4px; font-size: 13px; }
+  .pago button:not(.on) { background: var(--brand-soft); color: var(--brand); box-shadow: none; }
+  #bCobrar { width: 100%; padding: 16px; font-size: 18px; margin-top: 12px; }
+  .vuelto { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .otroForm { border: 1px dashed var(--brand-line); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px; background: var(--card); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
   .kpis .card { margin: 0; text-align: center; }
-  .kpis b { display: block; font-size: 20px; }
+  .kpis b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .chk { display: flex; gap: 8px; align-items: center; margin: 12px 0 0; color: var(--text); font-size: 15px; }
+  .grupo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 4px; }
 </style>
 </head>
 <body>
-<header class="top"><a href="../../" aria-label="Volver">‹</a><h1>Caja Rápida</h1><span id="planTag" class="pill">FREE</span></header>
+<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Caja Rápida</h1><span id="planTag" class="pill">FREE</span></header>
 <main>
+  <!-- VENDER -->
   <section class="view on" id="v-vender">
-    <div class="card">
-      <div class="row" style="align-items:center">
-        <div><div class="muted">Venta actual</div><div class="total" id="ticketTotal">$0.00</div></div>
-        <div style="flex:0 0 auto" class="btns">
-          <button class="ok" id="bCobrar">Cobrar</button>
-          <button class="alt" id="bLimpiar">✕</button>
+    <div class="vender">
+      <div>
+        <div class="buscar">
+          <input id="q" placeholder="Buscar producto…" aria-label="Buscar producto" autocomplete="off">
         </div>
+        <div class="cats" id="cats"></div>
+        <div class="otroForm hidden" id="otroForm">
+          <div class="row">
+            <div style="flex:2"><label for="oNombre">Producto</label><input id="oNombre" placeholder="Ej: Polera de remate" maxlength="60"></div>
+            <div><label for="oPrecio">Precio</label><input id="oPrecio" inputmode="decimal" placeholder="500"></div>
+          </div>
+          <label class="chk"><input type="checkbox" id="oGuardar"> Guardar en mis productos</label>
+          <div id="oCatRow" class="hidden"><label for="oCat">Categoría</label><input id="oCat" list="listaCats" maxlength="40"></div>
+          <div class="btns"><button id="bOtroAgregar">Agregar a la venta</button><button class="alt" id="bOtroCancelar">Cancelar</button></div>
+        </div>
+        <div class="prods" id="prods"></div>
       </div>
-      <ul class="list" id="ticket"></ul>
+
+      <div class="card ticketCard">
+        <div class="row" style="align-items:center">
+          <div><div class="muted">Venta actual</div><div class="total" id="ticketTotal">$0</div></div>
+          <button class="alt small" id="bLimpiar" style="flex:none">Vaciar</button>
+        </div>
+        <div id="ticket"></div>
+        <div class="pago" id="pago">
+          <button class="on" data-m="efectivo">💵 Efectivo</button>
+          <button data-m="tarjeta">💳 Tarjeta</button>
+          <button data-m="transferencia">📲 Transfer.</button>
+        </div>
+        <div id="rowRecibido">
+          <label for="recibido">Recibido (opcional, para calcular el vuelto)</label>
+          <input id="recibido" inputmode="decimal" placeholder="0">
+          <div class="vuelto" id="vuelto"></div>
+        </div>
+        <button class="ok" id="bCobrar">Cobrar</button>
+      </div>
     </div>
-    <div class="prods" id="prods"></div>
   </section>
 
+  <!-- PRODUCTOS -->
   <section class="view" id="v-productos">
     <div class="card">
-      <h2>Producto</h2>
-      <label>Nombre</label><input id="p-nombre">
+      <h2 id="formTitulo">Nuevo producto</h2>
+      <label for="p-nombre">Nombre</label><input id="p-nombre" maxlength="60">
       <div class="row">
-        <div><label>Precio</label><input id="p-precio" inputmode="decimal"></div>
-        <div><label>Costo</label><input id="p-costo" inputmode="decimal"></div>
-        <div><label>Stock</label><input id="p-stock" inputmode="numeric"></div>
+        <div><label for="p-precio">Precio</label><input id="p-precio" inputmode="decimal"></div>
+        <div><label for="p-costo">Costo</label><input id="p-costo" inputmode="decimal" placeholder="opcional"></div>
+        <div><label for="p-stock">Stock</label><input id="p-stock" inputmode="numeric" placeholder="opcional"></div>
       </div>
+      <label for="p-cat">Categoría</label><input id="p-cat" list="listaCats" maxlength="40" placeholder="Ej: Bebidas, Ropa, Cumpleaños">
+      <datalist id="listaCats"></datalist>
+      <label class="chk"><input type="checkbox" id="p-pub"> Mostrar en mi catálogo para clientes</label>
+      <div id="rowPrem" class="hidden"><label for="p-prem">Precio para clientes Premium (opcional)</label><input id="p-prem" inputmode="decimal"></div>
       <div class="btns"><button id="bGuardarProd">Guardar</button><button class="alt" id="bCancelarProd">Cancelar</button></div>
     </div>
-    <div class="card"><ul class="list" id="listaProds"></ul></div>
+    <div class="card">
+      <input id="pq" placeholder="Buscar en mis productos…" aria-label="Buscar en mis productos">
+      <div id="listaProds"></div>
+    </div>
   </section>
 
+  <!-- REPORTE -->
   <section class="view" id="v-reporte">
     <div class="card">
       <div class="seg" id="r-rango">
@@ -62,25 +122,30 @@
         <button class="small alt" data-r="30">30 días</button>
         <button class="small alt" data-r="mes">Este mes</button>
       </div>
-      <label>Día</label><input type="date" id="r-dia">
+      <label for="r-dia">Día</label><input type="date" id="r-dia">
     </div>
     <div class="kpis">
       <div class="card"><span class="muted">Ventas</span><b id="k-ventas">0</b></div>
       <div class="card"><span class="muted">Ingreso</span><b id="k-ingreso">$0</b></div>
       <div class="card"><span class="muted">Ganancia</span><b id="k-ganancia">$0</b></div>
+      <div class="card"><span class="muted">Ticket promedio</span><b id="k-prom">$0</b></div>
     </div>
-    <div class="card" style="margin-top:14px" id="r-top-card">
+    <div class="card" style="margin-top:14px">
+      <h2>Por medio de pago</h2>
+      <ul class="list" id="r-medios"></ul>
+    </div>
+    <div class="card">
       <h2>🏆 Más vendidos <span class="pill pro">PRO</span></h2>
       <ul class="list" id="r-top"></ul>
     </div>
-    <div class="card" style="margin-top:14px">
+    <div class="card">
       <h2>Detalle</h2>
       <ul class="list" id="r-lista"></ul>
       <div class="btns">
         <button class="alt" id="bCSV">⬇️ CSV</button>
         <button class="alt" id="bNube">☁️ Nube</button>
         <button class="alt" id="bBackup">💾 Respaldo</button>
-        <label class="btn alt" style="margin:0;color:var(--brand)">⬆️ Restaurar<input type="file" accept=".json" id="restore" hidden></label>
+        <label class="btn alt" style="margin:0">⬆️ Restaurar<input type="file" accept=".json" id="restore" hidden></label>
       </div>
     </div>
   </section>

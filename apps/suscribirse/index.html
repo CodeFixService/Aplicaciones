@@ -23,7 +23,13 @@
   <div class="hero"><div class="ico">🔔</div><h1 id="titulo">Ofertas exclusivas</h1>
     <p class="muted" id="sub">Recibe promociones directo en tu celular.</p></div>
 
+  <div class="card" id="cCuenta">
+    <h2>👤 Crea tu cuenta de cliente</h2>
+    <p class="muted">Gratis. Mira los productos y precios, recibe las ofertas y escribe directo a la tienda.</p>
+    <div class="btns"><a class="btn" id="bCuenta" href="../../" style="flex:1">Crear cuenta o ingresar</a></div>
+  </div>
   <div class="card" id="form">
+    <h2>🔔 O solo recibe avisos, sin cuenta</h2>
     <label>Tu nombre</label><input id="nombre" maxlength="60" autocomplete="given-name">
     <label>Correo (opcional)</label><input id="email" type="email" autocomplete="email" placeholder="para recibir también por correo">
     <p class="err" id="err"></p>
@@ -52,12 +58,14 @@
   Core.marca();
   const negocio = new URLSearchParams(location.search).get('n');
   const valido = /^[0-9a-f-]{36}$/i.test(negocio || '');
-  if (!Cuenta.configured || !valido) { $('form').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
+  if (!Cuenta.configured || !valido) { $('form').classList.add('hidden'); $('cCuenta').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
 
   let info = null;
   try { info = await Cuenta.rpc('negocio_publico', { p_id: negocio }); } catch (e) { /* sin red */ }
-  if (!info) { $('form').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
+  if (!info) { $('form').classList.add('hidden'); $('cCuenta').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
   $('titulo').textContent = info.empresa || 'Ofertas exclusivas';
+  $('bCuenta').href = '../../?cliente=' + negocio;
+  if (!info.pro) $('form').classList.add('hidden'); // los avisos sin cuenta son de empresas Pro
   document.title = 'Ofertas de ' + (info.empresa || 'nuestro negocio');
   $('sub').textContent = 'Recibe las promociones de ' + (info.empresa || 'nuestro negocio') + ' directo en tu celular.';
   if (!Cuenta.pushSupported() && /iPhone|iPad/.test(navigator.userAgent)) $('ios').hidden = false;
@@ -76,6 +84,7 @@
       });
       if (!r.ok) throw new Error(r.error);
       $('form').classList.add('hidden');
+      $('cCuenta').classList.add('hidden');
       $('ok').classList.remove('hidden');
       $('okTxt').textContent = (s ? 'Te avisaremos con una notificación' : 'Te escribiremos') +
         (s && email ? ' y por correo' : '') + ' cuando haya ofertas de ' + (info.empresa || 'nosotros') + '.';

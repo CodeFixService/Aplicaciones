@@ -11,6 +11,23 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 | **Administración** (`apps/admin`) | Solo el administrador general: usuarios, keys Pro, avisos a todos, ajustes de push y Gmail. |
 | **Suscribirse** (`apps/suscribirse`) | Página pública (sin cuenta) donde los clientes de un negocio Pro se suscriben a sus ofertas. |
 
+## Roles
+| Rol | Qué ve |
+|---|---|
+| **Administrador** (solo Josué) | Todo: empresas, clientes de cada empresa (con filtros), keys, solicitudes de prueba/pago, reportes, avisos a todos, link de pago y precios. Mensajes sin límite. |
+| **Empresa** | FichaPro, Caja Rápida, Mensajes con sus clientes y con soporte, enlace/QR para invitar clientes. Free o Pro. |
+| **Cliente** | Se registra con el enlace de su empresa. Ve los productos publicados, las ofertas y avisos, y chatea con su empresa. Normal o Premium (precios especiales). |
+
+## Reglas del chat
+- Hasta **3 mensajes seguidos**; luego hay que esperar la respuesta. El administrador no tiene límite.
+- Máximo 100 mensajes por día. Estado ✓ Enviado / ✓✓ Visto. Bloquear y reportar.
+- Todo validado en el servidor (`supabase/schema.sql`).
+
+## Vender Pro / Premium
+- **Administración → Ajustes → Venta**: pega tu link de Mercado Pago y los precios. Se actualiza al instante para todos.
+- Empresas y clientes ven **Comprar ahora**, **Ya pagué** (te avisa) y **Probar 7 días** (una vez por cuenta).
+- Las solicitudes llegan a **Administración → Resumen**: apruebas con un toque y se corta solo al vencer.
+
 ## Free vs Pro
 
 | | Free | Pro |
@@ -24,7 +41,8 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 | Campañas automáticas por **push** y **correo** con la imagen de la ficha | — | ✅ |
 | Estado de envío (notificaciones y correos enviados) | — | ✅ |
 | Respaldo en la nube (recuperar en otro celular) | — | ✅ |
-| Caja: productos | 15 | Ilimitados |
+| Caja: productos (y catálogo publicado) | 15 | Ilimitados |
+| Caja: categorías, "Otro" sin registrar, medios de pago, vuelto | ✅ | ✅ |
 | Caja: reportes 7 días / 30 días / mes, más vendidos, margen | — | ✅ |
 
 ## Cómo funciona la seguridad
