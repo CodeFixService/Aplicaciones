@@ -62,7 +62,15 @@
 
   function registerSW(rootPath) {
     if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
-    navigator.serviceWorker.register(rootPath + 'sw.js', { scope: rootPath }).catch(() => {});
+    // Si se publica una versión nueva, la app se recarga sola una vez para mostrarla.
+    const habia = !!navigator.serviceWorker.controller;
+    let recargado = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (habia && !recargado) { recargado = true; location.reload(); }
+    });
+    navigator.serviceWorker.register(rootPath + 'sw.js', { scope: rootPath, updateViaCache: 'none' })
+      .then((reg) => reg.update())
+      .catch(() => {});
   }
 
   async function askNotify() {
@@ -180,17 +188,20 @@
   aplicarTema(tema.get()); // antes de pintar, sin parpadeo
 
   // Pie de página con la marca del autor en todas las pantallas.
+  // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
+  const APP_VERSION = '3.4';
+
   function marca() {
     const cfg = global.CFX_CONFIG || {};
     const el = document.createElement('footer');
     el.className = 'marca';
     el.innerHTML = '© ' + new Date().getFullYear() + ' <b>' + esc(cfg.MARCA || 'CodeFix') + '</b> · ' +
-      esc(cfg.AUTOR || '') + '. Todos los derechos reservados. Prohibida su reventa.';
+      esc(cfg.AUTOR || '') + '. Todos los derechos reservados. Prohibida su reventa. <span class="ver">v' + APP_VERSION + '</span>';
     (document.querySelector('main') || document.body).appendChild(el);
   }
 
   global.Core = {
     store, uid, money, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, rootUrl, marca, tema
+    backup, restore, readImage, rootUrl, marca, tema, version: APP_VERSION
   };
 })(window);
