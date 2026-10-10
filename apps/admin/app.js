@@ -104,7 +104,7 @@
   const invitacion = '📲 Te invito a la app de ' + (window.CFX_CONFIG.MARCA || 'CodeFix') + ' (FichaPro y Caja Rápida).\n\n' +
     '1. Abre este enlace en Chrome (Android) o Safari (iPhone):\n' + appLink + '\n' +
     '2. Toca "Instalar" (en iPhone: Compartir → Agregar a inicio).\n' +
-    '3. Crea tu cuenta gratis y activa las notificaciones.';
+    '3. Ingresa con el correo y la contraseña que te enviamos, y activa las notificaciones.';
   function qrGrande(text, px) {
     const q = qrcode(0, 'M'); q.addData(text); q.make();
     const n = q.getModuleCount(), m = 4, c = document.createElement('canvas'), k = Math.floor(px / (n + 2 * m));
@@ -202,6 +202,43 @@
     location.href = 'mailto:?subject=' + encodeURIComponent('Tu key Pro') + '&body=' + encodeURIComponent(mensajeKey(nueva));
   };
   $('lnCopy').onclick = () => navigator.clipboard.writeText(mensajeKey(nueva)).then(() => Core.toast('Copiado'));
+
+  /* ---------- Crear usuario ---------- */
+  $('nTipo').onchange = () => {
+    const cli = $('nTipo').value === 'client';
+    $('rowNEmp').classList.toggle('hidden', !cli);
+    $('lblNNombre').textContent = cli ? 'Nombre del cliente' : 'Nombre de la empresa';
+    if (cli) llenarEmpresas();
+  };
+  async function llenarEmpresas() {
+    if (!usuarios.length) usuarios = await q(sb.from('profiles').select('*').order('created_at', { ascending: false }));
+    const emp = usuarios.filter((u) => u.role === 'user');
+    $('nEmpresa').innerHTML = emp.length ? emp.map((u) => '<option value="' + u.id + '">' + Core.esc(u.empresa || u.email) + '</option>').join('')
+      : '<option value="">Primero crea una empresa</option>';
+  }
+  $('nGen').onclick = () => { $('nClave').value = Cuenta.claveAleatoria(); };
+  let ultimoAcceso = '';
+  $('bNuevo').onclick = async () => {
+    $('nErr').textContent = '';
+    if (!$('nClave').value) $('nClave').value = Cuenta.claveAleatoria();
+    const tipo = $('nTipo').value;
+    const d = { tipo, nombre: $('nNombre').value.trim(), email: $('nEmail').value.trim(), password: $('nClave').value,
+      negocio: tipo === 'client' ? $('nEmpresa').value : null };
+    if (!d.nombre || !d.email) { $('nErr').textContent = 'Escribe el nombre y el correo'; return; }
+    $('bNuevo').disabled = true;
+    try {
+      await Cuenta.crearUsuario(d);
+      const emp = tipo === 'client' ? usuarios.find((u) => u.id === d.negocio) : null;
+      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: emp ? (emp.empresa || 'tu tienda') : 'CodeFix Apps' }, d));
+      $('nCred').textContent = ultimoAcceso;
+      $('nCred').classList.remove('hidden'); $('nCredBtns').classList.remove('hidden');
+      $('nNombre').value = ''; $('nEmail').value = ''; $('nClave').value = '';
+      Core.toast('✅ Cuenta creada');
+      cargarUsuarios();
+    } catch (err) { $('nErr').textContent = err.message; } finally { $('bNuevo').disabled = false; }
+  };
+  $('nWsp').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(ultimoAcceso), '_blank');
+  $('nCopiar').onclick = () => navigator.clipboard.writeText(ultimoAcceso).then(() => Core.toast('Copiado'));
 
   /* ---------- Usuarios ---------- */
   let usuarios = [];
@@ -368,5 +405,7 @@
     } catch (err) { fallo(err); }
   };
 
-  cargarResumen().catch(fallo);
+  cargarResumen().then(() => {
+    if (location.hash === '#solicitudes') $('cSolicitudes').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }).catch(fallo);
 })();

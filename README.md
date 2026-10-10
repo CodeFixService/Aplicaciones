@@ -16,7 +16,14 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 |---|---|
 | **Administrador** (solo Josué) | Todo: empresas, clientes de cada empresa (con filtros), keys, solicitudes de prueba/pago, reportes, avisos a todos, link de pago y precios. Mensajes sin límite. |
 | **Empresa** | FichaPro, Caja Rápida, Mensajes con sus clientes y con soporte, enlace/QR para invitar clientes. Free o Pro. |
-| **Cliente** | Se registra con el enlace de su empresa. Ve los productos publicados, las ofertas y avisos, y chatea con su empresa. Normal o Premium (precios especiales). |
+| **Cliente** | Su cuenta la crea su empresa (o el admin). Ve los productos publicados, las ofertas y avisos, y chatea con su empresa. Normal o Premium (precios especiales). |
+
+## Cuentas (registro cerrado)
+- La app solo muestra **Iniciar sesión**. Nadie puede registrarse solo: el servidor rechaza cualquier alta sin invitación.
+- **Administración → Usuarios → Crear usuario**: el admin crea empresas y clientes de cualquier empresa.
+- **Inicio → Mis clientes**: cada empresa crea sus propios clientes (Free: 30, Pro: 2000).
+- Al crear la cuenta se arma el mensaje con el enlace, el correo y la contraseña para enviarlo por WhatsApp.
+- En el primer ingreso cada persona acepta los términos; luego puede cambiar su contraseña en **Mi cuenta**.
 
 ## Reglas del chat
 - Hasta **3 mensajes seguidos**; luego hay que esperar la respuesta. El administrador no tiene límite.
