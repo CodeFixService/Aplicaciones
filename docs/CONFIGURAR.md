@@ -4,7 +4,7 @@ Guía con botones para copiar cada código: https://claude.ai/artifact/4pBSteVv3
 Todo se hace en https://supabase.com/dashboard → proyecto **CodeFix**. Unos 15 minutos.
 
 ## 1. Crear la base de datos
-**SQL Editor** → **+ New query** → pega **todo** [`supabase/instalar.sql`](../supabase/instalar.sql) → **Run**.
+**SQL Editor** → **+ New query** → pega [`supabase/instalar-corto.sql`](../supabase/instalar-corto.sql) (4 líneas; descarga e instala `instalar.sql`) → **Run**.
 Si aparece un aviso de operación destructiva, toca **Run this query** (es normal).
 
 ## 2. Configurar el inicio de sesión
