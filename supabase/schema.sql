@@ -23,6 +23,7 @@ alter table public.profiles add column if not exists negocio_id uuid references 
 alter table public.profiles add column if not exists terms_at timestamptz;
 alter table public.profiles add column if not exists trial_used boolean not null default false;
 alter table public.profiles add column if not exists mute_offers boolean not null default false;
+alter table public.profiles add column if not exists telefono text;
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('user', 'admin', 'client'));
 create index if not exists profiles_negocio_idx on public.profiles (negocio_id);
@@ -124,7 +125,7 @@ language sql stable security definer set search_path = '' as $$
     'id', p.id, 'email', p.email, 'empresa', p.empresa, 'plan', p.plan, 'role', p.role,
     'pro_until', p.pro_until, 'suspended', p.suspended, 'trial_used', p.trial_used,
     'mute_offers', p.mute_offers, 'terms_at', p.terms_at,
-    'negocio_id', p.negocio_id, 'negocio', n.empresa,
+    'negocio_id', p.negocio_id, 'negocio', n.empresa, 'telefono', p.telefono, 'negocio_telefono', n.telefono,
     'is_pro', public.is_pro(p.id), 'is_admin', public.is_admin())
   from public.profiles p left join public.profiles n on n.id = p.negocio_id
   where p.id = auth.uid()
@@ -431,7 +432,8 @@ begin
   if p_audience = 'my_subscribers' and cardinality(p_channels) > 0 and not public.is_pro(auth.uid()) then
     raise exception 'El envío automático (push y correo) es de la versión Pro';
   end if;
-  if not (p_channels <@ array['push', 'email']) or (cardinality(p_channels) = 0 and p_audience <> 'my_subscribers') then
+  if not (p_channels <@ array['push', 'email'])
+     or (cardinality(p_channels) = 0 and p_audience not in ('my_subscribers', 'all_users', 'all_businesses', 'pro_users', 'free_users', 'all_clients')) then
     raise exception 'Elige push y/o correo';
   end if;
   if 'email' = any(p_channels) and not public.is_pro(auth.uid()) then
@@ -468,18 +470,19 @@ create or replace function public.my_inbox()
 returns table (id uuid, title text, body text, url text, image text, sent_at timestamptz, de text, leido boolean)
 language sql stable security definer set search_path = '' as $$
   with me as (select p.* from public.profiles p where p.id = auth.uid())
-  select n.id, n.title, n.body, n.url, n.image, n.sent_at,
+  select n.id, n.title, n.body, n.url, n.image, coalesce(n.sent_at, n.send_at),
          case when o.role = 'admin' then 'CodeFix' else o.empresa end,
          exists (select 1 from public.notification_reads r where r.notification_id = n.id and r.user_id = me.id)
   from public.notifications n join me on true join public.profiles o on o.id = n.owner_id
-  where n.status = 'sent' and n.sent_at > now() - interval '60 days'
+  where (n.status = 'sent' or (n.status in ('scheduled', 'sending') and cardinality(n.channels) = 0 and n.send_at <= now()))
+    and coalesce(n.sent_at, n.send_at) > now() - interval '60 days'
     and (n.audience = 'all_users'
          or (me.role = 'user' and (n.audience = 'all_businesses'
                or (n.audience = 'pro_users' and public.is_pro(me.id))
                or (n.audience = 'free_users' and not public.is_pro(me.id))))
          or (me.role = 'client' and n.audience = 'all_clients')
          or (n.audience = 'direct' and n.target_id = me.id and coalesce(n.url, '') not like 'apps/mensajes/%'))
-  order by n.sent_at desc limit 40
+  order by coalesce(n.sent_at, n.send_at) desc limit 40
 $$;
 
 create or replace function public.admin_stats() returns jsonb
@@ -836,7 +839,7 @@ language sql stable security definer set search_path = '' as $$
   select a <> b and exists (
     select 1 from public.profiles pa, public.profiles pb
     where pa.id = a and pb.id = b and not pa.suspended
-      and (pa.role = 'admin' or pb.role = 'admin' and pa.role = 'user'
+      and ((pa.role = 'admin' and pb.role = 'user') or (pb.role = 'admin' and pa.role = 'user')
            or (pa.role = 'user' and pb.role = 'client' and pb.negocio_id = pa.id)
            or (pa.role = 'client' and pb.role = 'user' and pa.negocio_id = pb.id))
   )
@@ -1261,3 +1264,25 @@ revoke all on function public.set_offer_premium(uuid, boolean) from public, anon
 revoke all on function public.my_offers() from public, anon;
 revoke all on function public.catalog_of(uuid) from public, anon;
 grant execute on function public.set_offer_premium(uuid, boolean), public.my_offers(), public.catalog_of(uuid) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 3.5: WhatsApp de la tienda, diagnóstico de versión
+-- =====================================================================
+-- La empresa guarda su WhatsApp: sus clientes lo usan para enviarle pedidos.
+create or replace function public.set_my_phone(p_tel text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare t text := left(regexp_replace(coalesce(p_tel, ''), '\D', '', 'g'), 15);
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  if t <> '' and length(t) < 8 then raise exception 'WhatsApp no válido (incluye el código de país, ej: 56912345678)'; end if;
+  update public.profiles set telefono = nullif(t, '') where id = auth.uid();
+  return public.my_account();
+end $$;
+
+-- Versión de la base de datos (la app avisa al admin si falta actualizarla).
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '3.5'::text $$;
+
+revoke all on function public.set_my_phone(text) from public, anon;
+grant execute on function public.set_my_phone(text) to authenticated;
+grant execute on function public.db_version() to anon, authenticated;

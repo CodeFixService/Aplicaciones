@@ -62,7 +62,7 @@
   <div class="seg" role="tablist">
     <button id="tOfertas" class="small" role="tab">🏷️ Ofertas</button>
     <button id="tProductos" class="small on" role="tab">🛍️ Productos</button>
-    <button id="tPedidos" class="small" role="tab">🧾 Pedidos</button>
+    <button id="tPedidos" class="small" role="tab">🛒 Pedido</button>
   </div>
 
   <section id="vOfertas" class="hidden"><div class="ofertas" id="ofertas"></div></section>
@@ -70,10 +70,11 @@
   <section id="vProductos">
     <input id="buscar" placeholder="Buscar producto…" aria-label="Buscar producto" style="margin-bottom:12px">
     <div class="cats" id="cats"></div>
+    <p class="muted" id="tipCarro" style="margin:0 0 10px">Toca <b>➕ Agregar</b> para armar tu pedido 🛒 y envíalo a la tienda.</p>
     <div class="grid" id="grid"></div>
     <div class="card upsell hidden" id="cPrem" style="margin-top:16px">
       <h2>⭐ Hazte Premium</h2>
-      <p class="muted" id="premTxt">Precios especiales, ofertas exclusivas y favoritos ilimitados.</p>
+      <p class="muted" id="premTxt">Precios especiales, ofertas exclusivas, colores e ícono a tu gusto y favoritos ilimitados.</p>
       <div class="btns"><a class="btn warn" href="../../#premium">Ver Premium</a></div>
     </div>
   </section>
@@ -85,8 +86,10 @@
       <div class="total"><span>Total</span><span id="carTotal">$0</span></div>
       <label for="nota">Nota para la tienda (opcional)</label>
       <textarea id="nota" maxlength="200" placeholder="Ej: lo retiro el sábado en la mañana"></textarea>
-      <div class="btns"><button class="ok" id="bEnviarPed" style="flex:1">📨 Enviar pedido a la tienda</button><button class="alt" id="bVaciar">Vaciar</button></div>
-      <p class="muted">El pedido le llega a la tienda por el chat. Ahí coordinan el pago y la entrega.</p>
+      <div class="btns"><button id="bEnviarPed" style="flex:1">📨 Enviar por el chat de la app</button>
+        <button class="ok hidden" id="bWspPed" style="flex:1">💬 Enviar por WhatsApp</button></div>
+      <div class="btns"><button class="alt small" id="bVaciar">Vaciar pedido</button></div>
+      <p class="muted">La tienda recibe tu pedido con el detalle y el total, y te responde para coordinar el pago y la entrega.</p>
     </div>
     <div class="card">
       <h2>🧾 Mis pedidos</h2>
@@ -116,10 +119,13 @@
   const FAV_FREE = 5;
 
   /* ---------- Datos (con copia para usar sin internet) ---------- */
+  // Si el servidor falla y no hay copia guardada, se muestra el motivo (no una lista vacía muda).
+  const fallos = {};
   async function traer(fn, args, key) {
-    try { const d = await Cuenta.rpc(fn, args); db.set(key, d); return d; }
-    catch (e) { return db.get(key, []); }
+    try { const d = await Cuenta.rpc(fn, args); db.set(key, d); delete fallos[key]; return d || []; }
+    catch (e) { fallos[key] = e.message; return db.get(key, []); }
   }
+  const vacio = (key, txt) => fallos[key] ? '⚠️ No se pudo cargar (' + Core.esc(fallos[key]) + '). Revisa tu conexión e intenta de nuevo.' : txt;
   let items = await traer('catalog_of', { p_negocio: negocio }, 'catalogo');
   items.forEach((i) => { if (!i.clave) i.clave = i.nombre; });
   let favs = db.get('favs', []);
@@ -132,7 +138,9 @@
     encodeURIComponent(txt) + '">' + (txtBtn || '💬 Escribir a la tienda') + '</a>' : '';
 
   /* ---------- Pestañas ---------- */
+  let vistaActual = 'productos';
   function vista(v) {
+    vistaActual = v;
     ['Ofertas', 'Productos', 'Pedidos'].forEach((k) => {
       $('t' + k).classList.toggle('on', v === k.toLowerCase());
       $('v' + k).classList.toggle('hidden', v !== k.toLowerCase());
@@ -140,6 +148,7 @@
     history.replaceState(null, '', v === 'productos' ? location.pathname : '?v=' + v);
     if (v === 'ofertas' && !ofertas) cargarOfertas();
     if (v === 'pedidos') pintarPedidos();
+    guardarCarro();
     scrollTo(0, 0);
   }
   $('tOfertas').onclick = () => vista('ofertas');
@@ -166,7 +175,7 @@
         '<b>' + Core.esc(o.title) + '</b>' + (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
         '<span class="cat muted">' + fecha + '</span>' +
         escribir('Hola, vi su oferta "' + o.title + '" y me interesa.') + '</div></article>';
-    }).join('') : '<p class="empty" style="grid-column:1/-1">' + (esCliente ? 'La tienda aún no publica ofertas.'
+    }).join('') : '<p class="empty" style="grid-column:1/-1">' + vacio('ofertas', esCliente ? 'La tienda aún no publica ofertas.'
       : 'Aún no publicas ofertas. Programa una campaña en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
   }
 
@@ -190,8 +199,9 @@
         (esCliente ? '<div class="acc"><button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>' +
           escribir('Hola, me interesa: ' + i.nombre, '💬 Preguntar') + '</div>' : '') + '</div>';
     }).join('') : '<p class="empty" style="grid-column:1/-1">' + (items.length ? (cat === '__fav' ? 'Aún no marcas favoritos' : 'Sin resultados')
-      : 'La tienda aún no publica productos.') + '</p>';
+      : vacio('catalogo', esCliente ? 'La tienda aún no publica productos.' : 'Aún no publicas productos: agrégalos en Caja Rápida → Productos.')) + '</p>';
     $('cPrem').classList.toggle('hidden', premium || !esCliente);
+    $('tipCarro').classList.toggle('hidden', !esCliente || !items.length);
   }
   $('cats').onclick = (e) => { if (e.target.dataset.c !== undefined) { cat = e.target.dataset.c; pintar(); } };
   $('buscar').oninput = pintar;
@@ -220,7 +230,7 @@
     carro = carro.filter((l) => l.cant > 0 && items.some((i) => i.clave === l.clave));
     db.set('carro', carro);
     const n = carro.reduce((s, l) => s + l.cant, 0);
-    $('barra').classList.toggle('hidden', !n || !esCliente);
+    $('barra').classList.toggle('hidden', !n || !esCliente || vistaActual === 'pedidos');
     $('barTxt').textContent = '🛒 Ver pedido (' + n + ')';
     $('barTotal').textContent = precio(totalCarro());
     pintarCarro();
@@ -242,22 +252,38 @@
   };
   $('bVerCarro').onclick = () => vista('pedidos');
   $('bVaciar').onclick = () => { if (confirm('¿Vaciar el pedido?')) { carro = []; guardarCarro(); } };
-  $('bEnviarPed').onclick = async () => {
-    const ls = lineasCarro();
-    if (!ls.length) return;
-    let txt = '🛒 Pedido\n' + ls.map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
+  function textoPedido() {
+    let txt = '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
       '\nTotal: ' + precio(totalCarro()) + (premium ? ' (precios Premium)' : '');
     const nota = $('nota').value.trim();
     if (nota) txt += '\nNota: ' + nota;
+    return txt;
+  }
+  function registrarPedido(txt) {
+    pedidos.unshift({ fecha: Date.now(), texto: txt, carro: carro.slice(), total: totalCarro() });
+    db.set('pedidos', pedidos.slice(0, 30));
+    carro = []; $('nota').value = ''; guardarCarro(); pintarPedidos();
+  }
+  // WhatsApp de la tienda (lo guarda la empresa en FichaPro → Ajustes).
+  const wspTienda = String(yo.negocio_telefono || '').replace(/\D/g, '');
+  $('bWspPed').classList.toggle('hidden', !wspTienda);
+  $('bWspPed').onclick = () => {
+    if (!lineasCarro().length) return;
+    const txt = textoPedido();
+    window.open('https://wa.me/' + wspTienda + '?text=' + encodeURIComponent(txt), '_blank');
+    registrarPedido(txt);
+  };
+  $('bEnviarPed').onclick = async () => {
+    const ls = lineasCarro();
+    if (!ls.length) return;
+    const txt = textoPedido();
     if (txt.length > 1000) return Core.toast('El pedido es muy largo: envíalo en dos partes');
     $('bEnviarPed').disabled = true;
     try {
       const r = await Cuenta.rpc('send_message', { p_to: negocio, p_body: txt });
       if (!r.ok) throw new Error(r.error);
       Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato a la tienda
-      pedidos.unshift({ fecha: Date.now(), texto: txt, carro: carro.slice(), total: totalCarro() });
-      db.set('pedidos', pedidos.slice(0, 30));
-      carro = []; $('nota').value = ''; guardarCarro(); pintarPedidos();
+      registrarPedido(txt);
       Core.toast('✅ Pedido enviado. La tienda te responderá por el chat.');
     } catch (err) { Core.toast(err.message); } finally { $('bEnviarPed').disabled = false; }
   };

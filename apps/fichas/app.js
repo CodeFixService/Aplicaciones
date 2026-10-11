@@ -547,7 +547,7 @@
       ? fichas.map((f) => '<option value="' + f.id + '">' + Core.esc(f.titulo) + '</option>').join('')
       : '<option value="">Primero guarda una ficha</option>';
     const conWsp = todos().filter((c) => c.tel);
-    $('k-tag').innerHTML = '<option value="">Todos los clientes (' + conWsp.length + ' con WhatsApp)</option>' +
+    $('k-tag').innerHTML = '<option value="">Todos (' + todos().length + ' clientes · ' + conWsp.length + ' con WhatsApp)</option>' +
       tags().map((t) => '<option value="' + Core.esc(t) + '">Etiqueta: ' + Core.esc(t) + ' (' +
         conWsp.filter((c) => c.tag === t).length + ')</option>').join('');
     if (!$('k-fecha').value) $('k-fecha').value = localInput(Date.now() + 3600e3);
@@ -602,7 +602,7 @@
       let aviso = '';
       try {
         k.notifId = await programarAutomatico(k);
-        if (k.vip) await Cuenta.rpc('set_offer_premium', { p_id: k.notifId, p_premium: true });
+        if (k.vip && !cuenta.is_admin) await Cuenta.rpc('set_offer_premium', { p_id: k.notifId, p_premium: true });
         if (canales.length) k.avisado = true; // el servidor la envía solo; no hace falta recordatorio
       } catch (err) {
         if (canales.length) throw err;
@@ -637,7 +637,8 @@
       p_title: f.titulo + (f.precio ? ' · ' + fmtPrice(f.precio) : ''),
       p_body: k.msg.replace(/\{nombre\}\s*/g, ''), p_image: image,
       p_url: ajustes.tel ? 'https://wa.me/' + ajustes.tel.replace(/[^\d]/g, '') + '?text=' + encodeURIComponent('Hola, vi su oferta: ' + f.titulo) : image,
-      p_audience: 'my_subscribers', p_channels: k.canales, p_send_at: new Date(k.fecha).toISOString()
+      // El admin publica para todas las empresas; cada empresa, para sus clientes.
+      p_audience: cuenta.is_admin ? 'all_businesses' : 'my_subscribers', p_channels: k.canales, p_send_at: new Date(k.fecha).toISOString()
     });
     return n.id;
   }
@@ -745,6 +746,8 @@
     ajustes.negocio = $('a-negocio').value.trim();
     ajustes.tel = $('a-tel').value.trim();
     db.set('ajustes', ajustes); draw(ficha); Core.toast('Guardado');
+    // Tus clientes usan este WhatsApp para enviarte pedidos.
+    if (ajustes.tel) Cuenta.rpc('set_my_phone', { p_tel: ajustes.tel }).catch((e) => Core.toast(e.message));
   };
   $('a-logo').onchange = async (e) => {
     const file = e.target.files[0];
@@ -839,7 +842,24 @@
   };
 
   /* ---------- Inicio ---------- */
-  fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes();
+  // Campañas creadas con la versión antigua (o sin conexión): se publican en Ofertas.
+  async function publicarPendientes() {
+    const pend = campanas.filter((k) => !k.notifId && k.fecha > Date.now() - 30 * 864e5 && fichas.some((f) => f.id === k.fichaId));
+    let n = 0;
+    for (const k of pend) {
+      try { k.notifId = await programarAutomatico(Object.assign({}, k, { canales: [] })); n++; }
+      catch (e) { break; } // sin conexión: se reintenta al volver a abrir
+    }
+    if (n) { db.set('campanas', campanas); renderCampanas(); Core.toast('🏷️ ' + n + ' campaña(s) publicadas en Ofertas de tus clientes'); }
+  }
+
+  if (cuenta.is_admin) {
+    $('c-form').classList.add('hidden'); $('c-admin').classList.remove('hidden');
+    $('rowVip').classList.add('hidden');
+    $('k-pubTxt').innerHTML = '🏷️ Como administrador, tus campañas se publican en los <b>Avisos</b> de todas las empresas.';
+  }
+  if (ajustes.tel && !cuenta.telefono) Cuenta.rpc('set_my_phone', { p_tel: ajustes.tel }).catch(() => {});
+  fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes(); publicarPendientes();
   const m = location.hash.match(/camp=([\w]+)/);
   if (m) { show('campanas'); abrirEnvio(m[1]); }
 })();

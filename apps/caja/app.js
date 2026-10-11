@@ -354,5 +354,26 @@
     }
   };
 
+  // Una vez por celular: los productos creados con la versión antigua (que no publicaba
+  // por defecto) se suben al catálogo para que los clientes los vean.
+  async function publicarPendientes() {
+    if (db.get('catalogoV35')) return;
+    const l = productos.filter((p) => !p.publicado || !p.sync35);
+    let n = 0;
+    for (const p of l) {
+      try {
+        await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria });
+        p.publicado = true; p.sync35 = true; n++;
+      } catch (e) {
+        guardarProductos();
+        if (!/Failed|conexión/i.test(e.message)) Core.toast('Catálogo: ' + e.message);
+        return; // se reintenta la próxima vez que abras la Caja
+      }
+    }
+    guardarProductos(); db.set('catalogoV35', true);
+    if (n) { Core.toast('🛍️ ' + n + ' producto(s) publicados en tu catálogo: tus clientes ya los ven'); renderLista(); }
+  }
+
   renderProds(); renderTicket();
+  publicarPendientes();
 })();

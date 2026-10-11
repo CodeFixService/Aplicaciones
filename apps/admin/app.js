@@ -268,7 +268,7 @@
         : pro ? '<span class="pill pro">' + (u.role === 'client' ? 'PREMIUM' : 'PRO') + '</span>' : '<span class="pill">FREE</span>');
       const acciones = u.role === 'admin' ? '' :
         '<select class="small" data-id="' + u.id + '" style="width:auto">' +
-        '<option value="">Acción…</option><option value="msg">💬 Enviar mensaje</option><option value="pro7">Dar Pro 7 días</option>' +
+        '<option value="">Acción…</option>' + (u.role === 'client' ? '' : '<option value="msg">💬 Enviar mensaje</option>') + '<option value="pro7">Dar Pro 7 días</option>' +
         '<option value="pro1">Dar Pro 1 mes</option><option value="pro12">Dar Pro 1 año</option>' +
         '<option value="proinf">Dar Pro permanente</option><option value="free">Pasar a Free</option>' +
         '<option value="' + (u.suspended ? 'unsusp">Reactivar' : 'susp">Suspender') + '</option></select>';

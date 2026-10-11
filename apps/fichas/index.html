@@ -83,6 +83,9 @@
   <!-- CLIENTES -->
   <section class="view" id="v-clientes">
     <div class="card">
+      <p class="muted hidden" id="c-admin">👑 Eres el administrador: los clientes de cada empresa se crean en
+        <a href="../admin/">Administración → Usuarios → Crear usuario</a> (eliges la empresa). Aquí puedes guardar contactos solo de WhatsApp.</p>
+      <div id="c-form">
       <h2>➕ Nuevo cliente</h2>
       <p class="muted">Crea su cuenta en la app y envíale sus datos: verá tus productos y ofertas, y podrá escribirte.
         Si le pones WhatsApp, también te sirve para las campañas por WhatsApp. Solo tú ves a tus clientes.</p>
@@ -97,6 +100,7 @@
       <datalist id="tagsList"></datalist>
       <p class="err" id="c-err"></p>
       <div class="btns"><button id="bAddCliente">➕ Crear cliente</button></div>
+      </div>
       <div class="cred hidden" id="c-cred"></div>
       <div class="btns hidden" id="c-credBtns"><button class="ok small" id="c-wsp">💬 Enviarle sus datos por WhatsApp</button><button class="alt small" id="c-copiar">Copiar</button></div>
       <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">Contactos solo de WhatsApp (sin cuenta en la app)</summary>
@@ -136,13 +140,15 @@
       <h2>Nueva campaña</h2>
       <label>Nombre</label><input id="k-nombre" placeholder="Promo fin de semana">
       <label>Ficha</label><select id="k-ficha"></select>
-      <label>Para</label><select id="k-tag"></select>
+      <label for="k-tag">Para enviar por WhatsApp</label><select id="k-tag"></select>
       <label>Mensaje (usa {nombre} para personalizar)</label>
       <textarea id="k-msg">Hola {nombre} 👋 Tenemos una oferta especial para ti.</textarea>
       <label>Fecha y hora</label><input type="datetime-local" id="k-fecha">
-      <p class="muted">🏷️ Toda campaña se publica en <b>Ofertas</b> de tus clientes con cuenta a la hora programada.</p>
+      <p class="muted" id="k-pubTxt">🏷️ Toda campaña se publica en <b>Ofertas</b> de todos tus clientes con cuenta a la hora programada.</p>
+      <div id="rowVip">
       <label style="display:flex;gap:8px;align-items:center;color:var(--text)"><input type="checkbox" id="k-vip"> ⭐ Exclusiva para clientes Premium</label>
       <p class="muted" style="margin-top:0">Los demás clientes la ven bloqueada con el botón "Hazte Premium".</p>
+      </div>
       <label>Además, enviar automáticamente <span class="pill pro">PRO</span></label>
       <div style="display:flex;gap:14px;flex-wrap:wrap">
         <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--text)"><input type="checkbox" id="k-push"> 🔔 Notificación push</label>
