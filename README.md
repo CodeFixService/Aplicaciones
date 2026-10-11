@@ -36,6 +36,9 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 - El pedido se envía por el chat de la app o por WhatsApp (el de la tienda, que la empresa guarda en **Mi empresa**).
 - Cliente Premium: además elige el color de su app y su ícono.
 - El cliente solo chatea con su tienda; el administrador chatea solo con las empresas.
+- **Cadena de publicaciones**: cada ficha que se guarda en FichaPro se publica sola. Las del admin las ven todas las
+  empresas en **📣 Novedades CodeFix**; las de cada empresa, sus clientes en **🏷️ Ofertas**. La empresa revisa lo que
+  ven sus clientes en **👁️ Mi tienda**. Borrar la ficha la quita.
 - Las campañas que el admin hace en FichaPro llegan a los **Avisos** de todas las empresas.
 - Si la base de datos quedó en una versión anterior, el inicio del admin lo avisa.
 - La versión de la app se ve al pie de cada pantalla. Con internet siempre se carga lo último; sin internet, la copia guardada.

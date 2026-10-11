@@ -347,7 +347,7 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '3.5';
+  const DB_VERSION = '3.6';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
@@ -369,7 +369,9 @@
     caja: ['apps/caja/', '💵', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
     mensajes: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con tus clientes y con soporte'],
     mensajesCli: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con la tienda: pedidos y consultas'],
-    ofertas: ['apps/catalogo/?v=ofertas', '🏷️', 'Ofertas', 'Promociones y ofertas exclusivas'],
+    novedades: ['apps/catalogo/?v=codefix', '📣', 'Novedades CodeFix', 'Promociones y anuncios del administrador'],
+    vista: ['apps/catalogo/?v=ofertas', '👁️', 'Mi tienda', 'Lo que ven tus clientes: fichas, ofertas y productos'],
+    ofertas: ['apps/catalogo/?v=ofertas', '🏷️', 'Ofertas', 'Fichas, promociones y ofertas exclusivas'],
     catalogo: ['apps/catalogo/', '🛍️', 'Productos', 'Catálogo, favoritos y pedidos'],
     admin: ['apps/admin/', '🛡️', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
   };
@@ -387,7 +389,7 @@
     $('estadoPlan').textContent = acc.email + ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : '');
     $('avatar').textContent = icono(acc) || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
 
-    const lista = cliente ? ['ofertas', 'catalogo', 'mensajesCli'] : ['fichas', 'caja', 'mensajes'].concat(acc.is_admin ? ['admin'] : []);
+    const lista = cliente ? ['ofertas', 'catalogo', 'mensajesCli'] : ['fichas', 'caja', 'mensajes', 'novedades', 'vista'].concat(acc.is_admin ? ['admin'] : []);
     $('apps').innerHTML = lista.map((k) => {
       const a = APPS[k];
       return '<a class="app' + (k === 'admin' ? ' admin' : '') + '" href="' + a[0] + '"><div class="ico">' + a[1] + '</div><b>' + a[2] +

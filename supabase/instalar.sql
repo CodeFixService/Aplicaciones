@@ -1294,6 +1294,81 @@ grant execute on function public.set_my_phone(text) to authenticated;
 grant execute on function public.db_version() to anon, authenticated;
 
 -- =====================================================================
+--  VERSIÓN 3.6: publicaciones (las fichas de FichaPro se ven en la cadena)
+--    Admin   → sus fichas las ven todas las empresas ("Novedades CodeFix").
+--    Empresa → sus fichas las ven sus clientes ("Ofertas").
+--  La imagen se guarda en la misma fila (no depende del almacenamiento).
+-- =====================================================================
+create table if not exists public.publicaciones (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null references public.profiles (id) on delete cascade,
+  client_key  text not null,
+  titulo      text not null,
+  detalle     text not null default '',
+  precio      text not null default '',
+  imagen      text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (owner_id, client_key)
+);
+create index if not exists publicaciones_owner_idx on public.publicaciones (owner_id, updated_at desc);
+alter table public.publicaciones enable row level security;  -- sin políticas: solo por funciones
+revoke all on public.publicaciones from anon, authenticated;
+
+create or replace function public.publicar_ficha(p_key text, p_titulo text, p_detalle text, p_precio text, p_imagen text)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare img text := nullif(trim(coalesce(p_imagen, '')), '');
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas publican fichas'; end if;
+  if coalesce(trim(p_key), '') = '' or coalesce(trim(p_titulo), '') = '' then raise exception 'La ficha necesita un título'; end if;
+  if img is not null and img !~ '^(https://|data:image/(jpeg|png|webp);base64,)' then raise exception 'Imagen no válida'; end if;
+  if length(coalesce(img, '')) > 600000 then raise exception 'La imagen es muy pesada'; end if;
+  if not exists (select 1 from public.publicaciones where owner_id = auth.uid() and client_key = p_key)
+     and (select count(*) from public.publicaciones where owner_id = auth.uid())
+         >= (case when public.is_pro(auth.uid()) then 300 else 10 end) then
+    raise exception 'Llegaste al máximo de fichas publicadas de tu plan (Free: 10)';
+  end if;
+  insert into public.publicaciones (owner_id, client_key, titulo, detalle, precio, imagen)
+  values (auth.uid(), left(p_key, 60), left(trim(p_titulo), 80), left(coalesce(p_detalle, ''), 300), left(coalesce(p_precio, ''), 40), img)
+  on conflict (owner_id, client_key) do update
+    set titulo = excluded.titulo, detalle = excluded.detalle, precio = excluded.precio,
+        imagen = excluded.imagen, updated_at = now();
+end $$;
+
+create or replace function public.borrar_publicacion(p_key text) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.publicaciones where owner_id = auth.uid() and client_key = p_key
+$$;
+
+-- p_origen: 'tienda' → cliente: su empresa; empresa/admin: lo propio (vista previa).
+--           'codefix' → lo que publica el administrador (lo ven todas las empresas).
+create or replace function public.ver_publicaciones(p_origen text)
+returns table (id uuid, titulo text, detalle text, precio text, imagen text, fecha timestamptz, de text, de_id uuid)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.titulo, x.detalle, x.precio, x.imagen, x.updated_at,
+         case when o.role = 'admin' then 'CodeFix' else o.empresa end, x.owner_id
+  from public.profiles me
+  join public.publicaciones x on x.owner_id = case
+         when p_origen = 'codefix' and me.role in ('user', 'admin') then public.admin_id()
+         when p_origen = 'tienda' and me.role = 'client' then me.negocio_id
+         when p_origen = 'tienda' then me.id end
+  join public.profiles o on o.id = x.owner_id
+  where me.id = auth.uid() and not me.suspended
+  order by x.updated_at desc
+  limit 100
+$$;
+
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '3.6'::text $$;
+
+revoke all on function public.publicar_ficha(text, text, text, text, text) from public, anon;
+revoke all on function public.borrar_publicacion(text) from public, anon;
+revoke all on function public.ver_publicaciones(text) from public, anon;
+grant execute on function public.publicar_ficha(text, text, text, text, text), public.borrar_publicacion(text),
+  public.ver_publicaciones(text) to authenticated;
+
+-- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".
 --  Pega este archivo en Supabase → SQL Editor → Run (después de schema.sql
 --  y de crear la Edge Function "enviar").

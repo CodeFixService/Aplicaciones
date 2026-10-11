@@ -1,6 +1,6 @@
 /* Service worker: guarda todas las apps en el teléfono para usarlas sin internet.
    Sube VERSION cada vez que cambies archivos para que los celulares se actualicen. */
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE = 'misapps-' + VERSION;
 const FILES = [
   './',

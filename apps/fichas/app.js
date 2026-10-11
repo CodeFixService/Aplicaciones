@@ -340,7 +340,14 @@
       editId = Core.uid();
       fichas.unshift(Object.assign(data, { id: editId }));
     }
-    if (db.set('fichas', fichas)) Core.toast('Ficha guardada en la galería');
+    if (!db.set('fichas', fichas)) return;
+    Core.toast('Ficha guardada. Publicando…');
+    const guardada = fichas.find((x) => x.id === editId);
+    try {
+      await publicarFicha(guardada);
+      db.set('fichas', fichas);
+      Core.toast('✅ Ficha guardada y publicada: ' + (cuenta.is_admin ? 'la ven todas las empresas' : 'la ven tus clientes en Ofertas'));
+    } catch (err) { Core.toast('Guardada en este celular, pero no se publicó: ' + err.message); }
   };
 
   function thumbnail() {
@@ -379,6 +386,39 @@
     return true;
   }
 
+  /* ---------- Publicar fichas ----------
+     Empresa: sus clientes las ven en Ofertas. Admin: las ven todas las empresas.
+     La imagen viaja dentro de la publicación (no depende del almacenamiento). */
+  async function imagenFicha(f, ancho) {
+    await draw(f);
+    const c = document.createElement('canvas');
+    c.width = ancho; c.height = Math.round(ancho * H / W);
+    c.getContext('2d').drawImage(cv, 0, 0, c.width, c.height);
+    await draw(ficha);
+    return c.toDataURL('image/jpeg', 0.72);
+  }
+  async function publicarFicha(f) {
+    if (!f) return;
+    await Cuenta.rpc('publicar_ficha', {
+      p_key: f.id, p_titulo: f.titulo || 'Ficha', p_detalle: f.subtitulo || '',
+      p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 540)
+    });
+    f.pubAt = Date.now();
+  }
+  // Fichas que aún no están publicadas (o cambiaron): se publican al abrir FichaPro.
+  async function publicarFichasPendientes() {
+    const pend = fichas.filter((f) => !f.pubAt || f.pubAt < (f.fecha || 0));
+    let n = 0;
+    for (const f of pend) {
+      try { await publicarFicha(f); n++; }
+      catch (e) { Core.toast('Fichas sin publicar: ' + e.message); break; }
+    }
+    if (n) {
+      db.set('fichas', fichas);
+      Core.toast('📣 ' + n + ' ficha(s) publicadas: ' + (cuenta.is_admin ? 'las ven todas las empresas' : 'las ven tus clientes en Ofertas'));
+    }
+  }
+
   /* ---------- Galería ---------- */
   function renderGaleria() {
     const g = $('gal');
@@ -403,6 +443,7 @@
       fichas = fichas.filter((x) => x.id !== id);
       if (editId === id) editId = null;
       db.set('fichas', fichas); renderGaleria();
+      Cuenta.rpc('borrar_publicacion', { p_key: id }).catch(() => {});
     }
   };
 
@@ -848,7 +889,7 @@
     let n = 0;
     for (const k of pend) {
       try { k.notifId = await programarAutomatico(Object.assign({}, k, { canales: [] })); n++; }
-      catch (e) { break; } // sin conexión: se reintenta al volver a abrir
+      catch (e) { Core.toast('Campañas sin publicar: ' + e.message); break; } // se reintenta al volver a abrir
     }
     if (n) { db.set('campanas', campanas); renderCampanas(); Core.toast('🏷️ ' + n + ' campaña(s) publicadas en Ofertas de tus clientes'); }
   }
@@ -859,7 +900,8 @@
     $('k-pubTxt').innerHTML = '🏷️ Como administrador, tus campañas se publican en los <b>Avisos</b> de todas las empresas.';
   }
   if (ajustes.tel && !cuenta.telefono) Cuenta.rpc('set_my_phone', { p_tel: ajustes.tel }).catch(() => {});
-  fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes(); publicarPendientes();
+  fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes();
+  publicarFichasPendientes().then(publicarPendientes);
   const m = location.hash.match(/camp=([\w]+)/);
   if (m) { show('campanas'); abrirEnvio(m[1]); }
 })();
