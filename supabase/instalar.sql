@@ -30,6 +30,7 @@ alter table public.profiles add column if not exists terms_at timestamptz;
 alter table public.profiles add column if not exists trial_used boolean not null default false;
 alter table public.profiles add column if not exists mute_offers boolean not null default false;
 alter table public.profiles add column if not exists telefono text;
+alter table public.profiles add column if not exists logo text;
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('user', 'admin', 'client'));
 create index if not exists profiles_negocio_idx on public.profiles (negocio_id);
@@ -132,6 +133,7 @@ language sql stable security definer set search_path = '' as $$
     'pro_until', p.pro_until, 'suspended', p.suspended, 'trial_used', p.trial_used,
     'mute_offers', p.mute_offers, 'terms_at', p.terms_at,
     'negocio_id', p.negocio_id, 'negocio', n.empresa, 'telefono', p.telefono, 'negocio_telefono', n.telefono,
+    'logo', p.logo, 'negocio_logo', n.logo,
     'is_pro', public.is_pro(p.id), 'is_admin', public.is_admin())
   from public.profiles p left join public.profiles n on n.id = p.negocio_id
   where p.id = auth.uid()
@@ -1153,8 +1155,9 @@ begin
     if p_rol <> 'client' then return jsonb_build_object('ok', false, 'error', 'Solo puedes crear clientes'); end if;
     neg := c.id;
     if (select count(*) from public.profiles where negocio_id = c.id and role = 'client')
-       >= (case when public.is_pro(c.id) then 2000 else 30 end) then
-      return jsonb_build_object('ok', false, 'error', 'Llegaste al máximo de clientes de tu plan (Free: 30)');
+       >= (case when public.is_pro(c.id) then 300 else 50 end) then
+      return jsonb_build_object('ok', false, 'error', case when public.is_pro(c.id) then 'Llegaste al máximo de 300 clientes'
+        else 'Llegaste a 50 clientes. Pásate a Pro para tener hasta 300.' end);
     end if;
     if (select count(*) from public.profiles where created_by = c.id and created_at > now() - interval '1 day') >= 100 then
       return jsonb_build_object('ok', false, 'error', 'Máximo 100 cuentas nuevas por día');
@@ -1292,7 +1295,7 @@ end $$;
 
 -- Versión de la base de datos (la app avisa al admin si falta actualizarla).
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '3.7'::text $$;
+language sql immutable as $$ select '3.8'::text $$;
 
 revoke all on function public.set_my_phone(text) from public, anon;
 grant execute on function public.set_my_phone(text) to authenticated;
@@ -1349,6 +1352,7 @@ $$;
 -- p_origen: 'tienda' → cliente: su empresa; empresa/admin: lo propio (vista previa).
 --           'codefix' → lo que publica el administrador (lo ven todas las empresas).
 drop function if exists public.ver_publicaciones(text);
+drop function if exists public.ver_publicaciones(text, boolean);
 create or replace function public.ver_publicaciones(p_origen text)
 returns table (id uuid, titulo text, detalle text, precio text, imagen text, fecha timestamptz, de text, de_id uuid)
 language sql stable security definer set search_path = '' as $$
@@ -1366,7 +1370,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '3.7'::text $$;
+language sql immutable as $$ select '3.8'::text $$;
 
 revoke all on function public.publicar_ficha(text, text, text, text, text) from public, anon;
 revoke all on function public.borrar_publicacion(text) from public, anon;
@@ -1466,8 +1470,9 @@ begin
   if p_precio_num is not null and (p_precio_num < 0 or p_precio_num > 99999999) then raise exception 'Precio no válido'; end if;
   nueva := not exists (select 1 from public.publicaciones where owner_id = auth.uid() and client_key = p_key);
   if nueva and (select count(*) from public.publicaciones where owner_id = auth.uid())
-               >= (case when public.is_pro(auth.uid()) then 300 else 10 end) then
-    raise exception 'Llegaste al máximo de fichas publicadas de tu plan (Free: 10)';
+               >= (case when public.is_pro(auth.uid()) then 60 else 10 end) then
+    raise exception '%', case when public.is_pro(auth.uid()) then 'Llegaste al máximo de 60 fichas publicadas: borra alguna antigua'
+      else 'Llegaste a 10 fichas publicadas. Pásate a Pro para tener hasta 60.' end;
   end if;
   insert into public.publicaciones (owner_id, client_key, titulo, detalle, precio, imagen, tipo, vip, precio_num)
   values (auth.uid(), left(p_key, 60), left(trim(p_titulo), 80), left(coalesce(p_detalle, ''), 300), left(coalesce(p_precio, ''), 40), img,
@@ -1480,6 +1485,7 @@ end $$;
 
 -- Las VIP las ven completas los Premium/Pro; los demás, bloqueadas (en gris).
 drop function if exists public.ver_publicaciones(text);
+drop function if exists public.ver_publicaciones(text, boolean);
 create or replace function public.ver_publicaciones(p_origen text)
 returns table (id uuid, titulo text, detalle text, precio text, imagen text, fecha timestamptz, de text, de_id uuid,
                tipo text, vip boolean, precio_num numeric, bloqueada boolean)
@@ -1664,7 +1670,7 @@ language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
   pro boolean := public.is_pro(auth.uid());
-  it jsonb; k text; n int;
+  it jsonb; k text; n int; op text; ops text;
   nom text; pre numeric; vip boolean;
   lineas jsonb := '[]'::jsonb;
   sub numeric := 0; pct int := 0; desc_ numeric := 0;
@@ -1684,18 +1690,26 @@ begin
   end if;
   for it in select * from jsonb_array_elements(p_items) loop
     k := it ->> 'clave'; n := least(greatest(coalesce((it ->> 'cant')::int, 0), 0), 99);
+    op := nullif(left(trim(coalesce(it ->> 'opcion', '')), 40), '');
     continue when n = 0 or k is null;
-    nom := null;
+    nom := null; ops := null;
     if k like 'pub:%' then
       select x.titulo, x.precio_num, x.vip into nom, pre, vip from public.publicaciones x
       where x.owner_id = p_negocio and x.id::text = substr(k, 5);
     else
-      select c.nombre, case when pro and c.precio_premium is not null then c.precio_premium else c.precio end, c.solo_premium
-        into nom, pre, vip from public.catalog_items c where c.owner_id = p_negocio and c.client_key = k;
+      select c.nombre, case when pro and c.precio_premium is not null then c.precio_premium else c.precio end, c.solo_premium, c.opciones
+        into nom, pre, vip, ops from public.catalog_items c where c.owner_id = p_negocio and c.client_key = k;
+    end if;
+    -- Producto con opciones (colores, tallas…): hay que elegir una de la lista.
+    if coalesce(ops, '') <> '' then
+      if op is null or not exists (select 1 from unnest(string_to_array(ops, ',')) o where lower(trim(o)) = lower(op)) then
+        return jsonb_build_object('ok', false, 'error', 'Elige el color u opción de "' || nom || '"');
+      end if;
+      nom := nom || ' (' || op || ')';
     end if;
     if nom is null or pre is null then return jsonb_build_object('ok', false, 'error', 'Un producto ya no está disponible: actualiza el pedido'); end if;
     if vip and not pro then return jsonb_build_object('ok', false, 'error', '"' || nom || '" es solo para Premium'); end if;
-    lineas := lineas || jsonb_build_object('nombre', nom, 'cant', n, 'precio', pre, 'subtotal', pre * n, 'clave', k);
+    lineas := lineas || jsonb_build_object('nombre', nom, 'cant', n, 'precio', pre, 'subtotal', pre * n, 'clave', k, 'opcion', op);
     sub := sub + pre * n;
   end loop;
   if jsonb_array_length(lineas) = 0 then return jsonb_build_object('ok', false, 'error', 'El pedido está vacío'); end if;
@@ -1912,6 +1926,148 @@ grant execute on function public.set_mi_tienda(text, text, boolean, int, text), 
   public.pedidos_tienda(text), public.actualizar_pedido(uuid, text), public.estadisticas_tienda(),
   public.admin_ingresos(), public.admin_avisar_vencimiento(uuid), public.admin_empresa(uuid)
   to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 3.8: logo de la tienda, productos con opciones (colores, tallas),
+--  límites para partir (Free 50 productos / Pro 200), imágenes que el celular
+--  guarda (no se descargan dos veces) e indicador de uso del servidor.
+-- =====================================================================
+
+-- Logo chico (para la barra de arriba). Lo ven la empresa y sus clientes.
+create or replace function public.set_mi_logo(p_logo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare l text := nullif(trim(coalesce(p_logo, '')), '');
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  if l is not null and (l !~ '^data:image/(jpeg|png|webp);base64,' or length(l) > 40000) then raise exception 'Logo no válido o muy pesado'; end if;
+  update public.profiles set logo = l where id = auth.uid();
+  return public.my_account();
+end $$;
+
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', case when t.role = 'admin' then 'CodeFix' else t.empresa end,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', case when public.is_pro(t.id) then t.sellos_meta end, 'sellos_premio', t.sellos_premio,
+    'pro', public.is_pro(t.id), 'logo', t.logo)
+  from public.profiles t
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or t.id = auth.uid() or public.is_admin())
+$$;
+
+-- ---------- Productos: descripción y opciones (cuentan como 1 producto) ----------
+alter table public.catalog_items add column if not exists descripcion text not null default '';
+alter table public.catalog_items add column if not exists opciones text not null default '';
+
+drop function if exists public.catalog_upsert(text, text, numeric, numeric, text, boolean);
+create or replace function public.catalog_upsert(p_key text, p_nombre text, p_precio numeric, p_premium numeric, p_categoria text,
+                                                 p_vip boolean default false, p_descripcion text default '', p_opciones text default '')
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  nuevo boolean;
+  -- "Rojo, azul ,  verde" → "Rojo, azul, verde" (máx. 20 opciones)
+  ops text := (select string_agg(o, ', ') from (select left(trim(o), 40) o from unnest(string_to_array(coalesce(p_opciones, ''), ',')) o
+               where trim(o) <> '' limit 20) z);
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas publican productos'; end if;
+  if coalesce(trim(p_nombre), '') = '' or p_precio is null or p_precio < 0 then raise exception 'Revisa nombre y precio'; end if;
+  nuevo := not exists (select 1 from public.catalog_items where owner_id = auth.uid() and client_key = p_key);
+  if nuevo and (select count(*) from public.catalog_items where owner_id = auth.uid())
+               >= (case when public.is_pro(auth.uid()) then 200 else 50 end) then
+    raise exception '%', case when public.is_pro(auth.uid()) then 'Llegaste al máximo de 200 productos publicados'
+      else 'Llegaste a 50 productos. Pásate a Pro para tener hasta 200 (o agrupa colores y tallas como opciones).' end;
+  end if;
+  insert into public.catalog_items (owner_id, client_key, nombre, precio, precio_premium, categoria, solo_premium, descripcion, opciones)
+  values (auth.uid(), left(p_key, 40), left(trim(p_nombre), 80), p_precio, p_premium, left(trim(coalesce(p_categoria, '')), 40),
+          coalesce(p_vip, false), left(trim(coalesce(p_descripcion, '')), 300), coalesce(ops, ''))
+  on conflict (owner_id, client_key) do update
+    set nombre = excluded.nombre, precio = excluded.precio, precio_premium = excluded.precio_premium,
+        categoria = excluded.categoria, solo_premium = excluded.solo_premium,
+        descripcion = excluded.descripcion, opciones = excluded.opciones, updated_at = now();
+  if nuevo then perform public.avisar_publicacion(trim(p_nombre), 'nuevos productos', false); end if;
+end $$;
+
+drop function if exists public.catalog_of(uuid);
+create or replace function public.catalog_of(p_negocio uuid)
+returns table (nombre text, precio numeric, precio_premium numeric, tiene_premium boolean, categoria text,
+               clave text, nuevo boolean, solo_premium boolean, bloqueado boolean, descripcion text, opciones text)
+language sql stable security definer set search_path = '' as $$
+  select c.nombre,
+         case when b.bloq then null else c.precio end,
+         case when b.ve then c.precio_premium end,
+         c.precio_premium is not null, c.categoria, c.client_key, c.created_at > now() - interval '7 days',
+         c.solo_premium, b.bloq, c.descripcion, c.opciones
+  from public.catalog_items c
+  cross join lateral (select public.is_pro(auth.uid()) or c.owner_id = auth.uid() or public.is_admin() as ve) v
+  cross join lateral (select v.ve, c.solo_premium and not v.ve as bloq) b
+  where c.owner_id = p_negocio
+    and (c.owner_id = auth.uid() or public.is_admin() or public.puede_comprar(auth.uid(), p_negocio))
+  order by c.categoria, c.nombre
+$$;
+
+-- ---------- Imágenes: la lista viaja sin imágenes; el celular pide solo las que no tiene ----------
+drop function if exists public.ver_publicaciones(text);
+drop function if exists public.ver_publicaciones(text, boolean);
+create or replace function public.ver_publicaciones(p_origen text, p_con_imagen boolean default true)
+returns table (id uuid, titulo text, detalle text, precio text, imagen text, fecha timestamptz, de text, de_id uuid,
+               tipo text, vip boolean, precio_num numeric, bloqueada boolean)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.titulo,
+         case when b.bloq then '' else x.detalle end,
+         case when b.bloq then '' else x.precio end,
+         case when b.bloq or not p_con_imagen then null else x.imagen end,
+         x.updated_at, case when o.role = 'admin' then 'CodeFix' else o.empresa end, x.owner_id,
+         x.tipo, x.vip, case when b.bloq then null else x.precio_num end, b.bloq
+  from public.profiles me
+  join public.publicaciones x on x.owner_id = case
+         when p_origen = 'codefix' and me.role in ('user', 'admin') then public.admin_id()
+         when p_origen = 'tienda' and me.role = 'client' then me.negocio_id
+         when p_origen = 'tienda' then me.id end
+  join public.profiles o on o.id = x.owner_id
+  cross join lateral (select x.vip and x.owner_id <> me.id and me.role <> 'admin' and not public.is_pro(me.id) as bloq) b
+  where me.id = auth.uid() and not me.suspended
+  order by x.updated_at desc
+  limit 100
+$$;
+
+create or replace function public.imagenes_publicaciones(p_origen text, p_ids uuid[])
+returns table (id uuid, imagen text, fecha timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select v.id, v.imagen, v.fecha from public.ver_publicaciones(p_origen, true) v
+  where v.id = any(p_ids) and v.imagen is not null
+$$;
+
+-- ---------- Uso del servidor (plan gratis de Supabase: 500 MB de base de datos, 1 GB de archivos) ----------
+create or replace function public.admin_uso() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare almacen bigint := 0;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  begin
+    select coalesce(sum((metadata ->> 'size')::bigint), 0) into almacen from storage.objects;
+  exception when others then almacen := 0;
+  end;
+  return jsonb_build_object(
+    'db_bytes', pg_database_size(current_database()), 'db_limite', 500 * 1024 * 1024,
+    'archivos_bytes', almacen, 'archivos_limite', 1024 * 1024 * 1024,
+    'imagenes_bytes', (select coalesce(sum(length(imagen)), 0) from public.publicaciones),
+    'empresas', (select count(*) from public.profiles where role = 'user'),
+    'clientes', (select count(*) from public.profiles where role = 'client'),
+    'productos', (select count(*) from public.catalog_items),
+    'publicaciones', (select count(*) from public.publicaciones),
+    'pedidos', (select count(*) from public.pedidos),
+    'mensajes', (select count(*) from public.messages));
+end $$;
+
+revoke all on function public.set_mi_logo(text) from public, anon;
+revoke all on function public.catalog_upsert(text, text, numeric, numeric, text, boolean, text, text) from public, anon;
+revoke all on function public.catalog_of(uuid) from public, anon;
+revoke all on function public.ver_publicaciones(text, boolean) from public, anon;
+revoke all on function public.imagenes_publicaciones(text, uuid[]) from public, anon;
+revoke all on function public.admin_uso() from public, anon;
+grant execute on function public.set_mi_logo(text), public.tienda_info(uuid),
+  public.catalog_upsert(text, text, numeric, numeric, text, boolean, text, text), public.catalog_of(uuid),
+  public.ver_publicaciones(text, boolean), public.imagenes_publicaciones(text, uuid[]), public.admin_uso() to authenticated;
 
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".

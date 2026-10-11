@@ -49,7 +49,8 @@ async function instalarVersion(v) {
   await c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })));
   await (await caches.open(META)).put('actual', new Response(v));
   const keys = await caches.keys();
-  await Promise.all(keys.filter((k) => k !== META && k !== 'app-' + v).map((k) => caches.delete(k)));
+  // Borra versiones anteriores (y cachés viejos); conserva las imágenes ya vistas ("cfx-imagenes").
+  await Promise.all(keys.filter((k) => k !== META && k !== 'app-' + v && k !== 'cfx-imagenes').map((k) => caches.delete(k)));
   return v;
 }
 

@@ -73,6 +73,8 @@
   .sellos span { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 2px dashed var(--line); font-size: 18px; }
   .sellos span.on { border: 2px solid var(--brand); background: var(--brand-soft); }
   .est { font-size: 12px; }
+  .item .desc { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .item select.opc { padding: 8px 10px; font-size: 14px; }
   #pagoTxt { white-space: pre-wrap; font: inherit; margin: 0; padding: 10px; background: var(--field); border-radius: 10px; }
 </style>
 </head>
@@ -227,8 +229,33 @@
 
   /* ---------- Ofertas: fichas publicadas (todas las plantillas) + campañas ---------- */
   const TIPOS = { oferta: '🏷️ Oferta', evento: '🎉 Evento', foto: '📷 Foto', lista: '📋 Menú', nuevo: '🏷️ Oferta' };
+  // Las imágenes se guardan en el celular (caché): solo se descargan las nuevas o cambiadas.
+  async function ponerImagenes(pubs, origen) {
+    const conImg = pubs.filter((x) => !x.bloqueada);
+    if (!conImg.length) return;
+    const clave = (x) => './img/' + x.id + '?v=' + new Date(x.fecha).getTime();
+    let cache = null;
+    try { cache = 'caches' in window ? await caches.open('cfx-imagenes') : null; } catch (e) { cache = null; }
+    const faltan = [];
+    for (const x of conImg) {
+      const r = cache && await cache.match(clave(x));
+      if (r) x.imagen = await r.text(); else faltan.push(x);
+    }
+    if (!faltan.length) return;
+    try {
+      const imgs = await Cuenta.rpc('imagenes_publicaciones', { p_origen: origen, p_ids: faltan.map((x) => x.id) });
+      for (const im of imgs) {
+        const x = faltan.find((y) => y.id === im.id);
+        if (!x) continue;
+        x.imagen = im.imagen;
+        if (cache) cache.put(clave(x), new Response(im.imagen)).catch(() => {});
+      }
+    } catch (e) { /* sin red: quedan sin imagen */ }
+  }
   async function cargarOfertas() {
-    const pubs = await traer('ver_publicaciones', { p_origen: modoCF ? 'codefix' : 'tienda' }, 'publicaciones', []);
+    const origen = modoCF ? 'codefix' : 'tienda';
+    const pubs = await traer('ver_publicaciones', { p_origen: origen, p_con_imagen: false }, 'publicaciones', []);
+    await ponerImagenes(pubs, origen);
     let camp;
     if (modoCF) {
       camp = (await traer('my_inbox', {}, 'inbox', [])).filter((n) => n.de === 'CodeFix' && esImg(n.image))
@@ -297,6 +324,10 @@
       return '<div class="item' + (i.solo_premium ? ' vip' : '') + '">' + cinta + (comprador ? '<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>' : '') +
         (i.nuevo ? '<span class="pill ok nuevo">✨ Nuevo</span>' : '') +
         '<span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
+        (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
+        (i.opciones ? (comprador ? '<select class="opc" data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +
+          i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => '<option>' + Core.esc(o) + '</option>').join('') + '</select>'
+          : '<span class="desc">🎨 ' + Core.esc(i.opciones) + '</span>') : '') +
         (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
               : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Más barato con Premium</span>' : '')) +
         (comprador ? '<div class="acc"><button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>' +
@@ -318,12 +349,21 @@
       else favs.push(k);
       db.set('favs', favs); pintar();
     }
-    if (b.dataset.add !== undefined) agregarAlCarro({ clave: b.dataset.add });
+    if (b.dataset.add !== undefined) {
+      const it = items.find((x) => x.clave === b.dataset.add);
+      let opcion = null;
+      if (it && it.opciones) {
+        const sel = b.closest('.item').querySelector('select.opc');
+        opcion = sel && sel.value;
+        if (!opcion) { if (sel) sel.focus(); return Core.toast('🎨 Elige el color u opción primero'); }
+      }
+      agregarAlCarro({ clave: b.dataset.add, opcion });
+    }
   };
 
   /* ---------- Carrito y pedido ---------- */
   function agregarAlCarro(x) {
-    const l = carro.find((c) => c.clave === x.clave);
+    const l = carro.find((c) => c.clave === x.clave && (c.opcion || null) === (x.opcion || null));
     if (l) l.cant++; else carro.push(Object.assign({ cant: 1 }, x));
     guardarCarro();
     Core.toast('🛒 Agregado al pedido');
@@ -346,16 +386,16 @@
     const ls = lineasCarro();
     $('cCarro').classList.toggle('hidden', !ls.length);
     $('lineas').innerHTML = ls.map(({ l, i }) =>
-      '<div class="linea"><div class="grow"><b>' + Core.esc(i.nombre) + '</b><div class="muted">' + precio(precioDe(i)) + ' c/u</div></div>' +
-      '<div class="qty"><button class="alt" data-k="' + Core.esc(l.clave) + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
-      '</b><button class="alt" data-k="' + Core.esc(l.clave) + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('');
+      '<div class="linea"><div class="grow"><b>' + Core.esc(i.nombre) + (l.opcion ? ' (' + Core.esc(l.opcion) + ')' : '') + '</b><div class="muted">' + precio(precioDe(i)) + ' c/u</div></div>' +
+      '<div class="qty"><button class="alt" data-n="' + carro.indexOf(l) + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
+      '</b><button class="alt" data-n="' + carro.indexOf(l) + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('');
     const t = totalCarro(), d = cupon ? Math.round(t * cupon.pct / 100) : 0;
     $('carTotal').textContent = precio(t - d) + (d ? ' (−' + precio(d) + ')' : '');
   }
   $('lineas').onclick = (e) => {
-    const { k, d } = e.target.dataset;
-    if (!k) return;
-    const l = carro.find((x) => x.clave === k);
+    const { n, d } = e.target.dataset;
+    if (n === undefined) return;
+    const l = carro[Number(n)];
     if (l) { l.cant += Number(d); guardarCarro(); }
   };
   $('bVerCarro').onclick = () => vista('pedidos');
@@ -389,7 +429,7 @@
   const wspTienda = String(tienda.telefono || yo.negocio_telefono || '').replace(/\D/g, '');
   $('bWspPed').classList.toggle('hidden', !wspTienda);
   function textoPedido(r) {
-    return '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
+    return '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + (l.opcion ? ' (' + l.opcion + ')' : '') + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
       (r && r.descuento > 0 ? '\nDescuento: −' + precio(r.descuento) : '') +
       '\nTotal: ' + precio(r ? r.total : totalCarro()) + (premium ? ' (precios Premium)' : '') +
       '\nEntrega: ' + (entrega === 'despacho' ? '🚚 Despacho a ' + $('dir').value.trim() + ' (costo de despacho según distancia, por pagar)' : '🏪 Retiro en tienda') +
@@ -402,7 +442,7 @@
     btn.disabled = true;
     try {
       const r = await Cuenta.rpc('crear_pedido', {
-        p_negocio: negocio, p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant })), p_entrega: entrega,
+        p_negocio: negocio, p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant, opcion: l.opcion || null })), p_entrega: entrega,
         p_direccion: $('dir').value, p_nota: $('nota').value, p_cupon: cupon ? cupon.codigo : null
       });
       if (!r.ok) throw new Error(r.error);
@@ -449,7 +489,8 @@
   $('pedidos').onclick = (e) => {
     const n = e.target.dataset.rep;
     if (n === undefined) return;
-    carro = pedidos[n].lineas.map((l) => /^pub:/.test(l.clave) ? { clave: l.clave, cant: l.cant, nombre: l.nombre, precio: Number(l.precio) } : { clave: l.clave, cant: l.cant });
+    carro = pedidos[n].lineas.map((l) => /^pub:/.test(l.clave) ? { clave: l.clave, cant: l.cant, nombre: l.nombre, precio: Number(l.precio) }
+      : { clave: l.clave, cant: l.cant, opcion: l.opcion || null });
     guardarCarro();
     Core.toast(lineasCarro().length ? '🛒 Pedido cargado: revísalo y envíalo' : 'Esos productos ya no están disponibles');
   };

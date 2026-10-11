@@ -103,3 +103,22 @@ Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares 
 - **Actualizaciones con botón**: la app ya no cambia sola. Una versión nueva primero la ve solo el admin; al tocar
   **Administración → Ajustes → Liberar** les aparece "Actualizar" a todos.
 - Los pagos son por transferencia; la pasarela de pago queda para una versión futura.
+
+## Versión 3.8
+- **Logo arriba**, al lado del nombre: la empresa (y el admin) lo sube en FichaPro → Ajustes o en ⚙️ Ajustes → Mi tienda;
+  el cliente ve el de su tienda. Se guarda liviano (~6 KB).
+- **🚀 Emprende** (solo clientes): botón chico arriba del ❓ que abre el WhatsApp del administrador
+  (Administración → Ajustes → WhatsApp de contacto) con "Soy cliente de [tienda] y quiero emprender".
+- **Productos con descripción y opciones** (colores, tallas…): cuentan como 1 producto. El cliente elige la opción al
+  agregar al carrito y el pedido llega como "2 × Vaso (Azul)".
+- **Límites para partir (~10 empresas):**
+
+| | Free | Pro / Premium |
+|---|---|---|
+| Productos por empresa | 50 | 200 |
+| Clientes por empresa | 50 | 300 |
+| Fichas publicadas | 10 | 60 |
+| Pedidos por cliente al día | 20 | 20 |
+
+- **Imágenes livianas** (~35 KB por ficha) y guardadas en el celular: solo se descargan las nuevas.
+- **🖥️ Uso del servidor** en Administración → Resumen (🟢 / 🟡 70% / 🔴 90%) para saber cuándo pasar a Supabase Pro.

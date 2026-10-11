@@ -33,7 +33,7 @@
   let editId = null;
 
   const licensed = () => Cuenta.isPro();
-  const FREE_LIMIT = { fichas: 5, clientes: 30 };
+  const FREE_LIMIT = { fichas: 5, clientes: 50 };
   const FREE_TEMPLATES = ['oferta', 'evento']; // la plantilla "Producto" se quitó: los productos van en Caja
   const soloPro = (que) => Core.toast('⭐ ' + que + ' es de la versión Pro. Actívala en Ajustes.');
 
@@ -395,7 +395,7 @@
     c.width = ancho; c.height = Math.round(ancho * H / W);
     c.getContext('2d').drawImage(cv, 0, 0, c.width, c.height);
     await draw(ficha);
-    return c.toDataURL('image/jpeg', 0.72);
+    return c.toDataURL('image/jpeg', 0.7);
   }
   async function publicarFicha(f) {
     if (!f) return;
@@ -403,7 +403,7 @@
     const pn = parseFloat(String(f.precio || '').replace(/[^\d.,]/g, '').replace(',', '.'));
     await Cuenta.rpc('publicar_ficha', {
       p_key: f.id, p_titulo: f.titulo || 'Ficha', p_detalle: f.subtitulo || '',
-      p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 540),
+      p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 432), // ~35 KB: rápida y liviana
       p_tipo: tipo, p_vip: !!f.vip, p_precio_num: tipo !== 'lista' && !isNaN(pn) ? pn : null
     });
     f.pubAt = Date.now();
@@ -798,8 +798,18 @@
     if (!file) return;
     ajustes.logo = await Core.readImage(file, 256);
     db.set('ajustes', ajustes); draw(ficha); e.target.value = '';
+    subirLogo();
   };
-  $('bQuitarLogo').onclick = () => { ajustes.logo = null; db.set('ajustes', ajustes); draw(ficha); };
+  $('bQuitarLogo').onclick = () => {
+    ajustes.logo = null; db.set('ajustes', ajustes); draw(ficha);
+    Cuenta.rpc('set_mi_logo', { p_logo: null }).then((a) => Cuenta.aplicarLogo(a)).catch(() => {});
+  };
+  // El logo también va arriba, al lado del nombre (y lo ven tus clientes).
+  async function subirLogo() {
+    if (!ajustes.logo) return;
+    try { Cuenta.aplicarLogo(await Cuenta.rpc('set_mi_logo', { p_logo: await Core.logoChico(ajustes.logo) })); Core.toast('✅ Logo guardado: también se ve arriba'); }
+    catch (err) { Core.toast('Logo: ' + err.message); }
+  }
   $('bNotif').onclick = async () => Core.toast(await Core.askNotify() ? 'Notificaciones activadas' : 'Permiso denegado');
   $('bProbar').onclick = () => Core.notify('FichaPro', { body: 'Así te avisaré de tus campañas 📣' });
   $('bActivar').onclick = async () => {
@@ -912,6 +922,9 @@
     $('k-pubTxt').innerHTML = '🏷️ Como administrador, tus campañas llegan a <b>todas tus empresas</b> (en la app y como notificación).';
   }
   if (ajustes.tel && !cuenta.telefono) Cuenta.rpc('set_my_phone', { p_tel: ajustes.tel }).catch(() => {});
+  // Logo: si está en este celular y no en el servidor, se sube; si solo está en el servidor, se usa en las fichas.
+  if (ajustes.logo && !cuenta.logo) subirLogo();
+  else if (!ajustes.logo && cuenta.logo) { ajustes.logo = cuenta.logo; db.set('ajustes', ajustes); }
   fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes();
   publicarFichasPendientes().then(publicarPendientes).then(respaldoAuto).catch(() => {});
   const m = location.hash.match(/camp=([\w]+)/);
