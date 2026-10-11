@@ -33,6 +33,11 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 - El cliente tiene **Ofertas**, **Productos** y **Pedidos**: marca ❤️ favoritos (gratis: 5; Premium: ilimitados), ve los ✨ nuevos,
   arma un 🛒 pedido que llega a la tienda por el chat y puede repetir pedidos anteriores.
 - **Ofertas exclusivas Premium**: la empresa marca la campaña como ⭐ exclusiva; los clientes normales la ven bloqueada con "Hazte Premium".
+- El pedido se envía por el chat de la app o por WhatsApp (el de la tienda, que la empresa guarda en **Mi empresa**).
+- Cliente Premium: además elige el color de su app y su ícono.
+- El cliente solo chatea con su tienda; el administrador chatea solo con las empresas.
+- Las campañas que el admin hace en FichaPro llegan a los **Avisos** de todas las empresas.
+- Si la base de datos quedó en una versión anterior, el inicio del admin lo avisa.
 - La versión de la app se ve al pie de cada pantalla. Con internet siempre se carga lo último; sin internet, la copia guardada.
 
 ## Reglas del chat

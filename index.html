@@ -61,6 +61,10 @@
   details.key summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-top: 14px; }
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 14px; }
   .grid2 > * { min-width: 0; }
+  .iconos { display: flex; flex-wrap: wrap; gap: 8px; }
+  .iconos button { width: 44px; height: 44px; padding: 0; font-size: 22px; border-radius: 12px; background: var(--field); box-shadow: none; color: var(--text); }
+  .iconos button.on { outline: 3px solid var(--brand); }
+  .bloqueado { opacity: .55; }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
   .solicitudes { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--text);
     border: 2px solid var(--premium); background: linear-gradient(160deg, color-mix(in srgb, var(--premium) 14%, var(--card)), var(--card) 70%); }
@@ -135,6 +139,11 @@
       <div><h2 id="hola"></h2><p class="muted" id="estadoPlan"></p></div>
     </div>
 
+    <div class="card hidden" id="cBase" style="border:2px solid var(--bad)">
+      <h2>⚠️ Falta actualizar la base de datos</h2>
+      <p class="muted" id="baseTxt"></p>
+    </div>
+
     <a class="card solicitudes hidden" id="cSol" href="apps/admin/#solicitudes">
       <div class="num" id="solNum">0</div>
       <div class="grow"><b>Solicitudes pendientes</b><div class="muted">Pruebas de 7 días y avisos de pago. Toca para revisarlas.</div></div>
@@ -177,8 +186,16 @@
       <h2 id="cuentaTitulo">🏢 Mi cuenta</h2>
       <label for="eNombre" id="lblNombre">Nombre</label><input id="eNombre" maxlength="80">
       <div class="btns"><button class="small" id="eBtn">Guardar</button></div>
+      <div id="rowTel" class="hidden">
+        <label for="eTel">WhatsApp de la tienda (tus clientes te envían pedidos aquí)</label>
+        <div class="row"><input id="eTel" inputmode="tel" placeholder="56912345678" style="flex:2"><button class="small" id="eTelBtn" style="flex:none">Guardar</button></div>
+      </div>
+      <div id="rowIcono" class="hidden">
+        <label>Tu ícono <span class="pill pro" id="icoPill">PREMIUM</span></label>
+        <div class="iconos" id="iconos"></div>
+      </div>
       <div id="rowColor">
-        <label>Color de tu marca</label>
+        <label id="lblColor">Color de tu marca</label>
         <div class="swatches" id="swatches"></div>
         <div class="row" style="margin-top:10px;align-items:center">
           <span class="muted" style="flex:2">O elige cualquier color:</span>
@@ -321,13 +338,23 @@
     contarMensajes();
     if (acc.role === 'client') contarOfertas();
     Cuenta.settings().then((s) => { ajustes = s || {}; pintarPro(Cuenta.account); });
-    if (acc.is_admin) contarSolicitudes();
+    if (acc.is_admin) { contarSolicitudes(); revisarBase(); }
   }
 
   $('tBtn').onclick = async () => {
     if (!$('tAcepto').checked) { $('tErr').textContent = 'Marca la casilla para continuar'; return; }
     try { entrar(await Cuenta.rpc('accept_terms')); } catch (err) { $('tErr').textContent = err.message; }
   };
+
+  // La app y la base de datos deben ser de la misma versión.
+  const DB_VERSION = '3.5';
+  async function revisarBase() {
+    let v = '';
+    try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
+    $('cBase').classList.toggle('hidden', v === DB_VERSION);
+    $('baseTxt').textContent = 'La app es la versión ' + DB_VERSION + ' y la base de datos ' + (v ? 'es la ' + v : 'es anterior a la 3.5') +
+      '. Sin actualizarla, los clientes no ven productos ni ofertas. Corre el paso 3 de la guía (Supabase → SQL Editor).';
+  }
 
   async function contarSolicitudes() {
     try {
@@ -341,6 +368,7 @@
     fichas: ['apps/fichas/', '📣', 'FichaPro', 'Fichas publicitarias, campañas y avisos a tus clientes'],
     caja: ['apps/caja/', '💵', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
     mensajes: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con tus clientes y con soporte'],
+    mensajesCli: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con la tienda: pedidos y consultas'],
     ofertas: ['apps/catalogo/?v=ofertas', '🏷️', 'Ofertas', 'Promociones y ofertas exclusivas'],
     catalogo: ['apps/catalogo/', '🛍️', 'Productos', 'Catálogo, favoritos y pedidos'],
     admin: ['apps/admin/', '🛡️', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
@@ -357,23 +385,32 @@
       : acc.is_pro ? (cliente ? 'Cliente Premium' : 'Versión Pro') + (acc.pro_until ? ' hasta el ' + new Date(acc.pro_until).toLocaleDateString('es') : ' permanente')
       : cliente ? 'Cliente' : 'Versión Free';
     $('estadoPlan').textContent = acc.email + ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : '');
-    $('avatar').textContent = (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
+    $('avatar').textContent = icono(acc) || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
 
-    const lista = cliente ? ['ofertas', 'catalogo', 'mensajes'] : ['fichas', 'caja', 'mensajes'].concat(acc.is_admin ? ['admin'] : []);
+    const lista = cliente ? ['ofertas', 'catalogo', 'mensajesCli'] : ['fichas', 'caja', 'mensajes'].concat(acc.is_admin ? ['admin'] : []);
     $('apps').innerHTML = lista.map((k) => {
       const a = APPS[k];
       return '<a class="app' + (k === 'admin' ? ' admin' : '') + '" href="' + a[0] + '"><div class="ico">' + a[1] + '</div><b>' + a[2] +
-        '</b><small>' + a[3] + '</small>' + (k === 'mensajes' ? '<span class="badge hidden" id="badgeMsg"></span>' : k === 'ofertas' ? '<span class="badge hidden" id="badgeOf"></span>' : '') + '</a>';
+        '</b><small>' + a[3] + '</small>' + (k === 'mensajes' || k === 'mensajesCli' ? '<span class="badge hidden" id="badgeMsg"></span>' : k === 'ofertas' ? '<span class="badge hidden" id="badgeOf"></span>' : '') + '</a>';
     }).join('');
 
     $('inboxTitulo').textContent = '🔔 Avisos';
     $('cuentaTitulo').textContent = cliente ? '👤 Mi cuenta' : '🏢 Mi empresa';
     $('lblNombre').textContent = cliente ? 'Tu nombre' : 'Nombre de la empresa';
     $('eNombre').value = acc.empresa || '';
-    $('rowColor').classList.toggle('hidden', cliente);
+    // Clientes: color e ícono son beneficios Premium. Empresas: siempre.
+    const puedeEstilo = !cliente || acc.is_pro;
+    $('rowColor').classList.toggle('bloqueado', !puedeEstilo);
+    $('lblColor').innerHTML = cliente ? 'Color de tu app <span class="pill pro">PREMIUM</span>' : 'Color de tu marca';
+    $('rowIcono').classList.remove('hidden');
+    $('rowIcono').classList.toggle('bloqueado', !puedeEstilo);
+    $('icoPill').classList.toggle('hidden', !cliente);
+    pintarIconos(acc);
+    $('rowTel').classList.toggle('hidden', cliente);
+    $('eTel').value = acc.telefono || '';
     $('rowMute').classList.toggle('hidden', !cliente);
     $('eMute').checked = !!acc.mute_offers;
-    if (!cliente) pintarColores(acc.id);
+    pintarColores(acc.id);
 
     pintarPro(acc);
   }
@@ -389,7 +426,7 @@
     if (precio) $('proPrecio').innerHTML = '$' + Number(precio).toLocaleString('es-CL') + ' <small>' + (cliente ? 'pago único' : 'por mes') + '</small>';
     $('proFeat').innerHTML = (cliente
       ? ['Ofertas exclusivas que solo ven los clientes Premium', 'Precios especiales Premium en los productos y pedidos',
-         'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
+         'Elige el color de tu app y tu ícono', 'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
       : ['Fichas, clientes y productos ilimitados, sin marca de agua', 'Avisos push y correos automáticos a tus clientes',
          'Plantillas extra, menú de precios y código QR', 'Reportes avanzados de caja y respaldo en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
@@ -409,13 +446,40 @@
       '" style="background:' + c + '"></button>').join('');
     $('eColor').value = actual;
   }
+  // Personalizar la app: para clientes es un beneficio Premium.
+  function estiloBloqueado() {
+    const a = Cuenta.account;
+    if (a && a.role === 'client' && !a.is_pro) {
+      Core.toast('⭐ Elegir colores e ícono es de Premium');
+      $('cPro').scrollIntoView({ behavior: 'smooth' });
+      return true;
+    }
+    return false;
+  }
+  const ICONOS = ['😀', '😎', '🦊', '🐱', '🐶', '🦁', '🚴', '⚽', '🎮', '🎧', '🌸', '🌵', '🍕', '☕', '⭐', '🔥', '💎', '🚀'];
+  function icono(acc) { try { return localStorage.getItem('cfx:icono:' + acc.id) || ''; } catch (e) { return ''; } }
+  function pintarIconos(acc) {
+    const act = icono(acc);
+    $('iconos').innerHTML = [''].concat(ICONOS).map((i) => '<button type="button" class="' + (i === act ? 'on' : '') + '" data-i="' + i + '" aria-label="' +
+      (i || 'Inicial') + '">' + (i || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase()) + '</button>').join('');
+  }
+  $('iconos').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b || estiloBloqueado()) return;
+    try { localStorage.setItem('cfx:icono:' + Cuenta.uid(), b.dataset.i); } catch (err) { /* sin espacio */ }
+    pintar(Cuenta.account);
+  };
+  $('eTelBtn').onclick = async () => {
+    try { pintar(await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value })); Core.toast('✅ WhatsApp guardado: tus clientes ya pueden enviarte pedidos'); }
+    catch (err) { Core.toast(err.message); }
+  };
   $('swatches').onclick = (e) => {
     const c = e.target.dataset.c;
-    if (!c) return;
+    if (!c || estiloBloqueado()) return;
     Core.tema.set(Cuenta.uid(), c);
     pintarColores(Cuenta.uid());
   };
-  $('eColor').oninput = (e) => Core.tema.set(Cuenta.uid(), e.target.value);
+  $('eColor').oninput = (e) => { if (!estiloBloqueado()) Core.tema.set(Cuenta.uid(), e.target.value); else e.target.value = Core.tema.get(Cuenta.uid()); };
   $('eColor').onchange = () => pintarColores(Cuenta.uid());
 
   /* ---------- Avisos (con "visto") ---------- */
