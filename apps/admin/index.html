@@ -35,6 +35,19 @@
       <p class="muted">Pruebas de 7 días y avisos de pago. Revisa tu Mercado Pago antes de aprobar un pago.</p>
       <ul class="list" id="solicitudes"></ul>
     </div>
+    <div class="card" id="cIngresos">
+      <h2>💰 Ingresos</h2>
+      <div class="stats" id="ingresos"></div>
+      <h2 style="margin-top:14px">⏰ Planes que vencen en 7 días</h2>
+      <p class="muted">A los 3 días del vencimiento se les avisa solo. Puedes avisarles antes con un toque.</p>
+      <ul class="list" id="vencen"></ul>
+    </div>
+    <div class="card hidden" id="cEmpresa">
+      <div class="row" style="align-items:center"><h2 style="margin:0;flex:2" id="empTitulo">🏢 Empresa</h2><button class="alt small" id="bCerrarEmp" style="flex:none">Cerrar</button></div>
+      <div class="stats" id="empStats" style="margin-top:12px"></div>
+      <p class="muted" id="empInfo"></p>
+      <ul class="list" id="empPubs"></ul>
+    </div>
     <div class="stats" id="stats"></div>
     <div class="card" id="cReportes">
       <h2>🚩 Reportes <span class="pill" id="nRep">0</span></h2>
@@ -160,6 +173,13 @@
       <p class="muted">Comprueba que la función que envía notificaciones, correos y crea usuarios esté instalada y actualizada.</p>
       <div class="btns"><button class="alt" id="bPing">Probar conexión</button></div>
       <p class="muted" id="pingRes"></p>
+    </div>
+    <div class="card">
+      <h2>🔄 Versión de la app</h2>
+      <p class="muted">Cuando subo una versión nueva, primero te aparece solo a ti el botón "Actualizar" para probarla.
+        Cuando confirmes que funciona, libérala: recién ahí les aparece a empresas y clientes.</p>
+      <p id="verEstado"></p>
+      <div class="btns"><button id="bLiberar" class="ok">Liberar para todos</button></div>
     </div>
     <div class="card">
       <h2>💳 Venta de Pro / Premium</h2>

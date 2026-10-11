@@ -44,11 +44,15 @@
   .kpis .card { margin: 0; text-align: center; }
   .kpis b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
   .chk { display: flex; gap: 8px; align-items: center; margin: 12px 0 0; color: var(--text); font-size: 15px; }
+  .stockBajo { border: 1px solid color-mix(in srgb, var(--bad) 45%, transparent); background: color-mix(in srgb, var(--bad) 8%, var(--card));
+    border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; font-size: 14px; }
+  .barra { height: 14px; border-radius: 99px; background: var(--field); overflow: hidden; margin-top: 12px; }
+  .barra div { height: 100%; width: 0; background: linear-gradient(90deg, var(--brand), var(--ok)); transition: width .4s; }
   .grupo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 4px; }
 </style>
 </head>
 <body>
-<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Caja Rápida</h1><span id="planTag" class="pill">FREE</span></header>
+<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1 id="tituloCaja">Caja Rápida</h1><span id="planTag" class="pill">FREE</span></header>
 <main>
   <!-- VENDER -->
   <section class="view on" id="v-vender">
@@ -57,6 +61,7 @@
         <div class="buscar">
           <input id="q" placeholder="Buscar producto…" aria-label="Buscar producto" autocomplete="off">
         </div>
+        <div class="stockBajo hidden" id="stockBajo"></div>
         <div class="cats" id="cats"></div>
         <div class="otroForm hidden" id="otroForm">
           <div class="row">
@@ -103,7 +108,8 @@
       </div>
       <label for="p-cat">Categoría</label><input id="p-cat" list="listaCats" maxlength="40" placeholder="Ej: Bebidas, Ropa, Cumpleaños">
       <datalist id="listaCats"></datalist>
-      <label class="chk"><input type="checkbox" id="p-pub" checked> Mostrar en mi catálogo para clientes</label>
+      <label class="chk" id="rowPub"><input type="checkbox" id="p-pub" checked> Mostrar en mi catálogo para clientes</label>
+      <label class="chk" id="rowVipProd"><input type="checkbox" id="p-vip"> ⭐ VIP: solo clientes Premium (los demás lo ven en gris)</label>
       <div id="rowPrem"><label for="p-prem">Precio para clientes Premium (opcional)</label><input id="p-prem" inputmode="decimal"></div>
       <div class="btns"><button id="bGuardarProd">Guardar</button><button class="alt" id="bCancelarProd">Cancelar</button></div>
     </div>
@@ -114,6 +120,46 @@
       </div>
       <input id="pq" placeholder="Buscar en mis productos…" aria-label="Buscar en mis productos">
       <div id="listaProds"></div>
+    </div>
+  </section>
+
+  <!-- FINANZAS (Pro / Premium) -->
+  <section class="view" id="v-finanzas">
+    <div class="card upsell hidden" id="finLock">
+      <h2>📈 Mis finanzas <span class="pill pro">PRO</span></h2>
+      <p class="muted">Metas de venta, gastos, ganancia real y resumen semanal. Disponible con Pro (empresas) o Premium (clientes).</p>
+      <div class="btns"><a class="btn warn" href="../../#plan">⭐ Ver planes</a></div>
+    </div>
+    <div id="finPro">
+      <div class="card">
+        <h2>🎯 Meta del mes</h2>
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:2"><label for="fMeta">Meta de ventas ($)</label><input id="fMeta" inputmode="numeric" placeholder="500.000"></div>
+          <button class="small" id="bMeta" style="flex:none">Guardar</button>
+        </div>
+        <div class="barra"><div id="fBarra"></div></div>
+        <p class="muted" id="fMetaTxt"></p>
+      </div>
+      <div class="kpis">
+        <div class="card"><span class="muted">Ventas del mes</span><b id="f-ing">$0</b></div>
+        <div class="card"><span class="muted">Costo de lo vendido</span><b id="f-costo">$0</b></div>
+        <div class="card"><span class="muted">Gastos del mes</span><b id="f-gastos">$0</b></div>
+        <div class="card"><span class="muted">Ganancia real</span><b id="f-gan">$0</b></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h2>📅 Resumen de la semana</h2>
+        <ul class="list" id="fSemana"></ul>
+      </div>
+      <div class="card">
+        <h2>🧾 Gastos</h2>
+        <div class="row" style="flex-wrap:wrap">
+          <div style="flex:2;min-width:150px"><label for="gConcepto">Concepto</label><input id="gConcepto" maxlength="60" placeholder="Arriendo, luz, mercadería…"></div>
+          <div style="min-width:110px"><label for="gMonto">Monto</label><input id="gMonto" inputmode="decimal" placeholder="25.000"></div>
+          <div style="min-width:140px"><label for="gFecha">Fecha</label><input type="date" id="gFecha"></div>
+        </div>
+        <div class="btns"><button id="bGasto">➕ Agregar gasto</button><button class="alt" id="bFinCSV">⬇️ Excel (CSV) del mes</button></div>
+        <ul class="list" id="fGastos"></ul>
+      </div>
     </div>
   </section>
 
@@ -159,6 +205,7 @@
   <button data-v="vender" class="on"><span>🛒</span>Vender</button>
   <button data-v="productos"><span>📦</span>Productos</button>
   <button data-v="reporte"><span>📊</span>Reporte</button>
+  <button data-v="finanzas"><span>📈</span>Finanzas</button>
 </nav>
 
 <script src="../../shared/config.js"></script>

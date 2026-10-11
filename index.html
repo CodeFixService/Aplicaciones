@@ -65,6 +65,12 @@
   .iconos button { width: 44px; height: 44px; padding: 0; font-size: 22px; border-radius: 12px; background: var(--field); box-shadow: none; color: var(--text); }
   .iconos button.on { outline: 3px solid var(--brand); }
   .bloqueado { opacity: .55; }
+  .mini { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); }
+  .mini .grow { flex: 1; min-width: 0; }
+  .icono-top { margin-left: 8px; width: 40px; height: 40px; padding: 0; border-radius: 12px; font-size: 20px; background: var(--field); color: var(--text); box-shadow: none; flex: none; }
+  .ayuda { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 30; width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center; text-decoration: none; font-size: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .app.bloq { opacity: .55; filter: grayscale(1); }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
   .solicitudes { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--text);
     border: 2px solid var(--premium); background: linear-gradient(160deg, color-mix(in srgb, var(--premium) 14%, var(--card)), var(--card) 70%); }
@@ -73,7 +79,7 @@
 </style>
 </head>
 <body>
-<header class="top"><h1 id="titulo">CodeFix Apps</h1><span id="planTag" class="pill hidden"></span></header>
+<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">CodeFix Apps</h1><span id="planTag" class="pill hidden"></span><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
 <main>
   <div class="instalar hidden" id="cInstalar">
     <div style="font-size:30px">📲</div>
@@ -132,7 +138,7 @@
     </div>
   </section>
 
-  <!-- Con sesión -->
+  <!-- Con sesión: inicio -->
   <section id="v-home" class="hidden">
     <div class="card hola">
       <div class="avatar" id="avatar">C</div>
@@ -152,44 +158,30 @@
 
     <div class="apps" id="apps"></div>
 
-    <div class="card upsell hidden" id="cPro"><span id="premium"></span>
-      <h2 id="proTitulo">⭐ Versión Pro</h2>
-      <div class="precio hidden" id="proPrecio"></div>
-      <ul class="feat" id="proFeat"></ul>
-      <div class="btns">
-        <a class="btn warn hidden" id="bComprar" href="#" target="_blank" rel="noopener" style="flex:1">Comprar ahora</a>
-        <button class="alt" id="bPrueba">🎁 Probar 7 días gratis</button>
-      </div>
-      <div class="btns" style="margin-top:8px"><button class="alt small" id="bPague">Ya pagué: avisar para activar</button></div>
-      <p class="muted" id="proNota"></p>
-      <details class="key"><summary>Tengo una key de activación</summary>
-        <input id="kKey" placeholder="CFX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" style="margin-top:10px" aria-label="Key de activación">
-        <p class="err" id="kErr"></p>
-        <div class="btns"><button id="kBtn">Activar</button></div>
-      </details>
-    </div>
+    <a class="card upsell mini hidden" id="cProMini" href="#plan">
+      <span style="font-size:26px">⭐</span>
+      <div class="grow"><b id="miniTitulo">Hazte Premium</b><div class="muted" id="miniTxt">Ofertas exclusivas, precios especiales y más.</div></div>
+      <span style="font-size:22px">›</span>
+    </a>
 
     <div class="card avisoPush hidden" id="cPush">
       <h2>🔔 Activa las notificaciones</h2>
-      <p class="muted">Así te llegan los avisos y mensajes aunque tengas la app cerrada.</p>
+      <p class="muted">Así te llegan los avisos, pedidos y mensajes aunque tengas la app cerrada.</p>
       <div class="btns"><button id="bPush">Activar notificaciones</button></div>
     </div>
 
-    <div class="grid2">
-      <div class="card">
-        <h2 id="inboxTitulo">🔔 Avisos</h2>
-        <ul class="list inbox" id="inbox"></ul>
-      </div>
-    </div>
-
     <div class="card">
-      <h2 id="cuentaTitulo">🏢 Mi cuenta</h2>
+      <h2 id="inboxTitulo">🔔 Avisos</h2>
+      <ul class="list inbox" id="inbox"></ul>
+    </div>
+  </section>
+
+  <!-- Con sesión: ajustes (todo lo de configuración en un solo lugar) -->
+  <section id="v-ajustes" class="hidden">
+    <div class="card">
+      <h2>👤 Mi perfil</h2>
       <label for="eNombre" id="lblNombre">Nombre</label><input id="eNombre" maxlength="80">
       <div class="btns"><button class="small" id="eBtn">Guardar</button></div>
-      <div id="rowTel" class="hidden">
-        <label for="eTel">WhatsApp de la tienda (tus clientes te envían pedidos aquí)</label>
-        <div class="row"><input id="eTel" inputmode="tel" placeholder="56912345678" style="flex:2"><button class="small" id="eTelBtn" style="flex:none">Guardar</button></div>
-      </div>
       <div id="rowIcono" class="hidden">
         <label>Tu ícono <span class="pill pro" id="icoPill">PREMIUM</span></label>
         <div class="iconos" id="iconos"></div>
@@ -206,20 +198,77 @@
         <label for="nPass">Contraseña nueva (mínimo 6 caracteres)</label><input id="nPass" type="password" autocomplete="new-password" minlength="6">
         <div class="btns"><button class="small" id="bPass">Cambiar contraseña</button></div>
       </details>
-      <label class="terms hidden" id="rowMute"><input type="checkbox" id="eMute"> <span>Silenciar ofertas de la tienda (los mensajes del chat siguen llegando)</span></label>
-      <p class="muted" style="margin-top:14px"><a href="apps/legal/">Términos de uso y privacidad</a></p>
     </div>
 
-    <div class="btns"><button class="alt" id="bSalir">Cerrar sesión</button></div>
+    <div class="card hidden" id="cTienda">
+      <h2>🏪 Mi tienda</h2>
+      <p class="muted">Lo que ven tus clientes al comprarte.</p>
+      <div id="rowTel">
+        <label for="eTel">WhatsApp de la tienda (para recibir pedidos)</label>
+        <input id="eTel" inputmode="tel" placeholder="56912345678">
+      </div>
+      <label for="tPago">Datos para transferencia</label>
+      <textarea id="tPago" maxlength="400" placeholder="Banco · Tipo de cuenta · N° de cuenta · RUT · Nombre · Correo"></textarea>
+      <label for="tHorario">Horario de atención</label>
+      <input id="tHorario" maxlength="120" placeholder="Lun a Vie 9:00 a 19:00 · Sáb 10:00 a 14:00">
+      <label class="terms"><input type="checkbox" id="tAbierto" checked> <span>Tienda abierta ahora (si la desmarcas, tus clientes ven "Cerrado: te responderemos al abrir")</span></label>
+      <div id="rowSellos">
+        <label>🎟️ Tarjeta de sellos <span class="pill pro">PRO</span></label>
+        <div class="row" style="flex-wrap:wrap">
+          <div style="min-width:120px"><label for="tSellos">Sellos para el premio</label><input id="tSellos" inputmode="numeric" placeholder="10 (vacío = sin tarjeta)"></div>
+          <div style="min-width:160px"><label for="tPremio">Premio</label><input id="tPremio" maxlength="80" placeholder="Un café gratis"></div>
+        </div>
+        <p class="muted" style="margin:4px 0 0">Cada pedido entregado suma un sello a tu cliente.</p>
+      </div>
+      <div class="btns"><button id="bTienda">Guardar mi tienda</button></div>
+    </div>
 
-    <details class="card danger-zone" style="margin-top:14px">
-      <summary class="muted" style="cursor:pointer">Eliminar mi cuenta</summary>
-      <p class="muted">Se borran tu cuenta, tus mensajes y tus datos del servidor. No se puede deshacer.
-        Escribe <b>ELIMINAR</b> para confirmar.</p>
-      <input id="delConfirm" autocomplete="off" aria-label="Escribe ELIMINAR">
-      <div class="btns"><button class="danger" id="bEliminar">Eliminar mi cuenta</button></div>
-    </details>
+    <div class="card">
+      <h2>🔔 Notificaciones</h2>
+      <p class="muted" id="pushEstado"></p>
+      <div class="btns"><button class="small alt" id="bPush2">Activar en este celular</button></div>
+      <label class="terms hidden" id="rowMute"><input type="checkbox" id="eMute"> <span>Silenciar ofertas de la tienda (los mensajes y pedidos siguen llegando)</span></label>
+    </div>
+
+    <div class="card upsell" id="cPlan"><span id="plan"></span>
+      <h2>💳 Mi plan</h2>
+      <p class="muted" id="planActual"></p>
+      <div class="hidden" id="cPro"><span id="premium"></span>
+        <h2 id="proTitulo">⭐ Versión Pro</h2>
+        <div class="precio hidden" id="proPrecio"></div>
+        <ul class="feat" id="proFeat"></ul>
+        <div class="btns">
+          <a class="btn warn hidden" id="bComprar" href="#" target="_blank" rel="noopener" style="flex:1">Comprar ahora</a>
+          <button class="alt" id="bPrueba">🎁 Probar 7 días gratis</button>
+        </div>
+        <div class="btns" style="margin-top:8px"><button class="alt small" id="bPague">Ya pagué: avisar para activar</button></div>
+        <p class="muted" id="proNota"></p>
+      </div>
+      <details class="key"><summary>Tengo una key de activación</summary>
+        <input id="kKey" placeholder="CFX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" style="margin-top:10px" aria-label="Key de activación">
+        <p class="err" id="kErr"></p>
+        <div class="btns"><button id="kBtn">Activar</button></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>📄 Legal</h2>
+      <p class="muted"><a href="apps/legal/">Términos de uso y política de privacidad</a></p>
+    </div>
+
+    <div class="card danger-zone">
+      <h2>⚠️ Zona peligrosa</h2>
+      <div class="btns"><button class="alt" id="bSalir">Cerrar sesión</button></div>
+      <details style="margin-top:14px">
+        <summary class="muted" style="cursor:pointer">Eliminar mi cuenta</summary>
+        <p class="muted">Se borran tu cuenta, tus mensajes y tus datos del servidor. No se puede deshacer.
+          Escribe <b>ELIMINAR</b> para confirmar.</p>
+        <input id="delConfirm" autocomplete="off" aria-label="Escribe ELIMINAR">
+        <div class="btns"><button class="danger" id="bEliminar">Eliminar mi cuenta</button></div>
+      </details>
+    </div>
   </section>
+  <a class="ayuda hidden" id="bAyuda" href="#" aria-label="Ayuda">❓</a>
 </main>
 <script src="shared/config.js"></script>
 <script src="shared/vendor/supabase.js"></script>
@@ -227,8 +276,22 @@
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  const views = ['v-setup', 'v-login', 'v-reset', 'v-terms', 'v-home'];
-  const showView = (v) => views.forEach((x) => $(x).classList.toggle('hidden', x !== v));
+  const views = ['v-setup', 'v-login', 'v-reset', 'v-terms', 'v-home', 'v-ajustes'];
+  const showView = (v) => {
+    views.forEach((x) => $(x).classList.toggle('hidden', x !== v));
+    // Inicio: botón ⚙️ Ajustes. Ajustes: botón ‹ para volver.
+    $('bAjustes').classList.toggle('hidden', v !== 'v-home');
+    $('bVolver').classList.toggle('hidden', v !== 'v-ajustes');
+  };
+  // #ajustes, #plan (o #premium) abren Ajustes.
+  const enAjustes = () => /^#(ajustes|plan|premium)$/.test(location.hash);
+  function irAVista() {
+    if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
+    showView(enAjustes() ? 'v-ajustes' : 'v-home');
+    if (/^#(plan|premium)$/.test(location.hash)) setTimeout(() => $('cPlan').scrollIntoView({ behavior: 'smooth' }), 200);
+    else scrollTo(0, 0);
+  }
+  addEventListener('hashchange', irAVista);
   const params = new URLSearchParams(location.search);
   Core.registerSW('./');
   Core.marca();
@@ -332,8 +395,11 @@
     if (!acc.terms_at) { showView('v-terms'); return; }
     pintar(acc);
     showView('v-home');
-    if (location.hash === '#premium') setTimeout(() => $('cPro').scrollIntoView({ behavior: 'smooth' }), 300);
+    irAVista();
     cargarInbox();
+    Cuenta.revisarActualizacion();
+    if (!cliente(acc)) cargarTienda(acc);
+    prepararAyuda(acc);
     revisarPush();
     contarMensajes();
     if (acc.role === 'client') contarOfertas();
@@ -347,7 +413,7 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '3.6';
+  const DB_VERSION = '3.7';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
@@ -369,10 +435,11 @@
     caja: ['apps/caja/', '💵', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
     mensajes: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con tus clientes y con soporte'],
     mensajesCli: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con la tienda: pedidos y consultas'],
-    novedades: ['apps/catalogo/?v=codefix', '📣', 'Novedades CodeFix', 'Promociones y anuncios del administrador'],
+    novedades: ['apps/catalogo/?modo=codefix', '📣', 'Novedades CodeFix', 'Promociones, productos y pedidos a CodeFix'],
     vista: ['apps/catalogo/?v=ofertas', '👁️', 'Mi tienda', 'Lo que ven tus clientes: fichas, ofertas y productos'],
-    ofertas: ['apps/catalogo/?v=ofertas', '🏷️', 'Ofertas', 'Fichas, promociones y ofertas exclusivas'],
-    catalogo: ['apps/catalogo/', '🛍️', 'Productos', 'Catálogo, favoritos y pedidos'],
+    tienda: ['apps/catalogo/?v=ofertas', '🛍️', 'Tienda', 'Ofertas, productos y tus pedidos'],
+    pedidos: ['apps/pedidos/', '📦', 'Pedidos', 'Pedidos de tus clientes, cupones y estadísticas'],
+    cajaCli: ['apps/caja/', '💵', 'Mi Caja', 'Tu caja, productos y finanzas (Premium)'],
     admin: ['apps/admin/', '🛡️', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
   };
   function pintar(acc) {
@@ -389,15 +456,21 @@
     $('estadoPlan').textContent = acc.email + ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : '');
     $('avatar').textContent = icono(acc) || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
 
-    const lista = cliente ? ['ofertas', 'catalogo', 'mensajesCli'] : ['fichas', 'caja', 'mensajes', 'novedades', 'vista'].concat(acc.is_admin ? ['admin'] : []);
+    // Un acceso por cosa: el cliente tiene su Tienda; la empresa, Mi tienda (vista del cliente) y Novedades CodeFix.
+    const lista = cliente ? ['tienda', 'mensajesCli', 'cajaCli']
+      : acc.is_admin ? ['fichas', 'caja', 'pedidos', 'mensajes', 'vista', 'admin']
+      : ['fichas', 'caja', 'pedidos', 'mensajes', 'vista', 'novedades'];
     $('apps').innerHTML = lista.map((k) => {
       const a = APPS[k];
-      return '<a class="app' + (k === 'admin' ? ' admin' : '') + '" href="' + a[0] + '"><div class="ico">' + a[1] + '</div><b>' + a[2] +
-        '</b><small>' + a[3] + '</small>' + (k === 'mensajes' || k === 'mensajesCli' ? '<span class="badge hidden" id="badgeMsg"></span>' : k === 'ofertas' ? '<span class="badge hidden" id="badgeOf"></span>' : '') + '</a>';
+      const bloq = k === 'cajaCli' && !acc.is_pro; // Caja del cliente: solo Premium (se ve en gris)
+      return '<a class="app' + (k === 'admin' ? ' admin' : '') + (bloq ? ' bloq' : '') + '" href="' + (bloq ? '#plan' : a[0]) + '"><div class="ico">' + a[1] + '</div><b>' + a[2] +
+        (bloq ? ' <span class="pill pro">PREMIUM</span>' : '') + '</b><small>' + a[3] + '</small>' +
+        (k === 'mensajes' || k === 'mensajesCli' ? '<span class="badge hidden" id="badgeMsg"></span>' : k === 'tienda' ? '<span class="badge hidden" id="badgeOf"></span>'
+          : k === 'pedidos' ? '<span class="badge hidden" id="badgePed"></span>' : '') + '</a>';
     }).join('');
+    if (!cliente) contarPedidos();
 
     $('inboxTitulo').textContent = '🔔 Avisos';
-    $('cuentaTitulo').textContent = cliente ? '👤 Mi cuenta' : '🏢 Mi empresa';
     $('lblNombre').textContent = cliente ? 'Tu nombre' : 'Nombre de la empresa';
     $('eNombre').value = acc.empresa || '';
     // Clientes: color e ícono son beneficios Premium. Empresas: siempre.
@@ -408,8 +481,11 @@
     $('rowIcono').classList.toggle('bloqueado', !puedeEstilo);
     $('icoPill').classList.toggle('hidden', !cliente);
     pintarIconos(acc);
-    $('rowTel').classList.toggle('hidden', cliente);
+    $('cTienda').classList.toggle('hidden', cliente);
     $('eTel').value = acc.telefono || '';
+    $('rowSellos').classList.toggle('bloqueado', !acc.is_pro);
+    $('planActual').textContent = acc.is_admin ? 'Administrador general: tienes todo activado.'
+      : acc.is_pro ? '⭐ ' + plan + '. ¡Gracias por tu apoyo!' : 'Tu plan actual: ' + plan + '.';
     $('rowMute').classList.toggle('hidden', !cliente);
     $('eMute').checked = !!acc.mute_offers;
     pintarColores(acc.id);
@@ -417,20 +493,26 @@
     pintarPro(acc);
   }
 
+  const cliente = (acc) => acc.role === 'client';
   function pintarPro(acc) {
     if (!acc) return;
     const cliente = acc.role === 'client';
     $('cPro').classList.toggle('hidden', !!acc.is_pro);
+    $('cProMini').classList.toggle('hidden', !!acc.is_pro);
+    $('miniTitulo').textContent = cliente ? 'Hazte Premium' : 'Pásate a Pro';
+    $('miniTxt').textContent = cliente ? 'Ofertas VIP, precios especiales, tu propia Caja y más.' : 'Push y correos a tus clientes, cupones, sellos, estadísticas y más.';
     if (acc.is_pro) return;
     $('proTitulo').textContent = cliente ? '⭐ Hazte Premium' : '⭐ Versión Pro';
     const precio = cliente ? ajustes.price_client : ajustes.price_business;
     $('proPrecio').classList.toggle('hidden', !precio);
     if (precio) $('proPrecio').innerHTML = '$' + Number(precio).toLocaleString('es-CL') + ' <small>' + (cliente ? 'pago único' : 'por mes') + '</small>';
     $('proFeat').innerHTML = (cliente
-      ? ['Ofertas exclusivas que solo ven los clientes Premium', 'Precios especiales Premium en los productos y pedidos',
-         'Elige el color de tu app y tu ícono', 'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
-      : ['Fichas, clientes y productos ilimitados, sin marca de agua', 'Avisos push y correos automáticos a tus clientes',
-         'Plantillas extra, menú de precios y código QR', 'Reportes avanzados de caja y respaldo en la nube']
+      ? ['Ofertas y productos VIP que solo ven los clientes Premium', 'Precios especiales Premium en los productos y pedidos',
+         'Tu propia Caja con 📈 Finanzas: metas, gastos y ganancia real', 'Elige el color de tu app y tu ícono',
+         'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
+      : ['Fichas, clientes y productos ilimitados, sin marca de agua', 'Todas las plantillas (Foto completa y Menú), QR y fichas VIP',
+         'Cupones de descuento y tarjeta de sellos para tus clientes', '📊 Estadísticas: vistas, productos más pedidos y mejores clientes',
+         '📈 Finanzas: metas, gastos y ganancia real', 'Push y correos automáticos, y respaldo diario en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
     const link = /^https:\/\//.test(ajustes.payment_link || '') ? ajustes.payment_link : '';
     $('bComprar').classList.toggle('hidden', !link);
@@ -471,10 +553,45 @@
     try { localStorage.setItem('cfx:icono:' + Cuenta.uid(), b.dataset.i); } catch (err) { /* sin espacio */ }
     pintar(Cuenta.account);
   };
-  $('eTelBtn').onclick = async () => {
-    try { pintar(await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value })); Core.toast('✅ WhatsApp guardado: tus clientes ya pueden enviarte pedidos'); }
-    catch (err) { Core.toast(err.message); }
+  /* ---------- Mi tienda (empresas) ---------- */
+  async function cargarTienda(acc) {
+    try {
+      const t = await Cuenta.rpc('tienda_info', { p_negocio: acc.id });
+      if (!t) return;
+      $('tPago').value = t.datos_pago || ''; $('tHorario').value = t.horario || '';
+      $('tAbierto').checked = t.abierto !== false;
+      $('tSellos').value = t.sellos_meta || ''; $('tPremio').value = t.sellos_premio || '';
+    } catch (e) { /* sin red */ }
+  }
+  $('bTienda').onclick = async () => {
+    const meta = parseInt($('tSellos').value, 10);
+    if (!isNaN(meta) && !Cuenta.isPro()) return Core.toast('⭐ La tarjeta de sellos es de la versión Pro');
+    try {
+      await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value });
+      pintar(await Cuenta.rpc('set_mi_tienda', { p_datos_pago: $('tPago').value, p_horario: $('tHorario').value,
+        p_abierto: $('tAbierto').checked, p_sellos_meta: isNaN(meta) ? null : meta, p_sellos_premio: $('tPremio').value }));
+      Core.toast('✅ Mi tienda guardada');
+    } catch (err) { Core.toast(err.message); }
   };
+  $('bAjustes').onclick = () => { location.hash = 'ajustes'; };
+  $('bVolver').onclick = (e) => { e.preventDefault(); history.replaceState(null, '', location.pathname + location.search); irAVista(); };
+
+  /* ---------- Ayuda: abre el chat (empresa → CodeFix; cliente → su tienda) ---------- */
+  async function prepararAyuda(acc) {
+    let con = null;
+    if (acc.role === 'client') con = acc.negocio_id;
+    else if (acc.role === 'user') { try { con = await Cuenta.rpc('admin_id'); } catch (e) { con = null; } }
+    $('bAyuda').classList.toggle('hidden', !con);
+    if (con) $('bAyuda').href = 'apps/mensajes/?con=' + con + '&txt=' + encodeURIComponent('Hola, necesito ayuda con ');
+  }
+
+  async function contarPedidos() {
+    try {
+      const l = await Cuenta.rpc('pedidos_tienda', { p_estado: 'activos' });
+      const b = $('badgePed');
+      if (b) { b.textContent = l.length; b.classList.toggle('hidden', !l.length); }
+    } catch (e) { /* sin red */ }
+  }
   $('swatches').onclick = (e) => {
     const c = e.target.dataset.c;
     if (!c || estiloBloqueado()) return;
@@ -553,10 +670,12 @@
       activo = !!(reg && reg.pushManager && await reg.pushManager.getSubscription()) && Notification.permission === 'granted';
     } catch (e) { /* sin soporte */ }
     $('cPush').classList.toggle('hidden', activo);
+    $('pushEstado').textContent = activo ? '✅ Activas en este celular.' : 'Desactivadas en este celular: actívalas para recibir avisos, pedidos y mensajes.';
+    $('bPush2').classList.toggle('hidden', activo);
     if (activo) Cuenta.syncPush(); // el celular queda a nombre de esta cuenta
   }
-  $('bPush').onclick = async () => {
-    try { await Cuenta.enablePush(); Core.toast('✅ Notificaciones activadas en este celular'); $('cPush').classList.add('hidden'); }
+  $('bPush').onclick = $('bPush2').onclick = async () => {
+    try { await Cuenta.enablePush(); Core.toast('✅ Notificaciones activadas en este celular'); revisarPush(); }
     catch (err) { Core.toast(err.message); }
   };
 

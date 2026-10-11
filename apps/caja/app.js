@@ -3,7 +3,10 @@
   const $ = (id) => document.getElementById(id);
   Core.registerSW('../../');
   Core.marca();
-  const cuenta = await Cuenta.require('../../', { empresa: true });
+  const cuenta = await Cuenta.require('../../');
+  // Clientes: Caja privada solo con Premium (sus productos no se publican en ningún lado).
+  const esCliente = cuenta.role === 'client';
+  if (esCliente && !cuenta.is_pro) { location.replace('../../#plan'); return; }
   const db = Core.store('caja:' + cuenta.id);
   if (!localStorage.getItem('caja:migrado')) {
     const viejo = Core.store('caja').dump();
@@ -40,6 +43,7 @@
     scrollTo(0, 0);
     if (v === 'productos') renderLista();
     if (v === 'reporte') renderReporte();
+    if (v === 'finanzas') renderFinanzas();
     if (v === 'vender') renderProds();
   }
   const categorias = () => [...new Set(productos.map((p) => p.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -57,10 +61,14 @@
 
   function renderProds() {
     renderCats();
+    // Aviso de stock bajo (3 o menos).
+    const bajos = productos.filter((p) => p.stock !== '' && p.stock <= 3);
+    $('stockBajo').classList.toggle('hidden', !bajos.length);
+    $('stockBajo').innerHTML = '⚠️ <b>Stock bajo:</b> ' + bajos.map((p) => Core.esc(p.nombre) + ' (' + p.stock + ')').join(', ');
     const q = $('q').value.trim().toLowerCase();
     const l = productos.filter((p) => (!cat || p.categoria === cat) && (!q || p.nombre.toLowerCase().includes(q)));
     $('prods').innerHTML = '<button class="prod otro" id="bOtro"><b>➕ Otro</b><small>sin registrar</small></button>' +
-      l.map((p) => '<button class="prod' + (p.stock !== '' && p.stock <= 3 ? ' low' : '') + '" data-id="' + p.id + '">' +
+      l.map((p) => '<button class="prod' + (p.stock !== '' && p.stock <= 3 ? ' low' : '') + '" data-id="' + p.id + '">' + (p.vip ? '<small>⭐ VIP</small>' : '') +
         '<b>' + Core.esc(p.nombre) + '</b><span>' + money(p.precio) + '</span>' +
         '<small>' + (p.stock === '' ? Core.esc(p.categoria || '') : 'Stock: ' + p.stock) + '</small></button>').join('') +
       (!productos.length ? '<p class="empty" style="grid-column:1/-1">Agrega tus productos en 📦 o usa ➕ Otro para vender algo al tiro.</p>' : '');
@@ -101,7 +109,7 @@
     if ($('oGuardar').checked) {
       if (!pro && productos.length >= FREE_PRODUCTOS) soloPro('Tener más de ' + FREE_PRODUCTOS + ' productos');
       else {
-        const p = { id: Core.uid(), nombre, precio, costo: 0, stock: '', categoria: $('oCat').value.trim(), publicado: true, premium: null };
+        const p = { id: Core.uid(), nombre, precio, costo: 0, stock: '', categoria: $('oCat').value.trim(), publicado: !esCliente, premium: null };
         productos.push(p); guardarProductos(); id = p.id;
         sincronizar(p).then((ok) => { if (!ok) { p.publicado = false; guardarProductos(); } });
       }
@@ -175,7 +183,7 @@
         '<button class="small danger" data-a="del" data-id="' + p.id + '" aria-label="Eliminar">✕</button></div>';
     }).join('') : '<p class="empty">Sin productos</p>';
     $('formTitulo').textContent = editId ? 'Editar producto' : 'Nuevo producto (' + productos.length + (pro ? '' : '/' + FREE_PRODUCTOS) + ')';
-    const sinPublicar = productos.filter((p) => !p.publicado).length;
+    const sinPublicar = esCliente ? 0 : productos.filter((p) => !p.publicado).length;
     $('rowPublicar').classList.toggle('hidden', !sinPublicar);
     $('txtPublicar').textContent = sinPublicar + ' producto(s) no aparecen en el catálogo de tus clientes.';
   }
@@ -189,7 +197,7 @@
     try {
       for (const p of l) {
         try {
-          await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria });
+          await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip });
         } catch (e) { Core.toast('Se publicaron ' + n + '. ' + e.message); break; }
         p.publicado = true; n++;
       }
@@ -201,15 +209,17 @@
   function limpiarForm() {
     editId = null;
     ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem'].forEach((k) => { $('p-' + k).value = ''; });
-    $('p-pub').checked = true; $('rowPrem').classList.remove('hidden'); // lo nuevo se publica por defecto
+    $('p-pub').checked = !esCliente; $('rowPrem').classList.toggle('hidden', esCliente); // lo nuevo se publica por defecto
+    $('p-vip').checked = false;
     renderLista();
   }
   $('bCancelarProd').onclick = limpiarForm;
 
   async function sincronizar(p, borrar) {
+    if (esCliente) return true; // la Caja del cliente es privada
     try {
       if (borrar || !p.publicado) await Cuenta.rpc('catalog_delete', { p_key: p.id });
-      else await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria });
+      else await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip });
       return true;
     } catch (e) {
       Core.toast('Catálogo: ' + e.message);
@@ -225,8 +235,9 @@
       costo: num($('p-costo').value) || 0,
       stock: $('p-stock').value === '' ? '' : parseInt($('p-stock').value, 10),
       categoria: $('p-cat').value.trim(),
-      publicado: $('p-pub').checked,
-      premium: $('p-pub').checked && !isNaN(prem) ? prem : null
+      publicado: !esCliente && $('p-pub').checked,
+      premium: $('p-pub').checked && !isNaN(prem) ? prem : null,
+      vip: !esCliente && $('p-vip').checked
     };
     if (!p.nombre || isNaN(p.precio)) return Core.toast('Nombre y precio son obligatorios');
     let prod;
@@ -257,6 +268,7 @@
       $('p-nombre').value = p.nombre; $('p-precio').value = p.precio; $('p-costo').value = p.costo || '';
       $('p-stock').value = p.stock; $('p-cat').value = p.categoria || '';
       $('p-pub').checked = !!p.publicado; $('p-prem').value = p.premium == null ? '' : p.premium;
+      $('p-vip').checked = !!p.vip;
       $('rowPrem').classList.toggle('hidden', !p.publicado);
       renderLista();
       scrollTo(0, 0);
@@ -354,15 +366,23 @@
     }
   };
 
+  // Pro/Premium: respaldo automático en la nube una vez al día.
+  async function respaldoAuto() {
+    if (!pro || Date.now() - db.get('nubeAuto', 0) < 864e5) return;
+    const blob = new Blob([JSON.stringify({ datos: db.dump() })], { type: 'application/json' });
+    const { error } = await Cuenta.sb.storage.from('respaldos').upload(cuenta.id + '/caja.json', blob, { upsert: true, contentType: 'application/json' });
+    if (!error) db.set('nubeAuto', Date.now());
+  }
+
   // Una vez por celular: los productos creados con la versión antigua (que no publicaba
   // por defecto) se suben al catálogo para que los clientes los vean.
   async function publicarPendientes() {
-    if (db.get('catalogoV35')) return;
+    if (esCliente || db.get('catalogoV35')) return;
     const l = productos.filter((p) => !p.publicado || !p.sync35);
     let n = 0;
     for (const p of l) {
       try {
-        await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria });
+        await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip });
         p.publicado = true; p.sync35 = true; n++;
       } catch (e) {
         guardarProductos();
@@ -374,6 +394,69 @@
     if (n) { Core.toast('🛍️ ' + n + ' producto(s) publicados en tu catálogo: tus clientes ya los ven'); renderLista(); }
   }
 
+  /* ---------- Finanzas (Pro / Premium) ---------- */
+  let gastos = db.get('gastos', []);
+  const inicioMes = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); };
+  const totalVenta = (v) => v.items.reduce((s, l) => s + l.precio * l.cant, 0);
+  const costoVenta = (v) => v.items.reduce((s, l) => s + (l.costo || 0) * l.cant, 0);
+  function renderFinanzas() {
+    $('finLock').classList.toggle('hidden', pro);
+    $('finPro').classList.toggle('hidden', !pro);
+    if (!pro) return;
+    const m0 = inicioMes(), delMes = ventas.filter((v) => v.t >= m0);
+    const ing = delMes.reduce((s, v) => s + totalVenta(v), 0), costo = delMes.reduce((s, v) => s + costoVenta(v), 0);
+    const gMes = gastos.filter((g) => new Date(g.fecha + 'T12:00').getTime() >= m0).reduce((s, g) => s + g.monto, 0);
+    $('f-ing').textContent = money(ing); $('f-costo').textContent = money(costo);
+    $('f-gastos').textContent = money(gMes); $('f-gan').textContent = money(ing - costo - gMes);
+    const meta = db.get('meta', 0);
+    $('fMeta').value = meta || '';
+    const pct = meta ? Math.min(100, Math.round(ing * 100 / meta)) : 0;
+    $('fBarra').style.width = pct + '%';
+    $('fMetaTxt').textContent = meta ? pct + '% de la meta (' + money(ing) + ' de ' + money(meta) + ')' + (pct >= 100 ? ' 🎉 ¡Meta cumplida!' : '') : 'Define una meta para ver tu avance.';
+    // Semana: total, mejor producto y mejor día (últimos 28 días).
+    const s7 = ventas.filter((v) => v.t >= Date.now() - 7 * 864e5);
+    const porProd = {};
+    s7.forEach((v) => v.items.forEach((l) => { porProd[l.nombre] = (porProd[l.nombre] || 0) + l.cant; }));
+    const mejorProd = Object.entries(porProd).sort((a, b) => b[1] - a[1])[0];
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'], porDia = [0, 0, 0, 0, 0, 0, 0];
+    ventas.filter((v) => v.t >= Date.now() - 28 * 864e5).forEach((v) => { porDia[new Date(v.t).getDay()] += totalVenta(v); });
+    const mejorDia = porDia.indexOf(Math.max(...porDia));
+    $('fSemana').innerHTML = '<li><span class="grow">Vendiste en 7 días</span><b>' + money(s7.reduce((s, v) => s + totalVenta(v), 0)) + ' (' + s7.length + ' ventas)</b></li>' +
+      '<li><span class="grow">Producto estrella</span><b>' + (mejorProd ? Core.esc(mejorProd[0]) + ' × ' + mejorProd[1] : '—') + '</b></li>' +
+      '<li><span class="grow">Tu mejor día</span><b>' + (Math.max(...porDia) ? dias[mejorDia] : '—') + '</b></li>';
+    const gl = gastos.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 60);
+    $('fGastos').innerHTML = gl.length ? gl.map((g) => '<li><div class="grow"><b>' + Core.esc(g.concepto) + '</b><div class="muted">' +
+      new Date(g.fecha + 'T12:00').toLocaleDateString('es') + '</div></div><b>' + money(g.monto) + '</b>' +
+      '<button class="small danger" data-g="' + g.id + '" aria-label="Eliminar">✕</button></li>').join('') : '<li class="empty">Sin gastos registrados</li>';
+  }
+  $('bMeta').onclick = () => { const m = num($('fMeta').value); db.set('meta', isNaN(m) ? 0 : m); renderFinanzas(); Core.toast('🎯 Meta guardada'); };
+  $('gFecha').value = hoy();
+  $('bGasto').onclick = () => {
+    const monto = num($('gMonto').value), concepto = $('gConcepto').value.trim();
+    if (!concepto || isNaN(monto) || monto <= 0) return Core.toast('Escribe el concepto y el monto');
+    gastos.push({ id: Core.uid(), concepto, monto, fecha: $('gFecha').value || hoy() });
+    db.set('gastos', gastos); $('gConcepto').value = ''; $('gMonto').value = '';
+    renderFinanzas(); Core.toast('Gasto agregado');
+  };
+  $('fGastos').onclick = (e) => {
+    const id = e.target.dataset.g;
+    if (!id || !confirm('¿Eliminar este gasto?')) return;
+    gastos = gastos.filter((g) => g.id !== id); db.set('gastos', gastos); renderFinanzas();
+  };
+  $('bFinCSV').onclick = () => {
+    const m0 = inicioMes();
+    const filas = [['tipo', 'fecha', 'detalle', 'monto']]
+      .concat(ventas.filter((v) => v.t >= m0).map((v) => ['venta', new Date(v.t).toLocaleString('es'), v.items.map((l) => l.cant + 'x ' + l.nombre).join(' / '), totalVenta(v)]))
+      .concat(gastos.filter((g) => new Date(g.fecha + 'T12:00').getTime() >= m0).map((g) => ['gasto', g.fecha, g.concepto, -g.monto]));
+    const csv = filas.map((f) => f.map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(';')).join('\n');
+    Core.download('finanzas-' + hoy().slice(0, 7) + '.csv', new Blob(['\ufeff' + csv], { type: 'text/csv' }));
+  };
+
+  if (esCliente) {
+    $('tituloCaja').textContent = 'Mi Caja';
+    ['rowPub', 'rowPrem', 'rowVipProd'].forEach((id) => $(id).classList.add('hidden'));
+  }
   renderProds(); renderTicket();
+  respaldoAuto();
   publicarPendientes();
 })();

@@ -54,22 +54,38 @@
   .ped li { flex-wrap: wrap; }
   .ped .grow { min-width: 180px; }
   .ped pre { white-space: pre-wrap; font: inherit; font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+  /* VIP: marco y cinta roja. Bloqueado: en gris. */
+  .oferta, .item { position: relative; }
+  .vip { border: 3px solid #dc2626; }
+  .cinta { position: absolute; top: 14px; left: -34px; z-index: 2; transform: rotate(-45deg); background: #dc2626; color: #fff;
+    font-size: 12px; font-weight: 800; letter-spacing: .12em; padding: 4px 40px; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+  .gris { filter: grayscale(1); opacity: .75; }
+  .gris .btn.warn { filter: none; }
+  .bloq { background: linear-gradient(150deg, #9ca3af, #4b5563); color: #fff; }
+  .item.gris .p { color: var(--muted); }
+  .oferta .acc { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }
+  .oferta .acc > * { flex: 1 1 130px; }
+  .estado { border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; font-size: 14px; border: 1px solid var(--line); background: var(--card); }
+  .entrega { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .entrega button:not(.on) { background: var(--brand-soft); color: var(--brand); box-shadow: none; }
+  .aviso { font-size: 13px; padding: 8px 10px; border-radius: 10px; margin: 10px 0 0; background: color-mix(in srgb, #f59e0b 14%, var(--card)); border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent); }
+  .sellos { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+  .sellos span { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 2px dashed var(--line); font-size: 18px; }
+  .sellos span.on { border: 2px solid var(--brand); background: var(--brand-soft); }
+  .est { font-size: 12px; }
+  #pagoTxt { white-space: pre-wrap; font: inherit; margin: 0; padding: 10px; background: var(--field); border-radius: 10px; }
 </style>
 </head>
 <body>
 <header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1 id="titulo">Tienda</h1><span id="tag" class="pill hidden"></span></header>
 <main>
+  <div class="estado hidden" id="estado"></div>
   <div class="seg" role="tablist">
-    <button id="tCodefix" class="small hidden" role="tab">📣 CodeFix</button>
     <button id="tOfertas" class="small" role="tab">🏷️ Ofertas</button>
     <button id="tProductos" class="small on" role="tab">🛍️ Productos</button>
     <button id="tPedidos" class="small" role="tab">🛒 Pedido</button>
   </div>
 
-  <section id="vCodefix" class="hidden">
-    <p class="muted" style="margin:0 0 12px">Promociones y anuncios que publica CodeFix para todas las empresas.</p>
-    <div class="ofertas" id="codefix"></div>
-  </section>
   <section id="vOfertas" class="hidden"><p class="muted hidden" id="ofTip" style="margin:0 0 12px"></p><div class="ofertas" id="ofertas"></div></section>
 
   <section id="vProductos">
@@ -79,8 +95,8 @@
     <div class="grid" id="grid"></div>
     <div class="card upsell hidden" id="cPrem" style="margin-top:16px">
       <h2>⭐ Hazte Premium</h2>
-      <p class="muted" id="premTxt">Precios especiales, ofertas exclusivas, colores e ícono a tu gusto y favoritos ilimitados.</p>
-      <div class="btns"><a class="btn warn" href="../../#premium">Ver Premium</a></div>
+      <p class="muted" id="premTxt">Ofertas VIP, precios especiales, tu propia Caja, colores e ícono a tu gusto y favoritos ilimitados.</p>
+      <div class="btns"><a class="btn warn" href="../../#plan">⭐ Hazte Premium</a></div>
     </div>
   </section>
 
@@ -89,12 +105,35 @@
       <h2>🛒 Mi pedido</h2>
       <div id="lineas"></div>
       <div class="total"><span>Total</span><span id="carTotal">$0</span></div>
+      <label>¿Cómo lo recibes?</label>
+      <div class="entrega" id="entrega">
+        <button class="on" data-e="retiro" type="button">🏪 Retiro en tienda</button>
+        <button data-e="despacho" type="button">🚚 Despacho</button>
+      </div>
+      <div id="rowDir" class="hidden">
+        <p class="aviso">⚠️ El despacho tiene un <b>costo adicional según la distancia</b>, que paga el cliente. La tienda te confirmará el valor.</p>
+        <label for="dir">Dirección de despacho</label><input id="dir" maxlength="200" placeholder="Calle, número, depto, comuna">
+      </div>
+      <label for="cupon">Cupón de descuento (opcional)</label>
+      <div class="row"><input id="cupon" maxlength="20" autocapitalize="characters" placeholder="VERANO10" style="flex:2"><button class="alt small" id="bCupon" type="button" style="flex:none">Aplicar</button></div>
+      <p class="muted" id="cuponTxt" style="margin:4px 0 0"></p>
       <label for="nota">Nota para la tienda (opcional)</label>
       <textarea id="nota" maxlength="200" placeholder="Ej: lo retiro el sábado en la mañana"></textarea>
-      <div class="btns"><button id="bEnviarPed" style="flex:1">📨 Enviar por el chat de la app</button>
+      <div class="btns"><button id="bEnviarPed" style="flex:1">📨 Enviar pedido</button>
         <button class="ok hidden" id="bWspPed" style="flex:1">💬 Enviar por WhatsApp</button></div>
       <div class="btns"><button class="alt small" id="bVaciar">Vaciar pedido</button></div>
-      <p class="muted">La tienda recibe tu pedido con el detalle y el total, y te responde para coordinar el pago y la entrega.</p>
+      <p class="muted">La tienda recibe tu pedido con el detalle y el total, y te avisa cada cambio de estado.</p>
+    </div>
+    <div class="card hidden" id="cPago">
+      <h2>💳 Datos para transferir</h2>
+      <pre id="pagoTxt"></pre>
+      <div class="btns"><button class="small" id="bCopiarPago">📋 Copiar datos</button></div>
+      <p class="muted">Envía el comprobante por Mensajes. Los comprobantes de la app no reemplazan la boleta de la tienda.</p>
+    </div>
+    <div class="card hidden" id="cSellos">
+      <h2>🎟️ Mi tarjeta de sellos</h2>
+      <div class="sellos" id="sellos"></div>
+      <p class="muted" id="sellosTxt" style="margin:0"></p>
     </div>
     <div class="card">
       <h2>🧾 Mis pedidos</h2>
@@ -113,106 +152,130 @@
   Core.registerSW('../../');
   Core.marca();
   const yo = await Cuenta.require('../../');
-  // Clientes: su tienda. Empresas: vista previa de lo que ven sus clientes.
+  const params = new URLSearchParams(location.search);
   const esCliente = yo.role === 'client';
-  const negocio = esCliente ? yo.negocio_id : yo.id;
+  // ?modo=codefix: la empresa entra a la "tienda" de CodeFix (le compra al administrador).
+  const modoCF = params.get('modo') === 'codefix' && !esCliente;
+  // Comprador: el cliente en su tienda, o la empresa en CodeFix. Si no, es la vista previa de la propia tienda.
+  const comprador = esCliente || (modoCF && !yo.is_admin);
   const premium = !!yo.is_pro;
-  $('titulo').textContent = esCliente ? (yo.negocio || 'Tienda') : 'Vista del cliente';
+  const db0 = Core.store('tienda:' + yo.id);
+  let negocio = esCliente ? yo.negocio_id : yo.id;
+  if (modoCF) {
+    try { negocio = await Cuenta.rpc('admin_id'); db0.set('adminId', negocio); } catch (e) { negocio = db0.get('adminId', null); }
+  }
+  $('titulo').textContent = esCliente ? (yo.negocio || 'Tienda') : modoCF ? 'Novedades CodeFix' : 'Mi tienda (vista del cliente)';
   if (premium) { $('tag').textContent = esCliente ? 'PREMIUM' : 'PRO'; $('tag').classList.add('pro'); $('tag').classList.remove('hidden'); }
   const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
   const db = Core.store('tienda:' + yo.id + ':' + negocio);
   const FAV_FREE = 5;
+  const quienPremium = modoCF ? 'empresas Pro' : 'clientes Premium';
 
   /* ---------- Datos (con copia para usar sin internet) ---------- */
   // Si el servidor falla y no hay copia guardada, se muestra el motivo (no una lista vacía muda).
   const fallos = {};
-  async function traer(fn, args, key) {
-    try { const d = await Cuenta.rpc(fn, args); db.set(key, d); delete fallos[key]; return d || []; }
-    catch (e) { fallos[key] = e.message; return db.get(key, []); }
+  async function traer(fn, args, key, vacioDef) {
+    try { const d = await Cuenta.rpc(fn, args); db.set(key, d); delete fallos[key]; return d == null ? vacioDef : d; }
+    catch (e) { fallos[key] = e.message; return db.get(key, vacioDef); }
   }
   const vacio = (key, txt) => fallos[key] ? '⚠️ No se pudo cargar (' + Core.esc(fallos[key]) + '). Revisa tu conexión e intenta de nuevo.' : txt;
-  let items = await traer('catalog_of', { p_negocio: negocio }, 'catalogo');
+  let items = await traer('catalog_of', { p_negocio: negocio }, 'catalogo', []);
   items.forEach((i) => { if (!i.clave) i.clave = i.nombre; });
   let favs = db.get('favs', []);
-  let carro = db.get('carro', []);       // [{clave, cant}]
-  let pedidos = db.get('pedidos', []);   // historial en este celular
+  let carro = db.get('carro', []);       // [{clave, cant, nombre?, precio?}] (nombre/precio: ofertas con precio)
   let ofertas = null;
+  const tienda = await traer('tienda_info', { p_negocio: negocio }, 'tienda', {}) || {};
+
+  // Abierto / cerrado y horario de la tienda.
+  if (tienda.horario || tienda.abierto === false) {
+    $('estado').classList.remove('hidden');
+    $('estado').innerHTML = (tienda.abierto === false ? '🔴 <b>Cerrado ahora</b>: puedes pedir igual, te responderemos al abrir.' : '🟢 <b>Abierto</b>') +
+      (tienda.horario ? '<br><span class="muted">🕒 ' + Core.esc(tienda.horario) + '</span>' : '');
+  }
 
   const precioDe = (i) => i.precio_premium != null ? i.precio_premium : i.precio;
-  const escribir = (txt, txtBtn) => esCliente ? '<a class="btn small alt" href="../mensajes/?con=' + negocio + '&txt=' +
-    encodeURIComponent(txt) + '">' + (txtBtn || '💬 Escribir a la tienda') + '</a>' : '';
+  const esImg = (u) => /^(https?:\/\/|data:image\/)/i.test(u || '');
+  const mensaje = (txt, etiqueta) => comprador ? '<a class="btn small alt" href="../mensajes/?con=' + negocio + '&txt=' +
+    encodeURIComponent(txt) + '">' + (etiqueta || '💬 Enviar mensaje') + '</a>' : '';
+  const hazte = '<a class="btn small warn" href="../../#plan">⭐ Hazte Premium</a>';
 
   /* ---------- Pestañas ---------- */
   let vistaActual = 'productos';
   function vista(v) {
     vistaActual = v;
-    ['Codefix', 'Ofertas', 'Productos', 'Pedidos'].forEach((k) => {
+    ['Ofertas', 'Productos', 'Pedidos'].forEach((k) => {
       $('t' + k).classList.toggle('on', v === k.toLowerCase());
       $('v' + k).classList.toggle('hidden', v !== k.toLowerCase());
     });
-    history.replaceState(null, '', v === 'productos' ? location.pathname : '?v=' + v);
+    history.replaceState(null, '', location.pathname + '?' + (modoCF ? 'modo=codefix&' : '') + 'v=' + v);
     if (v === 'ofertas' && !ofertas) cargarOfertas();
-    if (v === 'codefix') cargarCodefix();
-    if (!esCliente) $('titulo').textContent = v === 'codefix' ? 'Novedades CodeFix' : 'Mi tienda (vista del cliente)';
-    if (v === 'pedidos') pintarPedidos();
+    if (v === 'pedidos') cargarPedidos();
     guardarCarro();
     scrollTo(0, 0);
   }
   $('tOfertas').onclick = () => vista('ofertas');
-  $('tCodefix').onclick = () => vista('codefix');
-  // Empresas y admin: pestaña con lo que publica CodeFix. El cliente no la ve; solo el cliente arma pedidos.
-  $('tCodefix').classList.toggle('hidden', esCliente);
-  $('tPedidos').classList.toggle('hidden', !esCliente);
-  if (!esCliente) {
-    $('ofTip').textContent = '👁️ Así ven tus clientes tus fichas y campañas. Cada ficha que guardas en FichaPro aparece aquí.';
-    $('ofTip').classList.remove('hidden');
-  }
   $('tProductos').onclick = () => vista('productos');
   $('tPedidos').onclick = () => vista('pedidos');
+  $('tPedidos').classList.toggle('hidden', !comprador);
+  if (!comprador) {
+    $('ofTip').textContent = '👁️ Así ven tus clientes tus fichas y campañas. Cada ficha que guardas en FichaPro aparece aquí.';
+    $('ofTip').classList.remove('hidden');
+  } else if (modoCF) {
+    $('ofTip').textContent = '📣 Promociones y anuncios de CodeFix para todas las empresas.';
+    $('ofTip').classList.remove('hidden');
+  }
 
-  /* ---------- Ofertas ---------- */
-  // Ofertas = fichas publicadas por la tienda + campañas programadas.
-  const esImg = (u) => /^(https?:\/\/|data:image\/)/i.test(u || '');
+  /* ---------- Ofertas: fichas publicadas (todas las plantillas) + campañas ---------- */
+  const TIPOS = { oferta: '🏷️ Oferta', evento: '🎉 Evento', foto: '📷 Foto', lista: '📋 Menú', nuevo: '🏷️ Oferta' };
   async function cargarOfertas() {
-    const [camp, pubs] = await Promise.all([traer('my_offers', {}, 'ofertas'), traer('ver_publicaciones', { p_origen: 'tienda' }, 'publicaciones')]);
-    ofertas = pubs.map((x) => ({ id: x.id, pub: true, title: x.titulo, body: x.detalle, precio: x.precio, image: x.imagen, fecha: x.fecha, leido: true }))
-      .concat(camp).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const pubs = await traer('ver_publicaciones', { p_origen: modoCF ? 'codefix' : 'tienda' }, 'publicaciones', []);
+    let camp;
+    if (modoCF) {
+      camp = (await traer('my_inbox', {}, 'inbox', [])).filter((n) => n.de === 'CodeFix' && esImg(n.image))
+        .map((n) => ({ id: n.id, title: n.title, body: n.body, image: n.image, fecha: n.sent_at, leido: true }));
+    } else camp = await traer('my_offers', {}, 'ofertas', []);
     if (fallos.publicaciones && !fallos.ofertas) fallos.ofertas = fallos.publicaciones;
+    ofertas = pubs.map((x) => ({ id: x.id, pub: true, title: x.titulo, body: x.detalle, precio: x.precio, precio_num: x.precio_num,
+      image: x.imagen, fecha: x.fecha, tipo: x.tipo, vip: !!x.vip, bloqueada: !!x.bloqueada, leido: true }))
+      .concat(camp.map((o) => Object.assign({ vip: !!o.solo_premium }, o)))
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     pintarOfertas();
-    if (esCliente) ofertas.filter((o) => !o.pub && !o.leido && !o.bloqueada).forEach((o) => Cuenta.rpc('mark_notification_read', { p_id: o.id }).catch(() => {}));
+    if (esCliente) {
+      ofertas.filter((o) => !o.pub && !o.leido && !o.bloqueada).forEach((o) => Cuenta.rpc('mark_notification_read', { p_id: o.id }).catch(() => {}));
+      const ids = pubs.filter((x) => !x.bloqueada).map((x) => x.id);
+      if (ids.length) Cuenta.rpc('registrar_vistas', { p_ids: ids }).catch(() => {});
+    }
+  }
+  function tarjeta(o) {
+    const fecha = new Date(o.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+    const cinta = o.vip ? '<span class="cinta">VIP</span>' : '';
+    if (o.bloqueada) {
+      return '<article class="oferta vip gris">' + cinta + '<div class="bloq"><span><div>🔒</div><b>Exclusivo para ' + quienPremium + '</b></span></div>' +
+        '<div class="txt"><div class="pills">' + (o.pub ? '<span class="pill">' + (TIPOS[o.tipo] || '🏷️ Oferta') + '</span>' : '') + '</div>' +
+        '<b>' + Core.esc(o.title) + '</b><span class="muted">Solo para ' + quienPremium + ' · ' + fecha + '</span>' + hazte + '</div></article>';
+    }
+    return '<article class="oferta' + (o.vip ? ' vip' : '') + '">' + cinta + (esImg(o.image) ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
+      '<div class="txt"><div class="pills">' + (o.pub ? '<span class="pill">' + (TIPOS[o.tipo] || '🏷️ Oferta') + '</span>' : '') +
+      (!o.leido && esCliente ? '<span class="pill pro">Nueva</span>' : '') + (o.vip ? '<span class="pill pro">⭐ VIP</span>' : '') + '</div>' +
+      '<b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</span>' : '') +
+      (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
+      '<span class="cat muted">' + fecha + '</span>' +
+      (comprador ? '<div class="acc">' + (o.pub && o.precio_num != null ? '<button class="ok small" data-addpub="' + o.id + '">🛒 Agregar al carrito</button>' : '') +
+        mensaje('Hola, vi su ' + (o.tipo === 'evento' ? 'evento' : 'oferta') + ' "' + o.title + '" y me interesa.') + '</div>' : '') +
+      '</div></article>';
   }
   function pintarOfertas() {
-    $('ofertas').innerHTML = ofertas.length ? ofertas.map((o) => {
-      const fecha = new Date(o.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' });
-      if (o.bloqueada) {
-        return '<article class="oferta"><div class="bloq"><span><div>⭐</div><b>Oferta exclusiva Premium</b></span></div>' +
-          '<div class="txt"><b>' + Core.esc(o.title) + '</b><span class="muted">Solo para clientes Premium · ' + fecha + '</span>' +
-          '<a class="btn warn" href="../../#premium">⭐ Hazte Premium para verla</a></div></article>';
-      }
-      return '<article class="oferta">' + (esImg(o.image) ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
-        '<div class="txt"><div class="pills">' + (!o.leido && esCliente ? '<span class="pill pro">Nueva</span>' : '') +
-        (o.solo_premium ? '<span class="pill pro">⭐ Exclusiva Premium</span>' : '') + '</div>' +
-        '<b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</span>' : '') +
-        (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
-        '<span class="cat muted">' + fecha + '</span>' +
-        escribir('Hola, vi su oferta "' + o.title + '" y me interesa.') + '</div></article>';
-    }).join('') : '<p class="empty" style="grid-column:1/-1">' + vacio('ofertas', esCliente ? 'La tienda aún no publica ofertas.'
-      : 'Aún no publicas nada. Guarda una ficha en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
+    $('ofertas').innerHTML = ofertas.length ? ofertas.map(tarjeta).join('') : '<p class="empty" style="grid-column:1/-1">' +
+      vacio('ofertas', comprador ? (modoCF ? 'CodeFix aún no publica novedades.' : 'La tienda aún no publica ofertas.')
+        : 'Aún no publicas nada. Guarda una ficha en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
   }
-
-  /* ---------- Novedades de CodeFix (para empresas) ---------- */
-  async function cargarCodefix() {
-    const [pubs, avisos] = await Promise.all([traer('ver_publicaciones', { p_origen: 'codefix' }, 'codefix'), traer('my_inbox', {}, 'inbox')]);
-    const l = pubs.map((x) => ({ title: x.titulo, body: x.detalle, precio: x.precio, image: x.imagen, fecha: x.fecha, de: x.de_id }))
-      .concat(avisos.filter((n) => n.de === 'CodeFix' && esImg(n.image)).map((n) => ({ title: n.title, body: n.body, image: n.image, fecha: n.sent_at })))
-      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    $('codefix').innerHTML = l.length ? l.map((o) => '<article class="oferta">' + (esImg(o.image) ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
-      '<div class="txt"><b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</span>' : '') +
-      (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
-      '<span class="cat muted">' + new Date(o.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' }) + '</span>' +
-      (o.de && !yo.is_admin ? '<a class="btn small alt" href="../mensajes/?con=' + o.de + '&txt=' + encodeURIComponent('Hola, vi su publicación "' + o.title + '".') + '">💬 Escribir a CodeFix</a>' : '') +
-      '</div></article>').join('') : '<p class="empty" style="grid-column:1/-1">' + vacio('codefix', 'CodeFix aún no publica novedades.') + '</p>';
-  }
+  $('ofertas').onclick = (e) => {
+    const b = e.target.closest('[data-addpub]');
+    if (!b) return;
+    const o = ofertas.find((x) => x.id === b.dataset.addpub);
+    if (!o) return;
+    agregarAlCarro({ clave: 'pub:' + o.id, nombre: o.title, precio: o.precio_num });
+  };
 
   /* ---------- Productos ---------- */
   let cat = '';
@@ -225,18 +288,23 @@
     const l = items.filter((i) => (!cat || (cat === '__fav' ? favs.includes(i.clave) : cat === '__nuevo' ? i.nuevo : i.categoria === cat)) &&
       (!q || i.nombre.toLowerCase().includes(q)));
     $('grid').innerHTML = l.length ? l.map((i) => {
+      const cinta = i.solo_premium ? '<span class="cinta">VIP</span>' : '';
+      if (i.bloqueado) {
+        return '<div class="item vip gris">' + cinta + '<span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
+          '<span class="p">🔒</span><span class="prem">Solo para ' + quienPremium + '</span><div class="acc">' + hazte + '</div></div>';
+      }
       const prem = i.precio_premium != null, fav = favs.includes(i.clave);
-      return '<div class="item">' + (esCliente ? '<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>' : '') +
+      return '<div class="item' + (i.solo_premium ? ' vip' : '') + '">' + cinta + (comprador ? '<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>' : '') +
         (i.nuevo ? '<span class="pill ok nuevo">✨ Nuevo</span>' : '') +
         '<span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
         (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
               : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Más barato con Premium</span>' : '')) +
-        (esCliente ? '<div class="acc"><button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>' +
-          escribir('Hola, me interesa: ' + i.nombre, '💬 Preguntar') + '</div>' : '') + '</div>';
+        (comprador ? '<div class="acc"><button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>' +
+          mensaje('Hola, me interesa: ' + i.nombre, '💬 Preguntar') + '</div>' : '') + '</div>';
     }).join('') : '<p class="empty" style="grid-column:1/-1">' + (items.length ? (cat === '__fav' ? 'Aún no marcas favoritos' : 'Sin resultados')
-      : vacio('catalogo', esCliente ? 'La tienda aún no publica productos.' : 'Aún no publicas productos: agrégalos en Caja Rápida → Productos.')) + '</p>';
-    $('cPrem').classList.toggle('hidden', premium || !esCliente);
-    $('tipCarro').classList.toggle('hidden', !esCliente || !items.length);
+      : vacio('catalogo', comprador ? 'La tienda aún no publica productos.' : 'Aún no publicas productos: agrégalos en Caja Rápida → Productos.')) + '</p>';
+    $('cPrem').classList.toggle('hidden', premium || !comprador);
+    $('tipCarro').classList.toggle('hidden', !comprador || !items.length);
   }
   $('cats').onclick = (e) => { if (e.target.dataset.c !== undefined) { cat = e.target.dataset.c; pintar(); } };
   $('buscar').oninput = pintar;
@@ -250,22 +318,26 @@
       else favs.push(k);
       db.set('favs', favs); pintar();
     }
-    if (b.dataset.add !== undefined) {
-      const l = carro.find((x) => x.clave === b.dataset.add);
-      if (l) l.cant++; else carro.push({ clave: b.dataset.add, cant: 1 });
-      guardarCarro();
-      Core.toast('🛒 Agregado al pedido');
-    }
+    if (b.dataset.add !== undefined) agregarAlCarro({ clave: b.dataset.add });
   };
 
-  /* ---------- Pedido (carrito) ---------- */
-  const lineasCarro = () => carro.map((l) => ({ l, i: items.find((x) => x.clave === l.clave) })).filter((x) => x.i);
+  /* ---------- Carrito y pedido ---------- */
+  function agregarAlCarro(x) {
+    const l = carro.find((c) => c.clave === x.clave);
+    if (l) l.cant++; else carro.push(Object.assign({ cant: 1 }, x));
+    guardarCarro();
+    Core.toast('🛒 Agregado al pedido');
+  }
+  // Producto del catálogo, u oferta con precio (guarda su nombre y precio en el carrito).
+  const itemDe = (l) => /^pub:/.test(l.clave) ? (l.nombre != null && l.precio != null ? { nombre: l.nombre, precio: l.precio } : null)
+    : items.find((x) => x.clave === l.clave && !x.bloqueado) || null;
+  const lineasCarro = () => carro.map((l) => ({ l, i: itemDe(l) })).filter((x) => x.i);
   const totalCarro = () => lineasCarro().reduce((s, x) => s + precioDe(x.i) * x.l.cant, 0);
   function guardarCarro() {
-    carro = carro.filter((l) => l.cant > 0 && items.some((i) => i.clave === l.clave));
+    carro = carro.filter((l) => l.cant > 0 && itemDe(l));
     db.set('carro', carro);
     const n = carro.reduce((s, l) => s + l.cant, 0);
-    $('barra').classList.toggle('hidden', !n || !esCliente || vistaActual === 'pedidos');
+    $('barra').classList.toggle('hidden', !n || !comprador || vistaActual === 'pedidos');
     $('barTxt').textContent = '🛒 Ver pedido (' + n + ')';
     $('barTotal').textContent = precio(totalCarro());
     pintarCarro();
@@ -277,7 +349,8 @@
       '<div class="linea"><div class="grow"><b>' + Core.esc(i.nombre) + '</b><div class="muted">' + precio(precioDe(i)) + ' c/u</div></div>' +
       '<div class="qty"><button class="alt" data-k="' + Core.esc(l.clave) + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
       '</b><button class="alt" data-k="' + Core.esc(l.clave) + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('');
-    $('carTotal').textContent = precio(totalCarro());
+    const t = totalCarro(), d = cupon ? Math.round(t * cupon.pct / 100) : 0;
+    $('carTotal').textContent = precio(t - d) + (d ? ' (−' + precio(d) + ')' : '');
   }
   $('lineas').onclick = (e) => {
     const { k, d } = e.target.dataset;
@@ -287,60 +360,103 @@
   };
   $('bVerCarro').onclick = () => vista('pedidos');
   $('bVaciar').onclick = () => { if (confirm('¿Vaciar el pedido?')) { carro = []; guardarCarro(); } };
-  function textoPedido() {
-    let txt = '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
-      '\nTotal: ' + precio(totalCarro()) + (premium ? ' (precios Premium)' : '');
-    const nota = $('nota').value.trim();
-    if (nota) txt += '\nNota: ' + nota;
-    return txt;
-  }
-  function registrarPedido(txt) {
-    pedidos.unshift({ fecha: Date.now(), texto: txt, carro: carro.slice(), total: totalCarro() });
-    db.set('pedidos', pedidos.slice(0, 30));
-    carro = []; $('nota').value = ''; guardarCarro(); pintarPedidos();
-  }
-  // WhatsApp de la tienda (lo guarda la empresa en FichaPro → Ajustes).
-  const wspTienda = String(yo.negocio_telefono || '').replace(/\D/g, '');
-  $('bWspPed').classList.toggle('hidden', !wspTienda);
-  $('bWspPed').onclick = () => {
-    if (!lineasCarro().length) return;
-    const txt = textoPedido();
-    window.open('https://wa.me/' + wspTienda + '?text=' + encodeURIComponent(txt), '_blank');
-    registrarPedido(txt);
+
+  // Retiro o despacho (el despacho tiene costo adicional según la distancia).
+  let entrega = 'retiro';
+  $('entrega').onclick = (e) => {
+    const b = e.target.closest('[data-e]');
+    if (!b) return;
+    entrega = b.dataset.e;
+    $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    $('rowDir').classList.toggle('hidden', entrega !== 'despacho');
+    if (entrega === 'despacho') $('dir').focus();
   };
-  $('bEnviarPed').onclick = async () => {
-    const ls = lineasCarro();
-    if (!ls.length) return;
-    const txt = textoPedido();
-    if (txt.length > 1000) return Core.toast('El pedido es muy largo: envíalo en dos partes');
-    $('bEnviarPed').disabled = true;
+
+  // Cupón (lo valida el servidor).
+  let cupon = null;
+  $('bCupon').onclick = async () => {
+    const c = $('cupon').value.trim();
+    if (!c) { cupon = null; $('cuponTxt').textContent = ''; pintarCarro(); return; }
     try {
-      const r = await Cuenta.rpc('send_message', { p_to: negocio, p_body: txt });
-      if (!r.ok) throw new Error(r.error);
-      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato a la tienda
-      registrarPedido(txt);
-      Core.toast('✅ Pedido enviado. La tienda te responderá por el chat.');
-    } catch (err) { Core.toast(err.message); } finally { $('bEnviarPed').disabled = false; }
+      const pct = await Cuenta.rpc('validar_cupon', { p_negocio: negocio, p_codigo: c });
+      cupon = { codigo: c, pct };
+      $('cuponTxt').textContent = '✅ Cupón aplicado: ' + pct + '% de descuento';
+    } catch (err) { cupon = null; $('cuponTxt').textContent = '❌ ' + err.message; }
+    pintarCarro();
   };
-  function pintarPedidos() {
+
+  // WhatsApp de la tienda (la empresa lo guarda en Ajustes → Mi tienda).
+  const wspTienda = String(tienda.telefono || yo.negocio_telefono || '').replace(/\D/g, '');
+  $('bWspPed').classList.toggle('hidden', !wspTienda);
+  function textoPedido(r) {
+    return '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
+      (r && r.descuento > 0 ? '\nDescuento: −' + precio(r.descuento) : '') +
+      '\nTotal: ' + precio(r ? r.total : totalCarro()) + (premium ? ' (precios Premium)' : '') +
+      '\nEntrega: ' + (entrega === 'despacho' ? '🚚 Despacho a ' + $('dir').value.trim() + ' (costo de despacho según distancia, por pagar)' : '🏪 Retiro en tienda') +
+      ($('nota').value.trim() ? '\nNota: ' + $('nota').value.trim() : '');
+  }
+  async function enviarPedido(porWsp) {
+    if (!lineasCarro().length) return;
+    if (entrega === 'despacho' && !$('dir').value.trim()) { $('dir').focus(); return Core.toast('Escribe la dirección de despacho'); }
+    const btn = porWsp ? $('bWspPed') : $('bEnviarPed');
+    btn.disabled = true;
+    try {
+      const r = await Cuenta.rpc('crear_pedido', {
+        p_negocio: negocio, p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant })), p_entrega: entrega,
+        p_direccion: $('dir').value, p_nota: $('nota').value, p_cupon: cupon ? cupon.codigo : null
+      });
+      if (!r.ok) throw new Error(r.error);
+      if (porWsp) window.open('https://wa.me/' + wspTienda + '?text=' + encodeURIComponent(textoPedido(r)), '_blank');
+      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato a la tienda
+      carro = []; $('nota').value = ''; $('cupon').value = ''; cupon = null; $('cuponTxt').textContent = '';
+      guardarCarro(); cargarPedidos();
+      Core.toast('✅ Pedido enviado (' + precio(r.total) + '). Te avisaremos cada cambio de estado.');
+      if (tienda.datos_pago) $('cPago').scrollIntoView({ behavior: 'smooth' });
+    } catch (err) { Core.toast(err.message); } finally { btn.disabled = false; }
+  }
+  $('bEnviarPed').onclick = () => enviarPedido(false);
+  $('bWspPed').onclick = () => enviarPedido(true);
+
+  // Datos de transferencia de la tienda.
+  if (tienda.datos_pago && comprador) {
+    $('cPago').classList.remove('hidden');
+    $('pagoTxt').textContent = tienda.datos_pago;
+  }
+  $('bCopiarPago').onclick = () => navigator.clipboard.writeText(tienda.datos_pago || '').then(() => Core.toast('📋 Datos copiados'));
+
+  /* ---------- Mis pedidos (con estado) y tarjeta de sellos ---------- */
+  const ESTADOS = { recibido: '📥 Recibido', preparando: '👨‍🍳 Preparando', listo: '✅ Listo para retirar', en_camino: '🚚 En camino',
+    entregado: '🎉 Entregado', cancelado: '❌ Cancelado' };
+  let pedidos = [];
+  async function cargarPedidos() {
+    if (!comprador) return;
+    pedidos = await traer('mis_pedidos', { p_negocio: negocio }, 'pedidos', []);
     $('pedidos').innerHTML = pedidos.length ? pedidos.map((p, n) =>
-      '<li><div class="grow"><b>' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) + ' · ' + precio(p.total) + '</b>' +
-      '<pre>' + Core.esc(p.texto.replace(/^🛒 Pedido\n/, '')) + '</pre></div>' +
+      '<li><div class="grow"><b>' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) + ' · ' + precio(p.total) + '</b> ' +
+      '<span class="pill est">' + (ESTADOS[p.estado] || p.estado) + '</span>' +
+      '<pre>' + Core.esc(p.lineas.map((l) => l.cant + ' × ' + l.nombre).join('\n') + '\n' + (p.entrega === 'despacho' ? '🚚 Despacho: ' + (p.direccion || '') : '🏪 Retiro en tienda') +
+        (p.descuento > 0 ? '\nCupón ' + p.cupon + ': −' + precio(p.descuento) : '')) + '</pre></div>' +
       '<button class="small alt" data-rep="' + n + '">🔁 Repetir</button>' +
       '<a class="btn small alt" href="../mensajes/?con=' + negocio + '">💬 Chat</a></li>').join('')
-      : '<li class="empty">' + (esCliente ? 'Aún no envías pedidos. Agrega productos con ➕ y envíalos desde aquí.' : 'Tus clientes arman pedidos desde aquí y te llegan por Mensajes.') + '</li>';
+      : '<li class="empty">' + vacio('pedidos', 'Aún no envías pedidos. Agrega productos u ofertas con 🛒 y envíalos desde aquí.') + '</li>';
+    const s = await traer('mis_sellos', { p_negocio: negocio }, 'sellos', null);
+    $('cSellos').classList.toggle('hidden', !s);
+    if (s) {
+      $('sellos').innerHTML = Array.from({ length: s.meta }, (_, i) => '<span class="' + (i < s.cantidad ? 'on' : '') + '">' + (i < s.cantidad ? '⭐' : '') + '</span>').join('');
+      $('sellosTxt').textContent = s.cantidad + ' de ' + s.meta + ' sellos · Premio: ' + (s.premio || 'sorpresa') + (s.premios ? ' · Premios ganados: ' + s.premios : '');
+    }
   }
   $('pedidos').onclick = (e) => {
     const n = e.target.dataset.rep;
     if (n === undefined) return;
-    carro = pedidos[n].carro.map((l) => ({ clave: l.clave, cant: l.cant }));
+    carro = pedidos[n].lineas.map((l) => /^pub:/.test(l.clave) ? { clave: l.clave, cant: l.cant, nombre: l.nombre, precio: Number(l.precio) } : { clave: l.clave, cant: l.cant });
     guardarCarro();
     Core.toast(lineasCarro().length ? '🛒 Pedido cargado: revísalo y envíalo' : 'Esos productos ya no están disponibles');
   };
 
   pintar(); guardarCarro();
-  const v = new URLSearchParams(location.search).get('v');
-  vista(['ofertas', 'pedidos', 'codefix'].includes(v) && !(v === 'pedidos' && !esCliente) && !(v === 'codefix' && esCliente) ? v : 'productos');
+  const v = params.get('v');
+  vista(['ofertas', 'pedidos'].includes(v) && !(v === 'pedidos' && !comprador) ? v : 'productos');
 })();
 </script>
 </body>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="robots" content="noindex, nofollow">
+<title>Pedidos</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/core.css">
+<script src="../../shared/core.js"></script>
+<style>
+  .filtros { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; }
+  .filtros button { flex: none; }
+  .ped { display: grid; gap: 12px; }
+  .ped .card { margin: 0; }
+  .ped .cab { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+  .ped pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 8px 0; }
+  .ped .total { font-size: 20px; font-weight: 800; }
+  .ped .acc { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .ped .acc > * { flex: 1 1 120px; }
+  .est-recibido { background: color-mix(in srgb, #3b82f6 16%, transparent); color: #2563eb; border-color: transparent; }
+  .est-preparando, .est-listo, .est-en_camino { background: color-mix(in srgb, #f59e0b 18%, transparent); color: #d97706; border-color: transparent; }
+  .est-entregado { background: color-mix(in srgb, #10b981 16%, transparent); color: #059669; border-color: transparent; }
+  .est-cancelado { background: var(--line); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpis .card { margin: 0; text-align: center; }
+  .kpis b { display: block; font-size: 22px; }
+  .vip { color: #dc2626; font-weight: 700; }
+</style>
+</head>
+<body>
+<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Pedidos</h1><span id="planTag" class="pill">FREE</span></header>
+<main>
+  <!-- PEDIDOS -->
+  <section class="view on" id="v-pedidos">
+    <div class="filtros" id="filtros">
+      <button class="small on" data-f="activos">Activos</button>
+      <button class="small alt" data-f="entregado">Entregados</button>
+      <button class="small alt" data-f="cancelado">Cancelados</button>
+      <button class="small alt" data-f="">Todos</button>
+    </div>
+    <div class="ped" id="lista"></div>
+  </section>
+
+  <!-- CUPONES -->
+  <section class="view" id="v-cupones">
+    <div class="card upsell hidden" id="cupLock">
+      <h2>🎟️ Cupones de descuento <span class="pill pro">PRO</span></h2>
+      <p class="muted">Crea códigos como VERANO10 (−10%) para que tus clientes los usen en el carrito.</p>
+      <div class="btns"><a class="btn warn" href="../../#plan">⭐ Pásate a Pro</a></div>
+    </div>
+    <div id="cupPro">
+      <div class="card">
+        <h2>🎟️ Nuevo cupón</h2>
+        <div class="row" style="flex-wrap:wrap">
+          <div style="min-width:140px"><label for="cCodigo">Código</label><input id="cCodigo" maxlength="20" autocapitalize="characters" placeholder="VERANO10"></div>
+          <div style="min-width:100px"><label for="cPct">Descuento %</label><input id="cPct" inputmode="numeric" placeholder="10"></div>
+          <div style="min-width:140px"><label for="cHasta">Válido hasta (opcional)</label><input type="date" id="cHasta"></div>
+        </div>
+        <div class="btns"><button id="bCupon">Guardar cupón</button></div>
+      </div>
+      <div class="card"><ul class="list" id="cupones"></ul></div>
+    </div>
+  </section>
+
+  <!-- ESTADÍSTICAS -->
+  <section class="view" id="v-stats">
+    <div class="card upsell hidden" id="stLock">
+      <h2>📊 Estadísticas de tu tienda <span class="pill pro">PRO</span></h2>
+      <p class="muted">Cuántos clientes vieron cada ficha, tus productos más pedidos y tus mejores clientes.</p>
+      <div class="btns"><a class="btn warn" href="../../#plan">⭐ Pásate a Pro</a></div>
+    </div>
+    <div id="stPro">
+      <p class="muted">Últimos 30 días.</p>
+      <div class="kpis">
+        <div class="card"><span class="muted">Pedidos</span><b id="sPed">0</b></div>
+        <div class="card"><span class="muted">Ventas entregadas</span><b id="sVen">$0</b></div>
+        <div class="card"><span class="muted">Clientes</span><b id="sCli">0</b></div>
+      </div>
+      <div class="card"><h2>🏆 Productos más pedidos</h2><ul class="list" id="sTop"></ul></div>
+      <div class="card"><h2>💎 Mejores clientes</h2><ul class="list" id="sMejores"></ul></div>
+      <div class="card"><h2>👁️ Vistas de tus fichas</h2><ul class="list" id="sVistas"></ul></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-v="pedidos" class="on"><span>📦</span>Pedidos</button>
+  <button data-v="cupones"><span>🎟️</span>Cupones</button>
+  <button data-v="stats"><span>📊</span>Estadísticas</button>
+</nav>
+
+<script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/supabase.js"></script>
+<script src="../../shared/cuenta.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  Core.registerSW('../../');
+  Core.marca();
+  const yo = await Cuenta.require('../../', { empresa: true });
+  const pro = !!yo.is_pro;
+  $('planTag').textContent = yo.is_admin ? 'ADMIN' : pro ? 'PRO' : 'FREE';
+  $('planTag').classList.toggle('pro', pro);
+  const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
+
+  document.querySelectorAll('nav.tabs button').forEach((b) => { b.onclick = () => show(b.dataset.v); });
+  function show(v) {
+    document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
+    document.querySelectorAll('.view').forEach((x) => x.classList.toggle('on', x.id === 'v-' + v));
+    scrollTo(0, 0);
+    if (v === 'cupones') cargarCupones();
+    if (v === 'stats') cargarStats();
+  }
+
+  /* ---------- Pedidos ---------- */
+  const ESTADOS = { recibido: '📥 Recibido', preparando: '👨‍🍳 Preparando', listo: '✅ Listo', en_camino: '🚚 En camino',
+    entregado: '🎉 Entregado', cancelado: '❌ Cancelado' };
+  let filtro = 'activos', pedidos = [];
+  async function cargar() {
+    try { pedidos = await Cuenta.rpc('pedidos_tienda', { p_estado: filtro || null }); }
+    catch (e) { $('lista').innerHTML = '<p class="empty">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    $('lista').innerHTML = pedidos.length ? pedidos.map((p) => {
+      // Siguiente paso según el tipo de entrega.
+      const sig = p.estado === 'recibido' ? ['preparando']
+        : p.estado === 'preparando' ? [p.entrega === 'despacho' ? 'en_camino' : 'listo']
+        : p.estado === 'listo' || p.estado === 'en_camino' ? ['entregado'] : [];
+      const activo = !['entregado', 'cancelado'].includes(p.estado);
+      const tel = String(p.telefono || '').replace(/\D/g, '');
+      return '<div class="card"><div class="cab"><div><b>' + Core.esc(p.cliente) + '</b><div class="muted">' +
+        new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) + '</div></div>' +
+        '<span class="pill est-' + p.estado + '">' + ESTADOS[p.estado] + '</span></div>' +
+        '<pre>' + Core.esc(p.lineas.map((l) => l.cant + ' × ' + l.nombre + ' — ' + precio(l.subtotal)).join('\n')) + '</pre>' +
+        (p.descuento > 0 ? '<div class="muted">Cupón ' + Core.esc(p.cupon) + ': −' + precio(p.descuento) + '</div>' : '') +
+        '<div class="total">Total ' + precio(p.total) + '</div>' +
+        '<div class="muted">' + (p.entrega === 'despacho' ? '🚚 Despacho a ' + Core.esc(p.direccion || '') + ' (cobrar despacho según distancia)' : '🏪 Retiro en tienda') + '</div>' +
+        (p.nota ? '<div class="muted">📝 ' + Core.esc(p.nota) + '</div>' : '') +
+        '<div class="acc">' + sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
+        (activo ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
+        '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' +
+        (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div></div>';
+    }).join('') : '<p class="empty">' + (filtro === 'activos' ? 'No tienes pedidos pendientes. 🎉' : 'Sin pedidos') + '</p>';
+  }
+  $('filtros').onclick = (e) => {
+    const b = e.target.closest('[data-f]');
+    if (!b) return;
+    filtro = b.dataset.f;
+    $('filtros').querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('alt', x !== b); });
+    cargar();
+  };
+  $('lista').onclick = async (e) => {
+    const b = e.target.closest('button[data-e]');
+    if (!b) return;
+    if (b.dataset.e === 'cancelado' && !confirm('¿Cancelar este pedido? Se le avisará al cliente.')) return;
+    b.disabled = true;
+    try {
+      await Cuenta.rpc('actualizar_pedido', { p_id: b.dataset.id, p_estado: b.dataset.e });
+      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato al cliente
+      Core.toast('Pedido: ' + ESTADOS[b.dataset.e] + ' · se le avisó al cliente');
+      cargar();
+    } catch (err) { Core.toast(err.message); b.disabled = false; }
+  };
+
+  /* ---------- Cupones (Pro) ---------- */
+  async function cargarCupones() {
+    $('cupLock').classList.toggle('hidden', pro);
+    $('cupPro').classList.toggle('hidden', !pro);
+    if (!pro) return;
+    try {
+      const l = await Cuenta.rpc('mis_cupones');
+      $('cupones').innerHTML = l.length ? l.map((c) => '<li><div class="grow"><b>' + Core.esc(c.codigo) + '</b> · −' + c.porcentaje + '%<div class="muted">' +
+        (c.hasta ? 'Hasta el ' + new Date(c.hasta + 'T12:00').toLocaleDateString('es') : 'Sin vencimiento') + ' · usado ' + c.usos + ' vez/veces</div></div>' +
+        '<button class="small danger" data-c="' + c.id + '" aria-label="Eliminar">✕</button></li>').join('') : '<li class="empty">Aún no creas cupones</li>';
+    } catch (e) { $('cupones').innerHTML = '<li class="empty">⚠️ ' + Core.esc(e.message) + '</li>'; }
+  }
+  $('bCupon').onclick = async () => {
+    try {
+      await Cuenta.rpc('guardar_cupon', { p_codigo: $('cCodigo').value, p_porcentaje: parseInt($('cPct').value, 10), p_hasta: $('cHasta').value || null });
+      $('cCodigo').value = ''; $('cPct').value = ''; $('cHasta').value = '';
+      Core.toast('🎟️ Cupón guardado: compártelo con tus clientes'); cargarCupones();
+    } catch (err) { Core.toast(err.message); }
+  };
+  $('cupones').onclick = async (e) => {
+    const id = e.target.dataset.c;
+    if (!id || !confirm('¿Eliminar este cupón?')) return;
+    await Cuenta.rpc('borrar_cupon', { p_id: id }).catch(() => {});
+    cargarCupones();
+  };
+
+  /* ---------- Estadísticas (Pro) ---------- */
+  async function cargarStats() {
+    $('stLock').classList.toggle('hidden', pro);
+    $('stPro').classList.toggle('hidden', !pro);
+    if (!pro) return;
+    try {
+      const s = await Cuenta.rpc('estadisticas_tienda');
+      $('sPed').textContent = s.pedidos; $('sVen').textContent = precio(s.ventas); $('sCli').textContent = s.clientes;
+      const fila = (a, b) => '<li><span class="grow">' + a + '</span><b>' + b + '</b></li>';
+      $('sTop').innerHTML = s.top_productos.length ? s.top_productos.map((p) => fila(Core.esc(p.nombre), p.cant + ' · ' + precio(p.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
+      $('sMejores').innerHTML = s.mejores_clientes.length ? s.mejores_clientes.map((c) => fila(Core.esc(c.nombre), c.pedidos + ' pedidos · ' + precio(c.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
+      $('sVistas').innerHTML = s.vistas.length ? s.vistas.map((v) => fila((v.vip ? '<span class="vip">VIP</span> ' : '') + Core.esc(v.titulo), '👁️ ' + v.vistas)).join('') : '<li class="empty">Aún no publicas fichas</li>';
+    } catch (e) { Core.toast(e.message); }
+  }
+
+  cargar();
+  setInterval(() => { if (!document.hidden && filtro === 'activos') cargar(); }, 30000);
+})();
+</script>
+</body>
+</html>

@@ -34,7 +34,7 @@
 
   const licensed = () => Cuenta.isPro();
   const FREE_LIMIT = { fichas: 5, clientes: 30 };
-  const FREE_TEMPLATES = ['oferta', 'nuevo'];
+  const FREE_TEMPLATES = ['oferta', 'evento']; // la plantilla "Producto" se quitó: los productos van en Caja
   const soloPro = (que) => Core.toast('⭐ ' + que + ' es de la versión Pro. Actívala en Ajustes.');
 
   /* ---------- Navegación ---------- */
@@ -174,21 +174,6 @@
       }
       footer(f, logo, true);
     } },
-    nuevo: { nombre: 'Producto', draw(f, foto, logo) {
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-      if (foto) cover(foto, 0, 0, W, 700); else { ctx.fillStyle = shade(f.color1, 70); ctx.fillRect(0, 0, W, 700); }
-      ctx.fillStyle = f.color2; ctx.fillRect(0, 700, W, 14);
-      ctx.fillStyle = f.color1; ctx.font = font('900', 92);
-      const th = wrap(f.titulo, W / 2, 830, W - 100, 98, 2);
-      ctx.fillStyle = '#444'; ctx.font = font('500', 44);
-      wrap(f.subtitulo, W / 2, 830 + th + 4, W - 120, 52, 2);
-      priceBadge(f, W - 170, 560, 130);
-      if (f.cta) {
-        ctx.fillStyle = f.color1; ctx.font = font('800', 44); ctx.textAlign = 'center';
-        ctx.fillText('👉 ' + f.cta, W / 2, 1180, W - 100);
-      }
-      footer(f, logo, false);
-    } },
     evento: { nombre: 'Evento', draw(f, foto, logo) {
       ctx.fillStyle = shade(f.color1, -70); ctx.fillRect(0, 0, W, H);
       if (foto) { ctx.globalAlpha = 0.35; cover(foto, 0, 0, W, H); ctx.globalAlpha = 1; }
@@ -286,7 +271,9 @@
   /* ---------- Formulario ---------- */
   const fields = ['titulo', 'subtitulo', 'precio', 'antes', 'cta', 'color1', 'color2', 'lista'];
   function fillForm() {
+    if (!TEMPLATES[ficha.plantilla]) ficha.plantilla = 'oferta';
     fields.forEach((k) => { $('f-' + k).value = ficha[k] || ''; });
+    $('f-vip').checked = !!ficha.vip;
     $('f-qr').checked = !!ficha.qr && licensed();
     $('rowLista').classList.toggle('hidden', ficha.plantilla !== 'lista');
     $('tpls').innerHTML = Object.keys(TEMPLATES).map((k) => {
@@ -315,6 +302,16 @@
     changed();
   };
   $('bQuitarFoto').onclick = () => { ficha.foto = null; changed(); };
+  $('f-vip').onchange = (e) => { ficha.vip = e.target.checked; changed(); };
+  // Menú / Precios: usa los mismos productos y precios de la Caja (una sola lista).
+  $('bTraerCaja').onclick = () => {
+    let prods = [];
+    try { prods = JSON.parse(localStorage.getItem('caja:' + cuenta.id + ':productos')) || []; } catch (e) { prods = []; }
+    if (!prods.length) return Core.toast('Aún no tienes productos en tu Caja');
+    ficha.lista = prods.slice(0, 12).map((p) => p.nombre + ' = ' + p.precio).join('\n');
+    $('f-lista').value = ficha.lista; changed();
+    Core.toast('📥 ' + Math.min(prods.length, 12) + ' productos traídos desde tu Caja');
+  };
 
   let saveT;
   function changed() {
@@ -357,12 +354,15 @@
     return c.toDataURL('image/jpeg', 0.7);
   }
 
+  const recordarGuardar = () => { if (!editId) Core.toast('💡 Toca 💾 Guardar para publicarla en Ofertas'); };
   $('bDescargar').onclick = async () => {
+    recordarGuardar();
     await draw(ficha);
     Core.download(slug(ficha.titulo) + '.png', await canvasBlob());
   };
 
   $('bCompartir').onclick = async () => {
+    setTimeout(recordarGuardar, 2800);
     await draw(ficha);
     shareImage(await canvasBlob(), ficha.titulo, '');
   };
@@ -399,9 +399,12 @@
   }
   async function publicarFicha(f) {
     if (!f) return;
+    const tipo = TEMPLATES[f.plantilla] && (licensed() || FREE_TEMPLATES.includes(f.plantilla)) ? f.plantilla : 'oferta';
+    const pn = parseFloat(String(f.precio || '').replace(/[^\d.,]/g, '').replace(',', '.'));
     await Cuenta.rpc('publicar_ficha', {
       p_key: f.id, p_titulo: f.titulo || 'Ficha', p_detalle: f.subtitulo || '',
-      p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 540)
+      p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 540),
+      p_tipo: tipo, p_vip: !!f.vip, p_precio_num: tipo !== 'lista' && !isNaN(pn) ? pn : null
     });
     f.pubAt = Date.now();
   }
@@ -679,7 +682,7 @@
       p_body: k.msg.replace(/\{nombre\}\s*/g, ''), p_image: image,
       p_url: ajustes.tel ? 'https://wa.me/' + ajustes.tel.replace(/[^\d]/g, '') + '?text=' + encodeURIComponent('Hola, vi su oferta: ' + f.titulo) : image,
       // El admin publica para todas las empresas; cada empresa, para sus clientes.
-      p_audience: cuenta.is_admin ? 'all_businesses' : 'my_subscribers', p_channels: k.canales, p_send_at: new Date(k.fecha).toISOString()
+      p_audience: cuenta.is_admin ? (k.vip ? 'pro_users' : 'all_businesses') : 'my_subscribers', p_channels: k.canales, p_send_at: new Date(k.fecha).toISOString()
     });
     return n.id;
   }
@@ -868,6 +871,13 @@
     Core.toast(error ? 'No se pudo guardar: ' + error.message : '☁️ Respaldo guardado en la nube');
     if (!error) $('nubeEstado').textContent = 'Último respaldo: ' + new Date().toLocaleString('es');
   };
+  // Pro: respaldo automático en la nube una vez al día (si se pierde el celular, no se pierde nada).
+  async function respaldoAuto() {
+    if (!licensed() || Date.now() - db.get('nubeAuto', 0) < 864e5) return;
+    const blob = new Blob([JSON.stringify({ app: 'fichas', fecha: new Date().toISOString(), datos: db.dump() })], { type: 'application/json' });
+    const { error } = await sb.storage.from('respaldos').upload(nubePath, blob, { upsert: true, contentType: 'application/json' });
+    if (!error) { db.set('nubeAuto', Date.now()); $('nubeEstado').textContent = '☁️ Respaldo automático diario activo · último: ' + new Date().toLocaleString('es'); }
+  }
   $('bNubeBajar').onclick = async () => {
     if (!licensed()) return soloPro('El respaldo en la nube');
     if (!confirm('Esto reemplaza los datos de este celular por los de la nube. ¿Seguir?')) return;
@@ -896,12 +906,14 @@
 
   if (cuenta.is_admin) {
     $('c-form').classList.add('hidden'); $('c-admin').classList.remove('hidden');
-    $('rowVip').classList.add('hidden');
-    $('k-pubTxt').innerHTML = '🏷️ Como administrador, tus campañas se publican en los <b>Avisos</b> de todas las empresas.';
+    $('rowVip').querySelector('label').lastChild.textContent = ' ⭐ Solo para empresas Pro';
+    $('vipTxt').textContent = 'solo para empresas Pro';
+    $('pubDonde').textContent = 'Novedades CodeFix de todas tus empresas';
+    $('k-pubTxt').innerHTML = '🏷️ Como administrador, tus campañas llegan a <b>todas tus empresas</b> (en la app y como notificación).';
   }
   if (ajustes.tel && !cuenta.telefono) Cuenta.rpc('set_my_phone', { p_tel: ajustes.tel }).catch(() => {});
   fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes();
-  publicarFichasPendientes().then(publicarPendientes);
+  publicarFichasPendientes().then(publicarPendientes).then(respaldoAuto).catch(() => {});
   const m = location.hash.match(/camp=([\w]+)/);
   if (m) { show('campanas'); abrirEnvio(m[1]); }
 })();

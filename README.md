@@ -83,3 +83,23 @@ Sigue [`docs/CONFIGURAR.md`](docs/CONFIGURAR.md) (una sola vez). Después, cada 
 `https://codefixservice.github.io/Aplicaciones/`.
 
 Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares descarguen la versión nueva.
+
+## Versión 3.7
+- **Inicio limpio** y todo lo de configuración en **⚙️ Ajustes**: Mi perfil, Mi tienda (WhatsApp, datos de transferencia,
+  horario, abierto/cerrado, tarjeta de sellos), Notificaciones, Mi plan, Legal y Zona peligrosa (cerrar sesión / eliminar cuenta).
+- **❓ Ayuda** abajo: la empresa abre el chat con CodeFix; el cliente, con su tienda.
+- **Un acceso por rol**: cliente → 🛍️ Tienda (Ofertas · Productos · Pedido) y 💵 Mi Caja (Premium);
+  empresa → FichaPro, Caja, 📦 Pedidos, Mensajes, 👁️ Mi tienda y 📣 Novedades CodeFix.
+- **Plantillas**: todas se publican al guardar (Oferta, Evento, Foto completa, Menú); se quitó "Producto". Free: Oferta + Evento.
+  El Menú puede traer los precios desde la Caja.
+- **VIP**: fichas y productos "Solo Premium" con marco y cinta roja. Quien no es Premium/Pro los ve en gris con ⭐ Hazte Premium.
+  Las fichas VIP del admin son para empresas Pro.
+- **Avisos en cadena**: al publicar, el admin avisa a las empresas y cada empresa a sus clientes (push, máx. 1 cada 10 min).
+- **Pedidos reales**: carrito con fichas y productos, 🚚 despacho (costo según distancia) o 🏪 retiro, cupón, datos de transferencia.
+  La empresa los gestiona en 📦 Pedidos: Recibido → Preparando → Listo / En camino → Entregado, y el cliente recibe aviso en cada paso.
+- **Pro (empresas)**: cupones, tarjeta de sellos, estadísticas (vistas, más pedidos, mejores clientes), finanzas y respaldo diario.
+- **Premium (clientes)**: ofertas VIP, precios especiales, su propia Caja con 📈 Finanzas, colores e ícono.
+- **Admin**: sus clientes son sus empresas; panel de ingresos, planes por vencer (aviso automático 3 días antes) y 👁️ Ver empresa.
+- **Actualizaciones con botón**: la app ya no cambia sola. Una versión nueva primero la ve solo el admin; al tocar
+  **Administración → Ajustes → Liberar** les aparece "Actualizar" a todos.
+- Los pagos son por transferencia; la pasarela de pago queda para una versión futura.
