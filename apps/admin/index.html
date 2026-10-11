@@ -21,6 +21,9 @@
   #solicitudes li > .grow, #reportes li > .grow { flex: 1 1 100%; }
   .acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
   .acc button, .acc select { width: auto; padding: 7px 12px; font-size: 13px; border-radius: 10px; }
+  .uso { margin: 10px 0; }
+  .uso .barra { height: 12px; border-radius: 99px; background: var(--field); overflow: hidden; margin-top: 4px; }
+  .uso .barra div { height: 100%; border-radius: 99px; }
   .chk { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
   .chk label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-size: 15px; }
 </style>
@@ -34,6 +37,11 @@
       <h2>🔔 Solicitudes pendientes <span class="pill" id="nSol">0</span></h2>
       <p class="muted">Pruebas de 7 días y avisos de pago. Revisa tu Mercado Pago antes de aprobar un pago.</p>
       <ul class="list" id="solicitudes"></ul>
+    </div>
+    <div class="card" id="cUso">
+      <h2>🖥️ Uso del servidor <span class="pill" id="usoPill"></span></h2>
+      <div id="usoBarras"></div>
+      <p class="muted" id="usoTxt"></p>
     </div>
     <div class="card" id="cIngresos">
       <h2>💰 Ingresos</h2>

@@ -125,6 +125,24 @@
     r.readAsText(file);
   }
 
+  // Logo chico (128 px, fondo blanco) para la barra de arriba: pesa ~6 KB. Acepta archivo o imagen en base64.
+  function logoChico(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 128 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = reject;
+      img.src = typeof src === 'string' ? src : URL.createObjectURL(src);
+    });
+  }
+
   function readImage(file, maxSide) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -184,7 +202,7 @@
 
   // Pie de página con la marca del autor en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '3.7';
+  const APP_VERSION = '3.8';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -197,6 +215,6 @@
 
   global.Core = {
     store, uid, money, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, rootUrl, marca, tema, version: APP_VERSION
+    backup, restore, readImage, logoChico, rootUrl, marca, tema, version: APP_VERSION
   };
 })(window);

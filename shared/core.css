@@ -186,3 +186,6 @@ code.key { font: 600 18px/1.3 ui-monospace, "SF Mono", Menlo, monospace; letter-
   background: var(--text); color: var(--card); box-shadow: var(--shadow); font-size: 14px; }
 .actualizar .grow { flex: 1; min-width: 0; }
 .actualizar button { flex: none; }
+
+/* Logo de la tienda en la barra de arriba (en vez del cuadrado de color). */
+html.con-logo header.top h1::before { background: var(--logo) center / cover no-repeat, #fff; box-shadow: 0 0 0 1px var(--line); }

@@ -33,7 +33,27 @@
       item('Solicitudes pendientes', s.pendientes) + item('Reportes abiertos', s.reportes) +
       item('Keys canjeadas', s.canjeadas + ' / ' + s.licencias) + item('Ingresos por keys', Core.money(s.ingresos)) +
       item('Suscriptores por enlace', s.suscriptores) + item('Celulares con push', s.dispositivos);
-    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos()]);
+    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos(), cargarUso()]);
+  }
+
+  /* ---------- Uso del servidor (plan gratis de Supabase) ---------- */
+  async function cargarUso() {
+    const u = await Cuenta.rpc('admin_uso');
+    const mb = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB';
+    const barra = (titulo, usado, limite) => {
+      const pct = Math.min(100, Math.round(usado * 100 / limite));
+      const color = pct >= 90 ? 'var(--bad)' : pct >= 70 ? '#f59e0b' : 'var(--ok)';
+      return { pct, html: '<div class="uso"><div class="row" style="justify-content:space-between"><span>' + titulo + '</span><b>' + mb(usado) + ' de ' +
+        mb(limite) + ' · ' + pct + '%</b></div><div class="barra"><div style="width:' + Math.max(pct, 2) + '%;background:' + color + '"></div></div></div>' };
+    };
+    const a = barra('Base de datos', u.db_bytes, u.db_limite), b = barra('Archivos (imágenes de campañas y respaldos)', u.archivos_bytes, u.archivos_limite);
+    const max = Math.max(a.pct, b.pct);
+    $('usoBarras').innerHTML = a.html + b.html;
+    $('usoPill').textContent = max >= 90 ? '🔴 ' + max + '%' : max >= 70 ? '🟡 ' + max + '%' : '🟢 Bien';
+    $('usoTxt').textContent = u.empresas + ' empresas · ' + u.clientes + ' clientes · ' + u.productos + ' productos · ' + u.publicaciones + ' fichas (' +
+      mb(u.imagenes_bytes) + ' en imágenes) · ' + u.pedidos + ' pedidos. ' +
+      (max >= 90 ? 'Ya conviene pasar a Supabase Pro (US$25/mes).' : max >= 70 ? 'Ve preparando el paso a Supabase Pro.' : 'Con el plan gratis vas holgado.') +
+      ' Los clientes guardan las imágenes en su celular, así que casi no se repiten descargas.';
   }
 
   /* ---------- Ingresos y vencimientos ---------- */

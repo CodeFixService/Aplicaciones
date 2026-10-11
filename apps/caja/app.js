@@ -14,7 +14,10 @@
     localStorage.setItem('caja:migrado', '1');
   }
   const pro = Cuenta.isPro();
-  const FREE_PRODUCTOS = 15;
+  const FREE_PRODUCTOS = 50, PRO_PRODUCTOS = 200;
+  const LIMITE = pro ? PRO_PRODUCTOS : FREE_PRODUCTOS;
+  const alLimite = () => Core.toast(pro ? 'Llegaste al máximo de ' + PRO_PRODUCTOS + ' productos'
+    : '⭐ Llegaste a ' + FREE_PRODUCTOS + ' productos. Pásate a Pro para tener hasta ' + PRO_PRODUCTOS + ' (o agrupa colores y tallas como opciones).');
   const soloPro = (que) => Core.toast('⭐ ' + que + ' es de la versión Pro');
   $('planTag').textContent = pro ? 'PRO' : 'FREE';
   $('planTag').classList.toggle('pro', pro);
@@ -107,7 +110,7 @@
     if (isNaN(precio) || precio < 0) { Core.toast('Escribe el precio'); $('oPrecio').focus(); return; }
     let id = 'otro-' + Core.uid();
     if ($('oGuardar').checked) {
-      if (!pro && productos.length >= FREE_PRODUCTOS) soloPro('Tener más de ' + FREE_PRODUCTOS + ' productos');
+      if (productos.length >= LIMITE) alLimite();
       else {
         const p = { id: Core.uid(), nombre, precio, costo: 0, stock: '', categoria: $('oCat').value.trim(), publicado: !esCliente, premium: null };
         productos.push(p); guardarProductos(); id = p.id;
@@ -178,11 +181,12 @@
       const g = p.categoria || 'Sin categoría';
       const head = g !== grupo ? '<div class="grupo">' + Core.esc(grupo = g) + '</div>' : '';
       return head + '<div class="linea"><div class="grow"><b>' + Core.esc(p.nombre) + '</b><div class="muted">' + money(p.precio) +
-        (p.stock === '' ? '' : ' · stock ' + p.stock) + (p.publicado ? ' · 🛍️ en catálogo' : '') + '</div></div>' +
+        (p.stock === '' ? '' : ' · stock ' + p.stock) + (p.publicado ? ' · 🛍️ en catálogo' : '') +
+        (p.ops ? '<br>🎨 ' + Core.esc(p.ops) : '') + '</div></div>' +
         '<button class="small alt" data-a="edit" data-id="' + p.id + '">Editar</button>' +
         '<button class="small danger" data-a="del" data-id="' + p.id + '" aria-label="Eliminar">✕</button></div>';
     }).join('') : '<p class="empty">Sin productos</p>';
-    $('formTitulo').textContent = editId ? 'Editar producto' : 'Nuevo producto (' + productos.length + (pro ? '' : '/' + FREE_PRODUCTOS) + ')';
+    $('formTitulo').textContent = editId ? 'Editar producto' : 'Nuevo producto (' + productos.length + '/' + LIMITE + ')';
     const sinPublicar = esCliente ? 0 : productos.filter((p) => !p.publicado).length;
     $('rowPublicar').classList.toggle('hidden', !sinPublicar);
     $('txtPublicar').textContent = sinPublicar + ' producto(s) no aparecen en el catálogo de tus clientes.';
@@ -197,7 +201,7 @@
     try {
       for (const p of l) {
         try {
-          await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip });
+          await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip, p_descripcion: p.desc || '', p_opciones: p.ops || '' });
         } catch (e) { Core.toast('Se publicaron ' + n + '. ' + e.message); break; }
         p.publicado = true; n++;
       }
@@ -208,7 +212,7 @@
   $('p-pub').onchange = (e) => $('rowPrem').classList.toggle('hidden', !e.target.checked);
   function limpiarForm() {
     editId = null;
-    ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem'].forEach((k) => { $('p-' + k).value = ''; });
+    ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem', 'desc', 'ops'].forEach((k) => { $('p-' + k).value = ''; });
     $('p-pub').checked = !esCliente; $('rowPrem').classList.toggle('hidden', esCliente); // lo nuevo se publica por defecto
     $('p-vip').checked = false;
     renderLista();
@@ -219,7 +223,7 @@
     if (esCliente) return true; // la Caja del cliente es privada
     try {
       if (borrar || !p.publicado) await Cuenta.rpc('catalog_delete', { p_key: p.id });
-      else await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip });
+      else await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip, p_descripcion: p.desc || '', p_opciones: p.ops || '' });
       return true;
     } catch (e) {
       Core.toast('Catálogo: ' + e.message);
@@ -237,7 +241,9 @@
       categoria: $('p-cat').value.trim(),
       publicado: !esCliente && $('p-pub').checked,
       premium: $('p-pub').checked && !isNaN(prem) ? prem : null,
-      vip: !esCliente && $('p-vip').checked
+      vip: !esCliente && $('p-vip').checked,
+      desc: $('p-desc').value.trim(),
+      ops: $('p-ops').value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20).join(', ')
     };
     if (!p.nombre || isNaN(p.precio)) return Core.toast('Nombre y precio son obligatorios');
     let prod;
@@ -250,7 +256,7 @@
         if (!ok && p.publicado) prod.publicado = antes;
       }
     } else {
-      if (!pro && productos.length >= FREE_PRODUCTOS) return soloPro('Tener más de ' + FREE_PRODUCTOS + ' productos');
+      if (productos.length >= LIMITE) return alLimite();
       prod = Object.assign({ id: Core.uid() }, p);
       productos.push(prod);
       if (p.publicado && !(await sincronizar(prod))) prod.publicado = false;
@@ -269,6 +275,7 @@
       $('p-stock').value = p.stock; $('p-cat').value = p.categoria || '';
       $('p-pub').checked = !!p.publicado; $('p-prem').value = p.premium == null ? '' : p.premium;
       $('p-vip').checked = !!p.vip;
+      $('p-desc').value = p.desc || ''; $('p-ops').value = p.ops || '';
       $('rowPrem').classList.toggle('hidden', !p.publicado);
       renderLista();
       scrollTo(0, 0);
@@ -382,7 +389,7 @@
     let n = 0;
     for (const p of l) {
       try {
-        await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip });
+        await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip, p_descripcion: p.desc || '', p_opciones: p.ops || '' });
         p.publicado = true; p.sync35 = true; n++;
       } catch (e) {
         guardarProductos();

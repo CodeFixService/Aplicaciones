@@ -26,6 +26,15 @@
     } catch (e) { /* sin espacio */ }
   }
 
+  // Logo arriba, al lado del nombre: la empresa ve el suyo; el cliente, el de su tienda.
+  function aplicarLogo(a) {
+    const logo = a && (a.role === 'client' ? a.negocio_logo : a.logo);
+    const ok = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(logo || '');
+    document.documentElement.classList.toggle('con-logo', ok);
+    if (ok) document.documentElement.style.setProperty('--logo', 'url("' + logo + '")');
+  }
+  aplicarLogo(account);
+
   function friendly(err) {
     const m = (err && (err.message || err.error_description || err)) + '';
     if (/Invalid login credentials/i.test(m)) return 'Correo o contraseña incorrectos';
@@ -54,6 +63,7 @@
     if (!acc) { writeCache(null); return null; }
     acc.checkedAt = Date.now();
     writeCache(acc);
+    aplicarLogo(acc);
     if (global.Core) global.Core.tema.usar(acc.id);
     return acc;
   }
@@ -297,7 +307,7 @@
 
   global.Cuenta = {
     configured, sb, refresh, require, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
-    enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora,
+    enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora, aplicarLogo,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
     isAdmin: () => !!(account && account.is_admin),

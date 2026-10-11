@@ -70,6 +70,7 @@
   .icono-top { margin-left: 8px; width: 40px; height: 40px; padding: 0; border-radius: 12px; font-size: 20px; background: var(--field); color: var(--text); box-shadow: none; flex: none; }
   .ayuda { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 30; width: 44px; height: 44px; border-radius: 50%;
     display: grid; place-items: center; text-decoration: none; font-size: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .ayuda.emprende { bottom: calc(66px + env(safe-area-inset-bottom)); font-size: 19px; }
   .app.bloq { opacity: .55; filter: grayscale(1); }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
   .solicitudes { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--text);
@@ -207,6 +208,8 @@
         <label for="eTel">WhatsApp de la tienda (para recibir pedidos)</label>
         <input id="eTel" inputmode="tel" placeholder="56912345678">
       </div>
+      <label for="tLogo">Logo (sale arriba, al lado del nombre, y en tus fichas)</label>
+      <div class="row" style="align-items:center"><input type="file" accept="image/*" id="tLogo" style="flex:2"><button class="alt small" id="bQuitarLogo" type="button" style="flex:none">Quitar</button></div>
       <label for="tPago">Datos para transferencia</label>
       <textarea id="tPago" maxlength="400" placeholder="Banco · Tipo de cuenta · N° de cuenta · RUT · Nombre · Correo"></textarea>
       <label for="tHorario">Horario de atención</label>
@@ -268,6 +271,7 @@
       </details>
     </div>
   </section>
+  <a class="ayuda emprende hidden" id="bEmprende" href="#" target="_blank" rel="noopener" aria-label="Emprende con tu propia tienda" title="¿Quieres tu propia tienda? Emprende con CodeFix">🚀</a>
   <a class="ayuda hidden" id="bAyuda" href="#" aria-label="Ayuda">❓</a>
 </main>
 <script src="shared/config.js"></script>
@@ -400,6 +404,7 @@
     Cuenta.revisarActualizacion();
     if (!cliente(acc)) cargarTienda(acc);
     prepararAyuda(acc);
+    prepararEmprende(acc);
     revisarPush();
     contarMensajes();
     if (acc.role === 'client') contarOfertas();
@@ -413,7 +418,7 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '3.7';
+  const DB_VERSION = '3.8';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
@@ -455,6 +460,7 @@
       : cliente ? 'Cliente' : 'Versión Free';
     $('estadoPlan').textContent = acc.email + ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : '');
     $('avatar').textContent = icono(acc) || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
+    Cuenta.aplicarLogo(acc);
 
     // Un acceso por cosa: el cliente tiene su Tienda; la empresa, Mi tienda (vista del cliente) y Novedades CodeFix.
     const lista = cliente ? ['tienda', 'mensajesCli', 'cajaCli']
@@ -510,7 +516,7 @@
       ? ['Ofertas y productos VIP que solo ven los clientes Premium', 'Precios especiales Premium en los productos y pedidos',
          'Tu propia Caja con 📈 Finanzas: metas, gastos y ganancia real', 'Elige el color de tu app y tu ícono',
          'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
-      : ['Fichas, clientes y productos ilimitados, sin marca de agua', 'Todas las plantillas (Foto completa y Menú), QR y fichas VIP',
+      : ['Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10), sin marca de agua', 'Todas las plantillas (Foto completa y Menú), QR y fichas VIP',
          'Cupones de descuento y tarjeta de sellos para tus clientes', '📊 Estadísticas: vistas, productos más pedidos y mejores clientes',
          '📈 Finanzas: metas, gastos y ganancia real', 'Push y correos automáticos, y respaldo diario en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
@@ -584,6 +590,30 @@
     $('bAyuda').classList.toggle('hidden', !con);
     if (con) $('bAyuda').href = 'apps/mensajes/?con=' + con + '&txt=' + encodeURIComponent('Hola, necesito ayuda con ');
   }
+
+  /* ---------- 🚀 Emprende (clientes): WhatsApp directo al administrador ---------- */
+  async function prepararEmprende(acc) {
+    $('bEmprende').classList.add('hidden');
+    if (acc.role !== 'client') return;
+    const s = await Cuenta.settings();
+    const wsp = String((s && s.contact_whatsapp) || '').replace(/\D/g, '');
+    if (!wsp) return;
+    $('bEmprende').href = 'https://wa.me/' + wsp + '?text=' + encodeURIComponent('Hola 👋 Soy cliente de ' + (acc.negocio || 'una tienda') +
+      ' en CodeFix y quiero emprender con mi propia tienda. ¿Cómo lo hago?');
+    $('bEmprende').classList.remove('hidden');
+  }
+
+  /* ---------- Logo de la tienda ---------- */
+  $('tLogo').onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try { pintar(await Cuenta.rpc('set_mi_logo', { p_logo: await Core.logoChico(f) })); Core.toast('✅ Logo guardado'); }
+    catch (err) { Core.toast(err.message); }
+    e.target.value = '';
+  };
+  $('bQuitarLogo').onclick = async () => {
+    try { pintar(await Cuenta.rpc('set_mi_logo', { p_logo: null })); Core.toast('Logo quitado'); } catch (err) { Core.toast(err.message); }
+  };
 
   async function contarPedidos() {
     try {
