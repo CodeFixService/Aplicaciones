@@ -314,7 +314,7 @@ create policy "borrar mis suscriptores" on public.subscribers
 
 create or replace function public.negocio_publico(p_id uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object('empresa', p.empresa, 'pro', public.is_pro(p.id))
+  select jsonb_build_object('empresa', p.empresa, 'pro', public.is_pro(p.id), 'telefono', p.telefono)
   from public.profiles p where p.id = p_id and p.role = 'user' and not p.suspended
 $$;
 
@@ -388,6 +388,8 @@ create table if not exists public.notifications (
 );
 alter table public.notifications add column if not exists target_id uuid references public.profiles (id) on delete cascade;
 alter table public.notifications add column if not exists solo_premium boolean not null default false;
+-- 'aviso' = notificación automática de una publicación nueva (solo push; no se lista como oferta).
+alter table public.notifications add column if not exists kind text not null default 'oferta';
 alter table public.notifications drop constraint if exists notifications_audience_check;
 alter table public.notifications add constraint notifications_audience_check
   check (audience in ('all_users', 'all_businesses', 'pro_users', 'free_users', 'all_clients',
@@ -475,7 +477,7 @@ language sql stable security definer set search_path = '' as $$
          exists (select 1 from public.notification_reads r where r.notification_id = n.id and r.user_id = me.id)
   from public.notifications n join me on true join public.profiles o on o.id = n.owner_id
   where (n.status = 'sent' or (n.status in ('scheduled', 'sending') and cardinality(n.channels) = 0 and n.send_at <= now()))
-    and coalesce(n.sent_at, n.send_at) > now() - interval '60 days'
+    and coalesce(n.sent_at, n.send_at) > now() - interval '60 days' and n.kind <> 'aviso'
     and (n.audience = 'all_users'
          or (me.role = 'user' and (n.audience = 'all_businesses'
                or (n.audience = 'pro_users' and public.is_pro(me.id))
@@ -686,12 +688,13 @@ language plpgsql security definer set search_path = '' as $$
 declare v text := trim(coalesce(p_value, ''));
 begin
   if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  if p_key not in ('payment_link', 'price_business', 'price_client', 'contact_whatsapp') then
+  if p_key not in ('payment_link', 'price_business', 'price_client', 'contact_whatsapp', 'version_liberada') then
     raise exception 'Ajuste no permitido';
   end if;
   if p_key = 'payment_link' and v <> '' and v !~* '^https://' then raise exception 'El link de pago debe empezar con https://'; end if;
   if p_key like 'price_%' and v !~ '^[0-9]{0,9}$' then raise exception 'Precio no válido (solo números)'; end if;
   if p_key = 'contact_whatsapp' and v !~ '^[0-9]{0,15}$' then raise exception 'WhatsApp no válido (solo números con código de país)'; end if;
+  if p_key = 'version_liberada' and v !~ '^[0-9]+(\.[0-9]+){0,2}$' then raise exception 'Versión no válida'; end if;
   insert into public.app_settings (key, value) values (p_key, left(v, 500))
   on conflict (key) do update set value = excluded.value;
 end $$;
@@ -1184,8 +1187,9 @@ declare t text := left(regexp_replace(coalesce(p_tel, ''), '\D', '', 'g'), 15);
 begin
   if t <> '' and length(t) < 7 then raise exception 'WhatsApp no válido (incluye el código de país)'; end if;
   update public.profiles set telefono = nullif(t, '')
-  where email = lower(trim(coalesce(p_email, ''))) and role = 'client'
-    and (negocio_id = auth.uid() or public.is_admin());
+  where email = lower(trim(coalesce(p_email, '')))
+    and ((role = 'client' and (negocio_id = auth.uid() or public.is_admin()))
+         or (role = 'user' and public.is_admin()));  -- los clientes del admin son las empresas
   if not found then raise exception 'Cliente no encontrado'; end if;
 end $$;
 
@@ -1195,7 +1199,8 @@ create or replace function public.my_clients()
 returns table (id uuid, nombre text, email text, creado timestamptz, telefono text)
 language sql stable security definer set search_path = '' as $$
   select p.id, p.empresa, p.email, p.created_at, p.telefono from public.profiles p
-  where p.role = 'client' and p.negocio_id = auth.uid()
+  where (p.role = 'client' and p.negocio_id = auth.uid())
+     or (p.role = 'user' and public.is_admin())  -- los clientes del admin son las empresas
   order by p.created_at desc limit 2000
 $$;
 
@@ -1225,7 +1230,7 @@ language sql stable security definer set search_path = '' as $$
   cross join lateral (select n.solo_premium and me.role = 'client' and not public.is_pro(me.id) as bloq) x
   where me.id = auth.uid()
     and (n.status = 'sent' or (n.status in ('scheduled', 'sending') and cardinality(n.channels) = 0 and n.send_at <= now()))
-    and coalesce(n.sent_at, n.send_at) > now() - interval '60 days'
+    and coalesce(n.sent_at, n.send_at) > now() - interval '60 days' and n.kind <> 'aviso'
   order by coalesce(n.sent_at, n.send_at) desc limit 30
 $$;
 
@@ -1281,7 +1286,7 @@ end $$;
 
 -- Versión de la base de datos (la app avisa al admin si falta actualizarla).
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '3.5'::text $$;
+language sql immutable as $$ select '3.7'::text $$;
 
 revoke all on function public.set_my_phone(text) from public, anon;
 grant execute on function public.set_my_phone(text) to authenticated;
@@ -1337,6 +1342,7 @@ $$;
 
 -- p_origen: 'tienda' → cliente: su empresa; empresa/admin: lo propio (vista previa).
 --           'codefix' → lo que publica el administrador (lo ven todas las empresas).
+drop function if exists public.ver_publicaciones(text);
 create or replace function public.ver_publicaciones(p_origen text)
 returns table (id uuid, titulo text, detalle text, precio text, imagen text, fecha timestamptz, de text, de_id uuid)
 language sql stable security definer set search_path = '' as $$
@@ -1354,10 +1360,549 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '3.6'::text $$;
+language sql immutable as $$ select '3.7'::text $$;
 
 revoke all on function public.publicar_ficha(text, text, text, text, text) from public, anon;
 revoke all on function public.borrar_publicacion(text) from public, anon;
 revoke all on function public.ver_publicaciones(text) from public, anon;
 grant execute on function public.publicar_ficha(text, text, text, text, text), public.borrar_publicacion(text),
   public.ver_publicaciones(text) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 3.7: pedidos con estados, cupones, sellos, publicaciones VIP,
+--  avisos en cadena (admin → empresas → clientes), datos de la tienda,
+--  panel de ingresos y vencimientos.
+-- =====================================================================
+
+-- ---------- Datos de la tienda ----------
+alter table public.profiles add column if not exists datos_pago text;
+alter table public.profiles add column if not exists horario text;
+alter table public.profiles add column if not exists abierto boolean not null default true;
+alter table public.profiles add column if not exists sellos_meta int;
+alter table public.profiles add column if not exists sellos_premio text;
+alter table public.profiles add column if not exists aviso_venc_at timestamptz;
+
+create or replace function public.set_mi_tienda(p_datos_pago text, p_horario text, p_abierto boolean,
+                                                p_sellos_meta int, p_sellos_premio text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  if p_sellos_meta is not null and not public.is_pro(auth.uid()) then raise exception 'La tarjeta de sellos es de la versión Pro'; end if;
+  if p_sellos_meta is not null and (p_sellos_meta < 2 or p_sellos_meta > 30) then raise exception 'La tarjeta debe tener entre 2 y 30 sellos'; end if;
+  update public.profiles set
+    datos_pago = nullif(left(trim(coalesce(p_datos_pago, '')), 400), ''),
+    horario = nullif(left(trim(coalesce(p_horario, '')), 120), ''),
+    abierto = coalesce(p_abierto, true),
+    sellos_meta = p_sellos_meta,
+    sellos_premio = nullif(left(trim(coalesce(p_sellos_premio, '')), 80), '')
+  where id = auth.uid();
+  return public.my_account();
+end $$;
+
+-- ¿Puede "me" comprarle a la tienda "t"? (cliente → su empresa; empresa → CodeFix)
+create or replace function public.puede_comprar(me uuid, t uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.profiles p where p.id = me and not p.suspended
+    and ((p.role = 'client' and p.negocio_id = t) or (p.role = 'user' and t = public.admin_id())))
+$$;
+
+-- Información pública de la tienda para quien le compra (o para la propia tienda).
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', case when t.role = 'admin' then 'CodeFix' else t.empresa end,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', case when public.is_pro(t.id) then t.sellos_meta end, 'sellos_premio', t.sellos_premio,
+    'pro', public.is_pro(t.id))
+  from public.profiles t
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or t.id = auth.uid() or public.is_admin())
+$$;
+
+-- ---------- Publicaciones: tipo, VIP, precio y aviso automático ----------
+alter table public.publicaciones add column if not exists tipo text not null default 'oferta';
+alter table public.publicaciones add column if not exists vip boolean not null default false;
+alter table public.publicaciones add column if not exists precio_num numeric(12, 2);
+
+-- Aviso push automático a quien corresponde (máx. 1 cada 10 minutos por tienda).
+create or replace function public.avisar_publicacion(p_titulo text, p_que text, p_vip boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+declare me public.profiles;
+begin
+  select * into me from public.profiles where id = auth.uid();
+  -- máx. 1 aviso del mismo tipo cada 10 minutos (evita spam al publicar muchas cosas seguidas)
+  if exists (select 1 from public.notifications where owner_id = me.id and kind = 'aviso' and solo_premium = p_vip
+             and title like '%' || p_que and created_at > now() - interval '10 minutes') then return; end if;
+  if me.role = 'admin' then
+    insert into public.notifications (owner_id, audience, channels, kind, solo_premium, title, body, url, send_at)
+    values (me.id, case when p_vip then 'pro_users' else 'all_businesses' end, '{push}', 'aviso', p_vip,
+            left('📣 CodeFix: ' || p_que, 80), left(p_titulo, 160), 'apps/catalogo/?modo=codefix', now());
+  else
+    insert into public.notifications (owner_id, audience, channels, kind, solo_premium, title, body, url, send_at)
+    values (me.id, 'my_subscribers', '{push}', 'aviso', p_vip,
+            left('🏷️ ' || coalesce(nullif(me.empresa, ''), 'Tu tienda') || ': ' || p_que, 80), left(p_titulo, 160),
+            'apps/catalogo/?v=ofertas', now());
+  end if;
+end $$;
+
+drop function if exists public.publicar_ficha(text, text, text, text, text);
+create or replace function public.publicar_ficha(p_key text, p_titulo text, p_detalle text, p_precio text, p_imagen text,
+                                                 p_tipo text default 'oferta', p_vip boolean default false,
+                                                 p_precio_num numeric default null)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  img text := nullif(trim(coalesce(p_imagen, '')), '');
+  nueva boolean;
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas publican fichas'; end if;
+  if coalesce(trim(p_key), '') = '' or coalesce(trim(p_titulo), '') = '' then raise exception 'La ficha necesita un título'; end if;
+  if img is not null and img !~ '^(https://|data:image/(jpeg|png|webp);base64,)' then raise exception 'Imagen no válida'; end if;
+  if length(coalesce(img, '')) > 600000 then raise exception 'La imagen es muy pesada'; end if;
+  if p_precio_num is not null and (p_precio_num < 0 or p_precio_num > 99999999) then raise exception 'Precio no válido'; end if;
+  nueva := not exists (select 1 from public.publicaciones where owner_id = auth.uid() and client_key = p_key);
+  if nueva and (select count(*) from public.publicaciones where owner_id = auth.uid())
+               >= (case when public.is_pro(auth.uid()) then 300 else 10 end) then
+    raise exception 'Llegaste al máximo de fichas publicadas de tu plan (Free: 10)';
+  end if;
+  insert into public.publicaciones (owner_id, client_key, titulo, detalle, precio, imagen, tipo, vip, precio_num)
+  values (auth.uid(), left(p_key, 60), left(trim(p_titulo), 80), left(coalesce(p_detalle, ''), 300), left(coalesce(p_precio, ''), 40), img,
+          left(coalesce(nullif(p_tipo, ''), 'oferta'), 20), coalesce(p_vip, false), p_precio_num)
+  on conflict (owner_id, client_key) do update
+    set titulo = excluded.titulo, detalle = excluded.detalle, precio = excluded.precio, imagen = excluded.imagen,
+        tipo = excluded.tipo, vip = excluded.vip, precio_num = excluded.precio_num, updated_at = now();
+  if nueva then perform public.avisar_publicacion(trim(p_titulo), case when coalesce(p_vip, false) then 'oferta VIP ⭐' else 'nueva publicación' end, coalesce(p_vip, false)); end if;
+end $$;
+
+-- Las VIP las ven completas los Premium/Pro; los demás, bloqueadas (en gris).
+drop function if exists public.ver_publicaciones(text);
+create or replace function public.ver_publicaciones(p_origen text)
+returns table (id uuid, titulo text, detalle text, precio text, imagen text, fecha timestamptz, de text, de_id uuid,
+               tipo text, vip boolean, precio_num numeric, bloqueada boolean)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.titulo,
+         case when b.bloq then '' else x.detalle end,
+         case when b.bloq then '' else x.precio end,
+         case when b.bloq then null else x.imagen end,
+         x.updated_at, case when o.role = 'admin' then 'CodeFix' else o.empresa end, x.owner_id,
+         x.tipo, x.vip, case when b.bloq then null else x.precio_num end, b.bloq
+  from public.profiles me
+  join public.publicaciones x on x.owner_id = case
+         when p_origen = 'codefix' and me.role in ('user', 'admin') then public.admin_id()
+         when p_origen = 'tienda' and me.role = 'client' then me.negocio_id
+         when p_origen = 'tienda' then me.id end
+  join public.profiles o on o.id = x.owner_id
+  cross join lateral (select x.vip and x.owner_id <> me.id and me.role <> 'admin' and not public.is_pro(me.id) as bloq) b
+  where me.id = auth.uid() and not me.suspended
+  order by x.updated_at desc
+  limit 100
+$$;
+
+-- Vistas de cada publicación (estadísticas de la tienda).
+create table if not exists public.publicacion_vistas (
+  publicacion_id uuid not null references public.publicaciones (id) on delete cascade,
+  user_id        uuid not null references public.profiles (id) on delete cascade,
+  visto_at       timestamptz not null default now(),
+  primary key (publicacion_id, user_id)
+);
+alter table public.publicacion_vistas enable row level security;
+revoke all on public.publicacion_vistas from anon, authenticated;
+
+create or replace function public.registrar_vistas(p_ids uuid[]) returns void
+language sql security definer set search_path = '' as $$
+  insert into public.publicacion_vistas (publicacion_id, user_id)
+  select v.id, auth.uid() from public.ver_publicaciones('tienda') v
+  where v.id = any(p_ids) and v.de_id <> auth.uid()
+  on conflict do nothing
+$$;
+
+-- ---------- Catálogo: productos VIP, catálogo de CodeFix para empresas, aviso de productos nuevos ----------
+alter table public.catalog_items add column if not exists solo_premium boolean not null default false;
+
+drop function if exists public.catalog_upsert(text, text, numeric, numeric, text);
+create or replace function public.catalog_upsert(p_key text, p_nombre text, p_precio numeric, p_premium numeric, p_categoria text,
+                                                 p_vip boolean default false)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare nuevo boolean;
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas publican productos'; end if;
+  if coalesce(trim(p_nombre), '') = '' or p_precio is null or p_precio < 0 then raise exception 'Revisa nombre y precio'; end if;
+  nuevo := not exists (select 1 from public.catalog_items where owner_id = auth.uid() and client_key = p_key);
+  if nuevo and (select count(*) from public.catalog_items where owner_id = auth.uid())
+               >= (case when public.is_pro(auth.uid()) then 500 else 15 end) then
+    raise exception 'Llegaste al máximo de productos publicados de tu plan';
+  end if;
+  insert into public.catalog_items (owner_id, client_key, nombre, precio, precio_premium, categoria, solo_premium)
+  values (auth.uid(), left(p_key, 40), left(trim(p_nombre), 80), p_precio, p_premium, left(trim(coalesce(p_categoria, '')), 40), coalesce(p_vip, false))
+  on conflict (owner_id, client_key) do update
+    set nombre = excluded.nombre, precio = excluded.precio, precio_premium = excluded.precio_premium,
+        categoria = excluded.categoria, solo_premium = excluded.solo_premium, updated_at = now();
+  if nuevo then perform public.avisar_publicacion(trim(p_nombre), 'nuevos productos', false); end if;
+end $$;
+
+drop function if exists public.catalog_of(uuid);
+create or replace function public.catalog_of(p_negocio uuid)
+returns table (nombre text, precio numeric, precio_premium numeric, tiene_premium boolean, categoria text,
+               clave text, nuevo boolean, solo_premium boolean, bloqueado boolean)
+language sql stable security definer set search_path = '' as $$
+  select c.nombre,
+         case when b.bloq then null else c.precio end,
+         case when b.ve then c.precio_premium end,
+         c.precio_premium is not null, c.categoria, c.client_key, c.created_at > now() - interval '7 days',
+         c.solo_premium, b.bloq
+  from public.catalog_items c
+  cross join lateral (select public.is_pro(auth.uid()) or c.owner_id = auth.uid() or public.is_admin() as ve) v
+  cross join lateral (select v.ve, c.solo_premium and not v.ve as bloq) b
+  where c.owner_id = p_negocio
+    and (c.owner_id = auth.uid() or public.is_admin() or public.puede_comprar(auth.uid(), p_negocio))
+  order by c.categoria, c.nombre
+$$;
+
+-- ---------- Cupones (Pro) ----------
+create table if not exists public.cupones (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null references public.profiles (id) on delete cascade,
+  codigo      text not null,
+  porcentaje  int not null check (porcentaje between 1 and 90),
+  hasta       date,
+  activo      boolean not null default true,
+  usos        int not null default 0,
+  created_at  timestamptz not null default now(),
+  unique (owner_id, codigo)
+);
+alter table public.cupones enable row level security;
+revoke all on public.cupones from anon, authenticated;
+
+create or replace function public.guardar_cupon(p_codigo text, p_porcentaje int, p_hasta date) returns void
+language plpgsql security definer set search_path = '' as $$
+declare c text := upper(regexp_replace(coalesce(p_codigo, ''), '[^A-Za-z0-9]', '', 'g'));
+begin
+  if not (public.is_business(auth.uid()) and public.is_pro(auth.uid())) then raise exception 'Los cupones son de la versión Pro'; end if;
+  if length(c) < 3 or length(c) > 20 then raise exception 'El código debe tener entre 3 y 20 letras o números'; end if;
+  if p_porcentaje is null or p_porcentaje < 1 or p_porcentaje > 90 then raise exception 'El descuento debe ser entre 1 y 90 por ciento'; end if;
+  if (select count(*) from public.cupones where owner_id = auth.uid()) >= 50 then raise exception 'Máximo 50 cupones'; end if;
+  insert into public.cupones (owner_id, codigo, porcentaje, hasta) values (auth.uid(), c, p_porcentaje, p_hasta)
+  on conflict (owner_id, codigo) do update set porcentaje = excluded.porcentaje, hasta = excluded.hasta, activo = true;
+end $$;
+
+create or replace function public.borrar_cupon(p_id uuid) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.cupones where id = p_id and owner_id = auth.uid()
+$$;
+
+create or replace function public.mis_cupones()
+returns table (id uuid, codigo text, porcentaje int, hasta date, activo boolean, usos int)
+language sql stable security definer set search_path = '' as $$
+  select c.id, c.codigo, c.porcentaje, c.hasta, c.activo, c.usos from public.cupones c
+  where c.owner_id = auth.uid() order by c.created_at desc
+$$;
+
+create or replace function public.validar_cupon(p_negocio uuid, p_codigo text) returns int
+language plpgsql stable security definer set search_path = '' as $$
+declare pct int;
+begin
+  if not public.puede_comprar(auth.uid(), p_negocio) then raise exception 'Sin permiso'; end if;
+  select c.porcentaje into pct from public.cupones c
+  where c.owner_id = p_negocio and c.codigo = upper(regexp_replace(coalesce(p_codigo, ''), '[^A-Za-z0-9]', '', 'g'))
+    and c.activo and (c.hasta is null or c.hasta >= current_date) and public.is_pro(p_negocio);
+  if pct is null then raise exception 'Cupón no válido o vencido'; end if;
+  return pct;
+end $$;
+
+-- ---------- Tarjeta de sellos (Pro) ----------
+create table if not exists public.sellos (
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  cliente_id  uuid not null references public.profiles (id) on delete cascade,
+  cantidad    int not null default 0,
+  premios     int not null default 0,
+  primary key (negocio_id, cliente_id)
+);
+alter table public.sellos enable row level security;
+revoke all on public.sellos from anon, authenticated;
+
+create or replace function public.mis_sellos(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('cantidad', coalesce(s.cantidad, 0), 'premios', coalesce(s.premios, 0),
+                            'meta', t.sellos_meta, 'premio', t.sellos_premio)
+  from public.profiles t left join public.sellos s on s.negocio_id = t.id and s.cliente_id = auth.uid()
+  where t.id = p_negocio and public.puede_comprar(auth.uid(), t.id) and t.sellos_meta is not null and public.is_pro(t.id)
+$$;
+
+-- ---------- Pedidos ----------
+create table if not exists public.pedidos (
+  id          uuid primary key default gen_random_uuid(),
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  cliente_id  uuid not null references public.profiles (id) on delete cascade,
+  lineas      jsonb not null,
+  subtotal    numeric(12, 2) not null,
+  descuento   numeric(12, 2) not null default 0,
+  total       numeric(12, 2) not null,
+  cupon       text,
+  entrega     text not null check (entrega in ('retiro', 'despacho')),
+  direccion   text,
+  nota        text,
+  estado      text not null default 'recibido'
+              check (estado in ('recibido', 'preparando', 'listo', 'en_camino', 'entregado', 'cancelado')),
+  sellado     boolean not null default false,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists pedidos_negocio_idx on public.pedidos (negocio_id, created_at desc);
+create index if not exists pedidos_cliente_idx on public.pedidos (cliente_id, created_at desc);
+alter table public.pedidos enable row level security;
+revoke all on public.pedidos from anon, authenticated;
+
+-- El servidor calcula los precios (no se confía en lo que manda el celular).
+create or replace function public.crear_pedido(p_negocio uuid, p_items jsonb, p_entrega text, p_direccion text,
+                                               p_nota text, p_cupon text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  pro boolean := public.is_pro(auth.uid());
+  it jsonb; k text; n int;
+  nom text; pre numeric; vip boolean;
+  lineas jsonb := '[]'::jsonb;
+  sub numeric := 0; pct int := 0; desc_ numeric := 0;
+  ped public.pedidos;
+  cli text;
+begin
+  if not public.puede_comprar(me, p_negocio) then return jsonb_build_object('ok', false, 'error', 'No puedes pedirle a esta tienda'); end if;
+  if p_entrega not in ('retiro', 'despacho') then return jsonb_build_object('ok', false, 'error', 'Elige despacho o retiro en tienda'); end if;
+  if p_entrega = 'despacho' and coalesce(trim(p_direccion), '') = '' then
+    return jsonb_build_object('ok', false, 'error', 'Escribe la dirección de despacho');
+  end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 or jsonb_array_length(p_items) > 50 then
+    return jsonb_build_object('ok', false, 'error', 'El pedido está vacío');
+  end if;
+  if (select count(*) from public.pedidos where cliente_id = me and created_at > now() - interval '1 day') >= 20 then
+    return jsonb_build_object('ok', false, 'error', 'Máximo 20 pedidos por día');
+  end if;
+  for it in select * from jsonb_array_elements(p_items) loop
+    k := it ->> 'clave'; n := least(greatest(coalesce((it ->> 'cant')::int, 0), 0), 99);
+    continue when n = 0 or k is null;
+    nom := null;
+    if k like 'pub:%' then
+      select x.titulo, x.precio_num, x.vip into nom, pre, vip from public.publicaciones x
+      where x.owner_id = p_negocio and x.id::text = substr(k, 5);
+    else
+      select c.nombre, case when pro and c.precio_premium is not null then c.precio_premium else c.precio end, c.solo_premium
+        into nom, pre, vip from public.catalog_items c where c.owner_id = p_negocio and c.client_key = k;
+    end if;
+    if nom is null or pre is null then return jsonb_build_object('ok', false, 'error', 'Un producto ya no está disponible: actualiza el pedido'); end if;
+    if vip and not pro then return jsonb_build_object('ok', false, 'error', '"' || nom || '" es solo para Premium'); end if;
+    lineas := lineas || jsonb_build_object('nombre', nom, 'cant', n, 'precio', pre, 'subtotal', pre * n, 'clave', k);
+    sub := sub + pre * n;
+  end loop;
+  if jsonb_array_length(lineas) = 0 then return jsonb_build_object('ok', false, 'error', 'El pedido está vacío'); end if;
+  if coalesce(trim(p_cupon), '') <> '' then
+    begin
+      pct := public.validar_cupon(p_negocio, p_cupon);
+    exception when others then
+      return jsonb_build_object('ok', false, 'error', 'Cupón no válido o vencido');
+    end;
+    desc_ := round(sub * pct / 100.0);
+    update public.cupones set usos = usos + 1
+    where owner_id = p_negocio and codigo = upper(regexp_replace(p_cupon, '[^A-Za-z0-9]', '', 'g'));
+  end if;
+  insert into public.pedidos (negocio_id, cliente_id, lineas, subtotal, descuento, total, cupon, entrega, direccion, nota)
+  values (p_negocio, me, lineas, sub, desc_, sub - desc_,
+          nullif(upper(regexp_replace(coalesce(p_cupon, ''), '[^A-Za-z0-9]', '', 'g')), ''),
+          p_entrega, case when p_entrega = 'despacho' then left(trim(p_direccion), 200) end, nullif(left(trim(coalesce(p_nota, '')), 300), ''))
+  returning * into ped;
+  select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) into cli from public.profiles where id = me;
+  perform public.notify_user(p_negocio, '📦 Nuevo pedido de ' || cli,
+    'Total $' || to_char(ped.total, 'FM999G999G999') || ' · ' || case when p_entrega = 'despacho' then 'Despacho' else 'Retiro en tienda' end,
+    'apps/pedidos/');
+  return jsonb_build_object('ok', true, 'id', ped.id, 'subtotal', ped.subtotal, 'descuento', ped.descuento, 'total', ped.total);
+end $$;
+
+-- Mis pedidos como comprador (opcional: de una tienda).
+create or replace function public.mis_pedidos(p_negocio uuid default null)
+returns table (id uuid, negocio text, lineas jsonb, subtotal numeric, descuento numeric, total numeric, cupon text,
+               entrega text, direccion text, nota text, estado text, fecha timestamptz, actualizado timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select x.id, case when t.role = 'admin' then 'CodeFix' else t.empresa end, x.lineas, x.subtotal, x.descuento, x.total, x.cupon,
+         x.entrega, x.direccion, x.nota, x.estado, x.created_at, x.updated_at
+  from public.pedidos x join public.profiles t on t.id = x.negocio_id
+  where x.cliente_id = auth.uid() and (p_negocio is null or x.negocio_id = p_negocio)
+  order by x.created_at desc limit 50
+$$;
+
+-- Pedidos que recibe mi tienda.
+create or replace function public.pedidos_tienda(p_estado text default null)
+returns table (id uuid, cliente_id uuid, cliente text, telefono text, lineas jsonb, subtotal numeric, descuento numeric,
+               total numeric, cupon text, entrega text, direccion text, nota text, estado text, fecha timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.cliente_id, coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1)), c.telefono, x.lineas, x.subtotal,
+         x.descuento, x.total, x.cupon, x.entrega, x.direccion, x.nota, x.estado, x.created_at
+  from public.pedidos x join public.profiles c on c.id = x.cliente_id
+  where x.negocio_id = auth.uid()
+    and (p_estado is null or (p_estado = 'activos' and x.estado not in ('entregado', 'cancelado')) or x.estado = p_estado)
+  order by x.created_at desc limit 300
+$$;
+
+create or replace function public.actualizar_pedido(p_id uuid, p_estado text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  ped public.pedidos;
+  t public.profiles;
+  s public.sellos;
+  url text;
+  txt text;
+begin
+  if p_estado not in ('recibido', 'preparando', 'listo', 'en_camino', 'entregado', 'cancelado') then
+    raise exception 'Estado no válido';
+  end if;
+  update public.pedidos set estado = p_estado, updated_at = now()
+  where id = p_id and negocio_id = auth.uid() returning * into ped;
+  if ped.id is null then raise exception 'Pedido no encontrado'; end if;
+  select * into t from public.profiles where id = ped.negocio_id;
+  url := case when t.role = 'admin' then 'apps/catalogo/?modo=codefix&v=pedidos' else 'apps/catalogo/?v=pedidos' end;
+  txt := case p_estado when 'preparando' then '👨‍🍳 Estamos preparando tu pedido'
+                      when 'listo' then '✅ Tu pedido está listo para retirar'
+                      when 'en_camino' then '🚚 Tu pedido va en camino'
+                      when 'entregado' then '🎉 Pedido entregado. ¡Gracias por tu compra!'
+                      when 'cancelado' then '❌ Tu pedido fue cancelado'
+                      else '📦 Recibimos tu pedido' end;
+  perform public.notify_user(ped.cliente_id, txt, coalesce(nullif(t.empresa, ''), 'CodeFix') || ' · Total $' || to_char(ped.total, 'FM999G999G999'), url);
+  -- Sello en la tarjeta del cliente (una vez por pedido entregado).
+  if p_estado = 'entregado' and not ped.sellado and t.sellos_meta is not null and public.is_pro(t.id) then
+    update public.pedidos set sellado = true where id = ped.id;
+    insert into public.sellos (negocio_id, cliente_id, cantidad) values (t.id, ped.cliente_id, 1)
+    on conflict (negocio_id, cliente_id) do update set cantidad = public.sellos.cantidad + 1
+    returning * into s;
+    if s.cantidad >= t.sellos_meta then
+      update public.sellos set cantidad = 0, premios = premios + 1 where negocio_id = t.id and cliente_id = ped.cliente_id;
+      perform public.notify_user(ped.cliente_id, '🎁 ¡Completaste tu tarjeta de sellos!',
+        'Premio: ' || coalesce(t.sellos_premio, 'pregunta en la tienda'), url);
+    end if;
+  end if;
+  return jsonb_build_object('ok', true, 'estado', p_estado);
+end $$;
+
+-- ---------- Estadísticas de la tienda (Pro) ----------
+create or replace function public.estadisticas_tienda() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if not (public.is_business(me) and public.is_pro(me)) then raise exception 'Las estadísticas son de la versión Pro'; end if;
+  return jsonb_build_object(
+    'pedidos', (select count(*) from public.pedidos where negocio_id = me and created_at > now() - interval '30 days'),
+    'ventas', (select coalesce(sum(total), 0) from public.pedidos where negocio_id = me and estado = 'entregado' and created_at > now() - interval '30 days'),
+    'clientes', (select count(*) from public.profiles where negocio_id = me and role = 'client'),
+    'top_productos', (select coalesce(jsonb_agg(z), '[]') from (
+        select l ->> 'nombre' as nombre, sum((l ->> 'cant')::int) as cant, sum((l ->> 'subtotal')::numeric) as monto
+        from public.pedidos x, jsonb_array_elements(x.lineas) l
+        where x.negocio_id = me and x.estado <> 'cancelado' and x.created_at > now() - interval '30 days'
+        group by 1 order by 2 desc limit 5) z),
+    'mejores_clientes', (select coalesce(jsonb_agg(z), '[]') from (
+        select coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1)) as nombre, count(*) as pedidos, sum(x.total) as monto
+        from public.pedidos x join public.profiles c on c.id = x.cliente_id
+        where x.negocio_id = me and x.estado <> 'cancelado' and x.created_at > now() - interval '30 days'
+        group by 1 order by 3 desc limit 5) z),
+    'vistas', (select coalesce(jsonb_agg(z), '[]') from (
+        select p.titulo, p.vip, (select count(*) from public.publicacion_vistas v where v.publicacion_id = p.id) as vistas
+        from public.publicaciones p where p.owner_id = me order by 3 desc limit 10) z));
+end $$;
+
+-- ---------- Administrador: ingresos, vencimientos y detalle de empresas ----------
+create or replace function public.admin_ingresos() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  pe numeric := coalesce(nullif((select value from public.app_settings where key = 'price_business'), '')::numeric, 0);
+  pc numeric := coalesce(nullif((select value from public.app_settings where key = 'price_client'), '')::numeric, 0);
+  ne int; nc int;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  select count(*) into ne from public.profiles where role = 'user' and public.is_pro(id);
+  select count(*) into nc from public.profiles where role = 'client' and public.is_pro(id);
+  return jsonb_build_object(
+    'empresas_pro', ne, 'clientes_premium', nc, 'precio_empresa', pe, 'precio_cliente', pc,
+    'estimado_mes', ne * pe,
+    'licencias_mes', (select coalesce(sum(price), 0) from public.licenses where not revoked and created_at > date_trunc('month', now())),
+    'pedidos_mes', (select count(*) from public.pedidos where created_at > date_trunc('month', now())),
+    'vencen', (select coalesce(jsonb_agg(z order by z.pro_until), '[]') from (
+        select p.id, coalesce(nullif(p.empresa, ''), p.email) as nombre, p.email, p.role, p.pro_until
+        from public.profiles p
+        where p.plan = 'pro' and p.pro_until between now() and now() + interval '7 days' and not p.suspended) z));
+end $$;
+
+create or replace function public.admin_avisar_vencimiento(p_user uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare p public.profiles;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  select * into p from public.profiles where id = p_user;
+  if p.id is null then raise exception 'Cuenta no encontrada'; end if;
+  perform public.notify_user(p.id, '⏰ Tu plan ' || case when p.role = 'client' then 'Premium' else 'Pro' end || ' vence pronto',
+    'Vence el ' || to_char(p.pro_until, 'DD/MM/YYYY') || '. Renuévalo desde Ajustes → Plan para no perder tus beneficios.', './#plan');
+  update public.profiles set aviso_venc_at = now() where id = p.id;
+end $$;
+
+-- Lo corre el cron cada día: avisa 3 días antes del vencimiento (una vez).
+create or replace function public.avisar_vencimientos() returns int
+language plpgsql security definer set search_path = '' as $$
+declare r record; n int := 0;
+begin
+  for r in select * from public.profiles
+           where plan = 'pro' and pro_until between now() + interval '2 days' and now() + interval '3 days'
+             and not suspended and (aviso_venc_at is null or aviso_venc_at < now() - interval '20 days') loop
+    insert into public.notifications (owner_id, target_id, audience, channels, title, body, url, send_at)
+    values (coalesce(public.admin_id(), r.id), r.id, 'direct', '{push}',
+            '⏰ Tu plan ' || case when r.role = 'client' then 'Premium' else 'Pro' end || ' vence en 3 días',
+            'Renuévalo desde Ajustes → Plan para no perder tus beneficios.', './#plan', now());
+    update public.profiles set aviso_venc_at = now() where id = r.id;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+create or replace function public.admin_empresa(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  return (select jsonb_build_object(
+    'empresa', p.empresa, 'email', p.email, 'telefono', p.telefono, 'plan', case when public.is_pro(p.id) then 'Pro' else 'Free' end,
+    'pro_until', p.pro_until, 'creada', p.created_at, 'abierto', p.abierto, 'horario', p.horario,
+    'clientes', (select count(*) from public.profiles c where c.negocio_id = p.id and c.role = 'client'),
+    'clientes_premium', (select count(*) from public.profiles c where c.negocio_id = p.id and c.role = 'client' and public.is_pro(c.id)),
+    'productos', (select count(*) from public.catalog_items c where c.owner_id = p.id),
+    'publicaciones', (select count(*) from public.publicaciones x where x.owner_id = p.id),
+    'pedidos_30d', (select count(*) from public.pedidos x where x.negocio_id = p.id and x.created_at > now() - interval '30 days'),
+    'ventas_30d', (select coalesce(sum(total), 0) from public.pedidos x where x.negocio_id = p.id and x.estado = 'entregado' and x.created_at > now() - interval '30 days'),
+    'ultimas_publicaciones', (select coalesce(jsonb_agg(z), '[]') from (
+        select x.titulo, x.tipo, x.vip, x.updated_at from public.publicaciones x where x.owner_id = p.id order by x.updated_at desc limit 5) z))
+    from public.profiles p where p.id = p_id);
+end $$;
+
+revoke all on function public.set_mi_tienda(text, text, boolean, int, text) from public, anon;
+revoke all on function public.puede_comprar(uuid, uuid) from public, anon;
+revoke all on function public.tienda_info(uuid) from public, anon;
+revoke all on function public.avisar_publicacion(text, text, boolean) from public, anon, authenticated;
+revoke all on function public.publicar_ficha(text, text, text, text, text, text, boolean, numeric) from public, anon;
+revoke all on function public.ver_publicaciones(text) from public, anon;
+revoke all on function public.registrar_vistas(uuid[]) from public, anon;
+revoke all on function public.catalog_upsert(text, text, numeric, numeric, text, boolean) from public, anon;
+revoke all on function public.catalog_of(uuid) from public, anon;
+revoke all on function public.guardar_cupon(text, int, date) from public, anon;
+revoke all on function public.borrar_cupon(uuid) from public, anon;
+revoke all on function public.mis_cupones() from public, anon;
+revoke all on function public.validar_cupon(uuid, text) from public, anon;
+revoke all on function public.mis_sellos(uuid) from public, anon;
+revoke all on function public.crear_pedido(uuid, jsonb, text, text, text, text) from public, anon;
+revoke all on function public.mis_pedidos(uuid) from public, anon;
+revoke all on function public.pedidos_tienda(text) from public, anon;
+revoke all on function public.actualizar_pedido(uuid, text) from public, anon;
+revoke all on function public.estadisticas_tienda() from public, anon;
+revoke all on function public.admin_ingresos() from public, anon;
+revoke all on function public.admin_avisar_vencimiento(uuid) from public, anon;
+revoke all on function public.avisar_vencimientos() from public, anon, authenticated;
+revoke all on function public.admin_empresa(uuid) from public, anon;
+grant execute on function public.set_mi_tienda(text, text, boolean, int, text), public.puede_comprar(uuid, uuid),
+  public.tienda_info(uuid), public.publicar_ficha(text, text, text, text, text, text, boolean, numeric),
+  public.ver_publicaciones(text), public.registrar_vistas(uuid[]),
+  public.catalog_upsert(text, text, numeric, numeric, text, boolean), public.catalog_of(uuid),
+  public.guardar_cupon(text, int, date), public.borrar_cupon(uuid), public.mis_cupones(), public.validar_cupon(uuid, text),
+  public.mis_sellos(uuid), public.crear_pedido(uuid, jsonb, text, text, text, text), public.mis_pedidos(uuid),
+  public.pedidos_tienda(text), public.actualizar_pedido(uuid, text), public.estadisticas_tienda(),
+  public.admin_ingresos(), public.admin_avisar_vencimiento(uuid), public.admin_empresa(uuid)
+  to authenticated;
