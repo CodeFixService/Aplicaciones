@@ -60,12 +60,17 @@
 <header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1 id="titulo">Tienda</h1><span id="tag" class="pill hidden"></span></header>
 <main>
   <div class="seg" role="tablist">
+    <button id="tCodefix" class="small hidden" role="tab">📣 CodeFix</button>
     <button id="tOfertas" class="small" role="tab">🏷️ Ofertas</button>
     <button id="tProductos" class="small on" role="tab">🛍️ Productos</button>
     <button id="tPedidos" class="small" role="tab">🛒 Pedido</button>
   </div>
 
-  <section id="vOfertas" class="hidden"><div class="ofertas" id="ofertas"></div></section>
+  <section id="vCodefix" class="hidden">
+    <p class="muted" style="margin:0 0 12px">Promociones y anuncios que publica CodeFix para todas las empresas.</p>
+    <div class="ofertas" id="codefix"></div>
+  </section>
+  <section id="vOfertas" class="hidden"><p class="muted hidden" id="ofTip" style="margin:0 0 12px"></p><div class="ofertas" id="ofertas"></div></section>
 
   <section id="vProductos">
     <input id="buscar" placeholder="Buscar producto…" aria-label="Buscar producto" style="margin-bottom:12px">
@@ -141,25 +146,40 @@
   let vistaActual = 'productos';
   function vista(v) {
     vistaActual = v;
-    ['Ofertas', 'Productos', 'Pedidos'].forEach((k) => {
+    ['Codefix', 'Ofertas', 'Productos', 'Pedidos'].forEach((k) => {
       $('t' + k).classList.toggle('on', v === k.toLowerCase());
       $('v' + k).classList.toggle('hidden', v !== k.toLowerCase());
     });
     history.replaceState(null, '', v === 'productos' ? location.pathname : '?v=' + v);
     if (v === 'ofertas' && !ofertas) cargarOfertas();
+    if (v === 'codefix') cargarCodefix();
+    if (!esCliente) $('titulo').textContent = v === 'codefix' ? 'Novedades CodeFix' : 'Mi tienda (vista del cliente)';
     if (v === 'pedidos') pintarPedidos();
     guardarCarro();
     scrollTo(0, 0);
   }
   $('tOfertas').onclick = () => vista('ofertas');
+  $('tCodefix').onclick = () => vista('codefix');
+  // Empresas y admin: pestaña con lo que publica CodeFix. El cliente no la ve; solo el cliente arma pedidos.
+  $('tCodefix').classList.toggle('hidden', esCliente);
+  $('tPedidos').classList.toggle('hidden', !esCliente);
+  if (!esCliente) {
+    $('ofTip').textContent = '👁️ Así ven tus clientes tus fichas y campañas. Cada ficha que guardas en FichaPro aparece aquí.';
+    $('ofTip').classList.remove('hidden');
+  }
   $('tProductos').onclick = () => vista('productos');
   $('tPedidos').onclick = () => vista('pedidos');
 
   /* ---------- Ofertas ---------- */
+  // Ofertas = fichas publicadas por la tienda + campañas programadas.
+  const esImg = (u) => /^(https?:\/\/|data:image\/)/i.test(u || '');
   async function cargarOfertas() {
-    ofertas = await traer('my_offers', {}, 'ofertas');
+    const [camp, pubs] = await Promise.all([traer('my_offers', {}, 'ofertas'), traer('ver_publicaciones', { p_origen: 'tienda' }, 'publicaciones')]);
+    ofertas = pubs.map((x) => ({ id: x.id, pub: true, title: x.titulo, body: x.detalle, precio: x.precio, image: x.imagen, fecha: x.fecha, leido: true }))
+      .concat(camp).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    if (fallos.publicaciones && !fallos.ofertas) fallos.ofertas = fallos.publicaciones;
     pintarOfertas();
-    if (esCliente) ofertas.filter((o) => !o.leido && !o.bloqueada).forEach((o) => Cuenta.rpc('mark_notification_read', { p_id: o.id }).catch(() => {}));
+    if (esCliente) ofertas.filter((o) => !o.pub && !o.leido && !o.bloqueada).forEach((o) => Cuenta.rpc('mark_notification_read', { p_id: o.id }).catch(() => {}));
   }
   function pintarOfertas() {
     $('ofertas').innerHTML = ofertas.length ? ofertas.map((o) => {
@@ -169,14 +189,29 @@
           '<div class="txt"><b>' + Core.esc(o.title) + '</b><span class="muted">Solo para clientes Premium · ' + fecha + '</span>' +
           '<a class="btn warn" href="../../#premium">⭐ Hazte Premium para verla</a></div></article>';
       }
-      return '<article class="oferta">' + (/^https?:\/\//i.test(o.image || '') ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
+      return '<article class="oferta">' + (esImg(o.image) ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
         '<div class="txt"><div class="pills">' + (!o.leido && esCliente ? '<span class="pill pro">Nueva</span>' : '') +
         (o.solo_premium ? '<span class="pill pro">⭐ Exclusiva Premium</span>' : '') + '</div>' +
-        '<b>' + Core.esc(o.title) + '</b>' + (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
+        '<b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</span>' : '') +
+        (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
         '<span class="cat muted">' + fecha + '</span>' +
         escribir('Hola, vi su oferta "' + o.title + '" y me interesa.') + '</div></article>';
     }).join('') : '<p class="empty" style="grid-column:1/-1">' + vacio('ofertas', esCliente ? 'La tienda aún no publica ofertas.'
-      : 'Aún no publicas ofertas. Programa una campaña en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
+      : 'Aún no publicas nada. Guarda una ficha en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
+  }
+
+  /* ---------- Novedades de CodeFix (para empresas) ---------- */
+  async function cargarCodefix() {
+    const [pubs, avisos] = await Promise.all([traer('ver_publicaciones', { p_origen: 'codefix' }, 'codefix'), traer('my_inbox', {}, 'inbox')]);
+    const l = pubs.map((x) => ({ title: x.titulo, body: x.detalle, precio: x.precio, image: x.imagen, fecha: x.fecha, de: x.de_id }))
+      .concat(avisos.filter((n) => n.de === 'CodeFix' && esImg(n.image)).map((n) => ({ title: n.title, body: n.body, image: n.image, fecha: n.sent_at })))
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    $('codefix').innerHTML = l.length ? l.map((o) => '<article class="oferta">' + (esImg(o.image) ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
+      '<div class="txt"><b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</span>' : '') +
+      (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
+      '<span class="cat muted">' + new Date(o.fecha).toLocaleDateString('es', { day: 'numeric', month: 'short' }) + '</span>' +
+      (o.de && !yo.is_admin ? '<a class="btn small alt" href="../mensajes/?con=' + o.de + '&txt=' + encodeURIComponent('Hola, vi su publicación "' + o.title + '".') + '">💬 Escribir a CodeFix</a>' : '') +
+      '</div></article>').join('') : '<p class="empty" style="grid-column:1/-1">' + vacio('codefix', 'CodeFix aún no publica novedades.') + '</p>';
   }
 
   /* ---------- Productos ---------- */
@@ -305,7 +340,7 @@
 
   pintar(); guardarCarro();
   const v = new URLSearchParams(location.search).get('v');
-  vista(['ofertas', 'pedidos'].includes(v) ? v : 'productos');
+  vista(['ofertas', 'pedidos', 'codefix'].includes(v) && !(v === 'pedidos' && !esCliente) && !(v === 'codefix' && esCliente) ? v : 'productos');
 })();
 </script>
 </body>
