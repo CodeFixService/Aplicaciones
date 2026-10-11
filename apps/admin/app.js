@@ -33,8 +33,44 @@
       item('Solicitudes pendientes', s.pendientes) + item('Reportes abiertos', s.reportes) +
       item('Keys canjeadas', s.canjeadas + ' / ' + s.licencias) + item('Ingresos por keys', Core.money(s.ingresos)) +
       item('Suscriptores por enlace', s.suscriptores) + item('Celulares con push', s.dispositivos);
-    await Promise.all([cargarSolicitudes(), cargarReportes()]);
+    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos()]);
   }
+
+  /* ---------- Ingresos y vencimientos ---------- */
+  async function cargarIngresos() {
+    const r = await Cuenta.rpc('admin_ingresos');
+    const item = (t, v) => '<div class="card"><span class="muted">' + t + '</span><b>' + v + '</b></div>';
+    $('ingresos').innerHTML = item('Empresas Pro', r.empresas_pro) + item('Clientes Premium', r.clientes_premium) +
+      item('Estimado mensual (empresas)', Core.money(r.estimado_mes)) + item('Keys vendidas este mes', Core.money(r.licencias_mes)) +
+      item('Pedidos este mes', r.pedidos_mes);
+    $('vencen').innerHTML = r.vencen.length ? r.vencen.map((u) => '<li><div class="grow"><b>' + Core.esc(u.nombre) + '</b><div class="muted">' +
+      (u.role === 'client' ? 'Cliente Premium' : 'Empresa Pro') + ' · vence el ' + new Date(u.pro_until).toLocaleDateString('es') + '</div></div>' +
+      '<button class="small" data-avisar="' + u.id + '">🔔 Avisar</button></li>').join('') : '<li class="empty">Nadie vence esta semana</li>';
+  }
+  $('vencen').onclick = async (e) => {
+    const id = e.target.dataset.avisar;
+    if (!id) return;
+    try { await Cuenta.rpc('admin_avisar_vencimiento', { p_user: id }); sb.functions.invoke('enviar').catch(() => {}); Core.toast('🔔 Aviso enviado'); }
+    catch (err) { fallo(err); }
+  };
+
+  /* ---------- Ver una empresa ---------- */
+  async function verEmpresa(id) {
+    const r = await Cuenta.rpc('admin_empresa', { p_id: id });
+    const item = (t, v) => '<div class="card"><span class="muted">' + t + '</span><b>' + v + '</b></div>';
+    $('empTitulo').textContent = '🏢 ' + (r.empresa || r.email);
+    $('empStats').innerHTML = item('Plan', r.plan) + item('Clientes', r.clientes + ' (' + r.clientes_premium + ' Premium)') +
+      item('Productos', r.productos) + item('Fichas publicadas', r.publicaciones) + item('Pedidos (30 días)', r.pedidos_30d) +
+      item('Ventas entregadas (30 días)', Core.money(r.ventas_30d));
+    $('empInfo').textContent = r.email + (r.telefono ? ' · WhatsApp +' + r.telefono : '') + (r.horario ? ' · 🕒 ' + r.horario : '') +
+      (r.abierto === false ? ' · 🔴 Cerrada' : '') + ' · desde ' + new Date(r.creada).toLocaleDateString('es');
+    $('empPubs').innerHTML = r.ultimas_publicaciones.length ? r.ultimas_publicaciones.map((x) => '<li><span class="grow">' + (x.vip ? '⭐ VIP · ' : '') +
+      Core.esc(x.titulo) + '</span><span class="muted">' + new Date(x.updated_at).toLocaleDateString('es') + '</span></li>').join('') : '<li class="empty">Sin fichas publicadas</li>';
+    document.querySelector('[data-v=resumen]').click();
+    $('cEmpresa').classList.remove('hidden');
+    $('cEmpresa').scrollIntoView({ behavior: 'smooth' });
+  }
+  $('bCerrarEmp').onclick = () => $('cEmpresa').classList.add('hidden');
 
   /* ---------- Solicitudes (prueba 7 días / pago) ---------- */
   let solicitudes = [];
@@ -268,7 +304,7 @@
         : pro ? '<span class="pill pro">' + (u.role === 'client' ? 'PREMIUM' : 'PRO') + '</span>' : '<span class="pill">FREE</span>');
       const acciones = u.role === 'admin' ? '' :
         '<select class="small" data-id="' + u.id + '" style="width:auto">' +
-        '<option value="">Acción…</option>' + (u.role === 'client' ? '' : '<option value="msg">💬 Enviar mensaje</option>') + '<option value="pro7">Dar Pro 7 días</option>' +
+        '<option value="">Acción…</option>' + (u.role === 'client' ? '' : '<option value="ver">👁️ Ver empresa</option><option value="msg">💬 Enviar mensaje</option>') + '<option value="pro7">Dar Pro 7 días</option>' +
         '<option value="pro1">Dar Pro 1 mes</option><option value="pro12">Dar Pro 1 año</option>' +
         '<option value="proinf">Dar Pro permanente</option><option value="free">Pasar a Free</option>' +
         '<option value="' + (u.suspended ? 'unsusp">Reactivar' : 'susp">Suspender') + '</option></select>';
@@ -283,6 +319,7 @@
     const u = usuarios.find((x) => x.id === id);
     if (!u || !acc) return;
     if (acc === 'msg') { location.href = '../mensajes/?con=' + id; return; }
+    if (acc === 'ver') { e.target.value = ''; return verEmpresa(id).catch(fallo); }
     const meses = (m) => { const d = new Date(Math.max(Date.now(), u.pro_until ? +new Date(u.pro_until) : 0)); d.setMonth(d.getMonth() + m); return d.toISOString(); };
     const dias = (n) => new Date(Math.max(Date.now(), u.pro_until ? +new Date(u.pro_until) : 0) + n * 864e5).toISOString();
     const p = { pro7: ['pro', dias(7), u.suspended], pro1: ['pro', meses(1), u.suspended], pro12: ['pro', meses(12), u.suspended], proinf: ['pro', null, u.suspended],
@@ -364,7 +401,21 @@
     $('pushEstado').textContent = s.vapid_public && s.vapid_private ? '✅ Claves push configuradas' : '⚠️ Falta generar las claves push';
     $('bVapid').textContent = s.vapid_public ? 'Regenerar claves push' : 'Generar claves push';
     $('mailEstado').textContent = s.gmail_user && s.gmail_app_password ? '✅ Gmail configurado' : '⚠️ Falta configurar Gmail';
+    // Versión publicada en GitHub vs. versión liberada para todos.
+    let pub = '';
+    try { pub = String((await (await fetch('../../version.json', { cache: 'no-store' })).json()).version); } catch (e) { pub = ''; }
+    verPublicada = pub;
+    $('verEstado').innerHTML = 'Tu celular: <b>v' + Core.version + '</b> · Publicada: <b>v' + (pub || '?') + '</b> · Liberada para todos: <b>' +
+      (v.version_liberada ? 'v' + Core.esc(v.version_liberada) : 'ninguna aún') + '</b>';
+    $('bLiberar').textContent = pub ? 'Liberar v' + pub + ' para todos' : 'Liberar para todos';
+    $('bLiberar').disabled = !pub || v.version_liberada === pub;
   }
+  let verPublicada = '';
+  $('bLiberar').onclick = async () => {
+    if (!verPublicada || !confirm('¿Liberar la v' + verPublicada + '? A todos les aparecerá el botón "Actualizar".')) return;
+    try { await Cuenta.rpc('admin_set_setting', { p_key: 'version_liberada', p_value: verPublicada }); Core.toast('✅ v' + verPublicada + ' liberada para todos'); cargarAjustes(); }
+    catch (err) { fallo(err); }
+  };
 
   const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   $('bVapid').onclick = async () => {

@@ -252,9 +252,52 @@
     return true;
   }
 
+  /* ---------- Actualizaciones (con botón) ----------
+     Aparece "Hay una versión nueva" cuando el admin la libera (el admin la ve antes para probarla). */
+  const mayor = (a, b) => {
+    const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
+    return false;
+  };
+  async function revisarActualizacion() {
+    const actual = global.Core ? global.Core.version : '';
+    let nueva = '';
+    try { nueva = String((await (await fetch(rootUrl() + 'version.json', { cache: 'no-store' })).json()).version); } catch (e) { return null; }
+    if (!nueva || !mayor(nueva, actual)) return null;
+    const ajustes = await settings();
+    const liberada = ajustes.version_liberada || '';
+    const esAdmin = !!(account && account.is_admin);
+    if (!esAdmin && (!liberada || mayor(nueva, liberada))) return null;
+    mostrarAviso(actual, nueva, esAdmin && (!liberada || mayor(nueva, liberada)));
+    return nueva;
+  }
+  function mostrarAviso(actual, nueva, soloAdmin) {
+    if (document.getElementById('cfxUpd')) return;
+    const d = document.createElement('div');
+    d.id = 'cfxUpd'; d.className = 'actualizar';
+    d.innerHTML = '<div class="grow"><b>🔄 Hay una versión nueva</b><br><span>Tienes la v' + actual + ' · Nueva: v' + nueva +
+      (soloAdmin ? ' (solo tú la ves: pruébala y libérala en Administración → Ajustes)' : '') + '</span></div><button class="small" type="button">Actualizar</button>';
+    d.querySelector('button').onclick = () => actualizarAhora(d.querySelector('button'));
+    (document.querySelector('main') || document.body).prepend(d);
+  }
+  async function actualizarAhora(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Actualizando…'; }
+    const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
+    const sw = reg && (reg.active || reg.waiting || reg.installing);
+    if (sw) {
+      await new Promise((ok) => {
+        const ch = new MessageChannel();
+        ch.port1.onmessage = ok;
+        sw.postMessage({ tipo: 'actualizar' }, [ch.port2]);
+        setTimeout(ok, 30000);
+      });
+    }
+    location.reload();
+  }
+
   global.Cuenta = {
     configured, sb, refresh, require, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
-    enablePush, syncPush, pushSubscription, pushSupported, friendly,
+    enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
     isAdmin: () => !!(account && account.is_admin),

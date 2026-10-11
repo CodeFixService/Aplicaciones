@@ -62,12 +62,7 @@
 
   function registerSW(rootPath) {
     if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
-    // Si se publica una versión nueva, la app se recarga sola una vez para mostrarla.
-    const habia = !!navigator.serviceWorker.controller;
-    let recargado = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (habia && !recargado) { recargado = true; location.reload(); }
-    });
+    // La app no se actualiza sola: ver Cuenta.revisarActualizacion() (botón "Actualizar").
     navigator.serviceWorker.register(rootPath + 'sw.js', { scope: rootPath, updateViaCache: 'none' })
       .then((reg) => reg.update())
       .catch(() => {});
@@ -189,7 +184,7 @@
 
   // Pie de página con la marca del autor en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '3.6';
+  const APP_VERSION = '3.7';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};

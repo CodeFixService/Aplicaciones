@@ -1,7 +1,7 @@
-/* Service worker: guarda todas las apps en el teléfono para usarlas sin internet.
-   Sube VERSION cada vez que cambies archivos para que los celulares se actualicen. */
-const VERSION = 'v12';
-const CACHE = 'misapps-' + VERSION;
+/* Service worker: guarda la app en el teléfono para usarla sin internet.
+   La app NO se actualiza sola: sigue usando su versión guardada hasta que la persona
+   toca "Actualizar" (el aviso aparece cuando el administrador libera la versión).
+   Cada versión vive en su propio caché "app-<versión>"; "meta" guarda cuál se usa. */
 const FILES = [
   './',
   'index.html',
@@ -27,40 +27,64 @@ const FILES = [
   'apps/suscribirse/index.html',
   'apps/mensajes/',
   'apps/mensajes/index.html',
+  'apps/pedidos/',
+  'apps/pedidos/index.html',
   'apps/catalogo/',
   'apps/catalogo/index.html',
   'apps/legal/',
   'apps/legal/index.html'
 ];
 
+const META = 'meta';
+const pedirVersion = () => fetch('version.json', { cache: 'no-store' }).then((r) => r.json()).then((j) => String(j.version));
+
+async function versionActual() {
+  const r = await (await caches.open(META)).match('actual');
+  return r ? r.text() : null;
+}
+
+// Descarga todos los archivos de una versión y la deja como la actual.
+async function instalarVersion(v) {
+  const c = await caches.open('app-' + v);
+  await c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })));
+  await (await caches.open(META)).put('actual', new Response(v));
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((k) => k !== META && k !== 'app-' + v).map((k) => caches.delete(k)));
+  return v;
+}
+
 self.addEventListener('install', (e) => {
-  // cache: 'reload' evita guardar copias viejas que el navegador tenga en su caché HTTP.
-  e.waitUntil(caches.open(CACHE)
-    .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' }))))
-    .then(() => self.skipWaiting()));
+  // Primera vez en este celular: guarda la versión publicada hoy.
+  e.waitUntil(versionActual().then((v) => v || pedirVersion().then(instalarVersion)).catch(() => {}).then(() => self.skipWaiting()));
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+
+// Botón "Actualizar": baja la versión nueva y responde cuando está lista.
+self.addEventListener('message', (e) => {
+  if (!e.data || e.data.tipo !== 'actualizar') return;
+  const port = e.ports && e.ports[0];
+  e.waitUntil(pedirVersion().then(instalarVersion)
+    .then((v) => port && port.postMessage({ ok: true, version: v }))
+    .catch((err) => port && port.postMessage({ ok: false, error: String(err) })));
 });
 
-// Con internet: siempre lo último (así cada cambio se ve al instante).
-// Sin internet: la copia guardada en el teléfono.
+// Primero la versión guardada (la que el usuario aceptó); si falta un archivo, se pide a internet.
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(
-    fetch(e.request, { cache: 'no-cache' })
-      .then((res) => {
-        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
-        return res;
-      })
-      .catch(() => caches.open(CACHE).then((c) => c.match(e.request, { ignoreSearch: true }))
-        .then((hit) => hit || Response.error()))
-  );
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+  if (/\/(version\.json|sw\.js)$/.test(url.pathname)) return; // siempre desde internet
+  e.respondWith((async () => {
+    const v = await versionActual();
+    const c = v ? await caches.open('app-' + v) : null;
+    const hit = c && await c.match(e.request, { ignoreSearch: true });
+    if (hit) return hit;
+    try {
+      const res = await fetch(e.request);
+      if (res.ok && c) c.put(e.request, res.clone());
+      return res;
+    } catch (err) { return Response.error(); }
+  })());
 });
 
 // Notificación push enviada por el servidor (llega aunque la app esté cerrada).

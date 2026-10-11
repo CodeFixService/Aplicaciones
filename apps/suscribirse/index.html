@@ -27,6 +27,7 @@
     <h2>👤 ¿Ya eres cliente con cuenta?</h2>
     <p class="muted">Ingresa con el correo y la contraseña que te dio la tienda para ver productos, ofertas y escribirle.</p>
     <div class="btns"><a class="btn" id="bCuenta" href="../../" style="flex:1">Ingresar</a></div>
+    <div class="btns hidden" id="rowAcceso"><a class="btn ok" id="bAcceso" target="_blank" rel="noopener" style="flex:1">💬 Pedir acceso por WhatsApp</a></div>
   </div>
   <div class="card" id="form">
     <h2>🔔 O solo recibe avisos, sin cuenta</h2>
@@ -65,6 +66,12 @@
   if (!info) { $('form').classList.add('hidden'); $('cCuenta').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
   $('titulo').textContent = info.empresa || 'Ofertas exclusivas';
   $('bCuenta').href = '../../?cliente=' + negocio;
+  // ¿Aún no tienes cuenta? Se la pides a la tienda por WhatsApp.
+  const tel = String(info.telefono || '').replace(/\D/g, '');
+  if (tel) {
+    $('rowAcceso').classList.remove('hidden');
+    $('bAcceso').href = 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Hola, quiero una cuenta de cliente en la app de ' + (info.empresa || 'su tienda') + '.');
+  }
   if (!info.pro) $('form').classList.add('hidden'); // los avisos sin cuenta son de empresas Pro
   document.title = 'Ofertas de ' + (info.empresa || 'nuestro negocio');
   $('sub').textContent = 'Recibe las promociones de ' + (info.empresa || 'nuestro negocio') + ' directo en tu celular.';

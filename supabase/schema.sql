@@ -680,7 +680,7 @@ alter table public.app_settings enable row level security;
 create or replace function public.public_settings() returns jsonb
 language sql stable security definer set search_path = '' as $$
   select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) from public.app_settings
-  where key in ('payment_link', 'price_business', 'price_client', 'contact_whatsapp')
+  where key in ('payment_link', 'price_business', 'price_client', 'contact_whatsapp', 'version_liberada')
 $$;
 
 create or replace function public.admin_set_setting(p_key text, p_value text) returns void
