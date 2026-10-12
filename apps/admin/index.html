@@ -26,6 +26,15 @@
   .uso .barra div { height: 100%; border-radius: 99px; }
   .chk { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
   .chk label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-size: 15px; }
+  .filtros { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; }
+  .filtros button { flex: none; }
+  #actLista li { flex-wrap: wrap; align-items: flex-start; }
+  #actLista li > .grow { flex: 1 1 220px; min-width: 0; }
+  #actLista .sem { font-size: 22px; line-height: 1; flex: none; }
+  .barras { display: flex; align-items: flex-end; gap: 2px; height: 70px; margin: 6px 0 2px; }
+  .barras div { flex: 1; background: var(--brand); border-radius: 3px 3px 0 0; min-height: 2px; opacity: .85; }
+  .barras.vacia div { background: var(--line); }
+  .ejes { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -37,6 +46,38 @@
       <h2>🔔 Solicitudes pendientes <span class="pill" id="nSol">0</span></h2>
       <p class="muted">Pruebas de 7 días y avisos de pago. Revisa tu Mercado Pago antes de aprobar un pago.</p>
       <ul class="list" id="solicitudes"></ul>
+    </div>
+    <div class="card" id="cActividad">
+      <h2>📡 Actividad de empresas <span class="pill" id="actPill"></span></h2>
+      <p class="muted" id="actHoy"></p>
+      <div class="filtros" id="actFiltros">
+        <button class="small on" data-f="">Todas</button>
+        <button class="small alt" data-f="verde">🟢 Activas</button>
+        <button class="small alt" data-f="amarillo">🟡 Tibias</button>
+        <button class="small alt" data-f="rojo">🔴 Dormidas</button>
+      </div>
+      <ul class="list" id="actLista"></ul>
+      <div class="btns">
+        <button class="small" id="bMotivarTodas">📣 Motivar a las dormidas</button>
+        <button class="alt small" id="bLimpiarAct">🧹 Limpiar historial</button>
+      </div>
+      <p class="muted" style="font-size:13px;margin-bottom:0">🔒 Solo tú ves esto. 🟢 entró hoy o ayer · 🟡 hace 2 a 7 días · 🔴 más de 7 días o nunca.
+        Se guarda la última vez que entraron y un resumen por día (máx. 90 días). "Limpiar historial" borra ese resumen; la última conexión se mantiene.</p>
+    </div>
+    <div class="card hidden" id="cMotivar">
+      <div class="row" style="align-items:center"><h2 style="margin:0;flex:2" id="motTitulo">📣 Motivar</h2><button class="alt small" id="bCerrarMot" style="flex:none">Cerrar</button></div>
+      <p class="muted" id="motInfo"></p>
+      <label>Tono del mensaje</label>
+      <div class="filtros" id="motTonos">
+        <button class="small on" data-t="motivador">💪 Motivador</button>
+        <button class="small alt" data-t="amable">😊 Amable</button>
+        <button class="small alt" data-t="directo">🎯 Directo</button>
+        <button class="small alt" data-t="divertido">😄 Divertido</button>
+      </div>
+      <label for="motTit">Título</label><input id="motTit" maxlength="80">
+      <label for="motTxt">Mensaje (puedes editarlo)</label><textarea id="motTxt" maxlength="1000" rows="6"></textarea>
+      <div class="btns"><button class="alt small" id="bOtroTxt">🔄 Otro texto</button><button id="bEnviarMot">📣 Enviar</button></div>
+      <p class="muted" style="font-size:13px;margin-bottom:0">Le llega como notificación push y queda en su chat con CodeFix. Máximo 1 aviso por empresa al día.</p>
     </div>
     <div class="card" id="cUso">
       <h2>🖥️ Uso del servidor <span class="pill" id="usoPill"></span></h2>
@@ -54,6 +95,8 @@
       <div class="row" style="align-items:center"><h2 style="margin:0;flex:2" id="empTitulo">🏢 Empresa</h2><button class="alt small" id="bCerrarEmp" style="flex:none">Cerrar</button></div>
       <div class="stats" id="empStats" style="margin-top:12px"></div>
       <p class="muted" id="empInfo"></p>
+      <div id="empAct"></div>
+      <div class="btns"><button class="small" id="bMotivarEmp">📣 Motivar</button><a class="btn small alt" id="bChatEmp" href="#">💬 Chat</a></div>
       <ul class="list" id="empPubs"></ul>
     </div>
     <div class="stats" id="stats"></div>

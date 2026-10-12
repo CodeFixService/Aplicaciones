@@ -223,6 +223,11 @@
       <label for="tHorario">Horario de atención</label>
       <input id="tHorario" maxlength="120" placeholder="Lun a Vie 9:00 a 19:00 · Sáb 10:00 a 14:00">
       <label class="terms"><input type="checkbox" id="tAbierto" checked> <span>Tienda abierta ahora (si la desmarcas, tus clientes ven "Cerrado: te responderemos al abrir")</span></label>
+      <label class="terms"><input type="checkbox" id="tVac"> <span>🌴 <b>Modo vacaciones</b>: tus clientes ven el aviso y no pueden enviar pedidos hasta tu regreso (se apaga solo)</span></label>
+      <div class="row hidden" id="rowVac" style="flex-wrap:wrap">
+        <div style="min-width:140px"><label for="tVacHasta">De vacaciones hasta el</label><input type="date" id="tVacHasta"></div>
+        <div style="min-width:180px;flex:2"><label for="tVacMsg">Mensaje para tus clientes</label><input id="tVacMsg" maxlength="160" placeholder="¡Volvemos con todo el lunes! 🌴"></div>
+      </div>
       <div id="rowSellos">
         <label>🎟️ Tarjeta de sellos <span class="pill pro">PRO</span></label>
         <div class="row" style="flex-wrap:wrap">
@@ -411,6 +416,8 @@
     cargarInbox();
     Cuenta.revisarActualizacion();
     if (!cliente(acc)) cargarTienda(acc);
+    // Empresas de antes de la 4.0: su color pasa a la tienda una sola vez.
+    if (!cliente(acc) && !acc.color && Core.tema.propio(acc.id)) colorTienda(Core.tema.get(acc.id), true);
     prepararAyuda(acc);
     prepararEmprende(acc);
     revisarPush();
@@ -426,7 +433,7 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '3.9';
+  const DB_VERSION = '4.0';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
@@ -500,7 +507,8 @@
     // Clientes: color e ícono son beneficios Premium. Empresas: siempre.
     const puedeEstilo = !cliente || acc.is_pro;
     $('rowColor').classList.toggle('bloqueado', !puedeEstilo);
-    $('lblColor').innerHTML = cliente ? 'Color de tu app <span class="pill pro">PREMIUM</span>' : 'Color de tu marca';
+    $('lblColor').innerHTML = cliente ? 'Color de tu app <span class="pill pro">PREMIUM</span>'
+      : 'Color de tu marca <span class="muted" style="font-weight:400">(tus clientes también lo ven' + (acc.is_pro ? '' : '; color personalizado: <span class="pill pro">PRO</span>') + ')</span>';
     $('rowIcono').classList.remove('hidden');
     $('rowIcono').classList.toggle('bloqueado', !puedeEstilo);
     $('icoPill').classList.toggle('hidden', !cliente);
@@ -536,7 +544,8 @@
          'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
       : ['Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10), sin marca de agua', 'Todas las plantillas (Foto completa y Menú), QR y fichas VIP',
          'Cupones de descuento y tarjeta de sellos para tus clientes', '📊 Estadísticas: vistas, productos más pedidos y mejores clientes',
-         '📈 Finanzas: metas, gastos y ganancia real', 'Push y correos automáticos, y respaldo diario en la nube']
+         '📈 Finanzas: metas, gastos y ganancia real', 'Push y correos automáticos, y respaldo diario en la nube',
+         '⭐ Responde y destaca las reseñas de tus clientes', '⚡ 20 respuestas rápidas en el chat (Free: 3) y 🎨 color propio para tu tienda']
     ).map((t) => '<li>' + t + '</li>').join('');
     const link = /^https:\/\//.test(ajustes.payment_link || '') ? ajustes.payment_link : '';
     $('bComprar').classList.toggle('hidden', !link);
@@ -585,13 +594,22 @@
       $('tPago').value = t.datos_pago || ''; $('tHorario').value = t.horario || '';
       $('tAbierto').checked = t.abierto !== false;
       $('tSellos').value = t.sellos_meta || ''; $('tPremio').value = t.sellos_premio || '';
+      $('tVac').checked = !!t.vacaciones_hasta;
+      $('tVacHasta').value = t.vacaciones_hasta || ''; $('tVacMsg').value = t.vacaciones_msg || '';
+      $('rowVac').classList.toggle('hidden', !t.vacaciones_hasta);
     } catch (e) { /* sin red */ }
   }
+  $('tVac').onchange = () => {
+    $('rowVac').classList.toggle('hidden', !$('tVac').checked);
+    if ($('tVac').checked && !$('tVacHasta').value) $('tVacHasta').focus();
+  };
   $('bTienda').onclick = async () => {
     const meta = parseInt($('tSellos').value, 10);
     if (!isNaN(meta) && !Cuenta.isPro()) return Core.toast('⭐ La tarjeta de sellos es de la versión Pro');
+    if ($('tVac').checked && !$('tVacHasta').value) { $('tVacHasta').focus(); return Core.toast('🌴 Elige hasta qué día estás de vacaciones'); }
     try {
       await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value });
+      await Cuenta.rpc('set_vacaciones', { p_hasta: $('tVac').checked ? $('tVacHasta').value : null, p_msg: $('tVacMsg').value });
       pintar(await Cuenta.rpc('set_mi_tienda', { p_datos_pago: $('tPago').value, p_horario: $('tHorario').value,
         p_abierto: $('tAbierto').checked, p_sellos_meta: isNaN(meta) ? null : meta, p_sellos_premio: $('tPremio').value }));
       Core.toast('✅ Mi tienda guardada');
@@ -640,14 +658,22 @@
       if (b) { b.textContent = l.length; b.classList.toggle('hidden', !l.length); }
     } catch (e) { /* sin red */ }
   }
+  // Empresas: el color también queda en el servidor para que sus clientes vean la tienda con su marca.
+  async function colorTienda(c, callado) {
+    const a = Cuenta.account;
+    if (!a || a.role === 'client') return;
+    try { await Cuenta.rpc('set_mi_color', { p_color: c }); }
+    catch (err) { if (!callado) Core.toast('🎨 Tu app queda con este color. ' + err.message); }
+  }
   $('swatches').onclick = (e) => {
     const c = e.target.dataset.c;
     if (!c || estiloBloqueado()) return;
     Core.tema.set(Cuenta.uid(), c);
     pintarColores(Cuenta.uid());
+    colorTienda(c);
   };
   $('eColor').oninput = (e) => { if (!estiloBloqueado()) Core.tema.set(Cuenta.uid(), e.target.value); else e.target.value = Core.tema.get(Cuenta.uid()); };
-  $('eColor').onchange = () => pintarColores(Cuenta.uid());
+  $('eColor').onchange = (e) => { const c = e.target.value; pintarColores(Cuenta.uid()); if (!estiloBloqueado()) colorTienda(c); };
 
   /* ---------- Avisos (con "visto") ---------- */
   async function cargarInbox() {

@@ -42,6 +42,10 @@
   .tip b { color: var(--text); }
   .vacio { margin: auto; text-align: center; color: var(--muted); padding: 24px; }
   .pick li { cursor: pointer; }
+  .rapidas { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; }
+  .rapidas button { flex: none; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 12px; font-size: 13px; border-radius: 99px; }
+  #editRap { margin-bottom: 8px; }
+  #editRap textarea { min-height: 110px; }
   @media (max-width: 859px) {
     .wrap.abierto .lista { display: none; }
     .wrap:not(.abierto) .hilo { display: none; }
@@ -74,6 +78,12 @@
       <div class="msgs" id="msgs"><div class="vacio">Elige una conversación o toca <b>＋ Nuevo</b>.</div></div>
       <div class="comp hidden" id="comp">
         <p class="tip" id="tip"></p>
+        <div class="rapidas hidden" id="rapidas"></div>
+        <div class="hidden" id="editRap">
+          <label for="rapTxt" id="rapLbl">⚡ Respuestas rápidas: una por línea</label>
+          <textarea id="rapTxt" maxlength="4200"></textarea>
+          <div class="btns"><button class="small" id="bGuardarRap">Guardar</button><button class="small alt" id="bCancelRap">Cancelar</button></div>
+        </div>
         <div class="row">
           <textarea id="texto" maxlength="1000" placeholder="Escribe tu mensaje…" aria-label="Mensaje"></textarea>
           <button id="bEnviar">Enviar</button>
@@ -145,6 +155,7 @@
     $('wrap').classList.add('abierto');
     $('cab').classList.remove('hidden');
     $('comp').classList.remove('hidden');
+    if (conRapidas) { if (rapidas === null) cargarRapidas(); else pintarRapidas(); }
     $('cabNombre').textContent = c.nombre;
     $('cabAv').textContent = (c.nombre || '?').charAt(0).toUpperCase();
     $('cabSub').textContent = ROL[c.rol] || '';
@@ -206,6 +217,49 @@
     } catch (e) { Core.toast(e.message); await pintarCupo(); }
   }
   $('bEnviar').onclick = enviar;
+
+  /* ---------- ⚡ Respuestas rápidas (empresas: Free 3 · Pro 20) ---------- */
+  const conRapidas = yo.role === 'user' || yo.role === 'admin';
+  const limRap = Cuenta.isPro() ? 20 : 3;
+  const SUGERIDAS = ['¡Hola! 😊 ¿En qué te puedo ayudar?', 'Sí, tenemos stock 👍', 'Tu pedido ya va en camino 🛵'];
+  let rapidas = null;
+  async function cargarRapidas() {
+    if (!conRapidas) return;
+    try { rapidas = await Cuenta.rpc('mis_respuestas'); } catch (e) { rapidas = rapidas || []; }
+    pintarRapidas();
+  }
+  function pintarRapidas() {
+    const l = rapidas && rapidas.length ? rapidas : SUGERIDAS.slice(0, limRap);
+    $('rapidas').classList.toggle('hidden', !conRapidas || !actual);
+    $('rapidas').innerHTML = l.map((t, i) => '<button class="alt" data-r="' + i + '" title="' + Core.esc(t) + '">' + Core.esc(t) + '</button>').join('') +
+      '<button data-r="editar" aria-label="Editar respuestas rápidas">⚡ Editar</button>';
+  }
+  $('rapidas').onclick = (e) => {
+    const b = e.target.closest('button[data-r]');
+    if (!b) return;
+    if (b.dataset.r === 'editar') {
+      $('rapLbl').innerHTML = '⚡ Respuestas rápidas: una por línea (' + (limRap === 20 ? 'Pro: hasta 20' : 'Free: hasta 3 · <a href="../../#plan">Pro: 20</a>') + ')';
+      $('rapTxt').value = (rapidas && rapidas.length ? rapidas : SUGERIDAS.slice(0, limRap)).join('\n');
+      $('editRap').classList.remove('hidden'); $('rapidas').classList.add('hidden');
+      $('rapTxt').focus();
+      return;
+    }
+    const l = rapidas && rapidas.length ? rapidas : SUGERIDAS;
+    const t = l[Number(b.dataset.r)];
+    if (!t || $('texto').disabled) return;
+    $('texto').value = $('texto').value.trim() ? $('texto').value.trim() + ' ' + t : t;
+    $('texto').focus();
+  };
+  $('bCancelRap').onclick = () => { $('editRap').classList.add('hidden'); pintarRapidas(); };
+  $('bGuardarRap').onclick = async () => {
+    const l = $('rapTxt').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    if (l.length > limRap) return Core.toast(limRap === 3 ? '⭐ Con Free tienes hasta 3 respuestas rápidas. Pásate a Pro para tener 20.' : 'Máximo 20 respuestas rápidas');
+    try {
+      rapidas = await Cuenta.rpc('set_mis_respuestas', { p_lista: l });
+      $('editRap').classList.add('hidden'); pintarRapidas();
+      Core.toast('⚡ Respuestas rápidas guardadas');
+    } catch (err) { Core.toast(err.message); }
+  };
   $('texto').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && matchMedia('(min-width: 860px)').matches) { e.preventDefault(); enviar(); } });
 
   $('msgs').onclick = async (e) => {

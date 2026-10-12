@@ -28,6 +28,9 @@
   .kpis .card { margin: 0; text-align: center; }
   .kpis b { display: block; font-size: 22px; }
   .vip { color: #dc2626; font-weight: 700; }
+  .est5 { color: #f59e0b; letter-spacing: 1px; }
+  .resp { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--field); margin-top: 8px; }
+  .ped .dest { border: 2px solid #f59e0b; }
 </style>
 </head>
 <body>
@@ -65,6 +68,15 @@
     </div>
   </section>
 
+  <!-- RESEÑAS -->
+  <section class="view" id="v-resenas">
+    <div class="card">
+      <h2>⭐ Reseñas de tu tienda <span class="pill" id="rProm"></span></h2>
+      <p class="muted" id="rTip" style="margin-bottom:0"></p>
+    </div>
+    <div class="ped" id="rLista"></div>
+  </section>
+
   <!-- ESTADÍSTICAS -->
   <section class="view" id="v-stats">
     <div class="card upsell hidden" id="stLock">
@@ -89,6 +101,7 @@
 <nav class="tabs">
   <button data-v="pedidos" class="on"><span data-ico="paquete"></span>Pedidos</button>
   <button data-v="cupones"><span data-ico="ticket"></span>Cupones</button>
+  <button data-v="resenas"><span data-ico="estrella"></span>Reseñas</button>
   <button data-v="stats"><span data-ico="grafico"></span>Estadísticas</button>
 </nav>
 
@@ -113,7 +126,46 @@
     scrollTo(0, 0);
     if (v === 'cupones') cargarCupones();
     if (v === 'stats') cargarStats();
+    if (v === 'resenas') cargarResenas();
   }
+
+  /* ---------- ⭐ Reseñas (Free: las ves · Pro: respondes y destacas hasta 3) ---------- */
+  let resenas = [];
+  async function cargarResenas() {
+    let r;
+    try { r = await Cuenta.rpc('ver_resenas', { p_negocio: yo.id }); }
+    catch (e) { $('rLista').innerHTML = '<p class="empty">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    resenas = r.lista;
+    $('rProm').textContent = r.total ? '★ ' + Number(r.promedio).toLocaleString('es-CL') + ' · ' + r.total : 'Sin reseñas';
+    $('rTip').innerHTML = pro ? 'Responde con cariño: tus clientes ven tu respuesta. Puedes destacar hasta 3 reseñas (salen primero en tu tienda).'
+      : 'Opinan los clientes que ya recibieron un pedido. <a href="../../#plan">⭐ Con Pro</a> respondes y destacas las mejores.';
+    const est = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+    $('rLista').innerHTML = resenas.length ? resenas.map((x) => '<div class="card' + (x.destacada ? ' dest' : '') + '"><div class="cab"><div><span class="est5">' + est(x.estrellas) +
+      '</span> <b>' + Core.esc(x.autor) + '</b>' + (x.destacada ? ' <span class="pill pro">📌 Destacada</span>' : '') + '</div><span class="muted">' +
+      new Date(x.fecha).toLocaleDateString('es') + '</span></div>' + (x.texto ? '<p style="margin:8px 0 0">' + Core.esc(x.texto) + '</p>' : '') +
+      (x.respuesta ? '<div class="resp">💬 <b>Tu respuesta:</b> ' + Core.esc(x.respuesta) + '</div>' : '') +
+      (pro ? '<textarea data-txt="' + x.id + '" maxlength="300" placeholder="Escribe tu respuesta…" style="margin-top:10px" aria-label="Respuesta">' + Core.esc(x.respuesta || '') + '</textarea>' +
+        '<div class="acc"><button class="small" data-resp="' + x.id + '">💬 ' + (x.respuesta ? 'Guardar respuesta' : 'Responder') + '</button>' +
+        '<button class="small alt" data-dest="' + x.id + '" data-on="' + (x.destacada ? '0' : '1') + '">' + (x.destacada ? 'Quitar destacada' : '📌 Destacar') + '</button></div>' : '') +
+      '</div>').join('') : '<p class="empty">Aún no tienes reseñas. Tus clientes pueden opinar cuando reciben un pedido 🎉</p>';
+  }
+  $('rLista').onclick = async (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    try {
+      if (b.dataset.resp) {
+        const t = $('rLista').querySelector('[data-txt="' + b.dataset.resp + '"]').value;
+        await Cuenta.rpc('responder_resena', { p_id: b.dataset.resp, p_respuesta: t });
+        Cuenta.sb.functions.invoke('enviar').catch(() => {});
+        Core.toast(t.trim() ? '💬 Respuesta publicada' : 'Respuesta quitada');
+      }
+      if (b.dataset.dest) {
+        await Cuenta.rpc('destacar_resena', { p_id: b.dataset.dest, p_destacar: b.dataset.on === '1' });
+        Core.toast(b.dataset.on === '1' ? '📌 Reseña destacada' : 'Ya no está destacada');
+      }
+      cargarResenas();
+    } catch (err) { Core.toast(err.message); }
+  };
 
   /* ---------- Pedidos ---------- */
   const ESTADOS = { recibido: '📥 Recibido', preparando: '👨‍🍳 Preparando', listo: '✅ Listo', en_camino: '🚚 En camino',
@@ -205,6 +257,7 @@
   }
 
   cargar();
+  if (new URLSearchParams(location.search).get('v') === 'resenas') show('resenas');
   setInterval(() => { if (!document.hidden && filtro === 'activos') cargar(); }, 30000);
 })();
 </script>

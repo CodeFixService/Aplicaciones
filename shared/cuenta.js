@@ -34,6 +34,7 @@
     if (ok) document.documentElement.style.setProperty('--logo', 'url("' + logo + '")');
   }
   aplicarLogo(account);
+  if (global.Core && account) global.Core.tema.usar(account.id, account.role === 'client' ? account.negocio_color : null);
 
   function friendly(err) {
     const m = (err && (err.message || err.error_description || err)) + '';
@@ -64,8 +65,19 @@
     acc.checkedAt = Date.now();
     writeCache(acc);
     aplicarLogo(acc);
-    if (global.Core) global.Core.tema.usar(acc.id);
+    if (global.Core) global.Core.tema.usar(acc.id, acc.role === 'client' ? acc.negocio_color : null);
+    actividad(acc.id);
     return acc;
+  }
+
+  // Última conexión (solo la ve el administrador). Máx. una vez cada 10 minutos, sin esperar respuesta.
+  function actividad(uid) {
+    try {
+      const k = 'cfx:visto:' + uid, t = +localStorage.getItem(k) || 0;
+      if (Date.now() - t < 6e5) return;
+      localStorage.setItem(k, String(Date.now()));
+    } catch (e) { /* sin espacio */ }
+    sb.rpc('registrar_actividad').then(() => {}, () => {});
   }
 
   // Úsalo al abrir cada app: si no hay sesión, vuelve al inicio para ingresar.

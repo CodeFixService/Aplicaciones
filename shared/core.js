@@ -148,7 +148,8 @@
     compartir: '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/>',
     descargar: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
     nueva: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>',
-    contactos: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>'
+    contactos: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+    estrella: '<path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
   };
   const ico = (n) => '<svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
     'stroke-linejoin="round" aria-hidden="true">' + (ICONOS[n] || '') + '</svg>';
@@ -226,14 +227,19 @@
       try { localStorage.setItem(TEMA_KEY + ':' + uid, color); localStorage.setItem(TEMA_KEY, color); } catch (e) { /* sin espacio */ }
       aplicarTema(color);
     },
-    // Al iniciar sesión: aplica el color guardado de ese usuario.
-    usar(uid) { aplicarTema(this.get(uid)); }
+    propio(uid) { try { return !!localStorage.getItem(TEMA_KEY + ':' + uid); } catch (e) { return false; } },
+    aplicar: aplicarTema,
+    // Al iniciar sesión: aplica el color guardado de ese usuario. Si no eligió uno, el de su tienda (respaldo).
+    usar(uid, respaldo) {
+      if (respaldo && /^#[0-9a-f]{6}$/i.test(respaldo) && !this.propio(uid)) { aplicarTema(respaldo); return; }
+      aplicarTema(this.get(uid));
+    }
   };
   aplicarTema(tema.get()); // antes de pintar, sin parpadeo
 
   // Pie de página con la marca del autor en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '3.9';
+  const APP_VERSION = '4.0';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
