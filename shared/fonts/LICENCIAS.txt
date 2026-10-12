@@ -1,0 +1,6 @@
+Tipografías incluidas (SIL Open Font License 1.1, uso comercial permitido):
+- Poppins — The Poppins Project Authors
+- Playfair Display — The Playfair Project Authors
+- Bebas Neue — The Bebas Neue Project Authors
+- Dancing Script — The Dancing Script Project Authors
+Archivos obtenidos de Fontsource (https://fontsource.org). Licencia: https://openfontlicense.org

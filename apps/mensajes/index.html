@@ -95,7 +95,7 @@
 
   const hora = (t) => new Date(t).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   const diaTxt = (t) => new Date(t).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
-  const ROL = { admin: 'Soporte CodeFix', user: 'Empresa', client: 'Cliente' };
+  const ROL = { admin: 'Soporte CodeFix', user: 'Empresa', client: Cuenta.isClient() ? 'Contacto' : 'Cliente' };
 
   async function cargarLista() {
     try { convs = await Cuenta.rpc('chat_list'); } catch (e) { return; }
@@ -181,13 +181,16 @@
   async function pintarCupo() {
     if (admin) { $('tip').innerHTML = 'Como administrador puedes enviar mensajes sin límite.'; $('bEnviar').disabled = false; return; }
     if (bloqueado) { $('tip').innerHTML = 'Bloqueaste esta conversación. Desbloquéala para escribir.'; $('bEnviar').disabled = true; return; }
-    let r = 3;
+    // Entre contactos: Free 1 mensaje a la vez, Premium hasta 5. Con tiendas y soporte: 3.
+    const lim = actual.rol === 'client' && Cuenta.isClient() ? (Cuenta.isPro() ? 5 : 1) : 3;
+    let r = lim;
     try { r = await Cuenta.rpc('chat_remaining', { p_other: actual.id }); } catch (e) { /* sin red */ }
     $('bEnviar').disabled = r <= 0;
     $('texto').disabled = r <= 0;
     $('tip').innerHTML = r <= 0
-      ? '⏳ Ya enviaste 3 mensajes seguidos. Podrás escribir de nuevo cuando te respondan.'
-      : '💡 Envía tu consulta completa: tienes <b>' + r + ' de 3</b> mensajes antes de recibir respuesta.';
+      ? '⏳ ' + (lim === 1 ? 'Con Free envías 1 mensaje a la vez' : 'Ya enviaste ' + lim + ' mensajes seguidos') + '. Podrás escribir de nuevo cuando te respondan.' +
+        (lim === 1 ? ' <a href="../../#plan">⭐ Premium: hasta 5</a>' : '')
+      : '💡 Envía tu mensaje completo: tienes <b>' + r + ' de ' + lim + '</b> mensaje' + (lim === 1 ? '' : 's') + ' antes de recibir respuesta.';
   }
 
   async function enviar() {

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="robots" content="noindex, nofollow">
+<title>Contactos</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/core.css">
+<script src="../../shared/core.js"></script>
+<style>
+  .codigo { font-size: 30px; font-weight: 800; letter-spacing: .08em; text-align: center; padding: 14px; border-radius: var(--radius-sm);
+    background: var(--brand-soft); color: var(--brand); margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+  .plan { font-size: 14px; }
+  .lista li { flex-wrap: wrap; }
+  .lista .grow { min-width: 160px; }
+  .avatar { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; flex: none;
+    background: var(--brand-soft); color: var(--brand); }
+  #cod { text-transform: uppercase; }
+</style>
+</head>
+<body>
+<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Contactos</h1><span id="planTag" class="pill">FREE</span></header>
+<main>
+  <div class="card">
+    <h2>🔑 Tu código</h2>
+    <p class="muted">Compártelo solo con quien quieras: con él te envían una solicitud de contacto.</p>
+    <div class="codigo" id="miCodigo">…</div>
+    <div class="btns">
+      <button class="small" id="bCopiar">📋 Copiar</button>
+      <a class="btn small ok" id="bWsp" target="_blank" rel="noopener">💬 Enviar por WhatsApp</a>
+      <button class="small alt" id="bCambiar">↻ Cambiar código</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>➕ Agregar contacto</h2>
+    <label for="cod">Código de tu contacto</label>
+    <div class="row"><input id="cod" maxlength="20" placeholder="BETO-1234" autocomplete="off" style="flex:2"><button id="bEnviar" style="flex:none">Enviar solicitud</button></div>
+    <p class="muted plan" id="planTxt"></p>
+  </div>
+
+  <div class="card hidden" id="cSolicitudes">
+    <h2>📨 Solicitudes</h2>
+    <ul class="list lista" id="solicitudes"></ul>
+  </div>
+
+  <div class="card">
+    <h2>👥 Mis contactos <span class="pill" id="nContactos">0</span></h2>
+    <ul class="list lista" id="contactos"></ul>
+    <p class="muted" style="font-size:13px;margin-bottom:0">🔒 Solo ves a tus propios contactos y ellos solo a los suyos. Se comparte tu nombre y tu tienda,
+      nunca tu correo ni tu teléfono. Las tiendas no ven tus contactos.</p>
+  </div>
+</main>
+
+<script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/supabase.js"></script>
+<script src="../../shared/cuenta.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  Core.registerSW('../../');
+  Core.marca();
+  const yo = await Cuenta.require('../../');
+  if (yo.role !== 'client') { location.replace('../../'); return; }
+  const premium = !!yo.is_pro, limite = premium ? 20 : 3;
+  $('planTag').textContent = premium ? 'PREMIUM' : 'FREE';
+  $('planTag').classList.toggle('pro', premium);
+  $('planTxt').innerHTML = premium
+    ? '⭐ Premium: hasta <b>20 contactos</b> y hasta <b>5 mensajes seguidos</b> en el chat.'
+    : 'Free: hasta <b>3 contactos</b> y <b>1 mensaje a la vez</b> en el chat. <a href="../../#plan">⭐ Hazte Premium</a> para 20 contactos y 5 mensajes seguidos.';
+
+  let codigo = '';
+  function pintarCodigo(c) {
+    codigo = c;
+    $('miCodigo').textContent = c;
+    $('bWsp').href = 'https://wa.me/?text=' + encodeURIComponent('Agrégame como contacto en la app de ' + (yo.negocio || 'mi tienda') + ' (CodeFix). Mi código es: ' + c);
+  }
+  try { pintarCodigo(await Cuenta.rpc('mi_codigo')); } catch (e) { $('miCodigo').textContent = '⚠️ ' + e.message; }
+  $('bCopiar').onclick = () => navigator.clipboard.writeText(codigo).then(() => Core.toast('📋 Código copiado'));
+  $('bCambiar').onclick = async () => {
+    if (!confirm('¿Cambiar tu código? El anterior deja de servir (tus contactos actuales se mantienen).')) return;
+    try { pintarCodigo(await Cuenta.rpc('cambiar_codigo')); Core.toast('Código nuevo listo'); } catch (e) { Core.toast(e.message); }
+  };
+
+  $('bEnviar').onclick = async () => {
+    const c = $('cod').value.trim();
+    if (!c) return Core.toast('Escribe el código de tu contacto');
+    $('bEnviar').disabled = true;
+    try {
+      const r = await Cuenta.rpc('solicitar_conexion', { p_codigo: c });
+      if (!r.ok) throw new Error(r.error);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso inmediato
+      $('cod').value = '';
+      Core.toast('✅ Solicitud enviada a ' + r.nombre);
+      cargar();
+    } catch (e) { Core.toast(e.message); } finally { $('bEnviar').disabled = false; }
+  };
+
+  const inicial = (n) => Core.esc((n || '?').trim().charAt(0).toUpperCase());
+  async function cargar() {
+    let l = [];
+    try { l = await Cuenta.rpc('mis_conexiones'); } catch (e) { $('contactos').innerHTML = '<li class="empty">⚠️ ' + Core.esc(e.message) + '</li>'; return; }
+    const recibidas = l.filter((c) => c.estado === 'pendiente' && !c.enviada);
+    const enviadas = l.filter((c) => c.estado === 'pendiente' && c.enviada);
+    const aceptadas = l.filter((c) => c.estado === 'aceptada');
+    $('cSolicitudes').classList.toggle('hidden', !recibidas.length && !enviadas.length);
+    $('solicitudes').innerHTML = recibidas.map((c) => '<li><div class="avatar">' + inicial(c.nombre) + '</div><div class="grow"><b>' + Core.esc(c.nombre) +
+      '</b><div class="muted">' + Core.esc(c.tienda ? 'Cliente de ' + c.tienda : '') + ' · quiere conectarse contigo</div></div>' +
+      '<button class="small ok" data-a="si" data-id="' + c.id + '">Aceptar</button><button class="small alt" data-a="no" data-id="' + c.id + '">Rechazar</button></li>').join('') +
+      enviadas.map((c) => '<li><div class="avatar">' + inicial(c.nombre) + '</div><div class="grow"><b>' + Core.esc(c.nombre) +
+        '</b><div class="muted">⏳ Esperando su respuesta</div></div></li>').join('');
+    $('nContactos').textContent = aceptadas.length + ' / ' + limite;
+    $('contactos').innerHTML = aceptadas.length ? aceptadas.map((c) => '<li><div class="avatar">' + inicial(c.nombre) + '</div><div class="grow"><b>' +
+      Core.esc(c.nombre) + '</b><div class="muted">' + Core.esc(c.tienda ? 'Cliente de ' + c.tienda : '') + '</div></div>' +
+      '<a class="btn small" href="../mensajes/?con=' + c.otro + '">💬 Chatear</a>' +
+      '<button class="small danger" data-a="del" data-otro="' + c.otro + '" aria-label="Eliminar contacto">✕</button></li>').join('')
+      : '<li class="empty">Aún no tienes contactos. Comparte tu código o agrega el de alguien.</li>';
+  }
+  document.querySelector('main').onclick = async (e) => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    try {
+      if (b.dataset.a === 'del') {
+        if (!confirm('¿Eliminar este contacto? Ya no podrán chatear.')) return;
+        await Cuenta.rpc('eliminar_conexion', { p_otro: b.dataset.otro });
+        Core.toast('Contacto eliminado');
+      } else {
+        const r = await Cuenta.rpc('responder_conexion', { p_id: b.dataset.id, p_aceptar: b.dataset.a === 'si' });
+        if (!r.ok) throw new Error(r.error);
+        Cuenta.sb.functions.invoke('enviar').catch(() => {});
+        Core.toast(b.dataset.a === 'si' ? '✅ Ahora son contactos: ya pueden chatear' : 'Solicitud rechazada');
+      }
+      cargar();
+    } catch (err) { Core.toast(err.message); }
+  };
+  cargar();
+})();
+</script>
+</body>
+</html>

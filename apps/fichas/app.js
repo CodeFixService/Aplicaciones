@@ -64,7 +64,7 @@
     });
   }
 
-  function wrap(text, x, y, maxW, lineH, maxLines, align) {
+  function wrap(text, x, y, maxW, lineH, maxLines, align, nombre) {
     const words = String(text || '').split(/\s+/).filter(Boolean);
     const lines = [];
     let line = '';
@@ -76,8 +76,36 @@
     const out = lines.slice(0, maxLines || 9);
     ctx.textAlign = align || 'center';
     out.forEach((l, i) => ctx.fillText(l, x, y + i * lineH));
+    if (nombre && out.length) {
+      const w = Math.max(...out.map((l) => ctx.measureText(l).width));
+      const x0 = ctx.textAlign === 'center' ? x - w / 2 : ctx.textAlign === 'right' ? x - w : x;
+      marcar(nombre, x0, y - lineH * 0.85, w, out.length * lineH);
+    }
     return out.length * lineH;
   }
+
+  /* ---------- Editor de textos: negrita, cursiva, color, tamaño y tipografía ----------
+     Cada plantilla trae su estilo por defecto; ficha.estilos[elemento] solo guarda los cambios. */
+  const FUENTES = {
+    clasica: ['Clásica', 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'],
+    moderna: ['Moderna', '"CFX Poppins", system-ui, sans-serif'],
+    elegante: ['Elegante', '"CFX Playfair", Georgia, serif'],
+    impacto: ['Impacto', '"CFX Bebas", Impact, sans-serif'],
+    manuscrita: ['Manuscrita', '"CFX Dancing", cursive']
+  };
+  const ELEMENTOS = { titulo: 'Título', subtitulo: 'Subtítulo', precio: 'Precio', cta: 'Botón' };
+  let fichaDibujo = null, zonas = {};
+  const estiloDe = (n) => (fichaDibujo && fichaDibujo.estilos && fichaDibujo.estilos[n]) || {};
+  // Aplica el estilo del elemento sobre el estilo por defecto de la plantilla. Devuelve el factor de tamaño.
+  function estilo(n, peso, tam, color) {
+    const e = estiloDe(n);
+    const k = e.k || 1;
+    const w = e.b === true ? '800' : e.b === false ? '400' : peso;
+    ctx.font = (e.i ? 'italic ' : '') + w + ' ' + Math.round(tam * k) + 'px ' + (FUENTES[e.f] || FUENTES.clasica)[1];
+    ctx.fillStyle = e.c || color;
+    return k;
+  }
+  function marcar(n, x, y, w, h) { zonas[n] = { x, y, w, h }; }
 
   function cover(img, x, y, w, h) {
     const k = Math.max(w / img.width, h / img.height);
@@ -111,9 +139,10 @@
       const tw = ctx.measureText(t).width;
       ctx.fillRect(cx - tw / 2, cy - r * 0.36, tw, 5);
     }
-    ctx.font = font('900', r * 0.42);
+    estilo('precio', '900', r * 0.42, '#1c1830');
     ctx.textAlign = 'center';
     ctx.fillText(fmtPrice(f.precio), cx, cy + r * (f.antes ? 0.25 : 0.15), r * 1.8);
+    marcar('precio', cx - r, cy - r, r * 2, r * 2);
   }
 
   function footer(f, logo, dark) {
@@ -152,26 +181,28 @@
     return c;
   }
 
+  // Botón con texto (llamado a la acción).
+  function boton(f, x, y, w, h, colorFondo, colorTxt, tam, cx, base, maxW) {
+    ctx.fillStyle = colorFondo; rounded(x, y, w, h, h / 2); ctx.fill();
+    estilo('cta', '800', tam, colorTxt); ctx.textAlign = 'center';
+    ctx.fillText(f.cta, cx, base, maxW);
+    marcar('cta', x, y, w, h);
+  }
+
   const TEMPLATES = {
     oferta: { nombre: 'Oferta', draw(f, foto, logo) {
       const g = ctx.createLinearGradient(0, 0, W, H);
       g.addColorStop(0, f.color1); g.addColorStop(1, shade(f.color1, -45));
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#fff';
-      ctx.font = font('900', 110);
-      const th = wrap(f.titulo.toUpperCase(), W / 2, 160, W - 100, 115, 2);
-      ctx.font = font('500', 46);
-      ctx.fillStyle = 'rgba(255,255,255,.9)';
-      wrap(f.subtitulo, W / 2, 160 + th + 10, W - 120, 54, 2);
+      let k = estilo('titulo', '900', 110, '#fff');
+      const th = wrap(f.titulo.toUpperCase(), W / 2, 160, W - 100, 115 * k, 2, 'center', 'titulo');
+      k = estilo('subtitulo', '500', 46, 'rgba(255,255,255,.9)');
+      wrap(f.subtitulo, W / 2, 160 + th + 10, W - 120, 54 * k, 2, 'center', 'subtitulo');
       if (foto) {
         ctx.save(); rounded(110, 470, W - 220, 560, 40); ctx.clip(); cover(foto, 110, 470, W - 220, 560); ctx.restore();
       }
       priceBadge(f, W - 180, 910, 140);
-      if (f.cta) {
-        ctx.fillStyle = f.color2; rounded(110, 1080, W - 220, 110, 55); ctx.fill();
-        ctx.fillStyle = '#1c1830'; ctx.font = font('800', 46); ctx.textAlign = 'center';
-        ctx.fillText(f.cta, W / 2, 1152, W - 280);
-      }
+      if (f.cta) boton(f, 110, 1080, W - 220, 110, f.color2, '#1c1830', 46, W / 2, 1152, W - 280);
       footer(f, logo, true);
     } },
     evento: { nombre: 'Evento', draw(f, foto, logo) {
@@ -180,15 +211,22 @@
       ctx.strokeStyle = f.color2; ctx.lineWidth = 10; ctx.strokeRect(50, 50, W - 100, H - 210);
       ctx.fillStyle = f.color2; ctx.font = font('700', 40); ctx.textAlign = 'center';
       ctx.fillText('★ ★ ★', W / 2, 170);
-      ctx.fillStyle = '#fff'; ctx.font = font('900', 120);
-      const th = wrap(f.titulo.toUpperCase(), W / 2, 330, W - 160, 125, 3);
-      ctx.fillStyle = f.color2; ctx.font = font('600', 52);
-      wrap(f.subtitulo, W / 2, 330 + th + 30, W - 180, 60, 3);
+      let k = estilo('titulo', '900', 120, '#fff');
+      const th = wrap(f.titulo.toUpperCase(), W / 2, 330, W - 160, 125 * k, 3, 'center', 'titulo');
+      k = estilo('subtitulo', '600', 52, f.color2);
+      wrap(f.subtitulo, W / 2, 330 + th + 30, W - 180, 60 * k, 3, 'center', 'subtitulo');
       if (f.precio) {
-        ctx.fillStyle = '#fff'; ctx.font = font('900', 90);
+        k = estilo('precio', '900', 90, '#fff'); ctx.textAlign = 'center';
         ctx.fillText(fmtPrice(f.precio), W / 2, 1010);
+        const pw = ctx.measureText(fmtPrice(f.precio)).width;
+        marcar('precio', W / 2 - pw / 2, 1010 - 80 * k, pw, 95 * k);
       }
-      if (f.cta) { ctx.fillStyle = '#fff'; ctx.font = font('700', 44); ctx.fillText(f.cta, W / 2, 1110, W - 180); }
+      if (f.cta) {
+        k = estilo('cta', '700', 44, '#fff'); ctx.textAlign = 'center';
+        ctx.fillText(f.cta, W / 2, 1110, W - 180);
+        const cw = Math.min(W - 180, ctx.measureText(f.cta).width);
+        marcar('cta', W / 2 - cw / 2, 1110 - 40 * k, cw, 52 * k);
+      }
       footer(f, logo, true);
     } },
     foto: { nombre: 'Foto completa', draw(f, foto, logo) {
@@ -196,28 +234,23 @@
       const g = ctx.createLinearGradient(0, H * 0.35, 0, H);
       g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.85)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#fff'; ctx.font = font('900', 96);
-      ctx.textAlign = 'left';
-      const lines = 2, top = 860;
-      const th = wrap(f.titulo, 60, top, W - 120, 100, lines, 'left');
-      ctx.fillStyle = f.color2; ctx.font = font('600', 46);
-      wrap(f.subtitulo, 60, top + th + 6, W - 120, 54, 2, 'left');
+      let k = estilo('titulo', '900', 96, '#fff');
+      const top = 860;
+      const th = wrap(f.titulo, 60, top, W - 120, 100 * k, 2, 'left', 'titulo');
+      k = estilo('subtitulo', '600', 46, f.color2);
+      wrap(f.subtitulo, 60, top + th + 6, W - 120, 54 * k, 2, 'left', 'subtitulo');
       priceBadge(f, W - 170, 170, 125);
-      if (f.cta) {
-        ctx.fillStyle = f.color2; rounded(60, 1110, 600, 90, 45); ctx.fill();
-        ctx.fillStyle = '#1c1830'; ctx.font = font('800', 38); ctx.textAlign = 'center';
-        ctx.fillText(f.cta, 360, 1168, 560);
-      }
+      if (f.cta) boton(f, 60, 1110, 600, 90, f.color2, '#1c1830', 38, 360, 1168, 560);
       footer(f, logo, true);
     } },
     lista: { nombre: 'Menú / Precios', draw(f, foto, logo) {
       ctx.fillStyle = '#fffaf2'; ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = f.color1; ctx.fillRect(0, 0, W, 300);
       if (foto) { ctx.save(); ctx.globalAlpha = 0.3; cover(foto, 0, 0, W, 300); ctx.restore(); }
-      ctx.fillStyle = '#fff'; ctx.font = font('900', 90);
-      wrap(f.titulo.toUpperCase(), W / 2, 150, W - 100, 92, 1);
-      ctx.font = font('500', 42); ctx.fillStyle = 'rgba(255,255,255,.9)';
-      wrap(f.subtitulo, W / 2, 230, W - 120, 48, 1);
+      let k = estilo('titulo', '900', 90, '#fff');
+      wrap(f.titulo.toUpperCase(), W / 2, 150, W - 100, 92 * k, 1, 'center', 'titulo');
+      k = estilo('subtitulo', '500', 42, 'rgba(255,255,255,.9)');
+      wrap(f.subtitulo, W / 2, 230, W - 120, 48 * k, 1, 'center', 'subtitulo');
       const items = String(f.lista || '').split(/\n/).map((l) => l.split(/=|:|\t/)).filter((p) => p[0] && p[0].trim()).slice(0, 9);
       const top = 380, step = Math.min(90, 640 / Math.max(items.length, 1));
       items.forEach((p, i) => {
@@ -236,11 +269,7 @@
         ctx.font = font('500', 40); ctx.fillStyle = '#999'; ctx.textAlign = 'center';
         ctx.fillText('Escribe tus productos y precios', W / 2, 600);
       }
-      if (f.cta) {
-        ctx.fillStyle = f.color2; rounded(110, 1090, W - 220, 100, 50); ctx.fill();
-        ctx.fillStyle = '#1c1830'; ctx.font = font('800', 42); ctx.textAlign = 'center';
-        ctx.fillText(f.cta, W / 2, 1155, W - 280);
-      }
+      if (f.cta) boton(f, 110, 1090, W - 220, 100, f.color2, '#1c1830', 42, W / 2, 1155, W - 280);
       footer(f, logo, false);
     } }
   };
@@ -254,9 +283,13 @@
   let drawToken = 0;
   async function draw(f) {
     const token = ++drawToken;
-    const [foto, logo] = await Promise.all([loadImg(f.foto), loadImg(ajustes.logo)]);
+    const usadas = Object.values(f.estilos || {}).map((e) => e.f).filter((x) => x && x !== 'clasica' && FUENTES[x]);
+    const [foto, logo] = await Promise.all([loadImg(f.foto), loadImg(ajustes.logo),
+      ...usadas.map((x) => document.fonts.load('800 40px ' + FUENTES[x][1].split(',')[0]).catch(() => null)),
+      ...usadas.map((x) => document.fonts.load('italic 400 40px ' + FUENTES[x][1].split(',')[0]).catch(() => null))]);
     if (token !== drawToken) return;
     ctx.clearRect(0, 0, W, H);
+    fichaDibujo = f; zonas = {};
     const tpl = licensed() || FREE_TEMPLATES.includes(f.plantilla) ? f.plantilla : 'oferta';
     (TEMPLATES[tpl] || TEMPLATES.oferta).draw(f, foto, logo);
     if (!licensed()) {
@@ -266,7 +299,55 @@
       ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillText('Hecho con FichaPro · CodeFix · versión Free', W - 30, H - 125);
       ctx.restore();
     }
+    if (f === ficha) pintarSeleccion();
   }
+
+  /* ---------- Editor de textos (tocar un texto de la ficha) ---------- */
+  let sel = null; // elemento elegido: titulo, subtitulo, precio o cta
+  function pintarEditor() {
+    $('elems').innerHTML = Object.keys(ELEMENTOS).map((k) => '<button class="small ' + (sel === k ? '' : 'alt') + '" data-el="' + k + '">' + ELEMENTOS[k] + '</button>').join('');
+    $('herr').classList.toggle('hidden', !sel);
+    if (!sel) { $('sel').classList.add('hidden'); return; }
+    const e = (ficha.estilos || {})[sel] || {};
+    $('tbB').classList.toggle('on', e.b === true);
+    $('tbI').classList.toggle('on', !!e.i);
+    $('tbMuestra').style.background = e.c || 'transparent';
+    $('tbColor').value = /^#[0-9a-f]{6}$/i.test(e.c || '') ? e.c : '#ffffff';
+    $('fuentes').innerHTML = Object.keys(FUENTES).map((k) => '<button class="' + ((e.f || 'clasica') === k ? 'on' : '') + '" data-f="' + k +
+      '" style="font-family:' + FUENTES[k][1].replace(/"/g, '&quot;') + '">' + FUENTES[k][0] + '</button>').join('');
+    pintarSeleccion();
+  }
+  // Recuadro sobre el texto elegido (no se dibuja en la ficha: es solo una guía en pantalla).
+  function pintarSeleccion() {
+    const z = sel && zonas[sel];
+    $('sel').classList.toggle('hidden', !z);
+    if (!z) return;
+    const k = cv.clientWidth / W, pad = 10;
+    Object.assign($('sel').style, { left: (z.x - pad) * k + 'px', top: (z.y - pad) * k + 'px', width: (z.w + pad * 2) * k + 'px', height: (z.h + pad * 2) * k + 'px' });
+  }
+  function cambiarEstilo(cambio) {
+    if (!sel) return;
+    ficha.estilos = Object.assign({}, ficha.estilos);
+    const e = Object.assign({}, ficha.estilos[sel], cambio);
+    Object.keys(e).forEach((k) => { if (e[k] == null) delete e[k]; });
+    if (Object.keys(e).length) ficha.estilos[sel] = e; else delete ficha.estilos[sel];
+    changed(); pintarEditor();
+  }
+  cv.addEventListener('click', (ev) => {
+    const r = cv.getBoundingClientRect(), x = (ev.clientX - r.left) * W / r.width, y = (ev.clientY - r.top) * H / r.height;
+    const hit = Object.keys(zonas).reverse().find((n) => { const z = zonas[n]; return x >= z.x - 20 && x <= z.x + z.w + 20 && y >= z.y - 20 && y <= z.y + z.h + 20; });
+    sel = hit || null; pintarEditor();
+  });
+  $('elems').onclick = (e) => { const k = e.target.dataset.el; if (!k) return; sel = sel === k ? null : k; pintarEditor(); };
+  $('tbB').onclick = () => { const e = (ficha.estilos || {})[sel] || {}; cambiarEstilo({ b: e.b === true ? null : true }); };
+  $('tbI').onclick = () => { const e = (ficha.estilos || {})[sel] || {}; cambiarEstilo({ i: e.i ? null : true }); };
+  const escalar = (d) => { const e = (ficha.estilos || {})[sel] || {}; const k = Math.round(Math.min(1.6, Math.max(0.6, (e.k || 1) + d)) * 10) / 10; cambiarEstilo({ k: k === 1 ? null : k }); };
+  $('tbMenos').onclick = () => escalar(-0.1);
+  $('tbMas').onclick = () => escalar(0.1);
+  $('tbColor').oninput = (e) => cambiarEstilo({ c: e.target.value });
+  $('tbReset').onclick = () => { if (!sel) return; ficha.estilos = Object.assign({}, ficha.estilos); delete ficha.estilos[sel]; changed(); pintarEditor(); };
+  $('fuentes').onclick = (e) => { const b = e.target.closest('[data-f]'); if (b) cambiarEstilo({ f: b.dataset.f === 'clasica' ? null : b.dataset.f }); };
+  addEventListener('resize', pintarSeleccion);
 
   /* ---------- Formulario ---------- */
   const fields = ['titulo', 'subtitulo', 'precio', 'antes', 'cta', 'color1', 'color2', 'lista'];
@@ -274,6 +355,7 @@
     if (!TEMPLATES[ficha.plantilla]) ficha.plantilla = 'oferta';
     fields.forEach((k) => { $('f-' + k).value = ficha[k] || ''; });
     $('f-vip').checked = !!ficha.vip;
+    pintarEditor();
     $('f-qr').checked = !!ficha.qr && licensed();
     $('rowLista').classList.toggle('hidden', ficha.plantilla !== 'lista');
     $('tpls').innerHTML = Object.keys(TEMPLATES).map((k) => {
@@ -368,7 +450,8 @@
   };
 
   $('bNueva').onclick = () => {
-    ficha = Object.assign({}, DEFAULT, { color1: ficha.color1, color2: ficha.color2, plantilla: ficha.plantilla });
+    ficha = Object.assign({}, DEFAULT, { color1: ficha.color1, color2: ficha.color2, plantilla: ficha.plantilla, estilos: {} });
+    sel = null;
     editId = null; fillForm(); changed();
   };
 
