@@ -33,8 +33,169 @@
       item('Solicitudes pendientes', s.pendientes) + item('Reportes abiertos', s.reportes) +
       item('Keys canjeadas', s.canjeadas + ' / ' + s.licencias) + item('Ingresos por keys', Core.money(s.ingresos)) +
       item('Suscriptores por enlace', s.suscriptores) + item('Celulares con push', s.dispositivos);
-    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos(), cargarUso()]);
+    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos(), cargarUso(), cargarActividad()]);
   }
+
+  /* ---------- 📡 Actividad de empresas (solo el admin la ve) ---------- */
+  const dias = (t) => t ? Math.floor((Date.now() - new Date(t)) / 864e5) : null;
+  function hace(t) {
+    if (!t) return 'nunca';
+    const m = Math.max(0, Math.round((Date.now() - new Date(t)) / 6e4));
+    return m < 60 ? 'hace ' + m + ' min' : m < 1440 ? 'hace ' + Math.round(m / 60) + ' h' : 'hace ' + Math.floor(m / 1440) + ' d';
+  }
+  // 🟢 entró hoy o ayer · 🟡 2 a 7 días · 🔴 más de 7 días o nunca.
+  const semaforo = (e) => { const d = dias(e.visto_at); return d == null || d > 7 ? 'rojo' : d >= 2 ? 'amarillo' : 'verde'; };
+  const SEM = { verde: '🟢', amarillo: '🟡', rojo: '🔴' };
+  let actividad = [], actFiltro = '';
+  async function cargarActividad() {
+    let hoy;
+    try { [actividad, hoy] = await Promise.all([Cuenta.rpc('admin_actividad'), Cuenta.rpc('admin_actividad_hoy')]); }
+    catch (e) {
+      $('actHoy').textContent = /admin_actividad/.test(e.message) ? '⚠️ Falta actualizar la base de datos a la 4.0 (paso 3 de la guía).' : '⚠️ ' + e.message;
+      $('actLista').innerHTML = ''; return;
+    }
+    const n = { verde: 0, amarillo: 0, rojo: 0 };
+    actividad.forEach((e) => { e.sem = semaforo(e); n[e.sem]++; });
+    $('actPill').textContent = '🟢 ' + n.verde + ' · 🟡 ' + n.amarillo + ' · 🔴 ' + n.rojo;
+    $('actHoy').innerHTML = '<b>Hoy:</b> ' + hoy.empresas + ' empresa(s) activa(s) · ' + hoy.clientes + ' cliente(s) · ' + hoy.productos + ' producto(s) nuevo(s) · ' +
+      hoy.fichas + ' ficha(s) · ' + hoy.pedidos + ' pedido(s)';
+    pintarActividad();
+  }
+  function pintarActividad() {
+    const l = actividad.filter((e) => !actFiltro || e.sem === actFiltro);
+    $('actLista').innerHTML = l.length ? l.map((e) =>
+      '<li><span class="sem" title="' + e.sem + '">' + SEM[e.sem] + '</span><div class="grow"><b>' + Core.esc(e.empresa || e.email) + '</b> ' +
+      (e.pro ? '<span class="pill pro">PRO</span>' : '<span class="pill">FREE</span>') +
+      '<div class="muted">Entró ' + hace(e.visto_at) + ' · ' + (e.push ? '🔔 con notificaciones' : '🔕 sin notificaciones') +
+        (e.motivado_at && dias(e.motivado_at) < 1 ? ' · 📣 motivada hoy' : '') + '</div>' +
+      '<div class="muted">📦 Último producto: ' + hace(e.ultimo_producto) + ' · 🖼️ Ficha: ' + hace(e.ultima_ficha) + ' · 🛒 Pedido: ' + hace(e.ultimo_pedido) + '</div>' +
+      '<div class="muted">' + e.productos + ' productos · ' + e.fichas + ' fichas · ' + e.clientes + ' clientes (' + e.clientes_activos + ' activos) · ' +
+        e.pedidos_7d + ' pedidos y ' + e.entradas_7d + ' entradas en 7 días</div></div>' +
+      '<div class="acc"><button class="alt" data-ver="' + e.id + '">👁️ Ver</button><button data-mot="' + e.id + '">📣 Motivar</button></div></li>').join('')
+      : '<li class="empty">' + (actividad.length ? 'Ninguna en este grupo 🎉' : 'Aún no hay empresas') + '</li>';
+  }
+  $('actFiltros').onclick = (e) => {
+    const b = e.target.closest('[data-f]');
+    if (!b) return;
+    actFiltro = b.dataset.f;
+    $('actFiltros').querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('alt', x !== b); });
+    pintarActividad();
+  };
+  $('actLista').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.ver) verEmpresa(b.dataset.ver).catch(fallo);
+    if (b.dataset.mot) abrirMotivar(b.dataset.mot);
+  };
+  $('bLimpiarAct').onclick = async () => {
+    if (!confirm('¿Borrar el historial de conexiones? Se mantiene la última vez que entró cada uno.')) return;
+    try { const n = await Cuenta.rpc('admin_limpiar_actividad'); Core.toast('🧹 Historial borrado (' + n + ' registros)'); cargarActividad(); }
+    catch (err) { fallo(err); }
+  };
+
+  /* ---------- 📣 Motivar: texto automático según el tono (editable) ---------- */
+  const TONOS = {
+    motivador: {
+      titulos: ['💪 ¡Tu tienda te espera, {n}!', '🚀 ¡Vamos con todo, {n}!', '🔥 Hoy es un buen día para vender'],
+      inicios: ['¡Hola {n}! 💪', '¡{n}, vamos que se puede! 🚀', '¡Hola {n}! 🔥'],
+      cierres: ['Cada publicación es una venta posible. ¡Tú puedes!', 'Los negocios que publican seguido venden más. ¡A darle!',
+        'Tus clientes están a un toque de comprarte. ¡Vamos!']
+    },
+    amable: {
+      titulos: ['😊 Te extrañamos, {n}', '🌷 Un saludo de CodeFix', '😊 ¿Cómo va todo, {n}?'],
+      inicios: ['Hola {n}, ¿cómo estás? 😊', 'Hola {n} 🌷', '¡Hola {n}! Esperamos que estés muy bien 😊'],
+      cierres: ['Si necesitas ayuda con algo, respóndenos aquí mismo. ¡Estamos para ayudarte!', 'Cualquier duda, escríbenos por este chat. 💙',
+        'Cuando quieras te ayudamos a armar tu próxima oferta.']
+    },
+    directo: {
+      titulos: ['🎯 {n}: tu tienda necesita movimiento', '🎯 Una idea rápida para vender más', '🎯 5 minutos para tu tienda'],
+      inicios: ['Hola {n}.', '{n}, un dato rápido:', 'Hola {n}, vamos al grano:'],
+      cierres: ['Te toma 5 minutos: entra, sube una oferta y listo.', 'Hoy: 1 ficha nueva en FichaPro. Mañana: más pedidos.',
+        'Entra hoy y publica algo, aunque sea chico.']
+    },
+    divertido: {
+      titulos: ['😄 ¡Tu tienda bostezó, {n}!', '🦥 ¿{n} en modo siesta?', '🎉 ¡Hora de despertar la tienda!'],
+      inicios: ['¡Hola {n}! 😄', '¡Toc toc, {n}! 🚪', '¡{n}! Tus productos preguntan por ti 🛍️'],
+      cierres: ['Tus clientes ya están mirando el celular… ¡dales algo que ver! 📱', 'Una oferta nueva y la tienda vuelve a la vida. 🎉',
+        'Sube algo hoy y que se arme el carrito. 🛒']
+    }
+  };
+  function situacion(e) {
+    const ult = [e.ultima_ficha, e.ultimo_producto].filter(Boolean).sort().pop();
+    const dEntra = dias(e.visto_at), dPub = dias(ult);
+    if (!e.productos && !e.fichas) return 'Aún no subes productos ni ofertas: sube los primeros y tus clientes ya podrán pedirte.';
+    if (dEntra == null) return 'Todavía no entras a tu app: entra, revisa tu tienda y sube tu primera oferta.';
+    if (dPub != null && dPub >= 7) return 'Hace ' + dPub + ' días que no publicas nada nuevo en tu tienda.';
+    if (dEntra >= 3) return 'Hace ' + dEntra + ' días que no entras a tu app.';
+    return '¡Vas muy bien! Sigue publicando para que tus clientes vuelvan seguido.';
+  }
+  let vuelta = 0;
+  function textoMotivar(e, tono, n) {
+    const t = TONOS[tono] || TONOS.motivador, k = (x) => x[n % x.length];
+    const nom = (e.empresa || 'emprendedor').trim();
+    const pon = (x) => x.replace(/\{n\}/g, nom);
+    return {
+      titulo: pon(k(t.titulos)).slice(0, 80),
+      cuerpo: pon(k(t.inicios)) + ' ' + situacion(e) + '\n\n' + k(t.cierres) +
+        (e.push ? '' : '\n\n🔔 Activa las notificaciones en ⚙️ Ajustes → Notificaciones para enterarte al tiro de tus pedidos y mensajes.')
+    };
+  }
+  let motEmp = null, tono = 'motivador';
+  async function abrirMotivar(id) {
+    if (!actividad.length) await cargarActividad();
+    motEmp = actividad.find((x) => x.id === id);
+    if (!motEmp) return Core.toast('Empresa no encontrada');
+    $('motTitulo').textContent = '📣 Motivar a ' + (motEmp.empresa || motEmp.email);
+    $('motInfo').textContent = SEM[motEmp.sem] + ' Entró ' + hace(motEmp.visto_at) + ' · ' + (motEmp.push ? '🔔 Tiene notificaciones activas' : '🔕 No tiene notificaciones: el mensaje queda en su chat y le pide activarlas') +
+      (motEmp.motivado_at && dias(motEmp.motivado_at) < 1 ? ' · ⚠️ Ya la motivaste hoy' : '');
+    vuelta = Math.floor(Math.random() * 3);
+    generar();
+    if (!$('v-resumen').classList.contains('on')) document.querySelector('[data-v=resumen]').click();
+    $('cMotivar').classList.remove('hidden');
+    $('cMotivar').scrollIntoView({ behavior: 'smooth' });
+  }
+  function generar() {
+    const t = textoMotivar(motEmp, tono, vuelta);
+    $('motTit').value = t.titulo; $('motTxt').value = t.cuerpo;
+  }
+  $('motTonos').onclick = (e) => {
+    const b = e.target.closest('[data-t]');
+    if (!b) return;
+    tono = b.dataset.t;
+    $('motTonos').querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('alt', x !== b); });
+    if (motEmp) generar();
+  };
+  $('bOtroTxt').onclick = () => { vuelta++; generar(); };
+  $('bCerrarMot').onclick = () => $('cMotivar').classList.add('hidden');
+  $('bEnviarMot').onclick = async () => {
+    if (!motEmp) return;
+    $('bEnviarMot').disabled = true;
+    try {
+      const r = await Cuenta.rpc('admin_motivar', { p_user: motEmp.id, p_titulo: $('motTit').value, p_cuerpo: $('motTxt').value });
+      if (!r.ok) throw new Error(r.error);
+      sb.functions.invoke('enviar').catch(() => {});
+      Core.toast('📣 Enviado' + (r.push ? '' : ' (quedó en su chat: no tiene notificaciones activas)'));
+      $('cMotivar').classList.add('hidden');
+      cargarActividad();
+    } catch (err) { fallo(err); } finally { $('bEnviarMot').disabled = false; }
+  };
+  $('bMotivarTodas').onclick = async () => {
+    if (!actividad.length) await cargarActividad();
+    const l = actividad.filter((e) => e.sem === 'rojo' && !(e.motivado_at && dias(e.motivado_at) < 1));
+    if (!l.length) return Core.toast('No hay empresas dormidas por motivar hoy 🎉');
+    const nombre = { motivador: '💪 motivador', amable: '😊 amable', directo: '🎯 directo', divertido: '😄 divertido' }[tono];
+    if (!confirm('¿Enviar un mensaje ' + nombre + ' a ' + l.length + ' empresa(s) dormida(s)? Cada una recibe un texto con su nombre.')) return;
+    $('bMotivarTodas').disabled = true;
+    let ok = 0;
+    for (const [i, e] of l.entries()) {
+      const t = textoMotivar(e, tono, i);
+      try { const r = await Cuenta.rpc('admin_motivar', { p_user: e.id, p_titulo: t.titulo, p_cuerpo: t.cuerpo }); if (r.ok) ok++; } catch (err) { /* sigue con la otra */ }
+    }
+    sb.functions.invoke('enviar').catch(() => {});
+    $('bMotivarTodas').disabled = false;
+    Core.toast('📣 Enviado a ' + ok + ' de ' + l.length + ' empresa(s)');
+    cargarActividad();
+  };
 
   /* ---------- Uso del servidor (plan gratis de Supabase) ---------- */
   async function cargarUso() {
@@ -84,6 +245,10 @@
       item('Ventas entregadas (30 días)', Core.money(r.ventas_30d));
     $('empInfo').textContent = r.email + (r.telefono ? ' · WhatsApp +' + r.telefono : '') + (r.horario ? ' · 🕒 ' + r.horario : '') +
       (r.abierto === false ? ' · 🔴 Cerrada' : '') + ' · desde ' + new Date(r.creada).toLocaleDateString('es');
+    empActual = id;
+    $('bChatEmp').href = '../mensajes/?con=' + id;
+    $('empAct').innerHTML = '';
+    Cuenta.rpc('admin_empresa_actividad', { p_id: id }).then(pintarEmpAct).catch(() => {});
     $('empPubs').innerHTML = r.ultimas_publicaciones.length ? r.ultimas_publicaciones.map((x) => '<li><span class="grow">' + (x.vip ? '⭐ VIP · ' : '') +
       Core.esc(x.titulo) + '</span><span class="muted">' + new Date(x.updated_at).toLocaleDateString('es') + '</span></li>').join('') : '<li class="empty">Sin fichas publicadas</li>';
     document.querySelector('[data-v=resumen]').click();
@@ -91,6 +256,25 @@
     $('cEmpresa').scrollIntoView({ behavior: 'smooth' });
   }
   $('bCerrarEmp').onclick = () => $('cEmpresa').classList.add('hidden');
+  let empActual = null;
+  $('bMotivarEmp').onclick = () => { if (empActual) abrirMotivar(empActual); };
+  // Actividad de la empresa: última vez, días activos, horario típico y últimos 14 días.
+  function pintarEmpAct(a) {
+    const max = (l) => Math.max(1, ...l);
+    const hs = a.horas || [], mh = max(hs), ds = a.dias || [], md = max(ds.map((d) => d.entradas));
+    const item = (t, v) => '<div class="card"><span class="muted">' + t + '</span><b>' + v + '</b></div>';
+    const pico = hs.some((x) => x) ? hs.indexOf(Math.max(...hs)) : -1;
+    $('empAct').innerHTML = '<div class="stats">' + item('Última conexión', hace(a.visto_at)) + item('Días activos (30 d)', a.dias_30 + ' de 30') +
+      item('Entradas (30 d)', a.entradas_30) + item('Clientes activos (7 d)', a.clientes_activos) +
+      item('Notificaciones', a.push ? '🔔 Activas' : '🔕 No') + item('Último producto', hace(a.ultimo_producto)) + '</div>' +
+      '<h2 style="margin-top:12px">🕒 A qué hora se conecta (30 días)' + (pico >= 0 ? ' <span class="pill">más a las ' + pico + ':00</span>' : '') + '</h2>' +
+      '<div class="barras' + (pico < 0 ? ' vacia' : '') + '">' + hs.map((x, i) => '<div title="' + i + ':00 · ' + x + '" style="height:' + Math.round(x * 100 / mh) + '%"></div>').join('') + '</div>' +
+      '<div class="ejes"><span>0 h</span><span>6 h</span><span>12 h</span><span>18 h</span><span>23 h</span></div>' +
+      '<h2 style="margin-top:12px">📅 Últimos 14 días</h2>' +
+      '<div class="barras">' + ds.map((d) => '<div title="' + new Date(d.dia + 'T12:00').toLocaleDateString('es') + ' · ' + d.entradas + '" style="height:' +
+        Math.round(d.entradas * 100 / md) + '%"></div>').join('') + '</div>' +
+      '<div class="ejes"><span>hace 2 semanas</span><span>hoy</span></div>';
+  }
 
   /* ---------- Solicitudes (prueba 7 días / pago) ---------- */
   let solicitudes = [];

@@ -75,6 +75,14 @@
   .est { font-size: 12px; }
   .item .desc { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
   .item select.opc { padding: 8px 10px; font-size: 14px; }
+  .estrellas { display: flex; gap: 4px; margin: 4px 0 10px; }
+  .estrellas button { width: 44px; height: 44px; padding: 0; font-size: 26px; border-radius: 12px; background: var(--field); box-shadow: none; color: #9ca3af; }
+  .estrellas button.on { color: #f59e0b; }
+  .res li { flex-direction: column; align-items: stretch; gap: 4px; }
+  .res .est { color: #f59e0b; letter-spacing: 1px; font-size: 15px; }
+  .res .resp { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--field); }
+  .res .dest { border-left: 3px solid #f59e0b; padding-left: 10px; }
+  #estado a { color: inherit; }
   #pagoTxt { white-space: pre-wrap; font: inherit; margin: 0; padding: 10px; background: var(--field); border-radius: 10px; }
 </style>
 </head>
@@ -99,6 +107,19 @@
       <h2>⭐ Hazte Premium</h2>
       <p class="muted" id="premTxt">Ofertas VIP, precios especiales, tu propia Caja, colores e ícono a tu gusto y favoritos ilimitados.</p>
       <div class="btns"><a class="btn warn" href="../../#plan">⭐ Hazte Premium</a></div>
+    </div>
+    <div class="card hidden" id="cResenas" style="margin-top:16px">
+      <h2>⭐ Reseñas <span class="pill" id="resProm"></span></h2>
+      <div class="hidden" id="resForm">
+        <label id="resLbl">Tu calificación</label>
+        <div class="estrellas" id="resEst">
+          <button type="button" data-s="1" aria-label="1 estrella">★</button><button type="button" data-s="2" aria-label="2 estrellas">★</button><button type="button" data-s="3" aria-label="3 estrellas">★</button><button type="button" data-s="4" aria-label="4 estrellas">★</button><button type="button" data-s="5" aria-label="5 estrellas">★</button>
+        </div>
+        <textarea id="resTxt" maxlength="300" placeholder="Cuéntales a otros cómo te fue (opcional)" aria-label="Tu reseña"></textarea>
+        <div class="btns"><button class="small" id="bResena">Publicar reseña</button></div>
+      </div>
+      <p class="muted hidden" id="resNo" style="margin:0 0 8px">✍️ Podrás dejar tu reseña cuando recibas tu primer pedido de esta tienda.</p>
+      <ul class="list res" id="resLista"></ul>
     </div>
   </section>
 
@@ -155,6 +176,7 @@
   Core.marca();
   const yo = await Cuenta.require('../../');
   const params = new URLSearchParams(location.search);
+  let irAResenas = location.hash === '#resenas'; // desde el aviso "La tienda respondió tu reseña"
   const esCliente = yo.role === 'client';
   // ?modo=codefix: la empresa entra a la "tienda" de CodeFix (le compra al administrador).
   const modoCF = params.get('modo') === 'codefix' && !esCliente;
@@ -188,12 +210,23 @@
   let ofertas = null;
   const tienda = await traer('tienda_info', { p_negocio: negocio }, 'tienda', {}) || {};
 
-  // Abierto / cerrado y horario de la tienda.
-  if (tienda.horario || tienda.abierto === false) {
-    $('estado').classList.remove('hidden');
-    $('estado').innerHTML = (tienda.abierto === false ? '🔴 <b>Cerrado ahora</b>: puedes pedir igual, te responderemos al abrir.' : '🟢 <b>Abierto</b>') +
-      (tienda.horario ? '<br><span class="muted">🕒 ' + Core.esc(tienda.horario) + '</span>' : '');
+  // Abierto / cerrado, vacaciones, horario y reseñas de la tienda.
+  const vacaciones = /^\d{4}-\d{2}-\d{2}$/.test(tienda.vacaciones_hasta || '') ? new Date(tienda.vacaciones_hasta + 'T12:00') : null;
+  let resumenResenas = '';
+  function pintarEstado() {
+    const partes = [];
+    if (vacaciones) {
+      partes.push('🌴 <b>De vacaciones hasta el ' + vacaciones.toLocaleDateString('es', { day: 'numeric', month: 'long' }) + '</b>' +
+        (tienda.vacaciones_msg ? ': ' + Core.esc(tienda.vacaciones_msg) : '') + '<br><span class="muted">Puedes mirar los productos; los pedidos se reciben a su regreso.</span>');
+    } else if (tienda.horario || tienda.abierto === false) {
+      partes.push(tienda.abierto === false ? '🔴 <b>Cerrado ahora</b>: puedes pedir igual, te responderemos al abrir.' : '🟢 <b>Abierto</b>');
+    }
+    if (tienda.horario) partes.push('<span class="muted">🕒 ' + Core.esc(tienda.horario) + '</span>');
+    if (resumenResenas) partes.push(resumenResenas);
+    $('estado').classList.toggle('hidden', !partes.length);
+    $('estado').innerHTML = partes.join('<br>');
   }
+  pintarEstado();
 
   const precioDe = (i) => i.precio_premium != null ? i.precio_premium : i.precio;
   const esImg = (u) => /^(https?:\/\/|data:image\/)/i.test(u || '');
@@ -456,6 +489,10 @@
   }
   $('bEnviarPed').onclick = () => enviarPedido(false);
   $('bWspPed').onclick = () => enviarPedido(true);
+  if (vacaciones && comprador) {
+    $('bEnviarPed').disabled = true; $('bEnviarPed').textContent = '🌴 La tienda está de vacaciones';
+    $('bWspPed').classList.add('hidden');
+  }
 
   // Datos de transferencia de la tienda.
   if (tienda.datos_pago && comprador) {
@@ -495,7 +532,55 @@
     Core.toast(lineasCarro().length ? '🛒 Pedido cargado: revísalo y envíalo' : 'Esos productos ya no están disponibles');
   };
 
+  /* ---------- ⭐ Reseñas (opina quien ya recibió un pedido) ---------- */
+  let resenas = null, estrellas = 0;
+  const est = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+  async function cargarResenas() {
+    try { resenas = await Cuenta.rpc('ver_resenas', { p_negocio: negocio }); } catch (e) { return; }
+    const r = resenas;
+    $('cResenas').classList.remove('hidden');
+    $('resProm').textContent = r.total ? '★ ' + Number(r.promedio).toLocaleString('es-CL') + ' · ' + r.total : 'Sin reseñas';
+    resumenResenas = r.total ? '<a href="#resenas" id="lnkRes">⭐ <b>' + Number(r.promedio).toLocaleString('es-CL') + '</b> · ' + r.total + ' reseña' + (r.total === 1 ? '' : 's') + '</a>' : '';
+    pintarEstado();
+    $('resForm').classList.toggle('hidden', !r.puede);
+    $('resNo').classList.toggle('hidden', r.puede || !comprador);
+    if (r.puede) {
+      $('resLbl').textContent = r.mia ? 'Tu calificación (puedes cambiarla)' : 'Tu calificación';
+      if (!estrellas) estrellas = r.mia ? r.mia.estrellas : 0;
+      if (r.mia && !$('resTxt').value) $('resTxt').value = r.mia.texto || '';
+      $('bResena').textContent = r.mia ? 'Actualizar mi reseña' : 'Publicar reseña';
+      pintarEstrellas();
+    }
+    $('resLista').innerHTML = r.lista.length ? r.lista.map((x) => '<li class="' + (x.destacada ? 'dest' : '') + '"><div><span class="est">' + est(x.estrellas) + '</span> <b>' +
+      Core.esc(x.autor) + '</b>' + (x.mia ? ' <span class="pill">Tú</span>' : '') + (x.destacada ? ' <span class="pill pro">📌 Destacada</span>' : '') +
+      ' <span class="muted" style="font-size:12px">' + new Date(x.fecha).toLocaleDateString('es') + '</span></div>' +
+      (x.texto ? '<div>' + Core.esc(x.texto) + '</div>' : '') +
+      (x.respuesta ? '<div class="resp">💬 <b>Respuesta de la tienda:</b> ' + Core.esc(x.respuesta) + '</div>' : '') + '</li>').join('')
+      : '<li class="empty">' + (comprador ? 'Aún no hay reseñas. ¡Sé el primero cuando recibas tu pedido!' : 'Aún no tienes reseñas. Tus clientes pueden opinar cuando reciben un pedido.') + '</li>';
+    if (irAResenas) { irAResenas = false; setTimeout(() => $('cResenas').scrollIntoView({ behavior: 'smooth' }), 150); }
+  }
+  function pintarEstrellas() { $('resEst').querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.s) <= estrellas)); }
+  $('resEst').onclick = (e) => { const b = e.target.closest('[data-s]'); if (b) { estrellas = Number(b.dataset.s); pintarEstrellas(); } };
+  $('bResena').onclick = async () => {
+    if (!estrellas) return Core.toast('Elige de 1 a 5 estrellas');
+    $('bResena').disabled = true;
+    try {
+      const r = await Cuenta.rpc('dejar_resena', { p_negocio: negocio, p_estrellas: estrellas, p_texto: $('resTxt').value });
+      if (!r.ok) throw new Error(r.error);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {});
+      Core.toast('⭐ ¡Gracias por tu reseña!');
+      cargarResenas();
+    } catch (err) { Core.toast(err.message); } finally { $('bResena').disabled = false; }
+  };
+  $('estado').onclick = (e) => {
+    if (!e.target.closest('#lnkRes')) return;
+    e.preventDefault();
+    if (vistaActual !== 'productos') vista('productos');
+    setTimeout(() => $('cResenas').scrollIntoView({ behavior: 'smooth' }), 50);
+  };
+
   pintar(); guardarCarro();
+  cargarResenas();
   const v = params.get('v');
   vista(['ofertas', 'pedidos'].includes(v) && !(v === 'pedidos' && !comprador) ? v : 'productos');
 })();

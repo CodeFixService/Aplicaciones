@@ -2249,6 +2249,373 @@ grant execute on function public.conectados(uuid, uuid), public.chat_limite(uuid
   public.mis_conexiones(), public.eliminar_conexion(uuid) to authenticated;
 
 -- =====================================================================
+--  VERSIÓN 4.0: 📡 actividad de las empresas (solo la ve el administrador),
+--  📣 motivar, ⭐ reseñas, 🌴 modo vacaciones, ⚡ respuestas rápidas y
+--  🎨 color de la tienda.
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '4.0'::text $$;
+
+alter table public.profiles add column if not exists visto_at timestamptz;
+alter table public.profiles add column if not exists motivado_at timestamptz;
+alter table public.profiles add column if not exists vacaciones_hasta date;
+alter table public.profiles add column if not exists vacaciones_msg text;
+alter table public.profiles add column if not exists respuestas jsonb not null default '[]'::jsonb;
+alter table public.profiles add column if not exists color text;
+
+-- Hoy en Chile (para vacaciones y horas de conexión).
+create or replace function public.hoy_cl() returns date
+language sql stable as $$ select (now() at time zone 'America/Santiago')::date $$;
+
+-- ---------- 📡 Actividad: un registro chico por persona y día (se guarda 90 días) ----------
+create table if not exists public.actividad_dia (
+  user_id   uuid not null references public.profiles (id) on delete cascade,
+  dia       date not null,
+  entradas  int not null default 0,
+  horas     int[] not null default array_fill(0, array[24]),
+  primary key (user_id, dia)
+);
+alter table public.actividad_dia enable row level security;  -- sin políticas: solo por funciones
+revoke all on public.actividad_dia from anon, authenticated;
+
+-- La app lo llama al abrirse (máx. una vez cada 10 minutos por persona).
+create or replace function public.registrar_actividad() returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  h int := extract(hour from now() at time zone 'America/Santiago')::int;
+begin
+  if me is null then return; end if;
+  update public.profiles set visto_at = now()
+  where id = me and (visto_at is null or visto_at < now() - interval '10 minutes');
+  if not found then return; end if;
+  insert into public.actividad_dia as a (user_id, dia, entradas, horas)
+  values (me, public.hoy_cl(), 1, (select array_agg(case when i = h then 1 else 0 end order by i) from generate_series(0, 23) i))
+  on conflict (user_id, dia) do update set entradas = a.entradas + 1, horas[h + 1] = a.horas[h + 1] + 1;
+  delete from public.actividad_dia where user_id = me and dia < public.hoy_cl() - 90;
+end $$;
+
+-- Lista de empresas con su última actividad (para el semáforo 🟢🟡🔴).
+create or replace function public.admin_actividad()
+returns table (id uuid, empresa text, email text, telefono text, pro boolean, visto_at timestamptz,
+               ultimo_producto timestamptz, ultima_ficha timestamptz, ultimo_pedido timestamptz,
+               productos int, fichas int, clientes int, clientes_activos int, pedidos_7d int, entradas_7d int,
+               push boolean, motivado_at timestamptz)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  return query
+  select p.id, p.empresa, p.email, p.telefono, public.is_pro(p.id), p.visto_at,
+    (select max(c.created_at) from public.catalog_items c where c.owner_id = p.id),
+    (select max(x.updated_at) from public.publicaciones x where x.owner_id = p.id),
+    (select max(x.created_at) from public.pedidos x where x.negocio_id = p.id),
+    (select count(*)::int from public.catalog_items c where c.owner_id = p.id),
+    (select count(*)::int from public.publicaciones x where x.owner_id = p.id),
+    (select count(*)::int from public.profiles c where c.negocio_id = p.id and c.role = 'client'),
+    (select count(*)::int from public.profiles c where c.negocio_id = p.id and c.role = 'client' and c.visto_at > now() - interval '7 days'),
+    (select count(*)::int from public.pedidos x where x.negocio_id = p.id and x.created_at > now() - interval '7 days'),
+    (select coalesce(sum(a.entradas), 0)::int from public.actividad_dia a where a.user_id = p.id and a.dia > public.hoy_cl() - 7),
+    exists (select 1 from public.push_subscriptions s where s.user_id = p.id),
+    p.motivado_at
+  from public.profiles p
+  where p.role = 'user'
+  order by p.visto_at desc nulls last;
+end $$;
+
+-- Resumen de hoy (para la tarjeta del administrador).
+create or replace function public.admin_actividad_hoy() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare d timestamptz := (public.hoy_cl()::timestamp at time zone 'America/Santiago');
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  return jsonb_build_object(
+    'empresas', (select count(*) from public.profiles where role = 'user' and visto_at >= d),
+    'clientes', (select count(*) from public.profiles where role = 'client' and visto_at >= d),
+    'productos', (select count(*) from public.catalog_items c join public.profiles p on p.id = c.owner_id
+                  where p.role = 'user' and c.created_at >= d),
+    'fichas', (select count(*) from public.publicaciones x join public.profiles p on p.id = x.owner_id
+               where p.role = 'user' and x.updated_at >= d),
+    'pedidos', (select count(*) from public.pedidos where created_at >= d));
+end $$;
+
+-- Detalle de una empresa: días activos, horario típico y últimos 14 días.
+create or replace function public.admin_empresa_actividad(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare hs int[] := array_fill(0, array[24]); r record;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  for r in select horas from public.actividad_dia where user_id = p_id and dia > public.hoy_cl() - 30 loop
+    for i in 1..24 loop hs[i] := hs[i] + coalesce(r.horas[i], 0); end loop;
+  end loop;
+  return jsonb_build_object(
+    'visto_at', (select visto_at from public.profiles where id = p_id),
+    'motivado_at', (select motivado_at from public.profiles where id = p_id),
+    'push', exists (select 1 from public.push_subscriptions s where s.user_id = p_id),
+    'dias_30', (select count(*) from public.actividad_dia where user_id = p_id and dia > public.hoy_cl() - 30),
+    'entradas_30', (select coalesce(sum(entradas), 0) from public.actividad_dia where user_id = p_id and dia > public.hoy_cl() - 30),
+    'horas', to_jsonb(hs),
+    'dias', (select coalesce(jsonb_agg(jsonb_build_object('dia', g::date, 'entradas', coalesce(a.entradas, 0)) order by g), '[]')
+             from generate_series(public.hoy_cl() - 13, public.hoy_cl(), interval '1 day') g
+             left join public.actividad_dia a on a.user_id = p_id and a.dia = g::date),
+    'clientes_activos', (select count(*) from public.profiles c where c.negocio_id = p_id and c.role = 'client' and c.visto_at > now() - interval '7 days'),
+    'ultimo_producto', (select max(created_at) from public.catalog_items where owner_id = p_id),
+    'ultima_ficha', (select max(updated_at) from public.publicaciones where owner_id = p_id),
+    'ultimo_pedido', (select max(created_at) from public.pedidos where negocio_id = p_id));
+end $$;
+
+-- 🧹 Borra el historial de conexiones (la "última vez" de cada uno se mantiene).
+create or replace function public.admin_limpiar_actividad() returns int
+language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  delete from public.actividad_dia where true;
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- 📣 Motivar: mensaje en su chat con CodeFix + notificación push (máx. 1 por empresa al día).
+create or replace function public.admin_motivar(p_user uuid, p_titulo text, p_cuerpo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  u public.profiles;
+  t text := left(trim(coalesce(p_titulo, '')), 80);
+  c text := left(trim(coalesce(p_cuerpo, '')), 1000);
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  select * into u from public.profiles where id = p_user and role = 'user';
+  if u.id is null then return jsonb_build_object('ok', false, 'error', 'Empresa no encontrada'); end if;
+  if c = '' then return jsonb_build_object('ok', false, 'error', 'Escribe el mensaje'); end if;
+  if u.motivado_at > now() - interval '20 hours' then
+    return jsonb_build_object('ok', false, 'error', 'A ' || coalesce(nullif(u.empresa, ''), u.email) || ' ya le enviaste un aviso hoy');
+  end if;
+  insert into public.messages (sender, recipient, body) values (auth.uid(), u.id, c);
+  perform public.notify_user(u.id, coalesce(nullif(t, ''), '💬 CodeFix'), c, 'apps/mensajes/?con=' || auth.uid());
+  update public.profiles set motivado_at = now() where id = u.id;
+  return jsonb_build_object('ok', true, 'push', exists (select 1 from public.push_subscriptions s where s.user_id = u.id));
+end $$;
+
+-- ---------- 🌴 Modo vacaciones (se apaga solo al pasar la fecha) ----------
+create or replace function public.en_vacaciones(t uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select vacaciones_hasta >= public.hoy_cl() from public.profiles where id = t), false)
+$$;
+
+create or replace function public.set_vacaciones(p_hasta date, p_msg text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  if p_hasta is not null and p_hasta < public.hoy_cl() then raise exception 'La fecha de regreso ya pasó'; end if;
+  if p_hasta is not null and p_hasta > public.hoy_cl() + 120 then raise exception 'Máximo 120 días de vacaciones'; end if;
+  update public.profiles set vacaciones_hasta = p_hasta,
+    vacaciones_msg = case when p_hasta is null then null else nullif(left(trim(coalesce(p_msg, '')), 160), '') end
+  where id = auth.uid();
+  return public.my_account();
+end $$;
+
+-- Con la tienda de vacaciones no entran pedidos (lo revisa el servidor).
+create or replace function public.pedido_sin_vacaciones() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare h date;
+begin
+  if public.en_vacaciones(new.negocio_id) then
+    select vacaciones_hasta into h from public.profiles where id = new.negocio_id;
+    raise exception 'La tienda está de vacaciones hasta el %. Podrás pedir a su regreso.', to_char(h, 'DD-MM-YYYY');
+  end if;
+  return new;
+end $$;
+drop trigger if exists pedidos_vacaciones on public.pedidos;
+create trigger pedidos_vacaciones before insert on public.pedidos
+  for each row execute function public.pedido_sin_vacaciones();
+
+-- ---------- 🎨 Color de la tienda (Free: 12 colores base · Pro: cualquiera) ----------
+create or replace function public.set_mi_color(p_color text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c text := lower(nullif(trim(coalesce(p_color, '')), ''));
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  if c is not null and c !~ '^#[0-9a-f]{6}$' then raise exception 'Color no válido'; end if;
+  if c is not null and not public.is_pro(auth.uid()) and c <> all (array['#2563eb', '#4f46e5', '#7c3aed', '#db2777', '#dc2626',
+      '#ea580c', '#d97706', '#16a34a', '#059669', '#0891b2', '#334155', '#111827']) then
+    raise exception 'El color personalizado para tu tienda es de la versión Pro (con Free elige uno de los 12 colores)';
+  end if;
+  update public.profiles set color = c where id = auth.uid();
+  return public.my_account();
+end $$;
+
+create or replace function public.my_account() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'id', p.id, 'email', p.email, 'empresa', p.empresa, 'plan', p.plan, 'role', p.role,
+    'pro_until', p.pro_until, 'suspended', p.suspended, 'trial_used', p.trial_used,
+    'mute_offers', p.mute_offers, 'terms_at', p.terms_at,
+    'negocio_id', p.negocio_id, 'negocio', n.empresa, 'telefono', p.telefono, 'negocio_telefono', n.telefono,
+    'logo', p.logo, 'negocio_logo', n.logo, 'color', p.color, 'negocio_color', n.color,
+    'is_pro', public.is_pro(p.id), 'is_admin', public.is_admin())
+  from public.profiles p left join public.profiles n on n.id = p.negocio_id
+  where p.id = auth.uid()
+$$;
+
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', case when t.role = 'admin' then 'CodeFix' else t.empresa end,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', case when public.is_pro(t.id) then t.sellos_meta end, 'sellos_premio', t.sellos_premio,
+    'pro', public.is_pro(t.id), 'logo', t.logo, 'color', t.color,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end)
+  from public.profiles t
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or t.id = auth.uid() or public.is_admin())
+$$;
+
+-- ---------- ⚡ Respuestas rápidas del chat (Free: 3 · Pro: 20) ----------
+create or replace function public.mis_respuestas() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select respuestas from public.profiles where id = auth.uid()), '[]'::jsonb)
+$$;
+
+create or replace function public.set_mis_respuestas(p_lista jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare l jsonb := '[]'::jsonb; x jsonb; t text; lim int;
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Las respuestas rápidas son para las empresas'; end if;
+  if jsonb_typeof(coalesce(p_lista, '[]'::jsonb)) <> 'array' then raise exception 'Lista no válida'; end if;
+  lim := case when public.is_pro(auth.uid()) then 20 else 3 end;
+  for x in select * from jsonb_array_elements(coalesce(p_lista, '[]'::jsonb)) loop
+    t := left(trim(coalesce(x #>> '{}', '')), 200);
+    if t <> '' then l := l || to_jsonb(t); end if;
+  end loop;
+  if jsonb_array_length(l) > lim then
+    raise exception '%', case when lim = 3 then 'Con Free tienes hasta 3 respuestas rápidas. Pásate a Pro para tener 20.'
+      else 'Máximo 20 respuestas rápidas' end;
+  end if;
+  update public.profiles set respuestas = l where id = auth.uid();
+  return l;
+end $$;
+
+-- ---------- ⭐ Reseñas: solo opina quien ya recibió un pedido de la tienda ----------
+create table if not exists public.resenas (
+  id          uuid primary key default gen_random_uuid(),
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  autor_id    uuid not null references public.profiles (id) on delete cascade,
+  estrellas   int not null check (estrellas between 1 and 5),
+  texto       text not null default '',
+  respuesta   text,
+  destacada   boolean not null default false,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (negocio_id, autor_id)
+);
+create index if not exists resenas_negocio_idx on public.resenas (negocio_id, updated_at desc);
+alter table public.resenas enable row level security;  -- sin políticas: solo por funciones
+revoke all on public.resenas from anon, authenticated;
+
+create or replace function public.puede_resenar(me uuid, t uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.puede_comprar(me, t)
+     and exists (select 1 from public.pedidos x where x.negocio_id = t and x.cliente_id = me and x.estado = 'entregado')
+$$;
+
+create or replace function public.dejar_resena(p_negocio uuid, p_estrellas int, p_texto text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me public.profiles; nueva boolean;
+begin
+  select * into me from public.profiles where id = auth.uid();
+  if me.id is null or me.suspended then return jsonb_build_object('ok', false, 'error', 'Inicia sesión primero'); end if;
+  if not public.puede_resenar(me.id, p_negocio) then
+    return jsonb_build_object('ok', false, 'error', 'Podrás dejar tu reseña cuando recibas tu primer pedido de esta tienda');
+  end if;
+  if p_estrellas is null or p_estrellas < 1 or p_estrellas > 5 then return jsonb_build_object('ok', false, 'error', 'Elige de 1 a 5 estrellas'); end if;
+  nueva := not exists (select 1 from public.resenas where negocio_id = p_negocio and autor_id = me.id);
+  insert into public.resenas (negocio_id, autor_id, estrellas, texto)
+  values (p_negocio, me.id, p_estrellas, left(trim(coalesce(p_texto, '')), 300))
+  on conflict (negocio_id, autor_id) do update set estrellas = excluded.estrellas, texto = excluded.texto, updated_at = now();
+  if nueva then
+    perform public.notify_user(p_negocio, '⭐ Nueva reseña: ' || repeat('★', p_estrellas) || repeat('☆', 5 - p_estrellas),
+      coalesce(nullif(left(trim(coalesce(p_texto, '')), 120), ''), 'Un cliente calificó tu tienda'), 'apps/pedidos/?v=resenas');
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- Nombre corto del autor ("Rosa M."): nunca el correo.
+create or replace function public.nombre_corto(n text) returns text
+language sql immutable as $$
+  select coalesce(nullif(trim(split_part(trim(coalesce(n, '')), ' ', 1) ||
+    case when split_part(trim(coalesce(n, '')), ' ', 2) <> '' then ' ' || upper(left(split_part(trim(n), ' ', 2), 1)) || '.' else '' end), ''), 'Cliente')
+$$;
+
+create or replace function public.ver_resenas(p_negocio uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare pro boolean := public.is_pro(p_negocio);
+begin
+  if not (public.puede_comprar(auth.uid(), p_negocio) or p_negocio = auth.uid() or public.is_admin()) then
+    raise exception 'No puedes ver las reseñas de esta tienda';
+  end if;
+  return jsonb_build_object(
+    'promedio', (select round(avg(estrellas)::numeric, 1) from public.resenas where negocio_id = p_negocio),
+    'total', (select count(*) from public.resenas where negocio_id = p_negocio),
+    'puede', public.puede_resenar(auth.uid(), p_negocio),
+    'pro', pro,
+    'mia', (select jsonb_build_object('estrellas', estrellas, 'texto', texto) from public.resenas
+            where negocio_id = p_negocio and autor_id = auth.uid()),
+    'lista', (select coalesce(jsonb_agg(z), '[]') from (
+      select r.id, public.nombre_corto(a.empresa) as autor, r.estrellas, r.texto, r.respuesta,
+             r.destacada and pro as destacada, r.updated_at as fecha, r.autor_id = auth.uid() as mia
+      from public.resenas r join public.profiles a on a.id = r.autor_id
+      where r.negocio_id = p_negocio
+      order by (r.destacada and pro) desc, r.updated_at desc limit 50) z));
+end $$;
+
+create or replace function public.responder_resena(p_id uuid, p_respuesta text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.resenas; t text := nullif(left(trim(coalesce(p_respuesta, '')), 300), '');
+begin
+  select * into r from public.resenas where id = p_id and negocio_id = auth.uid();
+  if r.id is null then raise exception 'Reseña no encontrada'; end if;
+  if not public.is_pro(auth.uid()) then raise exception 'Responder reseñas es de la versión Pro'; end if;
+  update public.resenas set respuesta = t where id = p_id;
+  if t is not null and r.respuesta is null then
+    perform public.notify_user(r.autor_id, '💬 La tienda respondió tu reseña', t, 'apps/catalogo/?v=productos#resenas');
+  end if;
+end $$;
+
+create or replace function public.destacar_resena(p_id uuid, p_destacar boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not exists (select 1 from public.resenas where id = p_id and negocio_id = auth.uid()) then raise exception 'Reseña no encontrada'; end if;
+  if not public.is_pro(auth.uid()) then raise exception 'Destacar reseñas es de la versión Pro'; end if;
+  if coalesce(p_destacar, false) and (select count(*) from public.resenas where negocio_id = auth.uid() and destacada and id <> p_id) >= 3 then
+    raise exception 'Puedes destacar hasta 3 reseñas';
+  end if;
+  update public.resenas set destacada = coalesce(p_destacar, false) where id = p_id;
+end $$;
+
+revoke all on function public.hoy_cl() from public, anon;
+revoke all on function public.registrar_actividad() from public, anon;
+revoke all on function public.admin_actividad() from public, anon;
+revoke all on function public.admin_actividad_hoy() from public, anon;
+revoke all on function public.admin_empresa_actividad(uuid) from public, anon;
+revoke all on function public.admin_limpiar_actividad() from public, anon;
+revoke all on function public.admin_motivar(uuid, text, text) from public, anon;
+revoke all on function public.en_vacaciones(uuid) from public, anon;
+revoke all on function public.set_vacaciones(date, text) from public, anon;
+revoke all on function public.pedido_sin_vacaciones() from public, anon, authenticated;
+revoke all on function public.set_mi_color(text) from public, anon;
+revoke all on function public.mis_respuestas() from public, anon;
+revoke all on function public.set_mis_respuestas(jsonb) from public, anon;
+revoke all on function public.puede_resenar(uuid, uuid) from public, anon;
+revoke all on function public.dejar_resena(uuid, int, text) from public, anon;
+revoke all on function public.nombre_corto(text) from public, anon;
+revoke all on function public.ver_resenas(uuid) from public, anon;
+revoke all on function public.responder_resena(uuid, text) from public, anon;
+revoke all on function public.destacar_resena(uuid, boolean) from public, anon;
+grant execute on function public.hoy_cl(), public.registrar_actividad(), public.admin_actividad(), public.admin_actividad_hoy(),
+  public.admin_empresa_actividad(uuid), public.admin_limpiar_actividad(), public.admin_motivar(uuid, text, text),
+  public.en_vacaciones(uuid), public.set_vacaciones(date, text), public.set_mi_color(text), public.my_account(), public.tienda_info(uuid),
+  public.mis_respuestas(), public.set_mis_respuestas(jsonb), public.puede_resenar(uuid, uuid), public.dejar_resena(uuid, int, text),
+  public.nombre_corto(text), public.ver_resenas(uuid), public.responder_resena(uuid, text), public.destacar_resena(uuid, boolean)
+  to authenticated;
+-- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".
 --  Pega este archivo en Supabase → SQL Editor → Run (después de schema.sql
 --  y de crear la Edge Function "enviar").
