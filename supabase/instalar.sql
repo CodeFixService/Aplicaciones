@@ -844,6 +844,32 @@ alter table public.reports enable row level security;
 drop policy if exists "reportes admin" on public.reports;
 create policy "reportes admin" on public.reports for select to authenticated using (public.is_admin());
 
+-- Conexiones entre clientes (👥 Contactos): se piden con el código personal y se aceptan.
+create table if not exists public.conexiones (
+  id            uuid primary key default gen_random_uuid(),
+  de            uuid not null references public.profiles (id) on delete cascade,
+  para          uuid not null references public.profiles (id) on delete cascade,
+  estado        text not null default 'pendiente' check (estado in ('pendiente', 'aceptada', 'rechazada')),
+  created_at    timestamptz not null default now(),
+  respondida_at timestamptz,
+  unique (de, para)
+);
+alter table public.conexiones enable row level security;  -- sin políticas: solo por funciones
+revoke all on public.conexiones from anon, authenticated;
+
+create or replace function public.conectados(a uuid, b uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.conexiones c where c.estado = 'aceptada'
+                 and ((c.de = a and c.para = b) or (c.de = b and c.para = a)))
+$$;
+
+-- Mensajes seguidos sin respuesta: entre contactos 1 (Free) o 5 (Premium); el resto, 3.
+create or replace function public.chat_limite(a uuid, b uuid) returns int
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select case when pa.role = 'client' and pb.role = 'client' then (case when public.is_pro(a) then 5 else 1 end) else 3 end
+                   from public.profiles pa, public.profiles pb where pa.id = a and pb.id = b), 3)
+$$;
+
 -- ¿Pueden hablar a y b?
 create or replace function public.can_message(a uuid, b uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -852,14 +878,15 @@ language sql stable security definer set search_path = '' as $$
     where pa.id = a and pb.id = b and not pa.suspended
       and ((pa.role = 'admin' and pb.role = 'user') or (pb.role = 'admin' and pa.role = 'user')
            or (pa.role = 'user' and pb.role = 'client' and pb.negocio_id = pa.id)
-           or (pa.role = 'client' and pb.role = 'user' and pa.negocio_id = pb.id))
+           or (pa.role = 'client' and pb.role = 'user' and pa.negocio_id = pb.id)
+           or (pa.role = 'client' and pb.role = 'client' and public.conectados(a, b)))
   )
 $$;
 
 -- Mensajes que aún puedo enviar seguidos a "otro" (null = sin límite).
 create or replace function public.chat_remaining(p_other uuid) returns int
 language sql stable security definer set search_path = '' as $$
-  select case when public.is_admin() then null else greatest(0, 3 - (
+  select case when public.is_admin() then null else greatest(0, public.chat_limite(auth.uid(), p_other) - (
     select count(*) from public.messages m
     where m.sender = auth.uid() and m.recipient = p_other
       and m.created_at > coalesce((select max(x.created_at) from public.messages x
@@ -889,7 +916,9 @@ begin
     end if;
     left_ := public.chat_remaining(p_to);
     if left_ <= 0 then
-      return jsonb_build_object('ok', false, 'error', 'Ya enviaste 3 mensajes seguidos. Espera la respuesta para escribir de nuevo.');
+      return jsonb_build_object('ok', false, 'error', case when public.chat_limite(me.id, p_to) = 1
+        then 'Con la versión Free envías 1 mensaje a la vez. Espera la respuesta (o hazte Premium para enviar hasta 5).'
+        else 'Ya enviaste ' || public.chat_limite(me.id, p_to) || ' mensajes seguidos. Espera la respuesta para escribir de nuevo.' end);
     end if;
     if (select count(*) from public.messages where sender = me.id and created_at > now() - interval '1 day') >= 100 then
       return jsonb_build_object('ok', false, 'error', 'Llegaste al máximo de 100 mensajes por día');
@@ -946,6 +975,8 @@ language sql stable security definer set search_path = '' as $$
          case when p.role = 'admin' then 'CodeFix (soporte)' else coalesce(nullif(p.empresa, ''), split_part(p.email, '@', 1)) end,
          p.role,
          case when public.is_admin() then p.email
+              when p.role = 'client' and (select me.role from public.profiles me where me.id = auth.uid()) = 'client'
+                then 'Contacto · ' || coalesce((select n.empresa from public.profiles n where n.id = p.negocio_id), '')
               when p.role = 'client' then 'Cliente desde ' || to_char(p.created_at, 'DD/MM/YYYY') else '' end
   from public.profiles p
   where public.can_message(auth.uid(), p.id)
@@ -1295,7 +1326,7 @@ end $$;
 
 -- Versión de la base de datos (la app avisa al admin si falta actualizarla).
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '3.8'::text $$;
+language sql immutable as $$ select '3.9'::text $$;
 
 revoke all on function public.set_my_phone(text) from public, anon;
 grant execute on function public.set_my_phone(text) to authenticated;
@@ -1370,7 +1401,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '3.8'::text $$;
+language sql immutable as $$ select '3.9'::text $$;
 
 revoke all on function public.publicar_ficha(text, text, text, text, text) from public, anon;
 revoke all on function public.borrar_publicacion(text) from public, anon;
@@ -2068,6 +2099,154 @@ revoke all on function public.admin_uso() from public, anon;
 grant execute on function public.set_mi_logo(text), public.tienda_info(uuid),
   public.catalog_upsert(text, text, numeric, numeric, text, boolean, text, text), public.catalog_of(uuid),
   public.ver_publicaciones(text, boolean), public.imagenes_publicaciones(text, uuid[]), public.admin_uso() to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 3.9: 👥 Contactos entre clientes (con código), chat entre contactos
+--  Free: 3 conexiones, 1 mensaje a la vez · Premium: 20 conexiones, hasta 5 seguidos.
+--  Las conexiones no se cruzan: cada uno ve solo las suyas. Las empresas no las ven.
+-- =====================================================================
+alter table public.profiles add column if not exists codigo text;
+create unique index if not exists profiles_codigo_idx on public.profiles (codigo) where codigo is not null;
+
+create or replace function public.limite_conexiones(u uuid) returns int
+language sql stable security definer set search_path = '' as $$
+  select case when public.is_pro(u) then 20 else 3 end
+$$;
+
+-- Código personal: 4 letras del nombre + 4 números (ej: ROSA-4821).
+create or replace function public.nuevo_codigo(u uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare base text; c text; i int := 0;
+begin
+  select upper(left(regexp_replace(translate(coalesce(nullif(empresa, ''), split_part(email, '@', 1)),
+           'áéíóúÁÉÍÓÚñÑüÜ', 'aeiouAEIOUnNuU'), '[^A-Za-z]', '', 'g'), 4)) into base from public.profiles where id = u;
+  if coalesce(base, '') = '' then base := 'CFX'; end if;
+  loop
+    c := base || '-' || lpad((floor(random() * 10000))::int::text, 4, '0');
+    exit when not exists (select 1 from public.profiles where codigo = c);
+    i := i + 1; if i > 20 then base := base || 'X'; end if;
+  end loop;
+  update public.profiles set codigo = c where id = u;
+  return c;
+end $$;
+
+create or replace function public.mi_codigo() returns text
+language plpgsql security definer set search_path = '' as $$
+declare c text;
+begin
+  if (select role from public.profiles where id = auth.uid()) is distinct from 'client' then raise exception 'Contactos es para clientes'; end if;
+  select codigo into c from public.profiles where id = auth.uid();
+  return coalesce(c, public.nuevo_codigo(auth.uid()));
+end $$;
+
+create or replace function public.cambiar_codigo() returns text
+language plpgsql security definer set search_path = '' as $$
+begin
+  if (select role from public.profiles where id = auth.uid()) is distinct from 'client' then raise exception 'Contactos es para clientes'; end if;
+  return public.nuevo_codigo(auth.uid());
+end $$;
+
+create or replace function public.contar_conexiones(u uuid) returns int
+language sql stable security definer set search_path = '' as $$
+  select count(*)::int from public.conexiones where estado = 'aceptada' and (de = u or para = u)
+$$;
+
+create or replace function public.solicitar_conexion(p_codigo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  me public.profiles; otro public.profiles; prev public.conexiones;
+  c text := upper(trim(coalesce(p_codigo, '')));
+  lim int;
+begin
+  select * into me from public.profiles where id = auth.uid();
+  if me.role is distinct from 'client' or me.suspended then return jsonb_build_object('ok', false, 'error', 'Contactos es para clientes'); end if;
+  select * into otro from public.profiles where codigo = c and role = 'client' and not suspended;
+  if otro.id is null then return jsonb_build_object('ok', false, 'error', 'No existe ese código. Revísalo con tu contacto.'); end if;
+  if otro.id = me.id then return jsonb_build_object('ok', false, 'error', 'Ese es tu propio código'); end if;
+  if public.conectados(me.id, otro.id) then return jsonb_build_object('ok', false, 'error', 'Ya son contactos'); end if;
+  if exists (select 1 from public.blocks where (blocker = otro.id and blocked = me.id) or (blocker = me.id and blocked = otro.id)) then
+    return jsonb_build_object('ok', false, 'error', 'No puedes conectarte con esta persona');
+  end if;
+  if exists (select 1 from public.conexiones where de = otro.id and para = me.id and estado = 'pendiente') then
+    return jsonb_build_object('ok', false, 'error', 'Esa persona ya te envió una solicitud: acéptala en "Solicitudes"');
+  end if;
+  select * into prev from public.conexiones where de = me.id and para = otro.id;
+  if prev.estado = 'pendiente' then return jsonb_build_object('ok', false, 'error', 'Ya le enviaste una solicitud. Espera su respuesta.'); end if;
+  if prev.estado = 'rechazada' and prev.respondida_at > now() - interval '30 days' then
+    return jsonb_build_object('ok', false, 'error', 'Esa persona no aceptó tu solicitud. Podrás volver a intentarlo en 30 días.');
+  end if;
+  -- Anti-spam: máximo 3 solicitudes por día.
+  if (select count(*) from public.conexiones where de = me.id and created_at > now() - interval '1 day') >= 3 then
+    return jsonb_build_object('ok', false, 'error', 'Máximo 3 solicitudes por día. Intenta mañana.');
+  end if;
+  lim := public.limite_conexiones(me.id);
+  if public.contar_conexiones(me.id) + (select count(*) from public.conexiones where de = me.id and estado = 'pendiente') >= lim then
+    return jsonb_build_object('ok', false, 'error', case when lim = 3 then 'Con Free tienes hasta 3 contactos. Hazte Premium para tener hasta 20.'
+      else 'Llegaste al máximo de 20 contactos' end);
+  end if;
+  insert into public.conexiones (de, para) values (me.id, otro.id)
+  on conflict (de, para) do update set estado = 'pendiente', created_at = now(), respondida_at = null;
+  perform public.notify_user(otro.id, '👥 Solicitud de contacto',
+    coalesce(nullif(me.empresa, ''), 'Alguien') || ' quiere conectarse contigo', 'apps/contactos/');
+  return jsonb_build_object('ok', true, 'nombre', coalesce(nullif(otro.empresa, ''), 'tu contacto'));
+end $$;
+
+create or replace function public.responder_conexion(p_id uuid, p_aceptar boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c public.conexiones; me public.profiles;
+begin
+  select * into me from public.profiles where id = auth.uid();
+  select * into c from public.conexiones where id = p_id and para = me.id and estado = 'pendiente';
+  if c.id is null then return jsonb_build_object('ok', false, 'error', 'Solicitud no encontrada'); end if;
+  if coalesce(p_aceptar, false) then
+    if public.contar_conexiones(me.id) >= public.limite_conexiones(me.id) then
+      return jsonb_build_object('ok', false, 'error', case when public.limite_conexiones(me.id) = 3
+        then 'Con Free tienes hasta 3 contactos. Hazte Premium para tener hasta 20.' else 'Llegaste al máximo de 20 contactos' end);
+    end if;
+    if public.contar_conexiones(c.de) >= public.limite_conexiones(c.de) then
+      return jsonb_build_object('ok', false, 'error', 'Esa persona ya llegó a su máximo de contactos');
+    end if;
+    update public.conexiones set estado = 'aceptada', respondida_at = now() where id = c.id;
+    perform public.notify_user(c.de, '👥 ' || coalesce(nullif(me.empresa, ''), 'Tu contacto') || ' aceptó tu solicitud',
+      'Ya pueden chatear en Mensajes', 'apps/contactos/');
+  else
+    update public.conexiones set estado = 'rechazada', respondida_at = now() where id = c.id;
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- Mis contactos y solicitudes (solo nombre y tienda; nunca correo ni teléfono).
+create or replace function public.mis_conexiones()
+returns table (id uuid, otro uuid, nombre text, tienda text, estado text, enviada boolean, fecha timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select c.id, o.id, coalesce(nullif(o.empresa, ''), 'Sin nombre'), coalesce(n.empresa, ''), c.estado, c.de = auth.uid(),
+         coalesce(c.respondida_at, c.created_at)
+  from public.conexiones c
+  join public.profiles o on o.id = case when c.de = auth.uid() then c.para else c.de end
+  left join public.profiles n on n.id = o.negocio_id
+  where (c.de = auth.uid() or c.para = auth.uid()) and c.estado in ('pendiente', 'aceptada')
+  order by c.estado = 'pendiente' desc, 3
+$$;
+
+create or replace function public.eliminar_conexion(p_otro uuid) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.conexiones where (de = auth.uid() and para = p_otro) or (de = p_otro and para = auth.uid())
+$$;
+
+revoke all on function public.conectados(uuid, uuid) from public, anon;
+revoke all on function public.chat_limite(uuid, uuid) from public, anon;
+revoke all on function public.limite_conexiones(uuid) from public, anon;
+revoke all on function public.nuevo_codigo(uuid) from public, anon, authenticated;
+revoke all on function public.contar_conexiones(uuid) from public, anon, authenticated;
+revoke all on function public.mi_codigo() from public, anon;
+revoke all on function public.cambiar_codigo() from public, anon;
+revoke all on function public.solicitar_conexion(text) from public, anon;
+revoke all on function public.responder_conexion(uuid, boolean) from public, anon;
+revoke all on function public.mis_conexiones() from public, anon;
+revoke all on function public.eliminar_conexion(uuid) from public, anon;
+grant execute on function public.conectados(uuid, uuid), public.chat_limite(uuid, uuid), public.limite_conexiones(uuid),
+  public.mi_codigo(), public.cambiar_codigo(), public.solicitar_conexion(text), public.responder_conexion(uuid, boolean),
+  public.mis_conexiones(), public.eliminar_conexion(uuid) to authenticated;
 
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".

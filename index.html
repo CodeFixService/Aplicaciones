@@ -23,6 +23,8 @@
   .app .ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 26px;
     background: var(--brand-soft); margin-bottom: 6px; }
   .app b { font-size: 16px; }
+  .app .ico .ico-svg { width: 26px; height: 26px; color: var(--brand); }
+  .app.admin .ico .ico-svg { color: var(--card); }
   .app small { color: var(--muted); font-size: 13px; line-height: 1.4; }
   .app.admin .ico { background: var(--text); }
   .badge { position: absolute; top: 12px; right: 12px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px;
@@ -65,6 +67,11 @@
   .iconos button { width: 44px; height: 44px; padding: 0; font-size: 22px; border-radius: 12px; background: var(--field); box-shadow: none; color: var(--text); }
   .iconos button.on { outline: 3px solid var(--brand); }
   .bloqueado { opacity: .55; }
+  .tiendaChip { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 4px 10px 4px 4px; border-radius: 99px;
+    background: var(--brand-soft); font-size: 13px; max-width: 100%; }
+  .tiendaChip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .logoMini { width: 26px; height: 26px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 13px;
+    background: var(--brand) center / cover no-repeat; color: var(--brand-ink); }
   .mini { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); }
   .mini .grow { flex: 1; min-width: 0; }
   .icono-top { margin-left: 8px; width: 40px; height: 40px; padding: 0; border-radius: 12px; font-size: 20px; background: var(--field); color: var(--text); box-shadow: none; flex: none; }
@@ -143,7 +150,8 @@
   <section id="v-home" class="hidden">
     <div class="card hola">
       <div class="avatar" id="avatar">C</div>
-      <div><h2 id="hola"></h2><p class="muted" id="estadoPlan"></p></div>
+      <div style="min-width:0"><h2 id="hola"></h2><p class="muted" id="estadoPlan"></p>
+        <div class="tiendaChip hidden" id="tiendaChip"><span class="logoMini" id="tiendaLogo"></span><span>Tu tienda: <b id="tiendaNom"></b></span></div></div>
     </div>
 
     <div class="card hidden" id="cBase" style="border:2px solid var(--bad)">
@@ -418,7 +426,7 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '3.8';
+  const DB_VERSION = '3.9';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
@@ -436,17 +444,19 @@
   }
 
   const APPS = {
-    fichas: ['apps/fichas/', '📣', 'FichaPro', 'Fichas publicitarias, campañas y avisos a tus clientes'],
-    caja: ['apps/caja/', '💵', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
-    mensajes: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con tus clientes y con soporte'],
-    mensajesCli: ['apps/mensajes/', '💬', 'Mensajes', 'Chat con la tienda: pedidos y consultas'],
-    novedades: ['apps/catalogo/?modo=codefix', '📣', 'Novedades CodeFix', 'Promociones, productos y pedidos a CodeFix'],
-    vista: ['apps/catalogo/?v=ofertas', '👁️', 'Mi tienda', 'Lo que ven tus clientes: fichas, ofertas y productos'],
-    tienda: ['apps/catalogo/?v=ofertas', '🛍️', 'Tienda', 'Ofertas, productos y tus pedidos'],
-    pedidos: ['apps/pedidos/', '📦', 'Pedidos', 'Pedidos de tus clientes, cupones y estadísticas'],
-    cajaCli: ['apps/caja/', '💵', 'Mi Caja', 'Tu caja, productos y finanzas (Premium)'],
-    admin: ['apps/admin/', '🛡️', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
+    fichas: ['apps/fichas/', 'paleta', 'FichaPro', 'Fichas publicitarias, campañas y avisos a tus clientes'],
+    caja: ['apps/caja/', 'caja', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
+    mensajes: ['apps/mensajes/', 'chat', 'Mensajes', 'Chat con tus clientes y con soporte'],
+    mensajesCli: ['apps/mensajes/', 'chat', 'Mensajes', 'Chat con la tienda y tus contactos'],
+    novedades: ['apps/catalogo/?modo=codefix', 'megafono', 'Novedades CodeFix', 'Promociones, productos y pedidos a CodeFix'],
+    vista: ['apps/catalogo/?v=ofertas', 'ojo', 'Mi tienda', 'Lo que ven tus clientes: fichas, ofertas y productos'],
+    tienda: ['apps/catalogo/?v=ofertas', 'bolsa', 'Tienda', 'Ofertas, productos y tus pedidos'],
+    pedidos: ['apps/pedidos/', 'paquete', 'Pedidos', 'Pedidos de tus clientes, cupones y estadísticas'],
+    cajaCli: ['apps/caja/', 'caja', 'Mi Caja', 'Tu caja, productos y finanzas (Premium)'],
+    contactos: ['apps/contactos/', 'contactos', 'Contactos', 'Conéctate con otros clientes con tu código'],
+    admin: ['apps/admin/', 'escudo', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
   };
+
   function pintar(acc) {
     const cliente = acc.role === 'client';
     const tag = $('planTag');
@@ -461,15 +471,23 @@
     $('estadoPlan').textContent = acc.email + ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : '');
     $('avatar').textContent = icono(acc) || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
     Cuenta.aplicarLogo(acc);
+    // Cliente: logo y nombre de su tienda en la bienvenida.
+    $('tiendaChip').classList.toggle('hidden', !cliente || !acc.negocio);
+    if (cliente && acc.negocio) {
+      $('tiendaNom').textContent = acc.negocio;
+      const lg = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(acc.negocio_logo || '') ? acc.negocio_logo : '';
+      $('tiendaLogo').style.backgroundImage = lg ? 'url("' + lg + '")' : '';
+      $('tiendaLogo').textContent = lg ? '' : acc.negocio.trim().charAt(0).toUpperCase();
+    }
 
     // Un acceso por cosa: el cliente tiene su Tienda; la empresa, Mi tienda (vista del cliente) y Novedades CodeFix.
-    const lista = cliente ? ['tienda', 'mensajesCli', 'cajaCli']
+    const lista = cliente ? ['tienda', 'mensajesCli', 'contactos', 'cajaCli']
       : acc.is_admin ? ['fichas', 'caja', 'pedidos', 'mensajes', 'vista', 'admin']
       : ['fichas', 'caja', 'pedidos', 'mensajes', 'vista', 'novedades'];
     $('apps').innerHTML = lista.map((k) => {
       const a = APPS[k];
       const bloq = k === 'cajaCli' && !acc.is_pro; // Caja del cliente: solo Premium (se ve en gris)
-      return '<a class="app' + (k === 'admin' ? ' admin' : '') + (bloq ? ' bloq' : '') + '" href="' + (bloq ? '#plan' : a[0]) + '"><div class="ico">' + a[1] + '</div><b>' + a[2] +
+      return '<a class="app' + (k === 'admin' ? ' admin' : '') + (bloq ? ' bloq' : '') + '" href="' + (bloq ? '#plan' : a[0]) + '"><div class="ico">' + Core.ico(a[1]) + '</div><b>' + a[2] +
         (bloq ? ' <span class="pill pro">PREMIUM</span>' : '') + '</b><small>' + a[3] + '</small>' +
         (k === 'mensajes' || k === 'mensajesCli' ? '<span class="badge hidden" id="badgeMsg"></span>' : k === 'tienda' ? '<span class="badge hidden" id="badgeOf"></span>'
           : k === 'pedidos' ? '<span class="badge hidden" id="badgePed"></span>' : '') + '</a>';

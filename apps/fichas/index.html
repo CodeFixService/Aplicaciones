@@ -23,6 +23,31 @@
   .sent { text-decoration: line-through; opacity: .6; }
   .banner { background: var(--brand); color: var(--brand-ink); padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 14px; box-shadow: var(--shadow); }
   .banner a { color: inherit; font-weight: 700; }
+  .lienzoWrap { position: relative; }
+  .sel { position: absolute; border: 3px dashed var(--brand); border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,.06); transition: all .15s; }
+  .editor { margin-top: 10px; }
+  .elems { display: flex; gap: 6px; flex-wrap: wrap; }
+  .elems button { flex: none; }
+  .herr { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; padding: 10px; border-radius: 14px;
+    background: var(--field); border: 1px solid var(--line); }
+  .tb { width: 42px; height: 42px; padding: 0; border-radius: 12px; background: var(--card); color: var(--text); box-shadow: none;
+    border: 1px solid var(--line); font-size: 16px; flex: none; }
+  .tb.on { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+  .tb.color { position: relative; display: grid; place-items: center; cursor: pointer; margin: 0; }
+  .tb.color span { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); }
+  .tb.color input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .fuentes { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 100%; padding-top: 4px; }
+  .fuentes button { flex: none; padding: 8px 12px; border-radius: 12px; background: var(--card); color: var(--text); border: 1px solid var(--line); box-shadow: none; font-size: 16px; }
+  .fuentes button.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); color: var(--brand); }
+  @font-face { font-family: "CFX Poppins"; font-weight: 400; src: url(../../shared/fonts/poppins-latin-400-normal.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Poppins"; font-weight: 800; src: url(../../shared/fonts/poppins-latin-800-normal.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Poppins"; font-weight: 400; font-style: italic; src: url(../../shared/fonts/poppins-latin-400-italic.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Poppins"; font-weight: 800; font-style: italic; src: url(../../shared/fonts/poppins-latin-800-italic.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Playfair"; font-weight: 400; src: url(../../shared/fonts/playfair-display-latin-400-normal.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Playfair"; font-weight: 800; src: url(../../shared/fonts/playfair-display-latin-800-normal.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Playfair"; font-weight: 400; font-style: italic; src: url(../../shared/fonts/playfair-display-latin-400-italic.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Bebas"; font-weight: 400 900; src: url(../../shared/fonts/bebas-neue-latin-400-normal.woff2) format("woff2"); font-display: swap; }
+  @font-face { font-family: "CFX Dancing"; font-weight: 400 900; src: url(../../shared/fonts/dancing-script-latin-700-normal.woff2) format("woff2"); font-display: swap; }
   .vipChk { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 10px 12px; border-radius: 12px; color: var(--text);
     border: 2px solid #dc2626; background: color-mix(in srgb, #dc2626 8%, transparent); font-size: 14px; }
   .vipChk input { margin-top: 2px; flex: none; }
@@ -45,12 +70,28 @@
   <!-- DISEÑAR -->
   <section class="view on" id="v-disenar">
     <div class="card">
-      <canvas id="lienzo" width="1080" height="1350"></canvas>
+      <div class="lienzoWrap" id="lienzoWrap">
+        <canvas id="lienzo" width="1080" height="1350"></canvas>
+        <div class="sel hidden" id="sel"></div>
+      </div>
+      <p class="muted" style="margin:8px 0 0;font-size:13px;text-align:center">✏️ Toca un texto de la ficha para cambiarle el estilo</p>
+      <div class="editor" id="editor">
+        <div class="elems" id="elems"></div>
+        <div class="herr hidden" id="herr">
+          <button class="tb" id="tbB" title="Negrita" aria-label="Negrita"><b>B</b></button>
+          <button class="tb" id="tbI" title="Cursiva" aria-label="Cursiva"><i style="font-family:Georgia,serif">I</i></button>
+          <button class="tb" id="tbMenos" title="Más chico" aria-label="Más chico">A−</button>
+          <button class="tb" id="tbMas" title="Más grande" aria-label="Más grande">A+</button>
+          <label class="tb color" title="Color del texto"><span id="tbMuestra"></span><input type="color" id="tbColor" aria-label="Color del texto"></label>
+          <button class="tb" id="tbReset" title="Volver al estilo de la plantilla" aria-label="Restablecer">↺</button>
+          <div class="fuentes" id="fuentes"></div>
+        </div>
+      </div>
       <div class="btns">
-        <button id="bGuardar">💾 Guardar</button>
-        <button class="warn" id="bCompartir">📤 Compartir</button>
-        <button class="alt" id="bDescargar">⬇️ PNG</button>
-        <button class="alt" id="bNueva">✨ Nueva</button>
+        <button id="bGuardar"><span data-ico="guardar"></span> Guardar</button>
+        <button class="warn" id="bCompartir"><span data-ico="compartir"></span> Compartir</button>
+        <button class="alt" id="bDescargar"><span data-ico="descargar"></span> PNG</button>
+        <button class="alt" id="bNueva"><span data-ico="nueva"></span> Nueva</button>
       </div>
     </div>
     <div class="card">
@@ -214,11 +255,11 @@
 </main>
 
 <nav class="tabs">
-  <button data-v="disenar" class="on"><span>🎨</span>Diseñar</button>
-  <button data-v="galeria"><span>🖼️</span>Galería</button>
-  <button data-v="clientes"><span>👥</span>Clientes</button>
-  <button data-v="campanas"><span>📅</span>Campañas</button>
-  <button data-v="ajustes"><span>⚙️</span>Ajustes</button>
+  <button data-v="disenar" class="on"><span data-ico="paleta"></span>Diseñar</button>
+  <button data-v="galeria"><span data-ico="imagen"></span>Galería</button>
+  <button data-v="clientes"><span data-ico="usuarios"></span>Clientes</button>
+  <button data-v="campanas"><span data-ico="calendario"></span>Campañas</button>
+  <button data-v="ajustes"><span data-ico="ajustes"></span>Ajustes</button>
 </nav>
 
 <script src="../../shared/config.js"></script>

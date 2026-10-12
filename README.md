@@ -122,3 +122,14 @@ Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares 
 
 - **Imágenes livianas** (~35 KB por ficha) y guardadas en el celular: solo se descargan las nuevas.
 - **🖥️ Uso del servidor** en Administración → Resumen (🟢 / 🟡 70% / 🔴 90%) para saber cuándo pasar a Supabase Pro.
+
+## Versión 3.9
+- **Editor de fichas**: toca un texto de la ficha (título, subtítulo, precio o botón) y cambia **negrita**, *cursiva*,
+  color, tamaño y tipografía (Clásica, Moderna, Elegante, Impacto o Manuscrita). Las tipografías van dentro de la app
+  (licencia OFL, ver `shared/fonts/LICENCIAS.txt`). "↺" vuelve al estilo de la plantilla.
+- **Íconos modernos** (SVG de línea) en las barras y accesos de toda la app.
+- **Cliente**: logo y nombre de su tienda en la bienvenida y arriba.
+- **👥 Contactos entre clientes** (de cualquier tienda) con código personal: solicitud → aceptar/rechazar.
+  Las conexiones no se cruzan; solo se ve nombre y tienda. Free: 3 contactos y 1 mensaje a la vez;
+  Premium: 20 contactos y hasta 5 mensajes seguidos. Anti-spam: 3 solicitudes al día, 30 días tras un rechazo,
+  100 mensajes al día, bloquear y reportar. Las empresas no ven las conexiones.
