@@ -12,6 +12,7 @@
 <script src="../../shared/core.js"></script>
 <style>
   main { max-width: 1100px; }
+  .fotoPrev { width: 72px; height: 72px; object-fit: cover; border-radius: 12px; border: 1px solid var(--line); flex: none; background: var(--field); }
   .vender { display: grid; gap: 14px; grid-template-columns: 1fr; }
   @media (min-width: 900px) { .vender { grid-template-columns: 1fr 380px; align-items: start; } .ticketCard { position: sticky; top: 80px; } }
   .vender > * { min-width: 0; }
@@ -112,6 +113,15 @@
       <label for="p-ops">Colores, tallas u opciones (separadas por coma)</label><input id="p-ops" maxlength="300" placeholder="Rojo, Azul, Verde, Amarillo">
       <p class="muted" style="margin:6px 0 0;font-size:13px">💡 Agrupa colores o tallas como <b>opciones</b> de un mismo producto: así no gastas tu cupo
         (Free: 50 productos · Pro: 200). El cliente elige la opción al pedir.</p>
+      <div id="rowFoto">
+        <label for="p-foto">📷 Foto del producto (opcional, 1 por producto)</label>
+        <div class="row" style="align-items:center;flex-wrap:wrap">
+          <img id="p-fotoPrev" class="fotoPrev hidden" alt="Foto del producto">
+          <input type="file" accept="image/*" id="p-foto" style="flex:2;min-width:180px">
+          <button class="alt small hidden" id="bQuitarFoto" type="button" style="flex:none">Quitar foto</button>
+        </div>
+        <p class="muted" style="margin:4px 0 0;font-size:13px">Se achica sola (~30 KB) y la ven tus clientes en tu tienda. Se guarda al tocar <b>Guardar</b>.</p>
+      </div>
       <label class="chk" id="rowPub"><input type="checkbox" id="p-pub" checked> Mostrar en mi catálogo para clientes</label>
       <label class="chk" id="rowVipProd"><input type="checkbox" id="p-vip"> ⭐ VIP: solo clientes Premium (los demás lo ven en gris)</label>
       <div id="rowPrem"><label for="p-prem">Precio para clientes Premium (opcional)</label><input id="p-prem" inputmode="decimal"></div>

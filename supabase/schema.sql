@@ -2733,3 +2733,79 @@ revoke all on function public.avisar_version_nueva(text) from public, anon, auth
 revoke all on function public.limpiar_mis_avisos() from public, anon;
 grant execute on function public.version_mayor(text, text), public.admin_liberar_version(text), public.limpiar_mis_avisos(),
   public.my_account() to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 4.3: 📷 foto de producto (1 por producto, Free y Pro).
+--  La app la achica a ~20-35 KB; el cliente la descarga una vez y queda
+--  guardada en su celular (solo vuelve a bajar si cambia).
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '4.3'::text $$;
+
+alter table public.catalog_items add column if not exists foto text;
+alter table public.catalog_items add column if not exists foto_at timestamptz;
+
+create or replace function public.set_foto_producto(p_key text, p_foto text) returns timestamptz
+language plpgsql security definer set search_path = '' as $$
+declare f text := nullif(trim(coalesce(p_foto, '')), ''); t timestamptz := case when f is null then null else now() end;
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  if f is not null and (f !~ '^data:image/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$' or length(f) > 60000) then
+    raise exception 'Foto no válida o muy pesada';
+  end if;
+  update public.catalog_items set foto = f, foto_at = t where owner_id = auth.uid() and client_key = p_key;
+  if not found then raise exception 'Primero guarda el producto en tu catálogo'; end if;
+  return t;
+end $$;
+
+-- Qué productos tienen foto y su versión (liviano: sin la imagen).
+create or replace function public.fotos_catalogo(p_negocio uuid)
+returns table (clave text, v bigint)
+language sql stable security definer set search_path = '' as $$
+  select c.client_key, (extract(epoch from c.foto_at) * 1000)::bigint
+  from public.catalog_items c
+  where c.owner_id = p_negocio and c.foto is not null
+    and (c.owner_id = auth.uid() or public.is_admin() or public.puede_comprar(auth.uid(), p_negocio))
+    and (not c.solo_premium or public.is_pro(auth.uid()) or c.owner_id = auth.uid() or public.is_admin())
+$$;
+
+-- Las fotos que el celular aún no tiene guardadas.
+create or replace function public.fotos_productos(p_negocio uuid, p_claves text[])
+returns table (clave text, foto text, v bigint)
+language sql stable security definer set search_path = '' as $$
+  select c.client_key, c.foto, (extract(epoch from c.foto_at) * 1000)::bigint
+  from public.catalog_items c
+  where c.owner_id = p_negocio and c.client_key = any(p_claves) and c.foto is not null
+    and (c.owner_id = auth.uid() or public.is_admin() or public.puede_comprar(auth.uid(), p_negocio))
+    and (not c.solo_premium or public.is_pro(auth.uid()) or c.owner_id = auth.uid() or public.is_admin())
+  limit 60
+$$;
+
+-- Uso del servidor: las fotos de productos suman a "imágenes".
+create or replace function public.admin_uso() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare almacen bigint := 0;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  begin
+    select coalesce(sum((metadata ->> 'size')::bigint), 0) into almacen from storage.objects;
+  exception when others then almacen := 0;
+  end;
+  return jsonb_build_object(
+    'db_bytes', pg_database_size(current_database()), 'db_limite', 500 * 1024 * 1024,
+    'archivos_bytes', almacen, 'archivos_limite', 1024 * 1024 * 1024,
+    'imagenes_bytes', (select coalesce(sum(length(imagen)), 0) from public.publicaciones)
+                      + (select coalesce(sum(length(foto)), 0) from public.catalog_items),
+    'empresas', (select count(*) from public.profiles where role = 'user'),
+    'clientes', (select count(*) from public.profiles where role = 'client'),
+    'productos', (select count(*) from public.catalog_items),
+    'publicaciones', (select count(*) from public.publicaciones),
+    'pedidos', (select count(*) from public.pedidos),
+    'mensajes', (select count(*) from public.messages));
+end $$;
+
+revoke all on function public.set_foto_producto(text, text) from public, anon;
+revoke all on function public.fotos_catalogo(uuid) from public, anon;
+revoke all on function public.fotos_productos(uuid, text[]) from public, anon;
+grant execute on function public.set_foto_producto(text, text), public.fotos_catalogo(uuid), public.fotos_productos(uuid, text[]),
+  public.admin_uso() to authenticated;
