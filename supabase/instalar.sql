@@ -2615,6 +2615,48 @@ grant execute on function public.hoy_cl(), public.registrar_actividad(), public.
   public.mis_respuestas(), public.set_mis_respuestas(jsonb), public.puede_resenar(uuid, uuid), public.dejar_resena(uuid, int, text),
   public.nombre_corto(text), public.ver_resenas(uuid), public.responder_resena(uuid, text), public.destacar_resena(uuid, boolean)
   to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 4.1: 🧹 limpieza automática (todos los días)
+--  · Avisos y notificaciones ya enviados: se borran a los 7 días.
+--  · Ofertas de las tiendas y campañas con imagen: a los 30 días.
+--  · Mensajes del chat: a los 7 días.
+--  · Los pedidos NO se borran (son el historial de ventas).
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '4.1'::text $$;
+
+create index if not exists messages_created_idx on public.messages (created_at);
+
+create or replace function public.limpiar_registros() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare a int; c int; m int;
+begin
+  delete from public.notifications n
+  where n.status in ('sent', 'failed', 'cancelled')
+    and not ((n.audience = 'my_subscribers' and n.kind <> 'aviso') or n.image is not null)
+    and coalesce(n.sent_at, n.send_at) < now() - interval '7 days';
+  get diagnostics a = row_count;
+  delete from public.notifications n
+  where n.status in ('sent', 'failed', 'cancelled')
+    and coalesce(n.sent_at, n.send_at) < now() - interval '30 days';
+  get diagnostics c = row_count;
+  delete from public.messages where created_at < now() - interval '7 days';
+  get diagnostics m = row_count;
+  return jsonb_build_object('avisos', a, 'campanas', c, 'mensajes', m);
+end $$;
+
+-- Botón "🧹 Limpiar ahora" del administrador (hace lo mismo que la limpieza diaria).
+create or replace function public.admin_limpiar_registros() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  return public.limpiar_registros();
+end $$;
+
+revoke all on function public.limpiar_registros() from public, anon, authenticated;
+revoke all on function public.admin_limpiar_registros() from public, anon;
+grant execute on function public.admin_limpiar_registros() to authenticated;
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".
 --  Pega este archivo en Supabase → SQL Editor → Run (después de schema.sql
@@ -2640,3 +2682,7 @@ select cron.schedule(
 -- Cada día (10:00 hora de Chile aprox.): avisa a quienes se les vence el plan en 3 días.
 select cron.unschedule(jobid) from cron.job where jobname = 'avisar-vencimientos';
 select cron.schedule('avisar-vencimientos', '0 13 * * *', $$ select public.avisar_vencimientos(); $$);
+
+-- Cada día (madrugada en Chile): borra avisos y mensajes de más de 7 días (ofertas: 30). Los pedidos no se tocan.
+select cron.unschedule(jobid) from cron.job where jobname = 'limpiar-registros';
+select cron.schedule('limpiar-registros', '0 8 * * *', $$ select public.limpiar_registros(); $$);

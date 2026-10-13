@@ -23,3 +23,7 @@ select cron.schedule(
 -- Cada día (10:00 hora de Chile aprox.): avisa a quienes se les vence el plan en 3 días.
 select cron.unschedule(jobid) from cron.job where jobname = 'avisar-vencimientos';
 select cron.schedule('avisar-vencimientos', '0 13 * * *', $$ select public.avisar_vencimientos(); $$);
+
+-- Cada día (madrugada en Chile): borra avisos y mensajes de más de 7 días (ofertas: 30). Los pedidos no se tocan.
+select cron.unschedule(jobid) from cron.job where jobname = 'limpiar-registros';
+select cron.schedule('limpiar-registros', '0 8 * * *', $$ select public.limpiar_registros(); $$);
