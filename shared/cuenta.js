@@ -298,12 +298,20 @@
     const d = document.createElement('div');
     d.id = 'cfxUpd'; d.className = 'actualizar';
     d.innerHTML = '<div class="grow"><b>🔄 Hay una versión nueva</b><br><span>Tienes la v' + actual + ' · Nueva: v' + nueva +
-      (soloAdmin ? ' (solo tú la ves: pruébala y libérala en Administración → Ajustes)' : '') + '</span></div><button class="small" type="button">Actualizar</button>';
-    d.querySelector('button').onclick = () => actualizarAhora(d.querySelector('button'));
+      (soloAdmin ? ' · al actualizar se libera para todos' : '') + '</span></div><button class="small" type="button">Actualizar</button>';
+    d.querySelector('button').onclick = () => actualizarAhora(d.querySelector('button'), soloAdmin ? nueva : null);
     (document.querySelector('main') || document.body).prepend(d);
   }
-  async function actualizarAhora(btn) {
+  // liberar: el admin, al actualizar, deja la versión liberada para todos (y les llega el aviso).
+  async function actualizarAhora(btn, liberar) {
     if (btn) { btn.disabled = true; btn.textContent = 'Actualizando…'; }
+    if (liberar && account && account.is_admin) {
+      try {
+        try { await rpc('admin_liberar_version', { p_version: liberar }); }
+        catch (e) { await rpc('admin_set_setting', { p_key: 'version_liberada', p_value: liberar }); } // base de datos anterior a la 4.2
+        sb.functions.invoke('enviar').catch(() => {});
+      } catch (e) { /* sin red: se puede liberar después en Ajustes */ }
+    }
     const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
     const sw = reg && (reg.active || reg.waiting || reg.installing);
     if (sw) {

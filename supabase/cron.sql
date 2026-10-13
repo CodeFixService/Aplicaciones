@@ -27,3 +27,8 @@ select cron.schedule('avisar-vencimientos', '0 13 * * *', $$ select public.avisa
 -- Cada día (madrugada en Chile): borra avisos y mensajes de más de 7 días (ofertas: 30). Los pedidos no se tocan.
 select cron.unschedule(jobid) from cron.job where jobname = 'limpiar-registros';
 select cron.schedule('limpiar-registros', '0 8 * * *', $$ select public.limpiar_registros(); $$);
+
+-- Cada hora: si subí una versión nueva de la app, te llega un aviso para tocar "Actualizar".
+create extension if not exists http with schema extensions;
+select cron.unschedule(jobid) from cron.job where jobname = 'avisar-version';
+select cron.schedule('avisar-version', '17 * * * *', $$ select public.avisar_version_nueva(); $$);

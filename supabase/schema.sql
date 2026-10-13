@@ -2651,3 +2651,85 @@ end $$;
 revoke all on function public.limpiar_registros() from public, anon, authenticated;
 revoke all on function public.admin_limpiar_registros() from public, anon;
 grant execute on function public.admin_limpiar_registros() to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 4.2: 🔄 versión nueva → aviso al admin; al tocar "Actualizar" se
+--  libera sola para todos (con push). 🧹 Cada usuario limpia sus avisos.
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '4.2'::text $$;
+
+alter table public.profiles add column if not exists avisos_limpios_at timestamptz;
+
+-- ¿La versión a es mayor que b? ('4.10' > '4.9')
+create or replace function public.version_mayor(a text, b text) returns boolean
+language sql immutable as $$
+  select case when coalesce(a, '') !~ '^[0-9]+(\.[0-9]+){0,2}$' then false
+              when coalesce(b, '') !~ '^[0-9]+(\.[0-9]+){0,2}$' then true
+              else string_to_array(a, '.')::int[] > string_to_array(b, '.')::int[] end
+$$;
+
+-- El admin toca "Actualizar": la versión queda liberada y a todos les llega el aviso.
+create or replace function public.admin_liberar_version(p_version text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare v text := trim(coalesce(p_version, ''));
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  if v !~ '^[0-9]+(\.[0-9]+){0,2}$' then raise exception 'Versión no válida'; end if;
+  if not public.version_mayor(v, (select value from public.app_settings where key = 'version_liberada')) then return false; end if;
+  insert into public.app_settings (key, value) values ('version_liberada', v)
+  on conflict (key) do update set value = excluded.value;
+  insert into public.notifications (owner_id, audience, channels, title, body, url, send_at, kind)
+  values (auth.uid(), 'all_users', '{push}', '🔄 Nueva versión ' || v || ' de la app',
+          'Abre la app y toca "Actualizar" para tener lo último.', './', now(), 'aviso');
+  return true;
+end $$;
+
+-- Cada hora: si hay una versión publicada más nueva, avisa al admin (una vez por versión).
+create or replace function public.avisar_version_nueva(p_version text default null) returns text
+language plpgsql security definer set search_path = '' as $$
+declare v text := p_version; a uuid := public.admin_id();
+begin
+  if v is null then
+    begin
+      execute $q$select (content::jsonb) ->> 'version' from extensions.http_get('https://codefixservice.github.io/Aplicaciones/version.json')$q$ into v;
+    exception when others then return null;
+    end;
+  end if;
+  if a is null or not public.version_mayor(v, coalesce((select value from public.app_settings where key = 'version_avisada'), '0'))
+     or not public.version_mayor(v, (select value from public.app_settings where key = 'version_liberada')) then
+    return null;
+  end if;
+  insert into public.app_settings (key, value) values ('version_avisada', v)
+  on conflict (key) do update set value = excluded.value;
+  perform public.notify_user(a, '🔄 Versión ' || v || ' lista para actualizar',
+    'Abre la app y toca "Actualizar": se libera sola para todos.', './');
+  return v;
+end $$;
+
+-- 🧹 Limpiar mis avisos: desde ahora solo veo los nuevos.
+create or replace function public.limpiar_mis_avisos() returns timestamptz
+language sql security definer set search_path = '' as $$
+  update public.profiles set avisos_limpios_at = now() where id = auth.uid() returning avisos_limpios_at
+$$;
+
+create or replace function public.my_account() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'id', p.id, 'email', p.email, 'empresa', p.empresa, 'plan', p.plan, 'role', p.role,
+    'pro_until', p.pro_until, 'suspended', p.suspended, 'trial_used', p.trial_used,
+    'mute_offers', p.mute_offers, 'terms_at', p.terms_at,
+    'negocio_id', p.negocio_id, 'negocio', n.empresa, 'telefono', p.telefono, 'negocio_telefono', n.telefono,
+    'logo', p.logo, 'negocio_logo', n.logo, 'color', p.color, 'negocio_color', n.color,
+    'avisos_limpios_at', p.avisos_limpios_at,
+    'is_pro', public.is_pro(p.id), 'is_admin', public.is_admin())
+  from public.profiles p left join public.profiles n on n.id = p.negocio_id
+  where p.id = auth.uid()
+$$;
+
+revoke all on function public.version_mayor(text, text) from public, anon;
+revoke all on function public.admin_liberar_version(text) from public, anon;
+revoke all on function public.avisar_version_nueva(text) from public, anon, authenticated;
+revoke all on function public.limpiar_mis_avisos() from public, anon;
+grant execute on function public.version_mayor(text, text), public.admin_liberar_version(text), public.limpiar_mis_avisos(),
+  public.my_account() to authenticated;
