@@ -181,7 +181,7 @@
       const g = p.categoria || 'Sin categoría';
       const head = g !== grupo ? '<div class="grupo">' + Core.esc(grupo = g) + '</div>' : '';
       return head + '<div class="linea"><div class="grow"><b>' + Core.esc(p.nombre) + '</b><div class="muted">' + money(p.precio) +
-        (p.stock === '' ? '' : ' · stock ' + p.stock) + (p.publicado ? ' · 🛍️ en catálogo' : '') +
+        (p.stock === '' ? '' : ' · stock ' + p.stock) + (p.publicado ? ' · 🛍️ en catálogo' : '') + (p.foto ? ' · 📷' : '') +
         (p.ops ? '<br>🎨 ' + Core.esc(p.ops) : '') + '</div></div>' +
         '<button class="small alt" data-a="edit" data-id="' + p.id + '">Editar</button>' +
         '<button class="small danger" data-a="del" data-id="' + p.id + '" aria-label="Eliminar">✕</button></div>';
@@ -210,8 +210,35 @@
     } finally { $('bPublicarTodos').disabled = false; renderLista(); }
   };
   $('p-pub').onchange = (e) => $('rowPrem').classList.toggle('hidden', !e.target.checked);
+
+  /* ---------- 📷 Foto del producto (1 por producto; se guarda en el servidor, liviana) ---------- */
+  let fotoNueva = null, fotoQuitar = false;
+  $('rowFoto').classList.toggle('hidden', esCliente); // la Caja del cliente es privada: sin fotos
+  function verFoto(src) {
+    $('p-fotoPrev').classList.toggle('hidden', !src);
+    if (src) $('p-fotoPrev').src = src; else $('p-fotoPrev').removeAttribute('src');
+    $('bQuitarFoto').classList.toggle('hidden', !src);
+  }
+  $('p-foto').onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try { fotoNueva = await Core.fotoChica(f); fotoQuitar = false; verFoto(fotoNueva); }
+    catch (err) { Core.toast(err.message); }
+    e.target.value = '';
+  };
+  $('bQuitarFoto').onclick = () => { fotoNueva = null; fotoQuitar = true; verFoto(null); };
+  async function guardarFoto(prod) {
+    if (esCliente || (!fotoNueva && !fotoQuitar)) return;
+    if (!prod.publicado) { if (fotoNueva) Core.toast('📷 Para mostrar la foto, marca "Mostrar en mi catálogo"'); return; }
+    try {
+      await Cuenta.rpc('set_foto_producto', { p_key: prod.id, p_foto: fotoQuitar ? null : fotoNueva });
+      prod.foto = !fotoQuitar;
+    } catch (err) { Core.toast('📷 Foto: ' + err.message); }
+  }
+
   function limpiarForm() {
     editId = null;
+    fotoNueva = null; fotoQuitar = false; verFoto(null);
     ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem', 'desc', 'ops'].forEach((k) => { $('p-' + k).value = ''; });
     $('p-pub').checked = !esCliente; $('rowPrem').classList.toggle('hidden', esCliente); // lo nuevo se publica por defecto
     $('p-vip').checked = false;
@@ -222,7 +249,7 @@
   async function sincronizar(p, borrar) {
     if (esCliente) return true; // la Caja del cliente es privada
     try {
-      if (borrar || !p.publicado) await Cuenta.rpc('catalog_delete', { p_key: p.id });
+      if (borrar || !p.publicado) { await Cuenta.rpc('catalog_delete', { p_key: p.id }); p.foto = false; }
       else await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip, p_descripcion: p.desc || '', p_opciones: p.ops || '' });
       return true;
     } catch (e) {
@@ -261,6 +288,7 @@
       productos.push(prod);
       if (p.publicado && !(await sincronizar(prod))) prod.publicado = false;
     }
+    await guardarFoto(prod);
     guardarProductos();
     Core.toast('Producto guardado');
     limpiarForm(); renderProds();
@@ -277,6 +305,11 @@
       $('p-vip').checked = !!p.vip;
       $('p-desc').value = p.desc || ''; $('p-ops').value = p.ops || '';
       $('rowPrem').classList.toggle('hidden', !p.publicado);
+      fotoNueva = null; fotoQuitar = false; verFoto(null);
+      if (p.publicado && !esCliente) {
+        Cuenta.rpc('fotos_productos', { p_negocio: cuenta.id, p_claves: [p.id] })
+          .then((l) => { p.foto = !!l[0]; if (editId === id && l[0] && !fotoNueva && !fotoQuitar) verFoto(l[0].foto); }).catch(() => {});
+      }
       renderLista();
       scrollTo(0, 0);
     }

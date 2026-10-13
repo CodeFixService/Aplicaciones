@@ -83,6 +83,10 @@
   .res .resp { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--field); }
   .res .dest { border-left: 3px solid #f59e0b; padding-left: 10px; }
   #estado a { color: inherit; }
+  .item .foto { display: block; width: calc(100% + 28px); max-width: none; margin: -14px -14px 4px; aspect-ratio: 1; object-fit: cover;
+    border-radius: var(--radius) var(--radius) 0 0; background: var(--field); cursor: zoom-in; }
+  .zoom { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.85); cursor: zoom-out; }
+  .zoom img { max-width: 100%; max-height: 100%; border-radius: 12px; }
   #pagoTxt { white-space: pre-wrap; font: inherit; margin: 0; padding: 10px; background: var(--field); border-radius: 10px; }
 </style>
 </head>
@@ -164,6 +168,7 @@
     </div>
   </section>
 </main>
+<div class="zoom hidden" id="zoom" role="dialog" aria-label="Foto del producto"><img id="zoomImg" alt=""></div>
 <div class="carro hidden" id="barra"><button class="ok" id="bVerCarro"><span id="barTxt">🛒 Ver pedido</span><span id="barTotal"></span></button></div>
 
 <script src="../../shared/config.js"></script>
@@ -354,7 +359,8 @@
           '<span class="p">🔒</span><span class="prem">Solo para ' + quienPremium + '</span><div class="acc">' + hazte + '</div></div>';
       }
       const prem = i.precio_premium != null, fav = favs.includes(i.clave);
-      return '<div class="item' + (i.solo_premium ? ' vip' : '') + '">' + cinta + (comprador ? '<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>' : '') +
+      return '<div class="item' + (i.solo_premium ? ' vip' : '') + '">' + cinta +
+        (fotos[i.clave] ? '<img class="foto" src="' + Core.esc(fotos[i.clave]) + '" data-zoom="' + Core.esc(i.clave) + '" alt="' + Core.esc(i.nombre) + '" loading="lazy">' : '') + (comprador ? '<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>' : '') +
         (i.nuevo ? '<span class="pill ok nuevo">✨ Nuevo</span>' : '') +
         '<span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
         (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
@@ -373,6 +379,7 @@
   $('cats').onclick = (e) => { if (e.target.dataset.c !== undefined) { cat = e.target.dataset.c; pintar(); } };
   $('buscar').oninput = pintar;
   $('grid').onclick = (e) => {
+    if (e.target.dataset.zoom !== undefined) { $('zoomImg').src = e.target.src; $('zoom').classList.remove('hidden'); return; }
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.fav !== undefined) {
@@ -393,6 +400,31 @@
       agregarAlCarro({ clave: b.dataset.add, opcion });
     }
   };
+
+  $('zoom').onclick = () => $('zoom').classList.add('hidden');
+
+  /* ---------- 📷 Fotos de productos: se guardan en el celular y solo se bajan las nuevas o cambiadas ---------- */
+  const fotos = {};
+  async function cargarFotos() {
+    const lista = await traer('fotos_catalogo', { p_negocio: negocio }, 'fotos', []);
+    if (!lista.length) return;
+    let cache = null;
+    try { cache = 'caches' in window ? await caches.open('cfx-imagenes') : null; } catch (e) { cache = null; }
+    const clave = (x) => './foto/' + negocio + '/' + encodeURIComponent(x.clave) + '?v=' + x.v;
+    const faltan = [];
+    for (const x of lista) {
+      const r = cache && await cache.match(clave(x));
+      if (r) fotos[x.clave] = await r.text(); else faltan.push(x);
+    }
+    if (lista.length > faltan.length) pintar();
+    for (let i = 0; i < faltan.length; i += 30) {
+      try {
+        const l = await Cuenta.rpc('fotos_productos', { p_negocio: negocio, p_claves: faltan.slice(i, i + 30).map((x) => x.clave) });
+        l.forEach((f) => { fotos[f.clave] = f.foto; if (cache) cache.put(clave(f), new Response(f.foto)).catch(() => {}); });
+        pintar();
+      } catch (e) { break; } // sin red: quedan sin foto
+    }
+  }
 
   /* ---------- Carrito y pedido ---------- */
   function agregarAlCarro(x) {
@@ -581,6 +613,7 @@
 
   pintar(); guardarCarro();
   cargarResenas();
+  cargarFotos();
   const v = params.get('v');
   vista(['ofertas', 'pedidos'].includes(v) && !(v === 'pedidos' && !comprador) ? v : 'productos');
 })();
