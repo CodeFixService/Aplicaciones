@@ -87,6 +87,14 @@
     if (b.dataset.ver) verEmpresa(b.dataset.ver).catch(fallo);
     if (b.dataset.mot) abrirMotivar(b.dataset.mot);
   };
+  $('bLimpiarReg').onclick = async () => {
+    if (!confirm('¿Borrar ahora los avisos y mensajes de más de 7 días (y ofertas de más de 30)?')) return;
+    try {
+      const r = await Cuenta.rpc('admin_limpiar_registros');
+      $('limpiarRes').textContent = '✅ Borrados: ' + r.avisos + ' avisos, ' + r.campanas + ' ofertas/campañas y ' + r.mensajes + ' mensajes.';
+      Core.toast('🧹 Limpieza lista');
+    } catch (err) { fallo(err); }
+  };
   $('bLimpiarAct').onclick = async () => {
     if (!confirm('¿Borrar el historial de conexiones? Se mantiene la última vez que entró cada uno.')) return;
     try { const n = await Cuenta.rpc('admin_limpiar_actividad'); Core.toast('🧹 Historial borrado (' + n + ' registros)'); cargarActividad(); }
