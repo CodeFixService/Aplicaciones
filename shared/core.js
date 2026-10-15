@@ -195,6 +195,24 @@
     });
   }
 
+  // Foto de comprobante: legible pero liviana (máx. 1100 px, JPEG, < 400 KB).
+  function comprobante(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 1100 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+        let q = 0.75, d = c.toDataURL('image/jpeg', q);
+        while (d.length > 390000 && q > 0.3) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+        resolve(d);
+      };
+      img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      img.src = typeof src === 'string' ? src : URL.createObjectURL(src);
+    });
+  }
+
   function readImage(file, maxSide) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -259,7 +277,7 @@
 
   // Pie de página con la marca del autor en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '4.3';
+  const APP_VERSION = '5.0';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -272,6 +290,6 @@
 
   global.Core = {
     store, uid, money, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, logoChico, fotoChica, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION
+    backup, restore, readImage, logoChico, fotoChica, comprobante, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION
   };
 })(window);

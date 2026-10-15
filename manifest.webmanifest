@@ -1,7 +1,7 @@
 {
-  "name": "CodeFix Apps",
-  "short_name": "CodeFix",
-  "description": "FichaPro y Caja Rápida de CodeFix: publicidad, clientes, notificaciones y ventas.",
+  "name": "FichaPro",
+  "short_name": "FichaPro",
+  "description": "FichaPro: tu tienda, caja, pedidos y fichas publicitarias en el celular.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
@@ -24,8 +24,18 @@
   ],
   "shortcuts": [
     {
-      "name": "FichaPro",
-      "url": "apps/fichas/",
+      "name": "Caja",
+      "url": "apps/caja/",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Pedidos",
+      "url": "apps/pedidos/",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -36,16 +46,6 @@
     {
       "name": "Mensajes",
       "url": "apps/mensajes/",
-      "icons": [
-        {
-          "src": "icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Caja Rápida",
-      "url": "apps/caja/",
       "icons": [
         {
           "src": "icons/icon-192.png",

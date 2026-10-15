@@ -5,6 +5,9 @@
   Core.registerSW('../../');
   Core.marca();
   await Cuenta.require('../../', { admin: true });
+  Cuenta.revisarActualizacion();
+  // La dirección de la app (Cloudflare): la usa el aviso automático de versión nueva.
+  Cuenta.rpc('admin_set_setting', { p_key: 'app_url', p_value: Core.rootUrl() }).catch(() => {});
 
   const fecha = (t) => t ? new Date(t).toLocaleDateString('es') : '';
   const fechaHora = (t) => t ? new Date(t).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '';
@@ -14,27 +17,52 @@
     return data;
   }
   const fallo = (e) => Core.toast(e.message || String(e));
+  let perfiles = {};
+  const DB_VERSION = '5.0';
 
-  /* ---------- Navegación ---------- */
-  const loaders = { resumen: cargarResumen, licencias: cargarLicencias, usuarios: cargarUsuarios, avisos: cargarAvisos, ajustes: cargarAjustes };
+  /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
+  const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, pagos: cargarPagos, ajustes: () => verAjuste(ajuste) };
   document.querySelectorAll('nav.tabs button').forEach((b) => { b.onclick = () => show(b.dataset.v); });
-  function show(v) {
+  function show(v, sinCargar) {
     document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
     document.querySelectorAll('.view').forEach((x) => x.classList.toggle('on', x.id === 'v-' + v));
-    scrollTo(0, 0);
-    loaders[v]().catch(fallo);
+    history.replaceState(null, '', '#' + v);
+    if (!sinCargar) { scrollTo(0, 0); Promise.resolve(loaders[v]()).catch(fallo); }
   }
+  $('bInicio').onclick = (e) => { e.preventDefault(); show('resumen'); };
+  const seg = (id, cb) => { $(id).onclick = (e) => { const b = e.target.closest('button'); if (!b) return;
+    $(id).querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('alt', x !== b); }); cb(b); }; };
 
   /* ---------- Resumen ---------- */
+  const MB = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB';
   async function cargarResumen() {
-    const s = await Cuenta.rpc('admin_stats');
+    const r = await Cuenta.rpc('admin_resumen');
+    $('cBase').classList.toggle('hidden', r.version === DB_VERSION);
+    $('baseTxt').textContent = 'La app es la ' + DB_VERSION + ' y la base de datos la ' + r.version + '. Corre el paso 3 de la guía (Supabase → SQL Editor).';
+    $('tabPagos').textContent = r.pagos_por_revisar; $('tabPagos').classList.toggle('hidden', !r.pagos_por_revisar);
+    $('cPagosAlerta').classList.toggle('hidden', !r.pagos_por_revisar);
+    $('cPagosAlerta').innerHTML = '💰 Tienes <b>' + r.pagos_por_revisar + '</b> comprobante(s) de Pro/Premium por revisar ›';
     const item = (t, v) => '<div class="card"><span class="muted">' + t + '</span><b>' + v + '</b></div>';
-    $('stats').innerHTML = item('Empresas', s.empresas) + item('Clientes', s.clientes) + item('Pro / Premium activos', s.pro) +
-      item('Solicitudes pendientes', s.pendientes) + item('Reportes abiertos', s.reportes) +
-      item('Keys canjeadas', s.canjeadas + ' / ' + s.licencias) + item('Ingresos por keys', Core.money(s.ingresos)) +
-      item('Suscriptores por enlace', s.suscriptores) + item('Celulares con push', s.dispositivos);
-    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos(), cargarUso(), cargarActividad()]);
+    $('stats').innerHTML = item('🏪 Negocios', r.negocios) + item('⭐ Negocios Pro', r.negocios_pro) + item('🟢 Activos 7 días', r.activos_7d) +
+      item('⏳ Vencen en 7 días', r.por_vencer) + item('👥 Clientes', r.clientes) + item('⭐ Clientes Premium', r.clientes_pro) +
+      item('🧑‍🍳 Equipo', r.equipo) + item('🛒 Pedidos del mes', r.pedidos_mes) + item('🛒 Pedidos hoy', r.pedidos_hoy) + item('💰 Ingresos del mes', Core.money(r.ingresos_mes));
+    const u = r.uso, pct = Math.min(100, Math.round(u.db_bytes * 100 / u.db_limite));
+    $('usoPill').textContent = pct >= 90 ? '🔴 ' + pct + '%' : pct >= 70 ? '🟡 ' + pct + '%' : '🟢 ' + pct + '%';
+    $('usoBarras').innerHTML = '<div class="uso"><div class="row" style="justify-content:space-between"><span>Base de datos</span><b>' + MB(u.db_bytes) + ' de ' + MB(u.db_limite) +
+      '</b></div><div class="barra"><div style="width:' + Math.max(pct, 2) + '%;background:' + (pct >= 90 ? 'var(--bad)' : pct >= 70 ? '#f59e0b' : 'var(--ok)') + '"></div></div></div>';
+    $('usoTablas').innerHTML = Object.entries(u.tablas || {}).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([k, v]) => '<tr><td>' + Core.esc(k) + '</td><td class="r">' + MB(v) + '</td></tr>').join('');
+    $('usoTxt').textContent = 'Comprobantes guardados: ' + u.comprobantes + ' (' + MB(u.comprobantes_bytes) + '). ' +
+      (pct >= 90 ? 'Casi lleno: limpia o pasa a Supabase Pro.' : pct >= 70 ? 'Va subiendo: programa una limpieza.' : 'Todo bien.');
+    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos(), cargarActividad()]);
   }
+  $('cServidor').onclick = async (e) => {
+    const b = e.target.closest('[data-l]');
+    if (!b || !confirm(b.dataset.l === 'todo' ? '¿Limpiar todo lo antiguo ahora?' : '¿Limpiar ahora?')) return;
+    try { const x = await Cuenta.rpc('admin_limpiar', { p_que: b.dataset.l }); Core.toast('🧹 Borrados: ' + x.comprobantes + ' comprobantes, ' + x.avisos + ' avisos, ' + x.mensajes + ' mensajes, ' + x.pedidos + ' pedidos'); cargarResumen().catch(fallo); }
+    catch (err) { fallo(err); }
+  };
+  $('cPagosAlerta').onclick = (e) => { e.preventDefault(); show('pagos'); };
 
   /* ---------- 📡 Actividad de empresas (solo el admin la ve) ---------- */
   const dias = (t) => t ? Math.floor((Date.now() - new Date(t)) / 864e5) : null;
@@ -86,14 +114,6 @@
     if (!b) return;
     if (b.dataset.ver) verEmpresa(b.dataset.ver).catch(fallo);
     if (b.dataset.mot) abrirMotivar(b.dataset.mot);
-  };
-  $('bLimpiarReg').onclick = async () => {
-    if (!confirm('¿Borrar ahora los avisos y mensajes de más de 7 días (y ofertas de más de 30)?')) return;
-    try {
-      const r = await Cuenta.rpc('admin_limpiar_registros');
-      $('limpiarRes').textContent = '✅ Borrados: ' + r.avisos + ' avisos, ' + r.campanas + ' ofertas/campañas y ' + r.mensajes + ' mensajes.';
-      Core.toast('🧹 Limpieza lista');
-    } catch (err) { fallo(err); }
   };
   $('bLimpiarAct').onclick = async () => {
     if (!confirm('¿Borrar el historial de conexiones? Se mantiene la última vez que entró cada uno.')) return;
@@ -158,7 +178,7 @@
       (motEmp.motivado_at && dias(motEmp.motivado_at) < 1 ? ' · ⚠️ Ya la motivaste hoy' : '');
     vuelta = Math.floor(Math.random() * 3);
     generar();
-    if (!$('v-resumen').classList.contains('on')) document.querySelector('[data-v=resumen]').click();
+    if (!$('v-resumen').classList.contains('on')) show('resumen', true);
     $('cMotivar').classList.remove('hidden');
     $('cMotivar').scrollIntoView({ behavior: 'smooth' });
   }
@@ -205,26 +225,6 @@
     cargarActividad();
   };
 
-  /* ---------- Uso del servidor (plan gratis de Supabase) ---------- */
-  async function cargarUso() {
-    const u = await Cuenta.rpc('admin_uso');
-    const mb = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB';
-    const barra = (titulo, usado, limite) => {
-      const pct = Math.min(100, Math.round(usado * 100 / limite));
-      const color = pct >= 90 ? 'var(--bad)' : pct >= 70 ? '#f59e0b' : 'var(--ok)';
-      return { pct, html: '<div class="uso"><div class="row" style="justify-content:space-between"><span>' + titulo + '</span><b>' + mb(usado) + ' de ' +
-        mb(limite) + ' · ' + pct + '%</b></div><div class="barra"><div style="width:' + Math.max(pct, 2) + '%;background:' + color + '"></div></div></div>' };
-    };
-    const a = barra('Base de datos', u.db_bytes, u.db_limite), b = barra('Archivos (imágenes de campañas y respaldos)', u.archivos_bytes, u.archivos_limite);
-    const max = Math.max(a.pct, b.pct);
-    $('usoBarras').innerHTML = a.html + b.html;
-    $('usoPill').textContent = max >= 90 ? '🔴 ' + max + '%' : max >= 70 ? '🟡 ' + max + '%' : '🟢 Bien';
-    $('usoTxt').textContent = u.empresas + ' empresas · ' + u.clientes + ' clientes · ' + u.productos + ' productos · ' + u.publicaciones + ' fichas (' +
-      mb(u.imagenes_bytes) + ' en imágenes) · ' + u.pedidos + ' pedidos. ' +
-      (max >= 90 ? 'Ya conviene pasar a Supabase Pro (US$25/mes).' : max >= 70 ? 'Ve preparando el paso a Supabase Pro.' : 'Con el plan gratis vas holgado.') +
-      ' Los clientes guardan las imágenes en su celular, así que casi no se repiten descargas.';
-  }
-
   /* ---------- Ingresos y vencimientos ---------- */
   async function cargarIngresos() {
     const r = await Cuenta.rpc('admin_ingresos');
@@ -259,7 +259,7 @@
     Cuenta.rpc('admin_empresa_actividad', { p_id: id }).then(pintarEmpAct).catch(() => {});
     $('empPubs').innerHTML = r.ultimas_publicaciones.length ? r.ultimas_publicaciones.map((x) => '<li><span class="grow">' + (x.vip ? '⭐ VIP · ' : '') +
       Core.esc(x.titulo) + '</span><span class="muted">' + new Date(x.updated_at).toLocaleDateString('es') + '</span></li>').join('') : '<li class="empty">Sin fichas publicadas</li>';
-    document.querySelector('[data-v=resumen]').click();
+    show('resumen', true);
     $('cEmpresa').classList.remove('hidden');
     $('cEmpresa').scrollIntoView({ behavior: 'smooth' });
   }
@@ -343,205 +343,240 @@
     const { a, id } = e.target.dataset;
     if (!a) return;
     if (a === 'susp' && !confirm('¿Suspender la cuenta reportada?')) return;
-    try { await Cuenta.rpc('admin_resolve_report', { p_id: id, p_suspend: a === 'susp' }); Core.toast('Listo'); cargarResumen(); }
+    try { await Cuenta.rpc('admin_resolve_report', { p_id: id, p_suspend: a === 'susp' }); Core.toast('Listo'); cargarResumen().catch(fallo); }
     catch (err) { fallo(err); }
   };
 
-  /* ---------- Invitar ---------- */
-  const appLink = Core.rootUrl();
-  const invitacion = '📲 Te invito a la app de ' + (window.CFX_CONFIG.MARCA || 'CodeFix') + ' (FichaPro y Caja Rápida).\n\n' +
-    '1. Abre este enlace en Chrome (Android) o Safari (iPhone):\n' + appLink + '\n' +
-    '2. Toca "Instalar" (en iPhone: Compartir → Agregar a inicio).\n' +
-    '3. Ingresa con el correo y la contraseña que te enviamos, y activa las notificaciones.';
-  function qrGrande(text, px) {
-    const q = qrcode(0, 'M'); q.addData(text); q.make();
-    const n = q.getModuleCount(), m = 4, c = document.createElement('canvas'), k = Math.floor(px / (n + 2 * m));
-    c.width = c.height = k * (n + 2 * m);
-    const g = c.getContext('2d');
-    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
-    for (let r = 0; r < n; r++) for (let j = 0; j < n; j++) if (q.isDark(r, j)) g.fillRect((j + m) * k, (r + m) * k, k, k);
-    return c;
-  }
-  $('appLink').value = appLink;
-  $('appQr').src = qrGrande(appLink, 400).toDataURL();
-  $('bInvWA').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(invitacion), '_blank');
-  $('bInvShare').onclick = async () => {
-    if (navigator.share) { try { await navigator.share({ title: 'App CodeFix', text: invitacion }); } catch (e) { /* cancelado */ } }
-    else $('bInvWA').onclick();
-  };
-  $('bInvQr').onclick = () => qrGrande(appLink, 1000).toBlob((b) => Core.download('qr-app-codefix.png', b));
-  $('bInvCopy').onclick = () => navigator.clipboard.writeText(invitacion).then(() => Core.toast('Mensaje copiado'));
-
-  /* ---------- Licencias ---------- */
-  let licencias = [], perfiles = {};
-  async function cargarLicencias() {
-    const [lic, users] = await Promise.all([
-      q(sb.from('licenses').select('*').order('created_at', { ascending: false })),
-      q(sb.from('profiles').select('id,email,empresa'))
-    ]);
-    licencias = lic;
-    perfiles = Object.fromEntries(users.map((u) => [u.id, u]));
-    pintarLicencias();
-  }
-  $('lBuscar').oninput = pintarLicencias;
-  function pintarLicencias() {
-    const t = $('lBuscar').value.toLowerCase();
-    const list = licencias.filter((l) => !t || (l.empresa + l.key + (l.note || '')).toLowerCase().includes(t));
-    $('licencias').innerHTML = list.length ? list.map((l) => {
-      const u = l.redeemed_by && perfiles[l.redeemed_by];
-      const estado = l.revoked ? '<span class="pill st-failed">Revocada</span>'
-        : l.redeemed_by ? '<span class="pill st-sent">Canjeada</span>' : '<span class="pill st-scheduled">Libre</span>';
-      return '<li><div class="grow"><b>' + Core.esc(l.empresa) + '</b> ' + estado +
-        '<div class="muted"><code>' + l.key + '</code></div>' +
-        '<div class="muted">' + (l.months ? l.months + ' mes(es)' : 'Permanente') +
-        (l.price != null ? ' · ' + Core.money(l.price) : '') + ' · ' + fecha(l.created_at) +
-        (u ? ' · ' + Core.esc(u.email) : '') + (l.note ? ' · ' + Core.esc(l.note) : '') + '</div></div>' +
-        (l.revoked ? '' : '<button class="small alt" data-a="share" data-id="' + l.id + '">Enviar</button>' +
-          '<button class="small danger" data-a="rev" data-id="' + l.id + '">Revocar</button>') + '</li>';
-    }).join('') : '<li class="empty">Sin keys todavía</li>';
-  }
-  $('licencias').onclick = async (e) => {
-    const { a, id } = e.target.dataset;
-    const l = licencias.find((x) => x.id === id);
-    if (!a || !l) return;
-    if (a === 'share') mostrarNueva(l);
-    if (a === 'rev' && confirm('¿Revocar la key de ' + l.empresa + '? Si ya la usó, su cuenta vuelve a Free.')) {
-      try { await Cuenta.rpc('admin_revoke_license', { p_id: id }); Core.toast('Key revocada'); cargarLicencias(); }
-      catch (err) { fallo(err); }
-    }
-  };
-
-  $('bCrear').onclick = async () => {
-    const empresa = $('lEmpresa').value.trim();
-    if (!empresa) return Core.toast('Escribe la empresa');
-    $('bCrear').disabled = true;
-    try {
-      const lic = await Cuenta.rpc('admin_create_license', {
-        p_empresa: empresa,
-        p_months: $('lMeses').value ? parseInt($('lMeses').value, 10) : null,
-        p_price: parseFloat(($('lPrecio').value || '').replace(',', '.')) || null,
-        p_note: $('lNota').value.trim() || null
-      });
-      mostrarNueva(lic);
-      $('lEmpresa').value = ''; $('lPrecio').value = ''; $('lNota').value = '';
-      cargarLicencias();
-    } catch (err) { fallo(err); } finally { $('bCrear').disabled = false; }
-  };
-
-  let nueva;
-  function mensajeKey(l) {
+  /* ---------- Negocios ---------- */
+  let negocios = [], nFiltro = '';
+  async function cargarNegocios() { negocios = await Cuenta.rpc('admin_negocios'); pintarNegocios(); }
+  $('nBuscar').oninput = () => pintarNegocios();
+  seg('nSeg', (b) => { nFiltro = b.dataset.f; pintarNegocios(); });
+  function pintarNegocios() {
+    const t = $('nBuscar').value.trim().toLowerCase(), semana = Date.now() - 7 * 864e5, siete = Date.now() + 7 * 864e5;
+    const l = negocios.filter((n) => (!t || (n.empresa + ' ' + n.email).toLowerCase().includes(t)) && (!nFiltro ||
+      (nFiltro === 'pro' && n.pro) || (nFiltro === 'free' && !n.pro) || (nFiltro === 'susp' && n.suspendido) ||
+      (nFiltro === 'vence' && n.pro && n.pro_until && new Date(n.pro_until) < siete) || (nFiltro === 'inactivos' && (!n.visto_at || new Date(n.visto_at) < semana))));
+    $('nCuenta').textContent = l.length + ' negocio(s)';
     const app = Core.rootUrl();
-    return 'Hola 👋 Gracias por comprar la versión Pro de ' + (window.CFX_CONFIG.MARCA || 'CodeFix') + '.\n\n' +
-      '1. Entra a ' + app + ' e inicia sesión (o crea tu cuenta).\n' +
-      '2. En "Activar versión Pro" pega esta key:\n\n' + l.key + '\n\n' +
-      (l.months ? 'Válida por ' + l.months + ' mes(es) desde que la actives.' : 'Licencia permanente.') +
-      '\nEs personal: solo funciona en una cuenta.';
+    $('nLista').innerHTML = l.length ? l.map((n) => {
+      const lg = /^data:image/.test(n.logo || '') ? 'background-image:url(\'' + n.logo + '\');' : '';
+      return '<div class="card"><div class="neg"><div class="lg" style="background-color:' + Core.esc(n.color || '#2563eb') + ';' + lg + '">' + (lg ? '' : Core.esc((n.empresa || '?').charAt(0).toUpperCase())) + '</div>' +
+        '<div class="grow" style="min-width:0"><b>' + Core.esc(n.empresa || n.email) + '</b> ' + (n.pro ? '<span class="pill pro">PRO</span>' : '<span class="pill">GRATIS</span>') +
+        (n.suspendido ? ' <span class="pill bad">Suspendido</span>' : '') + (n.pago_revision ? ' <span class="pill warn">🧾 Pago por revisar</span>' : '') +
+        (n.link_pago ? '' : ' <span class="pill warn">Sin link de pago</span>') +
+        '<div class="muted">' + Core.esc(n.email) + (n.telefono ? ' · +' + Core.esc(n.telefono) : '') + '</div>' +
+        '<div class="muted">' + (n.pro ? '⭐ Pro hasta ' + (n.pro_until ? fecha(n.pro_until) : 'siempre') : n.pro_until ? 'Pro venció el ' + fecha(n.pro_until) : 'Nunca fue Pro') +
+        ' · 🟢 entró ' + hace(n.visto_at) + '</div>' +
+        '<div class="muted">👥 ' + n.clientes + ' clientes · 🧑‍🍳 ' + n.equipo + ' equipo · 🛍️ ' + n.productos + ' productos · 🛒 ' + n.pedidos_mes + ' pedidos este mes' +
+        (n.estrellas ? ' · ★ ' + n.estrellas : '') + '</div></div></div>' +
+        '<div class="acc"><select data-acc="' + n.id + '" aria-label="Acciones"><option value="">Acción…</option><option value="30">⭐ Dar Pro 1 mes</option><option value="7">⭐ +7 días</option>' +
+        '<option value="365">⭐ +1 año</option><option value="0">Quitar Pro</option><option value="' + (n.suspendido ? 'react' : 'susp') + '">' + (n.suspendido ? '✅ Reactivar' : '⛔ Inhabilitar') + '</option>' +
+        '<option value="del">🗑️ Eliminar cuenta</option></select>' +
+        '<button class="alt" data-ver="' + n.id + '">👁️ Ver</button><button class="alt" data-mot="' + n.id + '">📣 Motivar</button>' +
+        (n.slug ? '<a class="btn small alt" target="_blank" rel="noopener" href="' + app + 't/?s=' + encodeURIComponent(n.slug) + '">🔗 Tienda</a>' : '') +
+        '<a class="btn small alt" href="../mensajes/?con=' + n.id + '">💬</a></div></div>';
+    }).join('') : '<p class="empty">Sin negocios en este filtro</p>';
   }
-  function mostrarNueva(l) {
-    nueva = l;
-    $('lnEmpresa').textContent = l.empresa;
-    $('lnKey').textContent = l.key;
-    $('lNueva').classList.remove('hidden');
-    show('licencias');
-    $('lNueva').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  async function accionCuenta(id, a, nombre, recargar) {
+    try {
+      if (a === 'susp' || a === 'react') await Cuenta.rpc('admin_suspender', { p_user: id, p_suspender: a === 'susp' });
+      else if (a === 'del') {
+        if (prompt('Se borra la cuenta de ' + nombre + ' y todos sus datos. Escribe ELIMINAR para confirmar.') !== 'ELIMINAR') return;
+        await Cuenta.rpc('admin_eliminar_cuenta', { p_user: id });
+      } else await Cuenta.rpc('admin_premium', { p_user: id, p_dias: +a });
+      sb.functions.invoke('enviar').catch(() => {});
+      Core.toast('Listo'); recargar();
+    } catch (err) { fallo(err); }
   }
-  $('lnWA').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(mensajeKey(nueva)), '_blank');
-  $('lnMail').onclick = () => {
-    location.href = 'mailto:?subject=' + encodeURIComponent('Tu key Pro') + '&body=' + encodeURIComponent(mensajeKey(nueva));
+  $('nLista').onchange = (e) => {
+    const id = e.target.dataset.acc, a = e.target.value;
+    if (!id || !a) return;
+    e.target.value = '';
+    const n = negocios.find((x) => x.id === id);
+    accionCuenta(id, a, n ? n.empresa : '', () => cargarNegocios().catch(fallo));
   };
-  $('lnCopy').onclick = () => navigator.clipboard.writeText(mensajeKey(nueva)).then(() => Core.toast('Copiado'));
-
-  /* ---------- Crear usuario ---------- */
-  $('nTipo').onchange = () => {
-    const cli = $('nTipo').value === 'client';
-    $('rowNEmp').classList.toggle('hidden', !cli);
-    $('lblNNombre').textContent = cli ? 'Nombre del cliente' : 'Nombre de la empresa';
-    if (cli) llenarEmpresas();
+  $('nLista').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.ver) verEmpresa(b.dataset.ver).catch(fallo);
+    if (b.dataset.mot) abrirMotivar(b.dataset.mot);
   };
-  async function llenarEmpresas() {
-    if (!usuarios.length) usuarios = await q(sb.from('profiles').select('*').order('created_at', { ascending: false }));
-    const emp = usuarios.filter((u) => u.role === 'user');
-    $('nEmpresa').innerHTML = emp.length ? emp.map((u) => '<option value="' + u.id + '">' + Core.esc(u.empresa || u.email) + '</option>').join('')
-      : '<option value="">Primero crea una empresa</option>';
-  }
   $('nGen').onclick = () => { $('nClave').value = Cuenta.claveAleatoria(); };
   let ultimoAcceso = '';
   $('bNuevo').onclick = async () => {
     $('nErr').textContent = '';
     if (!$('nClave').value) $('nClave').value = Cuenta.claveAleatoria();
-    const tipo = $('nTipo').value;
-    const d = { tipo, nombre: $('nNombre').value.trim(), email: $('nEmail').value.trim(), password: $('nClave').value,
-      negocio: tipo === 'client' ? $('nEmpresa').value : null };
+    const d = { tipo: 'user', nombre: $('nNombre').value.trim(), email: $('nEmail').value.trim(), password: $('nClave').value };
     if (!d.nombre || !d.email) { $('nErr').textContent = 'Escribe el nombre y el correo'; return; }
     $('bNuevo').disabled = true;
     try {
       await Cuenta.crearUsuario(d);
-      const emp = tipo === 'client' ? usuarios.find((u) => u.id === d.negocio) : null;
-      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: emp ? (emp.empresa || 'tu tienda') : 'CodeFix Apps' }, d));
+      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: 'FichaPro' }, d));
       $('nCred').textContent = ultimoAcceso;
       $('nCred').classList.remove('hidden'); $('nCredBtns').classList.remove('hidden');
       $('nNombre').value = ''; $('nEmail').value = ''; $('nClave').value = '';
-      Core.toast('✅ Cuenta creada');
-      cargarUsuarios();
+      Core.toast('✅ Negocio creado'); cargarNegocios().catch(fallo);
     } catch (err) { $('nErr').textContent = err.message; } finally { $('bNuevo').disabled = false; }
   };
   $('nWsp').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(ultimoAcceso), '_blank');
   $('nCopiar').onclick = () => navigator.clipboard.writeText(ultimoAcceso).then(() => Core.toast('Copiado'));
 
-  /* ---------- Usuarios ---------- */
-  let usuarios = [];
-  async function cargarUsuarios() {
-    usuarios = await q(sb.from('profiles').select('*').order('created_at', { ascending: false }));
-    pintarUsuarios();
+  /* ---------- Clientes ---------- */
+  let clientes = [], cFiltro = '';
+  async function cargarClientes() {
+    clientes = await Cuenta.rpc('admin_clientes');
+    if (!negocios.length) negocios = await Cuenta.rpc('admin_negocios');
+    const sel = $('cNeg').value;
+    $('cNeg').innerHTML = '<option value="">Todos los negocios</option>' + negocios.map((n) => '<option value="' + n.id + '"' + (n.id === sel ? ' selected' : '') + '>' +
+      Core.esc(n.empresa || n.email) + ' (' + n.clientes + ')</option>').join('');
+    pintarClientes();
   }
-  $('uBuscar').oninput = pintarUsuarios;
-  $('uTipo').onchange = pintarUsuarios;
-  $('uEmpresa').onchange = () => { if ($('uEmpresa').value) $('uTipo').value = 'client'; pintarUsuarios(); };
-  const proActivo = (u) => u.role === 'admin' || (u.plan === 'pro' && (!u.pro_until || new Date(u.pro_until) > new Date()));
-  function pintarUsuarios() {
-    const t = $('uBuscar').value.toLowerCase(), tipo = $('uTipo').value, emp = $('uEmpresa').value;
-    const empresas = usuarios.filter((u) => u.role === 'user');
-    const sel = $('uEmpresa').value;
-    $('uEmpresa').innerHTML = '<option value="">Todas las empresas</option>' + empresas.map((u) =>
-      '<option value="' + u.id + '"' + (u.id === sel ? ' selected' : '') + '>' + Core.esc(u.empresa || u.email) + ' (' +
-      usuarios.filter((c) => c.negocio_id === u.id).length + ')</option>').join('');
-    const nombreDe = (id) => { const x = usuarios.find((u) => u.id === id); return x ? (x.empresa || x.email) : '—'; };
-    const list = usuarios.filter((u) => (!t || (u.email + u.empresa).toLowerCase().includes(t)) &&
-      (!tipo || u.role === tipo || (tipo === 'user' && u.role === 'admin')) && (!emp || u.negocio_id === emp));
-    $('uCuenta').textContent = list.length + ' cuenta(s)';
-    $('usuarios').innerHTML = list.length ? list.map((u) => {
-      const pro = proActivo(u);
-      const pill = (u.role === 'client' ? '<span class="pill">Cliente</span> ' : '') + (u.role === 'admin' ? '<span class="pill admin">ADMIN</span>'
-        : u.suspended ? '<span class="pill st-failed">Suspendido</span>'
-        : pro ? '<span class="pill pro">' + (u.role === 'client' ? 'PREMIUM' : 'PRO') + '</span>' : '<span class="pill">FREE</span>');
-      const acciones = u.role === 'admin' ? '' :
-        '<select class="small" data-id="' + u.id + '" style="width:auto">' +
-        '<option value="">Acción…</option>' + (u.role === 'client' ? '' : '<option value="ver">👁️ Ver empresa</option><option value="msg">💬 Enviar mensaje</option>') + '<option value="pro7">Dar Pro 7 días</option>' +
-        '<option value="pro1">Dar Pro 1 mes</option><option value="pro12">Dar Pro 1 año</option>' +
-        '<option value="proinf">Dar Pro permanente</option><option value="free">Pasar a Free</option>' +
-        '<option value="' + (u.suspended ? 'unsusp">Reactivar' : 'susp">Suspender') + '</option></select>';
-      return '<li><div class="grow"><b>' + Core.esc(u.empresa || '(sin empresa)') + '</b> ' + pill +
-        '<div class="muted">' + Core.esc(u.email) + (u.role === 'client' ? ' · cliente de ' + Core.esc(nombreDe(u.negocio_id)) : '') +
-        '</div><div class="muted">Desde ' + fecha(u.created_at) +
-        (pro && u.pro_until ? ' · Pro hasta ' + fecha(u.pro_until) : '') + '</div></div>' + acciones + '</li>';
-    }).join('') : '<li class="empty">Sin usuarios</li>';
+  $('cBuscar').oninput = () => pintarClientes();
+  $('cNeg').onchange = () => pintarClientes();
+  seg('cSeg', (b) => { cFiltro = b.dataset.f; pintarClientes(); });
+  function pintarClientes() {
+    const t = $('cBuscar').value.trim().toLowerCase(), neg = $('cNeg').value;
+    const l = clientes.filter((c) => (!t || (c.nombre + ' ' + c.email).toLowerCase().includes(t)) && (!neg || c.negocio_id === neg) &&
+      (cFiltro === 'equipo' ? c.rol === 'equipo' : c.rol === 'client') && (!cFiltro || cFiltro === 'equipo' || (cFiltro === 'pro' && c.pro) || (cFiltro === 'susp' && c.suspendido)));
+    $('cCuenta').textContent = l.length + ' cuenta(s)';
+    $('cLista').innerHTML = l.length ? l.map((c) => '<li style="flex-wrap:wrap"><div class="grow" style="min-width:200px"><b>' + Core.esc(c.nombre || c.email) + '</b> ' +
+      (c.rol === 'equipo' ? '<span class="pill">Equipo</span>' : c.pro ? '<span class="pill pro">PREMIUM</span>' : '<span class="pill">FREE</span>') +
+      (c.suspendido ? ' <span class="pill bad">Suspendido</span>' : '') + '<div class="muted">' + Core.esc(c.email) + ' · ' + Core.esc(c.negocio || 'sin negocio') +
+      ' · entró ' + hace(c.visto_at) + ' · ' + c.pedidos + ' pedidos</div></div>' +
+      '<select data-acc="' + c.id + '" style="width:auto" aria-label="Acciones"><option value="">Acción…</option>' + (c.rol === 'client' ? '<option value="30">⭐ Premium 1 mes</option><option value="0">Quitar Premium</option>' : '') +
+      '<option value="' + (c.suspendido ? 'react' : 'susp') + '">' + (c.suspendido ? '✅ Reactivar' : '⛔ Inhabilitar') + '</option><option value="del">🗑️ Eliminar cuenta</option></select></li>').join('')
+      : '<li class="empty">Sin cuentas en este filtro</li>';
   }
-  $('usuarios').onchange = async (e) => {
-    const id = e.target.dataset.id, acc = e.target.value;
-    const u = usuarios.find((x) => x.id === id);
-    if (!u || !acc) return;
-    if (acc === 'msg') { location.href = '../mensajes/?con=' + id; return; }
-    if (acc === 'ver') { e.target.value = ''; return verEmpresa(id).catch(fallo); }
-    const meses = (m) => { const d = new Date(Math.max(Date.now(), u.pro_until ? +new Date(u.pro_until) : 0)); d.setMonth(d.getMonth() + m); return d.toISOString(); };
-    const dias = (n) => new Date(Math.max(Date.now(), u.pro_until ? +new Date(u.pro_until) : 0) + n * 864e5).toISOString();
-    const p = { pro7: ['pro', dias(7), u.suspended], pro1: ['pro', meses(1), u.suspended], pro12: ['pro', meses(12), u.suspended], proinf: ['pro', null, u.suspended],
-      free: ['free', null, u.suspended], susp: [u.plan, u.pro_until, true], unsusp: [u.plan, u.pro_until, false] }[acc];
-    try {
-      await Cuenta.rpc('admin_set_plan', { p_user: id, p_plan: p[0], p_until: p[1], p_suspended: p[2] });
-      Core.toast('Actualizado');
-      cargarUsuarios();
-    } catch (err) { fallo(err); e.target.value = ''; }
+  $('cLista').onchange = (e) => {
+    const id = e.target.dataset.acc, a = e.target.value;
+    if (!id || !a) return;
+    e.target.value = '';
+    const c = clientes.find((x) => x.id === id);
+    accionCuenta(id, a, c ? c.nombre : '', () => cargarClientes().catch(fallo));
   };
+
+  /* ---------- Pagos (comprobantes del Pro / Premium) ---------- */
+  let pFiltro = 'en_revision', pagos = [];
+  seg('pSeg', (b) => { pFiltro = b.dataset.f; cargarPagos().catch(fallo); });
+  async function cargarPagos() {
+    pagos = await Cuenta.rpc('admin_pagos', { p_estado: pFiltro });
+    const E = { en_revision: '🧾 Por revisar', aprobado: '✅ Aprobado', rechazado: '❌ Rechazado' };
+    $('pLista').innerHTML = pagos.length ? pagos.map((x) => '<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap">' +
+      '<div class="grow" style="min-width:180px"><b>' + Core.esc(x.nombre) + '</b> <span class="pill">' + (x.rol === 'client' ? 'Cliente' : 'Negocio') + '</span>' +
+      '<div class="muted">' + Core.esc(x.email) + ' · ' + fechaHora(x.fecha) + '</div>' +
+      '<div class="muted">' + (x.monto ? Core.money(x.monto) + ' · ' : '') + (x.pro_until ? 'Pro hasta ' + fecha(x.pro_until) : 'Sin Pro') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') + '</div></div>' +
+      '<span class="pill">' + E[x.estado] + '</span></div>' +
+      '<div class="acc" style="margin-top:8px">' + (x.tiene_comprobante ? '<button class="alt" data-ver="' + x.id + '">🧾 Ver comprobante</button>' : '') +
+      (x.estado === 'en_revision' ? '<button class="ok" data-ok="' + x.id + '">✅ Aprobar</button><button class="danger" data-no="' + x.id + '">Rechazar</button>' : '') + '</div>' +
+      '<div data-img="' + x.id + '"></div></div>').join('') : '<p class="empty">' + (pFiltro === 'en_revision' ? 'Nada por revisar 🎉' : 'Sin pagos') + '</p>';
+  }
+  $('pLista').onclick = async (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    try {
+      if (b.dataset.ver) {
+        const img = await Cuenta.rpc('admin_pago_comprobante', { p_id: b.dataset.ver });
+        const box = $('pLista').querySelector('[data-img="' + b.dataset.ver + '"]');
+        box.innerHTML = img ? '<img class="comp" src="' + img + '" alt="Comprobante"><div class="btns"><button class="small alt" data-dl="' + b.dataset.ver + '">⬇️ Descargar</button></div>' : '<p class="muted">El comprobante ya se borró.</p>';
+        box.querySelector('[data-dl]') && (box.querySelector('[data-dl]').onclick = () => fetch(img).then((r) => r.blob()).then((bl) => Core.download('comprobante.jpg', bl)));
+      }
+      if (b.dataset.ok) {
+        await Cuenta.rpc('admin_revisar_pago', { p_id: b.dataset.ok, p_aprobar: true, p_motivo: null });
+        sb.functions.invoke('enviar').catch(() => {}); Core.toast('✅ Aprobado: Pro activo'); cargarPagos().catch(fallo);
+      }
+      if (b.dataset.no) {
+        const m = prompt('Motivo del rechazo (le llega a la persona):', 'El comprobante no se ve claro');
+        if (m === null) return;
+        await Cuenta.rpc('admin_revisar_pago', { p_id: b.dataset.no, p_aprobar: false, p_motivo: m });
+        sb.functions.invoke('enviar').catch(() => {}); Core.toast('Rechazado'); cargarPagos().catch(fallo);
+      }
+    } catch (err) { fallo(err); }
+  };
+
+  /* ---------- Ajustes (sub-pestañas) ---------- */
+  let ajuste = 'links';
+  seg('aSeg', (b) => verAjuste(b.dataset.a));
+  function verAjuste(a) {
+    ajuste = a;
+    document.querySelectorAll('.aj').forEach((x) => x.classList.toggle('hidden', x.id !== 'aj-' + a));
+    const f = { links: cargarLinks, planes: cargarPlanes, reglas: cargarReglas, avisos: cargarAvisos, push: cargarAjustes, version: cargarAjustes, registro: cargarRegistro, cuenta: cargarAjustes }[a];
+    return Promise.resolve(f()).catch(fallo);
+  }
+  async function cargarLinks() {
+    const l = await Cuenta.rpc('mis_links_pago');
+    $('linksAdmin').innerHTML = [['premium_negocio', '🏪 Pro de negocios'], ['premium_cliente', '👤 Premium de clientes']].map(([t, nom]) =>
+      '<h2 style="margin-top:10px">' + nom + '</h2>' + [1, 2].map((n) => {
+        const x = l.find((y) => y.tipo === t && y.slot === n) || {}, k = t + n;
+        return '<div class="slotpago' + (x.activo ? ' on' : '') + '"><b>Espacio ' + n + (x.activo ? ' · ✅ Activo' : '') + '</b>' +
+          '<div class="row" style="flex-wrap:wrap"><div style="min-width:120px"><label for="lp' + k + '">Precio ($)</label><input id="lp' + k + '" inputmode="numeric" value="' + (x.precio == null ? '' : x.precio) + '"></div>' +
+          '<div style="min-width:160px;flex:2"><label for="lt' + k + '">Texto</label><input id="lt' + k + '" maxlength="80" value="' + Core.esc(x.titulo || '') + '" placeholder="Pro mensual"></div></div>' +
+          '<label for="lu' + k + '">Link de pago</label><input id="lu' + k + '" type="url" placeholder="https://mpago.la/…" value="' + Core.esc(x.url || '') + '">' +
+          '<label class="chk"><input type="checkbox" id="la' + k + '"' + (x.activo ? ' checked' : '') + '> Activo</label>' +
+          '<div class="btns"><button class="small" data-t="' + t + '" data-n="' + n + '">Guardar</button></div></div>';
+      }).join('')).join('');
+  }
+  $('linksAdmin').onclick = async (e) => {
+    const b = e.target.closest('[data-t]');
+    if (!b) return;
+    const k = b.dataset.t + b.dataset.n, pr = $('lp' + k).value.replace(/\D/g, '');
+    try {
+      await Cuenta.rpc('set_link_pago', { p_tipo: b.dataset.t, p_slot: +b.dataset.n, p_titulo: $('lt' + k).value, p_url: $('lu' + k).value,
+        p_precio: pr === '' ? null : +pr, p_activo: $('la' + k).checked });
+      Core.toast('💳 Guardado'); cargarLinks().catch(fallo);
+    } catch (err) { fallo(err); }
+  };
+  const ETIQ = { productos: 'Productos', clientes: 'Clientes con cuenta', fichas: 'Fichas publicadas', respuestas: 'Respuestas rápidas', equipo: 'Personas de equipo',
+    pedidos_mes: 'Pedidos online al mes', contactos: 'Contactos', favoritos: 'Favoritos', mensajes_seguidos: 'Mensajes seguidos' };
+  const NOMP = { negocio_free: '🏪 Negocio gratis', negocio_pro: '🏪⭐ Negocio Pro', cliente_free: '👤 Cliente gratis', cliente_pro: '👤⭐ Cliente Premium' };
+  async function cargarPlanes() {
+    const P = await Cuenta.rpc('planes_publicos');
+    $('planesBody').innerHTML = Object.keys(NOMP).filter((c) => P[c]).map((c) => {
+      const p = P[c];
+      return '<div class="card" data-plan="' + c + '"><h2>' + NOMP[c] + '</h2>' +
+        '<div class="row" style="flex-wrap:wrap"><div style="min-width:140px"><label>Nombre</label><input data-k="nombre" maxlength="40" value="' + Core.esc(p.nombre) + '"></div>' +
+        '<div style="min-width:120px"><label>Duración del pago (días)</label><input data-k="duracion" inputmode="numeric" value="' + p.duracion_dias + '"></div></div>' +
+        '<label>Descripción</label><input data-k="descripcion" maxlength="300" value="' + Core.esc(p.descripcion) + '">' +
+        '<label>Beneficios (uno por línea)</label><textarea data-k="beneficios" rows="4">' + Core.esc((p.beneficios || []).join('\n')) + '</textarea>' +
+        '<h2 style="margin-top:10px">Límites</h2><div class="row" style="flex-wrap:wrap">' + Object.keys(p.limites).map((k) =>
+          '<div style="min-width:140px"><label>' + Core.esc(ETIQ[k] || k) + '</label><input data-l="' + k + '" inputmode="numeric" value="' + p.limites[k] + '"></div>').join('') + '</div>' +
+        '<div class="btns"><button data-gp="' + c + '">💾 Guardar plan</button></div></div>';
+    }).join('');
+  }
+  $('planesBody').onclick = async (e) => {
+    const b = e.target.closest('[data-gp]');
+    if (!b) return;
+    const card = $('planesBody').querySelector('[data-plan="' + b.dataset.gp + '"]'), v = (k) => card.querySelector('[data-k="' + k + '"]').value;
+    const lim = {};
+    card.querySelectorAll('[data-l]').forEach((i) => { lim[i.dataset.l] = parseInt(i.value, 10) || 0; });
+    try {
+      await Cuenta.rpc('admin_plan_guardar', { p_codigo: b.dataset.gp, p_nombre: v('nombre'), p_descripcion: v('descripcion'),
+        p_beneficios: v('beneficios').split('\n').map((x) => x.trim()).filter(Boolean), p_duracion: parseInt(v('duracion'), 10) || 30, p_limites: lim });
+      Core.toast('⭐ Plan guardado');
+    } catch (err) { fallo(err); }
+  };
+  const REGLAS = [['retencion_min', 'Minutos que el pedido queda apartado esperando el pago'], ['cancel_min', 'Minutos para cancelar con devolución (desde que paga)'],
+    ['comprobantes_dias', 'Días que se guardan los comprobantes'], ['aviso1_dias', 'Primer aviso de vencimiento (días antes)'],
+    ['aviso2_dias', 'Segundo aviso de vencimiento (días antes)']];
+  async function cargarReglas() {
+    const r = await Cuenta.rpc('reglas');
+    $('reglasBody').innerHTML = REGLAS.map(([k, t]) => '<label for="rg' + k + '">' + t + '</label><input id="rg' + k + '" inputmode="numeric" value="' + r[k] + '">').join('');
+  }
+  $('bReglas').onclick = async () => {
+    try {
+      for (const [k] of REGLAS) await Cuenta.rpc('admin_set_regla', { p_k: k, p_v: parseInt($('rg' + k).value, 10) || 0 });
+      Core.toast('⚖️ Reglas guardadas');
+    } catch (err) { fallo(err); }
+  };
+  async function cargarRegistro() {
+    const l = await Cuenta.rpc('admin_auditoria');
+    $('regLista').innerHTML = l.length ? l.map((x) => '<li><div class="grow"><b>' + Core.esc(x.accion) + '</b><div class="muted">' + Core.esc(x.detalle) + '</div></div><span class="muted">' + fechaHora(x.created_at) + '</span></li>').join('')
+      : '<li class="empty">Sin cambios registrados</li>';
+  }
+  $('bWsp').onclick = async () => {
+    try { await Cuenta.rpc('admin_set_setting', { p_key: 'contact_whatsapp', p_value: $('sWsp').value.replace(/\D/g, '') }); Core.toast('Guardado'); } catch (err) { fallo(err); }
+  };
+  $('bSalir').onclick = async () => { await Cuenta.signOut(); location.replace('../../'); };
 
   /* ---------- Avisos ---------- */
   const PARA = { all_users: 'Todos', all_businesses: 'Empresas', pro_users: 'Empresas Pro', free_users: 'Empresas Free',
@@ -605,10 +640,7 @@
   /* ---------- Ajustes ---------- */
   async function cargarAjustes() {
     const v = await Cuenta.rpc('public_settings');
-    $('sLink').value = v.payment_link || ''; $('sPrecioE').value = v.price_business || '';
-    $('sPrecioC').value = v.price_client || ''; $('sWsp').value = v.contact_whatsapp || '';
-    $('sProbar').classList.toggle('hidden', !v.payment_link);
-    if (v.payment_link) $('sProbar').href = v.payment_link;
+    $('sWsp').value = v.contact_whatsapp || '';
     const s = await Cuenta.rpc('admin_secret_status');
     $('pushEstado').textContent = s.vapid_public && s.vapid_private ? '✅ Claves push configuradas' : '⚠️ Falta generar las claves push';
     $('bVapid').textContent = s.vapid_public ? 'Regenerar claves push' : 'Generar claves push';
@@ -653,16 +685,6 @@
     } catch (err) { $('pingRes').textContent = '❌ ' + err.message; }
   };
 
-  $('bVenta').onclick = async () => {
-    try {
-      const datos = { payment_link: $('sLink').value.trim(), price_business: $('sPrecioE').value.replace(/\D/g, ''),
-        price_client: $('sPrecioC').value.replace(/\D/g, ''), contact_whatsapp: $('sWsp').value.replace(/\D/g, '') };
-      for (const k of Object.keys(datos)) await Cuenta.rpc('admin_set_setting', { p_key: k, p_value: datos[k] });
-      Core.toast('✅ Guardado: ya se ve en la app de todos');
-      cargarAjustes();
-    } catch (err) { fallo(err); }
-  };
-
   $('bGmail').onclick = async () => {
     const user = $('gUser').value.trim(), pass = $('gPass').value.replace(/\s/g, ''), nombre = $('gNombre').value.trim();
     if (!/@/.test(user) || pass.length < 16) return Core.toast('Revisa el correo y la contraseña de aplicación (16 letras)');
@@ -676,7 +698,9 @@
     } catch (err) { fallo(err); }
   };
 
-  cargarResumen().then(() => {
-    if (location.hash === '#solicitudes') $('cSolicitudes').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }).catch(fallo);
+
+  const V = ['resumen', 'negocios', 'clientes', 'pagos', 'ajustes'];
+  const h = location.hash.slice(1);
+  show(V.includes(h) ? h : 'resumen');
+  addEventListener('hashchange', () => { const x = location.hash.slice(1); if (V.includes(x) && !$('v-' + x).classList.contains('on')) show(x); });
 })();

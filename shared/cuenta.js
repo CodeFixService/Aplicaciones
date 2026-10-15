@@ -100,10 +100,11 @@
       return new Promise(() => {});
     }
     if (a.suspended) { alert('Tu cuenta está suspendida. Contacta a ' + (cfg.MARCA || 'soporte') + '.'); }
-    if ((opts && opts.admin && !a.is_admin) || (opts && opts.empresa && a.role === 'client')) {
+    if ((opts && opts.admin && !a.is_admin) || (opts && opts.empresa && a.role === 'client') || (opts && opts.dueno && a.role === 'equipo')) {
       location.replace(rootPath);
       return new Promise(() => {});
     }
+    setTimeout(ofrecerPush, 1500);
     return a;
   }
 
@@ -325,7 +326,78 @@
     location.reload();
   }
 
+  /* ---------- v5.0: barra de abajo por perfil y atajos del encabezado ---------- */
+  const ICO = (n) => (global.Core && global.Core.ico ? global.Core.ico(n) : '');
+  function nav(activo) {
+    const a = account;
+    if (!a || a.is_admin) return;
+    const r = rootUrl();
+    const items = a.role === 'client'
+      ? [['tienda', 'bolsa', 'Tienda', 'apps/catalogo/'], ['pedidos', 'paquete', 'Pedidos', 'apps/catalogo/?v=pedidos'],
+         ['chat', 'chat', 'Chat', 'apps/mensajes/'], ['contactos', 'contactos', 'Contactos', 'apps/contactos/'], ['cuenta', 'usuarios', 'Cuenta', '#cuenta']]
+      : a.role === 'equipo'
+        ? [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'], ['chat', 'chat', 'Chat', 'apps/mensajes/']]
+        : [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'],
+           ['fichas', 'paleta', 'Fichas', 'apps/fichas/'], ['mas', 'ajustes', 'Más', '#ajustes']];
+    let n = document.querySelector('nav.tabs.abajo');
+    if (!n) { n = document.createElement('nav'); n.className = 'tabs abajo'; document.body.appendChild(n); }
+    document.body.classList.add('con-nav');
+    n.innerHTML = items.map(([k, i, t, u]) => '<a href="' + r + u + '" data-k="' + k + '" class="' + (k === activo ? 'on' : '') + '">' + ICO(i) + t +
+      (k === 'chat' || k === 'pedidos' ? '<span class="badge" hidden></span>' : '') + '</a>').join('');
+    // Atajos arriba: mensajes (negocio) y avisos.
+    const h = document.querySelector('header.top');
+    if (h && !h.querySelector('.atajos')) {
+      const d = document.createElement('div'); d.className = 'atajos';
+      d.innerHTML = (a.role === 'client' ? '' : '<a href="' + r + 'apps/mensajes/" aria-label="Mensajes">💬<span class="badge" hidden id="atMsg"></span></a>') +
+        '<a href="' + r + (a.role === 'client' ? '#cuenta' : '') + '#avisos" aria-label="Avisos">🔔</a>';
+      h.appendChild(d);
+    }
+    contar();
+  }
+  async function contar() {
+    if (!sb || !account) return;
+    try {
+      const { data } = await sb.rpc('chat_list');
+      const m = (data || []).reduce((s, c) => s + (c.no_leidos || 0), 0);
+      document.querySelectorAll('nav.tabs.abajo [data-k=chat] .badge, #atMsg').forEach((b) => { b.textContent = m; b.hidden = !m; });
+    } catch (e) { /* sin red */ }
+    if (account.role !== 'client') {
+      try {
+        const { data } = await sb.rpc('hoy_negocio');
+        const p = data ? data.revisar + data.activos : 0;
+        document.querySelectorAll('nav.tabs.abajo [data-k=pedidos] .badge').forEach((b) => { b.textContent = p; b.hidden = !p; });
+      } catch (e) { /* base anterior */ }
+    }
+  }
+  setInterval(() => { if (!document.hidden && document.querySelector('nav.tabs.abajo')) contar(); }, 60000);
+
+  /* ---------- v5.0: pedir activar notificaciones (al abrir, máx. cada 30 min, hasta que estén activas) ---------- */
+  async function ofrecerPush() {
+    try {
+      if (!pushSupported() || !account) return;
+      if (Notification.permission === 'granted' && await suscripcionActual()) return;
+      const k = 'cfx:pushPedido', t = +localStorage.getItem(k) || 0;
+      if (Date.now() - t < 18e5) return;
+      localStorage.setItem(k, String(Date.now()));
+      if (document.getElementById('cfxPush')) return;
+      const d = document.createElement('div');
+      d.className = 'hoja'; d.id = 'cfxPush';
+      const negado = Notification.permission === 'denied';
+      d.innerHTML = '<div><span style="font-size:28px">🔔</span><div class="grow"><b>Activa las notificaciones</b><br>' +
+        (negado ? 'Están bloqueadas: actívalas en los ajustes del navegador (candado junto a la dirección).' : 'Es muy importante: así te enteras al tiro de pedidos, pagos y mensajes.') +
+        '</div>' + (negado ? '' : '<button class="small" type="button">Activar</button>') + '<button class="small alt" type="button" aria-label="Ahora no">✕</button></div>';
+      const bs = d.querySelectorAll('button');
+      bs[bs.length - 1].onclick = () => d.remove();
+      if (!negado) bs[0].onclick = async () => {
+        try { await enablePush(); d.remove(); if (global.Core) global.Core.toast('✅ Notificaciones activadas'); }
+        catch (e) { if (global.Core) global.Core.toast(e.message); }
+      };
+      document.body.appendChild(d);
+    } catch (e) { /* sin soporte */ }
+  }
+
   global.Cuenta = {
+    nav, contar, ofrecerPush,
     configured, sb, refresh, require, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora, aplicarLogo,
     get account() { return account; },

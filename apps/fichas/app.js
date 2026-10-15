@@ -5,7 +5,9 @@
 
   Core.registerSW('../../');
   Core.marca();
-  const cuenta = await Cuenta.require('../../', { empresa: true });
+  const cuenta = await Cuenta.require('../../', { empresa: true, dueno: true });
+  if (cuenta.is_admin) { location.replace('../admin/'); return; }
+  Cuenta.nav('fichas');
   const sb = Cuenta.sb;
   // Datos separados por usuario en este celular.
   const db = Core.store('fichas:' + cuenta.id);
@@ -487,7 +489,7 @@
     await Cuenta.rpc('publicar_ficha', {
       p_key: f.id, p_titulo: f.titulo || 'Ficha', p_detalle: f.subtitulo || '',
       p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 432), // ~35 KB: rápida y liviana
-      p_tipo: tipo, p_vip: !!f.vip, p_precio_num: tipo !== 'lista' && !isNaN(pn) ? pn : null
+      p_tipo: tipo, p_vip: false, p_precio_num: tipo !== 'lista' && !isNaN(pn) ? pn : null
     });
     f.pubAt = Date.now();
   }
@@ -729,7 +731,7 @@
       let aviso = '';
       try {
         k.notifId = await programarAutomatico(k);
-        if (k.vip && !cuenta.is_admin) await Cuenta.rpc('set_offer_premium', { p_id: k.notifId, p_premium: true });
+
         if (canales.length) k.avisado = true; // el servidor la envía solo; no hace falta recordatorio
       } catch (err) {
         if (canales.length) throw err;
@@ -1012,4 +1014,5 @@
   publicarFichasPendientes().then(publicarPendientes).then(respaldoAuto).catch(() => {});
   const m = location.hash.match(/camp=([\w]+)/);
   if (m) { show('campanas'); abrirEnvio(m[1]); }
+  else if (location.hash === '#clientes') show('clientes');
 })();

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>Tienda · FichaPro</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../shared/core.css">
+<script src="../shared/core.js"></script>
+<style>
+  body { padding-bottom: 96px; }
+  .lg { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; font-weight: 800; color: var(--brand-ink);
+    background: var(--brand) center / cover no-repeat; }
+  header.top h1::before { display: none; }
+  .seg { display: flex; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; padding: 4px; margin-bottom: 14px; }
+  .seg button { flex: 1; border-radius: 99px; background: transparent; color: var(--muted); box-shadow: none; }
+  .seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .item .foto { width: calc(100% + 28px); max-width: none; margin: -14px -14px 4px; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius) var(--radius) 0 0; background: var(--field); }
+  .item b { overflow-wrap: anywhere; }
+  .item .p { font-size: 20px; font-weight: 800; }
+  .item .desc { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .item .acc { margin-top: auto; }
+  .item select { padding: 8px 10px; font-size: 14px; }
+  .oferta { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 14px; }
+  .oferta img { width: 100%; display: block; }
+  .oferta .txt { padding: 14px; }
+  .carro { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px max(16px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); }
+  .carro button { width: 100%; max-width: 640px; margin: 0 auto; display: flex; justify-content: space-between; }
+  .linea { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .linea .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .qty { display: flex; align-items: center; gap: 8px; }
+  .qty button { width: 34px; height: 34px; padding: 0; border-radius: 10px; }
+  .entrega { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .entrega button:not(.on) { background: var(--brand-soft); color: var(--brand); box-shadow: none; }
+  .estado { border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; font-size: 14px; border: 1px solid var(--line); background: var(--card); }
+</style>
+</head>
+<body>
+<header class="top"><span class="lg" id="lg"></span><h1 id="titulo">Tienda</h1><a href="../" id="bIngresar" style="width:auto;padding:0 12px;font-size:14px;font-weight:600">Ingresar</a></header>
+<main>
+  <p class="empty" id="cargando">Cargando…</p>
+  <div class="card hidden" id="noExiste"><h2>Tienda no encontrada</h2><p class="muted">Revisa el link o pídeselo de nuevo a la tienda.</p></div>
+  <div id="tienda" class="hidden">
+    <div class="estado hidden" id="estado"></div>
+    <div class="card hidden" id="misPed"><h2>🧾 Tus pedidos en esta tienda</h2><ul class="list" id="misPedL"></ul></div>
+    <div class="seg"><button class="on" data-t="productos">🛍️ Productos</button><button data-t="ofertas">🏷️ Ofertas</button><button data-t="pedido">🛒 Pedido</button></div>
+    <section id="v-productos">
+      <input id="buscar" placeholder="Buscar producto…" aria-label="Buscar producto" style="margin-bottom:12px">
+      <div class="grid" id="grid"></div>
+    </section>
+    <section id="v-ofertas" class="hidden"><div id="ofertas"></div></section>
+    <section id="v-pedido" class="hidden">
+      <div class="card"><h2>🛒 Tu pedido</h2><div id="lineas"></div>
+        <div class="row" style="justify-content:space-between;font-size:20px;font-weight:800;margin:10px 0"><span>Total</span><span id="total">$0</span></div>
+        <label for="nom">Tu nombre</label><input id="nom" maxlength="60" autocomplete="name">
+        <label for="tel">Tu WhatsApp (con código de país)</label><input id="tel" inputmode="tel" placeholder="56912345678" autocomplete="tel">
+        <label>¿Cómo lo recibes?</label>
+        <div class="entrega" id="entrega"><button class="on" data-e="retiro" type="button">🏪 Retiro</button><button data-e="despacho" type="button">🚚 Despacho</button></div>
+        <div id="rowDir" class="hidden"><p class="muted" style="font-size:13px">⚠️ El despacho tiene un costo según la distancia; la tienda te lo confirma.</p>
+          <label for="dir">Dirección</label><input id="dir" maxlength="200" placeholder="Calle, número, comuna"></div>
+        <label for="nota">Nota (opcional)</label><textarea id="nota" maxlength="200"></textarea>
+        <p class="muted" id="pagoTip" style="font-size:13px"></p>
+        <div class="btns"><button id="bPedir" style="flex:1">📨 Enviar pedido</button></div>
+      </div>
+    </section>
+    <div class="card" id="cCuenta" style="margin-top:16px"><h2>✨ ¿Quieres tu cuenta?</h2>
+      <p class="muted" style="margin-top:0">Con cuenta guardas tus pedidos, tus favoritos y recibes avisos de ofertas. Es gratis y quedas con esta tienda.</p>
+      <details><summary class="muted" style="cursor:pointer">Crear mi cuenta</summary>
+        <label for="rNom">Tu nombre</label><input id="rNom" maxlength="60" autocomplete="name">
+        <label for="rMail">Correo</label><input id="rMail" type="email" autocomplete="email">
+        <label for="rPass">Contraseña (mínimo 6)</label><input id="rPass" type="password" minlength="6" autocomplete="new-password">
+        <label class="terms"><input type="checkbox" id="rTerm"> <span>Acepto los <a href="../apps/legal/" target="_blank">términos y la privacidad</a></span></label>
+        <div class="btns"><button id="bCrear">Crear mi cuenta</button></div></details>
+    </div>
+  </div>
+</main>
+<div class="carro hidden" id="barra"><button class="ok" id="bVer"><span id="barTxt">🛒 Ver pedido</span><span id="barTotal"></span></button></div>
+<script src="../shared/config.js"></script>
+<script src="../shared/vendor/supabase.js"></script>
+<script src="../shared/cuenta.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  Core.registerSW('../');
+  Core.marca();
+  const slug = (new URLSearchParams(location.search).get('s') || '').toLowerCase();
+  const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
+  let t = null;
+  try { t = await Cuenta.rpc('tienda_publica', { p_slug: slug }); } catch (e) { t = null; }
+  $('cargando').classList.add('hidden');
+  if (!t) { $('noExiste').classList.remove('hidden'); return; }
+  // Con cuenta de esta tienda: directo a su app.
+  try {
+    const a = await Cuenta.refresh();
+    if (a && a.role === 'client' && a.negocio_id === t.id) { location.replace('../apps/catalogo/'); return; }
+    if (a) { $('bIngresar').textContent = 'Mi app'; $('cCuenta').classList.add('hidden'); }
+  } catch (e) { /* sin sesión */ }
+  document.title = t.empresa + ' · FichaPro';
+  $('titulo').textContent = t.empresa;
+  if (/^#[0-9a-f]{6}$/i.test(t.color || '')) Core.tema.aplicar(t.color);
+  if (/^data:image\//.test(t.logo || '')) $('lg').style.backgroundImage = 'url("' + t.logo + '")'; else $('lg').textContent = (t.empresa || '?').charAt(0).toUpperCase();
+  $('bIngresar').href = '../?volver=' + encodeURIComponent('/apps/catalogo/');
+  $('tienda').classList.remove('hidden');
+  const est = [];
+  if (t.vacaciones_hasta) est.push('🌴 <b>De vacaciones hasta el ' + new Date(t.vacaciones_hasta + 'T12:00').toLocaleDateString('es', { day: 'numeric', month: 'long' }) + '</b>' + (t.vacaciones_msg ? ': ' + Core.esc(t.vacaciones_msg) : ''));
+  else if (t.abierto === false) est.push('🔴 <b>Cerrado ahora</b>: puedes pedir igual.');
+  if (t.horario) est.push('<span class="muted">🕒 ' + Core.esc(t.horario) + '</span>');
+  if (t.estrellas && t.estrellas.total) est.push('⭐ <b>' + Number(t.estrellas.promedio).toLocaleString('es-CL') + '</b> · ' + t.estrellas.total + ' calificaciones');
+  $('estado').classList.toggle('hidden', !est.length); $('estado').innerHTML = est.join('<br>');
+  $('pagoTip').textContent = t.cobra_online ? '💳 Al enviar, tu pedido queda apartado ' + t.retencion_min + ' min para que pagues con el link de la tienda y subas el comprobante.'
+    : 'La tienda te contactará por WhatsApp para coordinar el pago.';
+
+  // Mis pedidos sin cuenta (guardados en este celular)
+  const KEY = 'pub:' + slug, mem = Core.store(KEY);
+  const tokens = mem.get('tokens', []);
+  $('misPed').classList.toggle('hidden', !tokens.length);
+  $('misPedL').innerHTML = tokens.slice(-5).reverse().map((x) => '<li><a class="mini" href="../r/?t=' + x.t + '" style="width:100%"><span class="grow">Pedido del ' +
+    new Date(x.f).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + ' · ' + precio(x.total) + '</span><span>›</span></a></li>').join('');
+
+  /* ---------- Catálogo con fotos (guardadas en el celular) ---------- */
+  let items = [];
+  try { items = await Cuenta.rpc('catalogo_publico', { p_slug: slug }); } catch (e) { items = []; }
+  const fotos = {};
+  function pintar() {
+    const q = $('buscar').value.toLowerCase();
+    const l = items.filter((i) => !q || i.nombre.toLowerCase().includes(q));
+    $('grid').innerHTML = l.length ? l.map((i) => '<div class="item">' + (fotos[i.clave] ? '<img class="foto" src="' + fotos[i.clave] + '" alt="" loading="lazy">' : '') +
+      (i.categoria ? '<span class="muted" style="font-size:12px">' + Core.esc(i.categoria) + '</span>' : '') + '<b>' + Core.esc(i.nombre) + '</b>' +
+      (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
+      (i.opciones ? '<select data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +
+        i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => '<option>' + Core.esc(o) + '</option>').join('') + '</select>' : '') +
+      '<span class="p">' + precio(i.precio) + '</span>' +
+      (i.disponible != null && i.disponible <= 3 ? '<span class="pill ' + (i.disponible ? 'warn' : 'bad') + '" style="align-self:flex-start">' + (i.disponible ? 'Quedan ' + i.disponible : 'Agotado') + '</span>' : '') +
+      '<div class="acc">' + (i.disponible === 0 ? '<button class="alt" disabled style="width:100%">Agotado</button>' : '<button class="ok" style="width:100%" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>') + '</div></div>').join('')
+      : '<p class="empty" style="grid-column:1/-1">' + (items.length ? 'Sin resultados' : 'La tienda aún no publica productos.') + '</p>';
+  }
+  $('buscar').oninput = pintar;
+  async function cargarFotos() {
+    const con = items.filter((i) => i.foto_v);
+    if (!con.length) return;
+    let cache = null;
+    try { cache = 'caches' in window ? await caches.open('cfx-imagenes') : null; } catch (e) { cache = null; }
+    const k = (c, v) => './foto/' + t.id + '/' + encodeURIComponent(c) + '?v=' + v;
+    const faltan = [];
+    for (const i of con) { const r = cache && await cache.match(k(i.clave, i.foto_v)); if (r) fotos[i.clave] = await r.text(); else faltan.push(i.clave); }
+    pintar();
+    for (let n = 0; n < faltan.length; n += 30) {
+      try {
+        const l = await Cuenta.rpc('fotos_publicas', { p_slug: slug, p_claves: faltan.slice(n, n + 30) });
+        l.forEach((f) => { fotos[f.clave] = f.foto; if (cache) cache.put(k(f.clave, f.v), new Response(f.foto)).catch(() => {}); });
+        pintar();
+      } catch (e) { break; }
+    }
+  }
+  pintar(); cargarFotos();
+
+  /* ---------- Ofertas ---------- */
+  let ofertas = null;
+  async function cargarOfertas() {
+    try { ofertas = await Cuenta.rpc('ofertas_publicas', { p_slug: slug }); } catch (e) { ofertas = []; }
+    $('ofertas').innerHTML = ofertas.length ? ofertas.map((o) => '<article class="oferta">' + (/^(https:|data:image\/)/.test(o.imagen || '') ? '<img src="' + Core.esc(o.imagen) + '" alt="" loading="lazy">' : '') +
+      '<div class="txt"><b>' + Core.esc(o.titulo) + '</b>' + (o.precio ? '<div style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</div>' : '') +
+      (o.detalle ? '<p class="muted" style="white-space:pre-line">' + Core.esc(o.detalle) + '</p>' : '') +
+      (o.precio_num != null ? '<button class="ok small" data-pub="' + o.id + '">🛒 Agregar</button>' : '') + '</div></article>').join('') : '<p class="empty">Sin ofertas por ahora.</p>';
+  }
+
+  /* ---------- Pestañas ---------- */
+  document.querySelector('.seg').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) vista(b.dataset.t); };
+  function vista(v) {
+    document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('on', x.dataset.t === v));
+    ['productos', 'ofertas', 'pedido'].forEach((k) => $('v-' + k).classList.toggle('hidden', k !== v));
+    if (v === 'ofertas' && !ofertas) cargarOfertas();
+    pintarCarro(); scrollTo(0, 0);
+  }
+
+  /* ---------- Carrito ---------- */
+  let carro = mem.get('carro', []);
+  const itemDe = (l) => /^pub:/.test(l.clave) ? { nombre: l.nombre, precio: l.precio } : items.find((i) => i.clave === l.clave);
+  const lineas = () => carro.map((l) => ({ l, i: itemDe(l) })).filter((x) => x.i);
+  const total = () => lineas().reduce((s, x) => s + x.i.precio * x.l.cant, 0);
+  function pintarCarro() {
+    carro = carro.filter((l) => l.cant > 0 && itemDe(l));
+    mem.set('carro', carro);
+    const n = carro.reduce((s, l) => s + l.cant, 0);
+    $('barra').classList.toggle('hidden', !n || !$('v-pedido').classList.contains('hidden'));
+    $('barTxt').textContent = '🛒 Ver pedido (' + n + ')'; $('barTotal').textContent = precio(total());
+    $('lineas').innerHTML = lineas().map(({ l, i }, k) => '<div class="linea"><div class="grow"><b>' + Core.esc(i.nombre) + (l.opcion ? ' (' + Core.esc(l.opcion) + ')' : '') +
+      '</b><div class="muted">' + precio(i.precio) + ' c/u</div></div><div class="qty"><button class="alt" data-k="' + k + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
+      '</b><button class="alt" data-k="' + k + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('') || '<p class="muted">Agrega productos con ➕.</p>';
+    $('total').textContent = precio(total());
+  }
+  $('lineas').onclick = (e) => { const { k, d } = e.target.dataset; if (k === undefined) return; const l = lineas()[+k].l; l.cant += +d; pintarCarro(); };
+  function agregar(x) {
+    const l = carro.find((c) => c.clave === x.clave && (c.opcion || null) === (x.opcion || null));
+    if (l) l.cant++; else carro.push(Object.assign({ cant: 1 }, x));
+    pintarCarro(); Core.toast('🛒 Agregado');
+  }
+  $('grid').onclick = (e) => {
+    const b = e.target.closest('[data-add]');
+    if (!b) return;
+    const i = items.find((x) => x.clave === b.dataset.add);
+    let opcion = null;
+    if (i.opciones) { const s = b.closest('.item').querySelector('select'); opcion = s && s.value; if (!opcion) return Core.toast('🎨 Elige el color u opción primero'); }
+    agregar({ clave: i.clave, opcion });
+  };
+  $('ofertas').onclick = (e) => {
+    const b = e.target.closest('[data-pub]');
+    if (!b) return;
+    const o = ofertas.find((x) => x.id === b.dataset.pub);
+    agregar({ clave: 'pub:' + o.id, nombre: o.titulo, precio: Number(o.precio_num) });
+  };
+  $('bVer').onclick = () => vista('pedido');
+  let entrega = 'retiro';
+  $('entrega').onclick = (e) => {
+    const b = e.target.closest('[data-e]'); if (!b) return;
+    entrega = b.dataset.e;
+    $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    $('rowDir').classList.toggle('hidden', entrega !== 'despacho');
+  };
+  $('nom').value = mem.get('nom', ''); $('tel').value = mem.get('tel', '');
+  $('bPedir').onclick = async () => {
+    if (!lineas().length) return Core.toast('Tu pedido está vacío');
+    $('bPedir').disabled = true;
+    try {
+      const r = await Cuenta.rpc('crear_pedido_invitado', { p_slug: slug, p_nombre: $('nom').value, p_tel: $('tel').value,
+        p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant, opcion: l.opcion || null })), p_entrega: entrega, p_direccion: $('dir').value, p_nota: $('nota').value });
+      if (!r.ok) throw new Error(r.error);
+      mem.set('nom', $('nom').value); mem.set('tel', $('tel').value);
+      tokens.push({ t: r.token, f: Date.now(), total: r.total }); mem.set('tokens', tokens.slice(-20));
+      carro = []; mem.set('carro', []);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {});
+      location.href = '../r/?t=' + r.token;
+    } catch (err) { Core.toast(err.message); } finally { $('bPedir').disabled = false; }
+  };
+
+  /* ---------- Crear cuenta desde la tienda ---------- */
+  $('bCrear').onclick = async () => {
+    if (!$('rTerm').checked) return Core.toast('Acepta los términos para crear tu cuenta');
+    const d = { accion: 'registro_cliente', slug, nombre: $('rNom').value.trim(), email: $('rMail').value.trim(), password: $('rPass').value };
+    if (!d.nombre || !d.email || d.password.length < 6) return Core.toast('Completa nombre, correo y una contraseña de 6 o más');
+    $('bCrear').disabled = true;
+    try {
+      const { data, error } = await Cuenta.sb.functions.invoke('enviar', { body: d });
+      if (error) throw new Error('No se pudo conectar con el servidor');
+      if (!data || !data.ok) throw new Error((data && data.error) || 'No se pudo crear la cuenta');
+      await Cuenta.signIn(d.email, d.password);
+      try { await Cuenta.rpc('accept_terms'); } catch (e) { /* lo pide al entrar */ }
+      location.replace('../apps/catalogo/');
+    } catch (err) { Core.toast(err.message); } finally { $('bCrear').disabled = false; }
+  };
+  pintarCarro();
+})();
+</script>
+</body>
+</html>
