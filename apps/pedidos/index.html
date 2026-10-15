@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
-<title>Pedidos</title>
+<title>Pedidos · FichaPro</title>
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="icon" href="../../icons/icon-192.png">
 <link rel="stylesheet" href="../../shared/core.css">
@@ -28,6 +28,9 @@
   .kpis .card { margin: 0; text-align: center; }
   .kpis b { display: block; font-size: 22px; }
   .vip { color: #dc2626; font-weight: 700; }
+  .est-pagando, .est-en_revision { background: color-mix(in srgb, #8b5cf6 16%, transparent); color: #7c3aed; border-color: transparent; }
+  .est-rechazado, .est-expirado { background: var(--line); }
+  .aviso { font-size: 13px; padding: 8px 10px; border-radius: 10px; margin: 8px 0 0; background: color-mix(in srgb, #f59e0b 14%, var(--card)); border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent); }
   .est5 { color: #f59e0b; letter-spacing: 1px; }
   .resp { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--field); margin-top: 8px; }
   .ped .dest { border: 2px solid #f59e0b; }
@@ -35,15 +38,22 @@
 </head>
 <body>
 <header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Pedidos</h1><span id="planTag" class="pill">FREE</span></header>
+<nav class="tabs sub" id="subtabs">
+  <button data-v="pedidos" class="on"><span data-ico="paquete"></span>Pedidos</button>
+  <button data-v="cupones" class="dueno"><span data-ico="ticket"></span>Promociones</button>
+  <button data-v="stats" class="dueno"><span data-ico="grafico"></span>Estadísticas</button>
+</nav>
 <main>
   <!-- PEDIDOS -->
   <section class="view on" id="v-pedidos">
     <div class="filtros" id="filtros">
-      <button class="small on" data-f="activos">Activos</button>
-      <button class="small alt" data-f="entregado">Entregados</button>
-      <button class="small alt" data-f="cancelado">Cancelados</button>
-      <button class="small alt" data-f="">Todos</button>
+      <button class="small on" data-f="revisar">🧾 Por revisar</button>
+      <button class="small alt" data-f="activos">📦 Activos</button>
+      <button class="small alt" data-f="pagando">⏳ Esperando pago</button>
+      <button class="small alt" data-f="devolver">💸 Por devolver</button>
+      <button class="small alt" data-f="historial">📚 Historial</button>
     </div>
+    <input id="buscar" placeholder="Buscar por nombre o WhatsApp…" aria-label="Buscar" style="margin-bottom:12px">
     <div class="ped" id="lista"></div>
   </section>
 
@@ -68,15 +78,6 @@
     </div>
   </section>
 
-  <!-- RESEÑAS -->
-  <section class="view" id="v-resenas">
-    <div class="card">
-      <h2>⭐ Reseñas de tu tienda <span class="pill" id="rProm"></span></h2>
-      <p class="muted" id="rTip" style="margin-bottom:0"></p>
-    </div>
-    <div class="ped" id="rLista"></div>
-  </section>
-
   <!-- ESTADÍSTICAS -->
   <section class="view" id="v-stats">
     <div class="card upsell hidden" id="stLock">
@@ -98,13 +99,6 @@
   </section>
 </main>
 
-<nav class="tabs">
-  <button data-v="pedidos" class="on"><span data-ico="paquete"></span>Pedidos</button>
-  <button data-v="cupones"><span data-ico="ticket"></span>Cupones</button>
-  <button data-v="resenas"><span data-ico="estrella"></span>Reseñas</button>
-  <button data-v="stats"><span data-ico="grafico"></span>Estadísticas</button>
-</nav>
-
 <script src="../../shared/config.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
 <script src="../../shared/cuenta.js"></script>
@@ -114,151 +108,109 @@
   Core.registerSW('../../');
   Core.marca();
   const yo = await Cuenta.require('../../', { empresa: true });
+  Cuenta.nav('pedidos');
+  const dueno = yo.role !== 'equipo';
   const pro = !!yo.is_pro;
-  $('planTag').textContent = yo.is_admin ? 'ADMIN' : pro ? 'PRO' : 'FREE';
+  $('planTag').textContent = yo.role === 'equipo' ? 'EQUIPO' : pro ? 'PRO' : 'FREE';
   $('planTag').classList.toggle('pro', pro);
+  document.querySelectorAll('.dueno').forEach((b) => b.classList.toggle('hidden', !dueno));
   const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
+  const params = new URLSearchParams(location.search);
 
-  document.querySelectorAll('nav.tabs button').forEach((b) => { b.onclick = () => show(b.dataset.v); });
+  document.querySelectorAll('#subtabs button').forEach((b) => { b.onclick = () => show(b.dataset.v); });
   function show(v) {
-    document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
+    document.querySelectorAll('#subtabs button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
     document.querySelectorAll('.view').forEach((x) => x.classList.toggle('on', x.id === 'v-' + v));
     scrollTo(0, 0);
     if (v === 'cupones') cargarCupones();
     if (v === 'stats') cargarStats();
-    if (v === 'resenas') cargarResenas();
   }
 
-  /* ---------- ⭐ Reseñas (Free: las ves · Pro: respondes y destacas hasta 3) ---------- */
-  let resenas = [];
-  async function cargarResenas() {
-    let r;
-    try { r = await Cuenta.rpc('ver_resenas', { p_negocio: yo.id }); }
-    catch (e) { $('rLista').innerHTML = '<p class="empty">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
-    resenas = r.lista;
-    $('rProm').textContent = r.total ? '★ ' + Number(r.promedio).toLocaleString('es-CL') + ' · ' + r.total : 'Sin reseñas';
-    $('rTip').innerHTML = pro ? 'Responde con cariño: tus clientes ven tu respuesta. Puedes destacar hasta 3 reseñas (salen primero en tu tienda).'
-      : 'Opinan los clientes que ya recibieron un pedido. <a href="../../#plan">⭐ Con Pro</a> respondes y destacas las mejores.';
-    const est = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
-    $('rLista').innerHTML = resenas.length ? resenas.map((x) => '<div class="card' + (x.destacada ? ' dest' : '') + '"><div class="cab"><div><span class="est5">' + est(x.estrellas) +
-      '</span> <b>' + Core.esc(x.autor) + '</b>' + (x.destacada ? ' <span class="pill pro">📌 Destacada</span>' : '') + '</div><span class="muted">' +
-      new Date(x.fecha).toLocaleDateString('es') + '</span></div>' + (x.texto ? '<p style="margin:8px 0 0">' + Core.esc(x.texto) + '</p>' : '') +
-      (x.respuesta ? '<div class="resp">💬 <b>Tu respuesta:</b> ' + Core.esc(x.respuesta) + '</div>' : '') +
-      (pro ? '<textarea data-txt="' + x.id + '" maxlength="300" placeholder="Escribe tu respuesta…" style="margin-top:10px" aria-label="Respuesta">' + Core.esc(x.respuesta || '') + '</textarea>' +
-        '<div class="acc"><button class="small" data-resp="' + x.id + '">💬 ' + (x.respuesta ? 'Guardar respuesta' : 'Responder') + '</button>' +
-        '<button class="small alt" data-dest="' + x.id + '" data-on="' + (x.destacada ? '0' : '1') + '">' + (x.destacada ? 'Quitar destacada' : '📌 Destacar') + '</button></div>' : '') +
-      '</div>').join('') : '<p class="empty">Aún no tienes reseñas. Tus clientes pueden opinar cuando reciben un pedido 🎉</p>';
-  }
-  $('rLista').onclick = async (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    try {
-      if (b.dataset.resp) {
-        const t = $('rLista').querySelector('[data-txt="' + b.dataset.resp + '"]').value;
-        await Cuenta.rpc('responder_resena', { p_id: b.dataset.resp, p_respuesta: t });
-        Cuenta.sb.functions.invoke('enviar').catch(() => {});
-        Core.toast(t.trim() ? '💬 Respuesta publicada' : 'Respuesta quitada');
-      }
-      if (b.dataset.dest) {
-        await Cuenta.rpc('destacar_resena', { p_id: b.dataset.dest, p_destacar: b.dataset.on === '1' });
-        Core.toast(b.dataset.on === '1' ? '📌 Reseña destacada' : 'Ya no está destacada');
-      }
-      cargarResenas();
-    } catch (err) { Core.toast(err.message); }
-  };
-
-  /* ---------- Pedidos ---------- */
-  const ESTADOS = { recibido: '📥 Recibido', preparando: '👨‍🍳 Preparando', listo: '✅ Listo', en_camino: '🚚 En camino',
-    entregado: '🎉 Entregado', cancelado: '❌ Cancelado' };
-  let filtro = 'activos', pedidos = [];
+  /* ---------- Pedidos: comprobantes, estados, devoluciones y calificación ---------- */
+  const ESTADOS = { pagando: '⏳ Esperando pago', en_revision: '🧾 Comprobante por revisar', recibido: '📥 Recibido', preparando: '👨‍🍳 Preparando',
+    listo: '✅ Listo', en_camino: '🚚 En camino', entregado: '🎉 Entregado', cancelado: '❌ Cancelado', rechazado: '❌ Rechazado', expirado: '⌛ Expirado' };
+  let filtro = params.has('f') ? params.get('f') : 'revisar', pedidos = [];
+  const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
   async function cargar() {
+    document.querySelectorAll('#filtros button').forEach((x) => { x.classList.toggle('on', x.dataset.f === filtro); x.classList.toggle('alt', x.dataset.f !== filtro); });
     try { pedidos = await Cuenta.rpc('pedidos_tienda', { p_estado: filtro || null }); }
     catch (e) { $('lista').innerHTML = '<p class="empty">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
-    $('lista').innerHTML = pedidos.length ? pedidos.map((p) => {
-      // Siguiente paso según el tipo de entrega.
-      const sig = p.estado === 'recibido' ? ['preparando']
-        : p.estado === 'preparando' ? [p.entrega === 'despacho' ? 'en_camino' : 'listo']
+    pintar();
+  }
+  $('buscar').oninput = () => pintar();
+  function pintar() {
+    const q = $('buscar').value.trim().toLowerCase();
+    const l = pedidos.filter((p) => !q || ((p.cliente || '') + ' ' + (p.telefono || '')).toLowerCase().includes(q));
+    $('lista').innerHTML = l.length ? l.map((p) => {
+      const sig = p.estado === 'recibido' ? ['preparando'] : p.estado === 'preparando' ? [p.entrega === 'despacho' ? 'en_camino' : 'listo']
         : p.estado === 'listo' || p.estado === 'en_camino' ? ['entregado'] : [];
-      const activo = !['entregado', 'cancelado'].includes(p.estado);
+      const abierto = ['pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado);
       const tel = String(p.telefono || '').replace(/\D/g, '');
-      return '<div class="card"><div class="cab"><div><b>' + Core.esc(p.cliente) + '</b><div class="muted">' +
-        new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) + '</div></div>' +
-        '<span class="pill est-' + p.estado + '">' + ESTADOS[p.estado] + '</span></div>' +
-        '<pre>' + Core.esc(p.lineas.map((l) => l.cant + ' × ' + l.nombre + ' — ' + precio(l.subtotal)).join('\n')) + '</pre>' +
+      return '<div class="card"><div class="cab"><div><b>' + Core.esc(p.cliente) + '</b>' + (p.invitado ? ' <span class="pill">Sin cuenta</span>' : '') +
+        (p.cliente_estrellas ? ' <span class="estrellas5">★ ' + p.cliente_estrellas + '</span>' : '') +
+        '<div class="muted">' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) +
+        (p.estado === 'pagando' && p.retenido_hasta ? ' · apartado ' + quedan(p.retenido_hasta) : '') + '</div></div>' +
+        '<span class="pill est-' + p.estado + '">' + (ESTADOS[p.estado] || p.estado) + '</span></div>' +
+        '<pre>' + Core.esc(p.lineas.map((x) => x.cant + ' × ' + x.nombre + ' — ' + precio(x.subtotal)).join('\n')) + '</pre>' +
         (p.descuento > 0 ? '<div class="muted">Cupón ' + Core.esc(p.cupon) + ': −' + precio(p.descuento) + '</div>' : '') +
         '<div class="total">Total ' + precio(p.total) + '</div>' +
         '<div class="muted">' + (p.entrega === 'despacho' ? '🚚 Despacho a ' + Core.esc(p.direccion || '') + ' (cobrar despacho según distancia)' : '🏪 Retiro en tienda') + '</div>' +
         (p.nota ? '<div class="muted">📝 ' + Core.esc(p.nota) + '</div>' : '') +
-        '<div class="acc">' + sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
-        (activo ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
-        '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' +
-        (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div></div>';
-    }).join('') : '<p class="empty">' + (filtro === 'activos' ? 'No tienes pedidos pendientes. 🎉' : 'Sin pedidos') + '</p>';
+        (p.devolucion === 'pendiente' ? '<div class="aviso">💸 <b>Devuelve el pago</b>: canceló a tiempo.</div>' : p.devolucion === 'hecha' ? '<div class="muted">💸 Devuelto</div>' : '') +
+        '<div data-img="' + p.id + '"></div>' +
+        '<div class="acc">' +
+        (p.tiene_comprobante ? '<button class="alt small" data-comp="' + p.id + '">🧾 Ver comprobante</button>' : '') +
+        (p.estado === 'en_revision' ? '<button class="ok small" data-rev="' + p.id + '" data-si="1">✅ Aprobar pago</button><button class="danger small" data-rev="' + p.id + '" data-si="0">Rechazar</button>' : '') +
+        sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
+        (abierto && p.estado !== 'en_revision' ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
+        (p.devolucion === 'pendiente' ? '<button class="small" data-dev="' + p.id + '">💸 Ya devolví</button>' : '') +
+        (p.cliente_id ? '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' : '') +
+        (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div>' +
+        (p.estado === 'entregado' && !p.calificado ? '<div class="row" style="align-items:center;margin-top:10px"><span class="muted" style="flex:none">Califica al cliente:</span><span class="califica">' +
+          [1, 2, 3, 4, 5].map((n) => '<button type="button" data-cal="' + p.id + '" data-n="' + n + '" aria-label="' + n + ' estrellas">★</button>').join('') + '</span></div>' : '') +
+        '</div>';
+    }).join('') : '<p class="empty">' + ({ revisar: 'No hay comprobantes por revisar 🎉', activos: 'No tienes pedidos pendientes 🎉', pagando: 'Nadie está pagando ahora', devolver: 'Sin devoluciones pendientes' }[filtro] || 'Sin pedidos') + '</p>';
   }
-  $('filtros').onclick = (e) => {
-    const b = e.target.closest('[data-f]');
-    if (!b) return;
-    filtro = b.dataset.f;
-    $('filtros').querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('alt', x !== b); });
-    cargar();
-  };
+  $('filtros').onclick = (e) => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; cargar(); } };
   $('lista').onclick = async (e) => {
-    const b = e.target.closest('button[data-e]');
+    const b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.e === 'cancelado' && !confirm('¿Cancelar este pedido? Se le avisará al cliente.')) return;
-    b.disabled = true;
     try {
-      await Cuenta.rpc('actualizar_pedido', { p_id: b.dataset.id, p_estado: b.dataset.e });
-      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato al cliente
-      Core.toast('Pedido: ' + ESTADOS[b.dataset.e] + ' · se le avisó al cliente');
-      cargar();
-    } catch (err) { Core.toast(err.message); b.disabled = false; }
-  };
-
-  /* ---------- Cupones (Pro) ---------- */
-  async function cargarCupones() {
-    $('cupLock').classList.toggle('hidden', pro);
-    $('cupPro').classList.toggle('hidden', !pro);
-    if (!pro) return;
-    try {
-      const l = await Cuenta.rpc('mis_cupones');
-      $('cupones').innerHTML = l.length ? l.map((c) => '<li><div class="grow"><b>' + Core.esc(c.codigo) + '</b> · −' + c.porcentaje + '%<div class="muted">' +
-        (c.hasta ? 'Hasta el ' + new Date(c.hasta + 'T12:00').toLocaleDateString('es') : 'Sin vencimiento') + ' · usado ' + c.usos + ' vez/veces</div></div>' +
-        '<button class="small danger" data-c="' + c.id + '" aria-label="Eliminar">✕</button></li>').join('') : '<li class="empty">Aún no creas cupones</li>';
-    } catch (e) { $('cupones').innerHTML = '<li class="empty">⚠️ ' + Core.esc(e.message) + '</li>'; }
-  }
-  $('bCupon').onclick = async () => {
-    try {
-      await Cuenta.rpc('guardar_cupon', { p_codigo: $('cCodigo').value, p_porcentaje: parseInt($('cPct').value, 10), p_hasta: $('cHasta').value || null });
-      $('cCodigo').value = ''; $('cPct').value = ''; $('cHasta').value = '';
-      Core.toast('🎟️ Cupón guardado: compártelo con tus clientes'); cargarCupones();
+      if (b.dataset.comp) {
+        const img = await Cuenta.rpc('comprobante_pedido', { p_id: b.dataset.comp });
+        const box = $('lista').querySelector('[data-img="' + b.dataset.comp + '"]');
+        box.innerHTML = img ? '<img src="' + img + '" alt="Comprobante" style="max-width:100%;border-radius:12px;margin-top:8px;border:1px solid var(--line)">' +
+          '<div class="btns"><button class="small alt" type="button" id="dl' + b.dataset.comp + '">⬇️ Descargar</button></div>' : '<p class="muted">El comprobante ya se borró.</p>';
+        const dl = document.getElementById('dl' + b.dataset.comp);
+        if (dl) dl.onclick = () => fetch(img).then((r) => r.blob()).then((bl) => Core.download('comprobante.jpg', bl));
+        return;
+      }
+      if (b.dataset.rev) {
+        const si = b.dataset.si === '1';
+        const motivo = si ? null : prompt('Motivo (le llega al cliente):', 'No vemos el pago en la cuenta');
+        if (!si && motivo === null) return;
+        await Cuenta.rpc('revisar_comprobante', { p_id: b.dataset.rev, p_aprobar: si, p_motivo: motivo });
+        Core.toast(si ? '✅ Pago aprobado: se descontó el stock' : 'Comprobante rechazado');
+      }
+      if (b.dataset.e) {
+        if (b.dataset.e === 'cancelado' && !confirm('¿Cancelar este pedido? Se le avisará al cliente.')) return;
+        await Cuenta.rpc('actualizar_pedido', { p_id: b.dataset.id, p_estado: b.dataset.e });
+        Core.toast('Pedido: ' + ESTADOS[b.dataset.e]);
+      }
+      if (b.dataset.dev) { await Cuenta.rpc('marcar_devuelto', { p_id: b.dataset.dev }); Core.toast('💸 Marcado como devuelto'); }
+      if (b.dataset.cal) {
+        const r = await Cuenta.rpc('calificar_pedido', { p_ref: b.dataset.cal, p_estrellas: +b.dataset.n });
+        if (!r.ok) throw new Error(r.error);
+        Core.toast('⭐ Gracias por calificar');
+      }
+      Cuenta.sb.functions.invoke('enviar').catch(() => {});
+      cargar(); Cuenta.contar();
     } catch (err) { Core.toast(err.message); }
   };
-  $('cupones').onclick = async (e) => {
-    const id = e.target.dataset.c;
-    if (!id || !confirm('¿Eliminar este cupón?')) return;
-    await Cuenta.rpc('borrar_cupon', { p_id: id }).catch(() => {});
-    cargarCupones();
-  };
-
-  /* ---------- Estadísticas (Pro) ---------- */
-  async function cargarStats() {
-    $('stLock').classList.toggle('hidden', pro);
-    $('stPro').classList.toggle('hidden', !pro);
-    if (!pro) return;
-    try {
-      const s = await Cuenta.rpc('estadisticas_tienda');
-      $('sPed').textContent = s.pedidos; $('sVen').textContent = precio(s.ventas); $('sCli').textContent = s.clientes;
-      const fila = (a, b) => '<li><span class="grow">' + a + '</span><b>' + b + '</b></li>';
-      $('sTop').innerHTML = s.top_productos.length ? s.top_productos.map((p) => fila(Core.esc(p.nombre), p.cant + ' · ' + precio(p.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
-      $('sMejores').innerHTML = s.mejores_clientes.length ? s.mejores_clientes.map((c) => fila(Core.esc(c.nombre), c.pedidos + ' pedidos · ' + precio(c.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
-      $('sVistas').innerHTML = s.vistas.length ? s.vistas.map((v) => fila((v.vip ? '<span class="vip">VIP</span> ' : '') + Core.esc(v.titulo), '👁️ ' + v.vistas)).join('') : '<li class="empty">Aún no publicas fichas</li>';
-    } catch (e) { Core.toast(e.message); }
-  }
 
   cargar();
-  if (new URLSearchParams(location.search).get('v') === 'resenas') show('resenas');
-  setInterval(() => { if (!document.hidden && filtro === 'activos') cargar(); }, 30000);
+  if (params.get('v') === 'cupones' || params.get('v') === 'stats') show(params.get('v'));
+  setInterval(() => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); }, 30000);
 })();
 </script>
 </body>

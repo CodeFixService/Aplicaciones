@@ -51,6 +51,7 @@
   .vipChk { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 10px 12px; border-radius: 12px; color: var(--text);
     border: 2px solid #dc2626; background: color-mix(in srgb, #dc2626 8%, transparent); font-size: 14px; }
   .vipChk input { margin-top: 2px; flex: none; }
+  .vipChk, label:has(> #k-vip) { display: none !important; }
   .cred { background: var(--field); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-top: 12px; white-space: pre-line; font-size: 14px; }
   #clientes li { flex-wrap: wrap; }
   #clientes .grow { min-width: 160px; }
@@ -63,6 +64,13 @@
   <h1>FichaPro</h1>
   <span id="licTag" class="pill">FREE</span>
 </header>
+<nav class="tabs sub" id="subtabs">
+  <button data-v="disenar" class="on"><span data-ico="paleta"></span>Diseñar</button>
+  <button data-v="galeria"><span data-ico="imagen"></span>Galería</button>
+  <button data-v="clientes"><span data-ico="usuarios"></span>Clientes</button>
+  <button data-v="campanas"><span data-ico="calendario"></span>Campañas</button>
+  <button data-v="ajustes"><span data-ico="ajustes"></span>Ajustes</button>
+</nav>
 
 <main>
   <div id="pendientes"></div>
@@ -254,13 +262,7 @@
   </section>
 </main>
 
-<nav class="tabs">
-  <button data-v="disenar" class="on"><span data-ico="paleta"></span>Diseñar</button>
-  <button data-v="galeria"><span data-ico="imagen"></span>Galería</button>
-  <button data-v="clientes"><span data-ico="usuarios"></span>Clientes</button>
-  <button data-v="campanas"><span data-ico="calendario"></span>Campañas</button>
-  <button data-v="ajustes"><span data-ico="ajustes"></span>Ajustes</button>
-</nav>
+
 
 <script src="../../shared/config.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>

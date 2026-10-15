@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
-<title>CodeFix Apps</title>
+<title>FichaPro</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -75,9 +75,9 @@
   .mini { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); }
   .mini .grow { flex: 1; min-width: 0; }
   .icono-top { margin-left: 8px; width: 40px; height: 40px; padding: 0; border-radius: 12px; font-size: 20px; background: var(--field); color: var(--text); box-shadow: none; flex: none; }
-  .ayuda { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 30; width: 44px; height: 44px; border-radius: 50%;
+  .ayuda { position: fixed; right: 14px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 30; width: 44px; height: 44px; border-radius: 50%;
     display: grid; place-items: center; text-decoration: none; font-size: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
-  .ayuda.emprende { bottom: calc(66px + env(safe-area-inset-bottom)); font-size: 19px; }
+  .ayuda.emprende { bottom: calc(138px + env(safe-area-inset-bottom)); font-size: 19px; }
   .app.bloq { opacity: .55; filter: grayscale(1); }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
   .solicitudes { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--text);
@@ -87,7 +87,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">CodeFix Apps</h1><span id="planTag" class="pill hidden"></span><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
+<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">FichaPro</h1><span id="planTag" class="pill hidden"></span><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
 <main>
   <div class="instalar hidden" id="cInstalar">
     <div style="font-size:30px">📲</div>
@@ -165,7 +165,21 @@
       <span style="font-size:22px">›</span>
     </a>
 
-    <div class="apps" id="apps"></div>
+    <a class="card mini hidden" id="cMiCaja" href="apps/caja/"><span style="font-size:26px">🧮</span><div class="grow"><b>Mi Caja</b><div class="muted">Tus ventas, productos y finanzas (Premium)</div></div><span style="font-size:22px">›</span></a>
+    <!-- Hoy (negocio y equipo) -->
+    <div id="hoy" class="hidden">
+      <div class="stats" id="hoyStats"></div>
+      <div class="card hidden" id="hoyStock" style="border-color:#f59e0b"></div>
+      <div class="card hidden" id="hoyFalta"><h2>👋 Te falta configurar</h2><ul class="list" id="hoyFaltaL"></ul></div>
+      <div class="card hidden" id="hoyTienda"><h2>🔗 Tu tienda</h2>
+        <p class="muted" style="margin-top:0">Compártela en WhatsApp o Instagram, o imprime el QR. Sin cuenta piden desde ahí; con cuenta entran directo a su app.</p>
+        <input id="hoyLink" readonly aria-label="Link de tu tienda">
+        <div class="btns"><button class="small" id="hoyCompartir" type="button">📤 Compartir</button><button class="small alt" id="hoyQR" type="button">QR</button>
+          <a class="btn small alt" id="hoyVer" target="_blank" rel="noopener">👁️ Ver</a></div>
+        <div id="hoyQRbox" class="hidden" style="text-align:center;margin-top:10px"><img id="hoyQRimg" alt="QR de tu tienda" style="width:220px;background:#fff;border-radius:12px;padding:8px">
+          <div class="btns" style="justify-content:center"><button class="small alt" id="hoyQRdl" type="button">⬇️ Descargar QR</button></div></div>
+      </div>
+    </div>
 
     <a class="card upsell mini hidden" id="cProMini" href="#plan">
       <span style="font-size:26px">⭐</span>
@@ -180,7 +194,7 @@
     </div>
 
     <div class="card">
-      <div class="row" style="align-items:center;margin-bottom:6px"><h2 id="inboxTitulo" style="flex:2;margin:0">🔔 Avisos</h2>
+      <span id="avisos"></span><div class="row" style="align-items:center;margin-bottom:6px"><h2 id="inboxTitulo" style="flex:2;margin:0">🔔 Avisos</h2>
         <button class="alt small hidden" id="bLimpiarAvisos" style="flex:none">🧹 Limpiar</button></div>
       <ul class="list inbox" id="inbox"></ul>
     </div>
@@ -188,6 +202,7 @@
 
   <!-- Con sesión: ajustes (todo lo de configuración en un solo lugar) -->
   <section id="v-ajustes" class="hidden">
+    <div class="card hidden" id="cMas"><h2>⚙️ Más</h2><ul class="list" id="masL"></ul></div>
     <div class="card">
       <h2>👤 Mi perfil</h2>
       <label for="eNombre" id="lblNombre">Nombre</label><input id="eNombre" maxlength="80">
@@ -240,6 +255,27 @@
       <div class="btns"><button id="bTienda">Guardar mi tienda</button></div>
     </div>
 
+    <div class="card hidden" id="cLinks"><span id="links"></span>
+      <h2>💳 Links de pago</h2>
+      <p class="muted">Pega el link de tu Mercado Pago (o similar). El cliente paga ahí y sube la foto del comprobante: el pedido y el stock quedan apartados
+        mientras lo revisas. Tienes 2 espacios; solo uno queda activo.</p>
+      <div id="linksBody"></div>
+    </div>
+
+    <div class="card hidden" id="cEquipo"><span id="equipo"></span>
+      <h2>🧑‍🍳 Mi equipo <span class="pill pro">PRO</span></h2>
+      <p class="muted">Ven Hoy, Caja, Pedidos y Mensajes. No ven tus links de pago, tu plan ni tus ajustes.</p>
+      <ul class="list" id="eqL"></ul>
+      <div class="row" style="flex-wrap:wrap">
+        <div style="min-width:150px"><label for="eqNom">Nombre</label><input id="eqNom" maxlength="60"></div>
+        <div style="min-width:180px"><label for="eqMail">Correo</label><input id="eqMail" type="email" autocomplete="off"></div>
+      </div>
+      <label for="eqPass">Contraseña</label>
+      <div class="row"><input id="eqPass" autocomplete="off" style="flex:2"><button class="alt small" id="eqGen" type="button" style="flex:none">Generar</button></div>
+      <div class="btns"><button id="eqCrear">Agregar al equipo</button></div>
+      <p class="muted hidden" id="eqCred" style="white-space:pre-line"></p>
+    </div>
+
     <div class="card">
       <h2>🔔 Notificaciones</h2>
       <p class="muted" id="pushEstado"></p>
@@ -256,12 +292,14 @@
         <ul class="feat" id="proFeat"></ul>
         <div class="btns">
           <a class="btn warn hidden" id="bComprar" href="#" target="_blank" rel="noopener" style="flex:1">Comprar ahora</a>
-          <button class="alt" id="bPrueba">🎁 Probar 7 días gratis</button>
+          <label class="btn alt" for="fComprobante" style="flex:1">📷 Subir comprobante</label>
+          <input type="file" accept="image/*" id="fComprobante" class="hidden">
+          <button class="hidden" id="bPrueba"></button><button class="hidden" id="bPague"></button>
         </div>
-        <div class="btns" style="margin-top:8px"><button class="alt small" id="bPague">Ya pagué: avisar para activar</button></div>
         <p class="muted" id="proNota"></p>
       </div>
-      <details class="key"><summary>Tengo una key de activación</summary>
+      <ul class="list" id="planPagos"></ul>
+      <details class="key hidden"><summary>Tengo una key de activación</summary>
         <input id="kKey" placeholder="CFX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" style="margin-top:10px" aria-label="Key de activación">
         <p class="err" id="kErr"></p>
         <div class="btns"><button id="kBtn">Activar</button></div>
@@ -289,6 +327,7 @@
   <a class="ayuda hidden" id="bAyuda" href="#" aria-label="Ayuda">❓</a>
 </main>
 <script src="shared/config.js"></script>
+<script src="shared/vendor/qrcode.js"></script>
 <script src="shared/vendor/supabase.js"></script>
 <script src="shared/cuenta.js"></script>
 <script>
@@ -298,15 +337,18 @@
   const showView = (v) => {
     views.forEach((x) => $(x).classList.toggle('hidden', x !== v));
     // Inicio: botón ⚙️ Ajustes. Ajustes: botón ‹ para volver.
-    $('bAjustes').classList.toggle('hidden', v !== 'v-home');
-    $('bVolver').classList.toggle('hidden', v !== 'v-ajustes');
+    const a = Cuenta.account, negocio = a && (a.role === 'user' || a.role === 'equipo');
+    $('bAjustes').classList.toggle('hidden', v !== 'v-home' || negocio);
+    $('bVolver').classList.toggle('hidden', v !== 'v-ajustes' || negocio);
+    if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium)$/.test(location.hash);
+  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo)$/.test(location.hash);
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     showView(enAjustes() ? 'v-ajustes' : 'v-home');
-    if (/^#(plan|premium)$/.test(location.hash)) setTimeout(() => $('cPlan').scrollIntoView({ behavior: 'smooth' }), 200);
+    const ancla = /^#(plan|premium)$/.test(location.hash) ? 'cPlan' : /^#(avisos|links|equipo)$/.test(location.hash) ? location.hash.slice(1) : null;
+    if (ancla) setTimeout(() => $(ancla).scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
   }
   addEventListener('hashchange', irAVista);
@@ -411,14 +453,21 @@
     if (volver && volver.startsWith('/') && !volver.startsWith('//')) { location.replace(volver); return; }
     if (params.get('cliente')) history.replaceState(null, '', location.pathname);
     if (!acc.terms_at) { showView('v-terms'); return; }
+    // FichaPro: el admin solo administra; el cliente entra directo a su tienda.
+    if (acc.is_admin) { location.replace('apps/admin/'); return; }
+    if (acc.role === 'client' && !/^#(cuenta|avisos|ajustes|plan|premium)$/.test(location.hash)) { location.replace('apps/catalogo/'); return; }
     pintar(acc);
     showView('v-home');
     irAVista();
     cargarInbox();
     Cuenta.revisarActualizacion();
-    if (!cliente(acc)) cargarTienda(acc);
+    if (acc.role === 'user') cargarTienda(acc);
+    if (acc.role !== 'client') cargarHoy(acc);
+    if (acc.role === 'user') { cargarLinks(); cargarEquipo(); }
+    cargarPagos();
+    Cuenta.ofrecerPush();
     // Empresas de antes de la 4.0: su color pasa a la tienda una sola vez.
-    if (!cliente(acc) && !acc.color && Core.tema.propio(acc.id)) colorTienda(Core.tema.get(acc.id), true);
+    if (acc.role === 'user' && !acc.color && Core.tema.propio(acc.id)) colorTienda(Core.tema.get(acc.id), true);
     prepararAyuda(acc);
     prepararEmprende(acc);
     revisarPush();
@@ -434,7 +483,7 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '4.3';
+  const DB_VERSION = '5.0';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
@@ -488,19 +537,17 @@
       $('tiendaLogo').textContent = lg ? '' : acc.negocio.trim().charAt(0).toUpperCase();
     }
 
-    // Un acceso por cosa: el cliente tiene su Tienda; la empresa, Mi tienda (vista del cliente) y Novedades CodeFix.
-    const lista = cliente ? ['tienda', 'mensajesCli', 'contactos', 'cajaCli']
-      : acc.is_admin ? ['fichas', 'caja', 'pedidos', 'mensajes', 'vista', 'admin']
-      : ['fichas', 'caja', 'pedidos', 'mensajes', 'vista', 'novedades'];
-    $('apps').innerHTML = lista.map((k) => {
-      const a = APPS[k];
-      const bloq = k === 'cajaCli' && !acc.is_pro; // Caja del cliente: solo Premium (se ve en gris)
-      return '<a class="app' + (k === 'admin' ? ' admin' : '') + (bloq ? ' bloq' : '') + '" href="' + (bloq ? '#plan' : a[0]) + '"><div class="ico">' + Core.ico(a[1]) + '</div><b>' + a[2] +
-        (bloq ? ' <span class="pill pro">PREMIUM</span>' : '') + '</b><small>' + a[3] + '</small>' +
-        (k === 'mensajes' || k === 'mensajesCli' ? '<span class="badge hidden" id="badgeMsg"></span>' : k === 'tienda' ? '<span class="badge hidden" id="badgeOf"></span>'
-          : k === 'pedidos' ? '<span class="badge hidden" id="badgePed"></span>' : '') + '</a>';
-    }).join('');
-    if (!cliente) contarPedidos();
+    // FichaPro: el negocio y su equipo ven "Hoy"; las secciones están en la barra de abajo.
+    $('hoy').classList.toggle('hidden', cliente);
+    $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'FichaPro') : (acc.empresa || 'FichaPro'));
+    const dueno = acc.role === 'user';
+    ['cTienda', 'cLinks', 'cEquipo', 'cMas'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
+    $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
+    $('cProMini').classList.toggle('hidden', true);
+    $('cMiCaja').classList.toggle('hidden', !cliente);
+    if (cliente && !acc.is_pro) $('cMiCaja').href = '#plan';
+    if (dueno) pintarMas();
+
 
     $('inboxTitulo').textContent = '🔔 Avisos';
     $('lblNombre').textContent = cliente ? 'Tu nombre' : 'Nombre de la empresa';
@@ -530,31 +577,35 @@
   function pintarPro(acc) {
     if (!acc) return;
     const cliente = acc.role === 'client';
-    $('cPro').classList.toggle('hidden', !!acc.is_pro);
+    const vence = acc.is_pro && acc.pro_until && (new Date(acc.pro_until) - Date.now()) < 16 * 864e5;
+    $('cPro').classList.toggle('hidden', !!acc.is_pro && !vence);
     $('cProMini').classList.toggle('hidden', !!acc.is_pro);
     $('miniTitulo').textContent = cliente ? 'Hazte Premium' : 'Pásate a Pro';
-    $('miniTxt').textContent = cliente ? 'Ofertas VIP, precios especiales, tu propia Caja y más.' : 'Push y correos a tus clientes, cupones, sellos, estadísticas y más.';
-    if (acc.is_pro) return;
-    $('proTitulo').textContent = cliente ? '⭐ Hazte Premium' : '⭐ Versión Pro';
-    const precio = cliente ? ajustes.price_client : ajustes.price_business;
+    $('miniTxt').textContent = cliente ? 'Tu propia Caja, colores, más contactos y más.' : 'Push y correos a tus clientes, cupones, sellos, estadísticas y más.';
+    if (acc.is_pro && !vence) return;
+    $('proTitulo').textContent = acc.is_pro ? '⏰ Renueva tu plan' : cliente ? '⭐ Hazte Premium' : '⭐ Versión Pro';
+    const pi = premium && premium[cliente ? 'cliente' : 'negocio'];
+    const plan = premium && premium.planes && premium.planes[cliente ? 'cliente_pro' : 'negocio_pro'];
+    const precio = pi && pi.precio != null ? pi.precio : (cliente ? ajustes.price_client : ajustes.price_business);
     $('proPrecio').classList.toggle('hidden', !precio);
-    if (precio) $('proPrecio').innerHTML = '$' + Number(precio).toLocaleString('es-CL') + ' <small>' + (cliente ? 'pago único' : 'por mes') + '</small>';
+    if (precio) $('proPrecio').innerHTML = '$' + Number(precio).toLocaleString('es-CL') + ' <small>por ' + ((plan && plan.duracion_dias) || 30) + ' días</small>';
     $('proFeat').innerHTML = (cliente
-      ? ['Ofertas y productos VIP que solo ven los clientes Premium', 'Precios especiales Premium en los productos y pedidos',
+      ? [
          'Tu propia Caja con 📈 Finanzas: metas, gastos y ganancia real', 'Elige el color de tu app y tu ícono',
          'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
-      : ['Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10), sin marca de agua', 'Todas las plantillas (Foto completa y Menú), QR y fichas VIP',
+      : ['Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10), sin marca de agua', 'Todas las plantillas (Foto completa y Menú) y QR',
          'Cupones de descuento y tarjeta de sellos para tus clientes', '📊 Estadísticas: vistas, productos más pedidos y mejores clientes',
          '📈 Finanzas: metas, gastos y ganancia real', 'Push y correos automáticos, y respaldo diario en la nube',
          '⭐ Responde y destaca las reseñas de tus clientes', '⚡ 20 respuestas rápidas en el chat (Free: 3) y 🎨 color propio para tu tienda']
     ).map((t) => '<li>' + t + '</li>').join('');
-    const link = /^https:\/\//.test(ajustes.payment_link || '') ? ajustes.payment_link : '';
+    if (plan && plan.beneficios && plan.beneficios.length) $('proFeat').innerHTML = plan.beneficios.map((t) => '<li>' + Core.esc(t) + '</li>').join('');
+    const link = pi && /^https:\/\//.test(pi.url || '') ? pi.url : /^https:\/\//.test(ajustes.payment_link || '') ? ajustes.payment_link : '';
     $('bComprar').classList.toggle('hidden', !link);
     if (link) $('bComprar').href = link;
-    $('bPrueba').classList.toggle('hidden', !!acc.trial_used);
+    $('bPrueba').classList.add('hidden');
     $('proNota').textContent = link
-      ? 'Después de pagar toca "Ya pagué" y lo activamos a la brevedad.'
-      : 'Toca "Ya pagué" o escríbenos por Mensajes para activarlo.';
+      ? '1) Paga con el botón. 2) Sube la foto del comprobante. Se activa por ' + ((plan && plan.duracion_dias) || 30) + ' días apenas lo aprobemos.'
+      : 'Sube la foto del comprobante de tu pago y lo activamos apenas lo revisemos.';
   }
 
   function pintarColores(uid) {
@@ -587,6 +638,131 @@
     try { localStorage.setItem('cfx:icono:' + Cuenta.uid(), b.dataset.i); } catch (err) { /* sin espacio */ }
     pintar(Cuenta.account);
   };
+  /* ---------- Más (negocio): todo agrupado ---------- */
+  function pintarMas() {
+    const L = [['apps/caja/#productos', '🛍️', 'Productos, fotos y stock'], ['apps/fichas/#clientes', '👥', 'Clientes'],
+      ['apps/pedidos/?v=cupones', '🏷️', 'Promociones: cupones y sellos'], ['apps/pedidos/?v=stats', '📊', 'Estadísticas'],
+      ['apps/catalogo/?v=ofertas', '👁️', 'Ver mi tienda como cliente'], ['apps/mensajes/', '💬', 'Mensajes'],
+      ['#links', '💳', 'Links de pago'], ['#equipo', '🧑‍🍳', 'Mi equipo'], ['#plan', '⭐', 'Mi plan']];
+    $('masL').innerHTML = L.map(([u, i, t]) => '<li><a class="mini" href="' + u + '" style="width:100%"><span style="font-size:22px">' + i + '</span><span class="grow">' + t + '</span><span>›</span></a></li>').join('');
+  }
+
+  /* ---------- Hoy (negocio y equipo) ---------- */
+  let hoyLink = '';
+  async function cargarHoy(acc) {
+    let h;
+    try { h = await Cuenta.rpc('hoy_negocio'); } catch (e) { $('hoyStats').innerHTML = '<p class="muted">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    const it = (t, v, u) => '<a class="card" href="' + u + '" style="text-decoration:none;color:inherit"><span class="muted">' + t + '</span><b>' + v + '</b></a>';
+    $('hoyStats').innerHTML = it('🧾 Comprobantes por revisar', h.revisar, 'apps/pedidos/?f=revisar') + it('📦 Pedidos activos', h.activos, 'apps/pedidos/?f=activos') +
+      it('⏳ Esperando pago', h.pagando, 'apps/pedidos/?f=pagando') + it('💸 Por devolver', h.devolver, 'apps/pedidos/?f=devolver') +
+      it('🛒 Pedidos de hoy', h.hoy, 'apps/pedidos/?f=') + it('⭐ Calificación', h.estrellas ? '★ ' + Number(h.estrellas).toLocaleString('es-CL') : '—', 'apps/pedidos/?f=historial');
+    $('hoyStock').classList.toggle('hidden', !h.stock_bajo.length);
+    $('hoyStock').innerHTML = '⚠️ <b>Stock bajo:</b> ' + h.stock_bajo.map((x) => Core.esc(x.nombre) + ' (' + x.stock + ')').join(', ') + ' · <a href="apps/caja/#productos">Reponer</a>';
+    const dueno = acc.role === 'user';
+    hoyLink = Core.rootUrl() + 't/?s=' + encodeURIComponent(h.slug);
+    $('hoyTienda').classList.toggle('hidden', !dueno);
+    $('hoyLink').value = hoyLink; $('hoyVer').href = hoyLink;
+    if (!dueno) { $('hoyFalta').classList.add('hidden'); return; }
+    let t = {};
+    try { t = await Cuenta.rpc('tienda_info', { p_negocio: acc.id }) || {}; } catch (e) { /* sin red */ }
+    const falta = [];
+    if (!acc.logo) falta.push(['#ajustes', 'Sube tu logo y elige tu color']);
+    if (!h.productos) falta.push(['apps/caja/#productos', 'Agrega tus productos con foto y precio']);
+    if (!h.link_pago) falta.push(['#links', 'Pega tu link de pago para cobrar pedidos online']);
+    if (!acc.telefono) falta.push(['#ajustes', 'Escribe el WhatsApp de tu tienda']);
+    if (!t.horario) falta.push(['#ajustes', 'Escribe tu horario de atención']);
+    $('hoyFalta').classList.toggle('hidden', !falta.length);
+    $('hoyFaltaL').innerHTML = falta.map(([u, x]) => '<li><a class="mini" href="' + u + '" style="width:100%"><span class="grow">◻️ ' + x + '</span><span>›</span></a></li>').join('');
+  }
+  function qrCanvas(text, px) {
+    const q = qrcode(0, 'M'); q.addData(text); q.make();
+    const n = q.getModuleCount(), m = 4, c = document.createElement('canvas'), k = Math.floor(px / (n + 2 * m));
+    c.width = c.height = k * (n + 2 * m);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let j = 0; j < n; j++) if (q.isDark(r, j)) g.fillRect((j + m) * k, (r + m) * k, k, k);
+    return c;
+  }
+  $('hoyQR').onclick = () => { $('hoyQRimg').src = qrCanvas(hoyLink, 440).toDataURL(); $('hoyQRbox').classList.toggle('hidden'); };
+  $('hoyQRdl').onclick = () => qrCanvas(hoyLink, 1000).toBlob((b) => Core.download('qr-mi-tienda.png', b));
+  $('hoyCompartir').onclick = async () => {
+    const txt = '🛍️ Pide en ' + (Cuenta.account.empresa || 'mi tienda') + ': ' + hoyLink;
+    if (navigator.share) { try { await navigator.share({ title: Cuenta.account.empresa || 'Mi tienda', text: txt }); return; } catch (e) { return; } }
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  };
+
+  /* ---------- Links de pago del negocio (2 espacios, uno activo) ---------- */
+  async function cargarLinks() {
+    let l = [];
+    try { l = await Cuenta.rpc('mis_links_pago'); } catch (e) { $('linksBody').innerHTML = '<p class="muted">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    $('linksBody').innerHTML = [1, 2].map((n) => {
+      const x = l.find((y) => y.tipo === 'pedido' && y.slot === n) || {};
+      return '<div class="slotpago' + (x.activo ? ' on' : '') + '" data-slot="' + n + '"><b>Espacio ' + n + (x.activo ? ' · ✅ Activo' : '') + '</b>' +
+        '<label for="lkT' + n + '">Nombre</label><input id="lkT' + n + '" maxlength="80" placeholder="Mercado Pago" value="' + Core.esc(x.titulo || '') + '">' +
+        '<label for="lkU' + n + '">Link de pago</label><input id="lkU' + n + '" type="url" placeholder="https://mpago.la/…" value="' + Core.esc(x.url || '') + '">' +
+        '<label class="terms"><input type="checkbox" id="lkA' + n + '"' + (x.activo ? ' checked' : '') + '> <span>Usar este link en mis pedidos</span></label>' +
+        '<div class="btns"><button class="small" data-gl="' + n + '">Guardar</button></div></div>';
+    }).join('') + '<p class="muted" style="margin:0">Sin link activo, los pedidos llegan igual y cobras al entregar o por transferencia.</p>';
+  }
+  $('linksBody').onclick = async (e) => {
+    const n = e.target.dataset.gl;
+    if (!n) return;
+    try {
+      await Cuenta.rpc('set_link_pago', { p_tipo: 'pedido', p_slot: +n, p_titulo: $('lkT' + n).value, p_url: $('lkU' + n).value, p_precio: null, p_activo: $('lkA' + n).checked });
+      Core.toast('💳 Link guardado'); cargarLinks();
+    } catch (err) { Core.toast(err.message); }
+  };
+
+  /* ---------- Equipo (Pro) ---------- */
+  async function cargarEquipo() {
+    try {
+      const l = await Cuenta.rpc('mi_equipo');
+      $('eqL').innerHTML = l.length ? l.map((x) => '<li><div class="grow"><b>' + Core.esc(x.nombre) + '</b><div class="muted">' + Core.esc(x.email) + '</div></div>' +
+        '<button class="small danger" data-q="' + x.id + '">Quitar</button></li>').join('') : '<li class="empty">Aún no agregas a nadie</li>';
+    } catch (e) { $('eqL').innerHTML = ''; }
+  }
+  $('eqGen').onclick = () => { $('eqPass').value = Cuenta.claveAleatoria(); };
+  $('eqCrear').onclick = async () => {
+    if (!$('eqPass').value) $('eqPass').value = Cuenta.claveAleatoria();
+    const d = { tipo: 'equipo', nombre: $('eqNom').value.trim(), email: $('eqMail').value.trim(), password: $('eqPass').value };
+    if (!d.nombre || !d.email) return Core.toast('Escribe el nombre y el correo');
+    $('eqCrear').disabled = true;
+    try {
+      await Cuenta.crearUsuario(d);
+      $('eqCred').textContent = Cuenta.mensajeAcceso(Object.assign({ tienda: Cuenta.account.empresa }, d));
+      $('eqCred').classList.remove('hidden');
+      $('eqNom').value = ''; $('eqMail').value = ''; $('eqPass').value = '';
+      Core.toast('✅ Agregado al equipo'); cargarEquipo();
+    } catch (err) { Core.toast(err.message); } finally { $('eqCrear').disabled = false; }
+  };
+  $('eqL').onclick = async (e) => {
+    const id = e.target.dataset.q;
+    if (!id || !confirm('¿Quitar a esta persona de tu equipo? Se borra su cuenta.')) return;
+    try { await Cuenta.rpc('quitar_equipo', { p_id: id }); Core.toast('Quitado del equipo'); cargarEquipo(); } catch (err) { Core.toast(err.message); }
+  };
+
+  /* ---------- Mi plan: pagar y subir comprobante ---------- */
+  let premium = null;
+  async function cargarPagos() {
+    try { premium = await Cuenta.rpc('premium_info'); pintarPro(Cuenta.account); } catch (e) { /* base anterior */ }
+    try {
+      const l = await Cuenta.rpc('mis_pagos');
+      const E = { en_revision: '🧾 En revisión', aprobado: '✅ Aprobado', rechazado: '❌ Rechazado' };
+      $('planPagos').innerHTML = l.map((x) => '<li><div class="grow"><b>' + E[x.estado] + '</b>' + (x.monto ? ' · ' + Core.money(x.monto) : '') +
+        '<div class="muted">' + new Date(x.fecha).toLocaleDateString('es') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') + '</div></div></li>').join('');
+    } catch (e) { /* base anterior */ }
+  }
+  $('fComprobante').onchange = async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const r = await Cuenta.rpc('subir_pago_premium', { p_comprobante: await Core.comprobante(f) });
+      if (!r.ok) throw new Error(r.error);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {});
+      Core.toast('✅ Comprobante enviado. Te avisamos apenas se apruebe.'); cargarPagos();
+    } catch (err) { Core.toast(err.message); }
+  };
+
   /* ---------- Mi tienda (empresas) ---------- */
   async function cargarTienda(acc) {
     try {

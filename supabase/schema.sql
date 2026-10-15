@@ -3665,7 +3665,7 @@ end $$;
 
 -- Resumen "Hoy" del negocio.
 create or replace function public.hoy_negocio() returns jsonb
-language plpgsql stable security definer set search_path = '' as $$
+language plpgsql security definer set search_path = '' as $$
 declare n uuid := public.negocio_de(auth.uid()); d timestamptz := public.hoy_cl()::timestamp at time zone 'America/Santiago';
 begin
   if n is null then raise exception 'Sin permiso'; end if;

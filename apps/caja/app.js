@@ -7,6 +7,8 @@
   // Clientes: Caja privada solo con Premium (sus productos no se publican en ningún lado).
   const esCliente = cuenta.role === 'client';
   if (esCliente && !cuenta.is_pro) { location.replace('../../#plan'); return; }
+  const equipo = cuenta.role === 'equipo';
+  Cuenta.nav(esCliente ? 'cuenta' : 'caja');
   const db = Core.store('caja:' + cuenta.id);
   if (!localStorage.getItem('caja:migrado')) {
     const viejo = Core.store('caja').dump();
@@ -33,6 +35,29 @@
   };
 
   let productos = db.get('productos', []).map((p) => Object.assign({ categoria: '', publicado: false, premium: null }, p));
+  // Equipo: vende los productos publicados del negocio (sin editar precios ni ver finanzas).
+  if (equipo) {
+    ['tabProd', 'tabFin'].forEach((id) => $(id).classList.add('hidden'));
+    try {
+      const l = await Cuenta.rpc('catalog_of', { p_negocio: cuenta.negocio_id });
+      productos = l.map((x) => ({ id: x.clave, nombre: x.nombre, precio: Number(x.precio), costo: 0, stock: '', categoria: x.categoria || '', publicado: true }));
+      db.set('productos', productos);
+    } catch (e) { /* sin red: usa la copia */ }
+  }
+  // Un solo stock: el del servidor (lo descuentan la Caja y los pedidos online aprobados).
+  let pendStock = db.get('stockPend', []);
+  async function enviarStock() {
+    if (esCliente || !pendStock.length) return;
+    try { await Cuenta.rpc('caja_descontar', { p_items: pendStock }); pendStock = []; db.set('stockPend', []); } catch (e) { /* sin red: se envía después */ }
+  }
+  async function traerStock() {
+    if (esCliente) return;
+    try {
+      const l = await Cuenta.rpc('stock_catalogo', { p_negocio: equipo ? cuenta.negocio_id : cuenta.id });
+      l.forEach((x) => { const p = productos.find((y) => y.id === x.clave && y.publicado); if (p) p.stock = x.stock; });
+      guardarProductos(); renderProds();
+    } catch (e) { /* sin red */ }
+  }
   let ventas = db.get('ventas', []);
   let ticket = [];
   let medio = 'efectivo';
@@ -162,6 +187,8 @@
       if (p && p.stock !== '') p.stock = Math.max(0, p.stock - l.cant);
     });
     db.set('ventas', ventas); guardarProductos();
+    ticket.forEach((l) => { const p = productos.find((x) => x.id === l.id); if (p && p.publicado) pendStock.push({ clave: p.id, cant: l.cant }); });
+    db.set('stockPend', pendStock); enviarStock();
     const low = productos.filter((p) => p.stock !== '' && p.stock <= 3);
     if (low.length) Core.notify('Stock bajo', { body: low.map((p) => p.nombre + ' (' + p.stock + ')').join(', ') });
     Core.toast('✅ Venta registrada: ' + $('ticketTotal').textContent);
@@ -259,7 +286,7 @@
   }
 
   $('bGuardarProd').onclick = async () => {
-    const prem = num($('p-prem').value);
+
     const p = {
       nombre: $('p-nombre').value.trim(),
       precio: num($('p-precio').value),
@@ -267,8 +294,8 @@
       stock: $('p-stock').value === '' ? '' : parseInt($('p-stock').value, 10),
       categoria: $('p-cat').value.trim(),
       publicado: !esCliente && $('p-pub').checked,
-      premium: $('p-pub').checked && !isNaN(prem) ? prem : null,
-      vip: !esCliente && $('p-vip').checked,
+      premium: null,
+      vip: false,
       desc: $('p-desc').value.trim(),
       ops: $('p-ops').value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20).join(', ')
     };
@@ -289,6 +316,7 @@
       if (p.publicado && !(await sincronizar(prod))) prod.publicado = false;
     }
     await guardarFoto(prod);
+    if (!esCliente && prod.publicado) Cuenta.rpc('set_stock', { p_key: prod.id, p_stock: prod.stock === '' ? null : prod.stock }).catch(() => {});
     guardarProductos();
     Core.toast('Producto guardado');
     limpiarForm(); renderProds();
@@ -497,6 +525,7 @@
     ['rowPub', 'rowPrem', 'rowVipProd'].forEach((id) => $(id).classList.add('hidden'));
   }
   renderProds(); renderTicket();
-  respaldoAuto();
-  publicarPendientes();
+  if (!equipo) { respaldoAuto(); publicarPendientes(); }
+  enviarStock().then(traerStock);
+  if (location.hash === '#productos' && !equipo) show('productos');
 })();

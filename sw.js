@@ -43,7 +43,11 @@ const FILES = [
   'apps/catalogo/',
   'apps/catalogo/index.html',
   'apps/legal/',
-  'apps/legal/index.html'
+  'apps/legal/index.html',
+  't/',
+  't/index.html',
+  'r/',
+  'r/index.html'
 ];
 
 const META = 'meta';

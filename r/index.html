@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="robots" content="noindex, nofollow">
+<title>Tu pedido · FichaPro</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../shared/core.css">
+<script src="../shared/core.js"></script>
+<style>
+  body { padding-bottom: 40px; }
+  header.top h1::before { display: none; }
+  .lg { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; font-weight: 800; color: var(--brand-ink); background: var(--brand) center / cover no-repeat; }
+  .grande { font-size: 22px; font-weight: 800; }
+  .reloj { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; }
+  pre { white-space: pre-wrap; font: inherit; margin: 6px 0; }
+</style>
+</head>
+<body>
+<header class="top"><span class="lg" id="lg"></span><h1 id="titulo">Tu pedido</h1></header>
+<main>
+  <p class="empty" id="cargando">Cargando…</p>
+  <div class="card hidden" id="noExiste"><h2>Pedido no encontrado</h2><p class="muted">Revisa el enlace que te quedó al pedir.</p></div>
+  <div id="ped" class="hidden">
+    <div class="card"><div class="grande" id="estado"></div><p class="muted" id="estadoTxt" style="margin:4px 0 0"></p></div>
+    <div class="card hidden" id="cPagar"><h2>💳 Paga y sube tu comprobante</h2>
+      <p class="muted" style="margin-top:0">Tu pedido y su stock quedan apartados por:</p><div class="reloj" id="reloj"></div>
+      <div class="btns"><a class="btn ok" id="bPagar" target="_blank" rel="noopener" style="flex:1">💳 Pagar</a></div>
+      <div class="btns"><label class="btn" for="fComp" style="flex:1">📷 Subir foto del comprobante</label><input type="file" accept="image/*" id="fComp" class="hidden"></div>
+    </div>
+    <div class="card hidden" id="cDatos"><h2>🏦 Datos de la tienda</h2><pre id="datos"></pre></div>
+    <div class="card"><h2>🧾 Detalle</h2><pre id="detalle"></pre><div class="row" style="justify-content:space-between" ><b>Total</b><b id="total"></b></div></div>
+    <div class="card hidden" id="cCalif"><h2>⭐ ¿Cómo te fue?</h2><span class="califica" id="calif"></span></div>
+    <div class="btns"><a class="btn alt" id="bWsp" target="_blank" rel="noopener">💬 WhatsApp de la tienda</a><a class="btn alt" id="bTienda">🛍️ Volver a la tienda</a>
+      <button class="danger hidden" id="bCancelar">Cancelar pedido</button></div>
+    <p class="muted" style="font-size:13px">Guarda este enlace para ver tu pedido cuando quieras.</p>
+  </div>
+</main>
+<script src="../shared/config.js"></script>
+<script src="../shared/vendor/supabase.js"></script>
+<script src="../shared/cuenta.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  Core.registerSW('../');
+  Core.marca();
+  const tk = new URLSearchParams(location.search).get('t') || '';
+  const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
+  const E = { pagando: ['⏳ Esperando tu pago', 'Paga con el link y sube la foto del comprobante antes de que se acabe el tiempo.'],
+    en_revision: ['🧾 Comprobante en revisión', 'La tienda está revisando tu pago. Te avisamos por WhatsApp.'],
+    recibido: ['📥 Pedido recibido', 'La tienda te contactará para coordinar el pago y la entrega.'],
+    preparando: ['👨‍🍳 Preparando tu pedido', 'Pago aprobado.'], listo: ['✅ Listo para retirar', ''], en_camino: ['🚚 En camino', ''],
+    entregado: ['🎉 Entregado', '¡Gracias por tu compra!'], cancelado: ['❌ Cancelado', ''], rechazado: ['❌ Pago rechazado', ''],
+    expirado: ['⌛ Se acabó el tiempo', 'El pedido se liberó. Puedes hacerlo de nuevo.'] };
+  let p = null, timer = null;
+  async function cargar() {
+    try { p = await Cuenta.rpc('ver_pedido', { p_ref: tk }); } catch (e) { p = null; }
+    $('cargando').classList.add('hidden');
+    if (!p) { $('noExiste').classList.remove('hidden'); return; }
+    $('ped').classList.remove('hidden');
+    const t = p.tienda;
+    $('titulo').textContent = t.nombre;
+    if (/^#[0-9a-f]{6}$/i.test(t.color || '')) Core.tema.aplicar(t.color);
+    if (/^data:image\//.test(t.logo || '')) $('lg').style.backgroundImage = 'url("' + t.logo + '")'; else $('lg').textContent = (t.nombre || '?').charAt(0).toUpperCase();
+    $('estado').textContent = (E[p.estado] || [p.estado])[0];
+    $('estadoTxt').textContent = (p.motivo ? p.motivo + ' · ' : '') + ((E[p.estado] || [])[1] || '') +
+      (p.devolucion === 'pendiente' ? ' La tienda te devolverá el pago.' : p.devolucion === 'hecha' ? ' Pago devuelto.' : '');
+    $('detalle').textContent = p.lineas.map((l) => l.cant + ' × ' + l.nombre + ' — ' + precio(l.subtotal)).join('\n') + '\n' +
+      (p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') + ' (costo según distancia)' : '🏪 Retiro en tienda');
+    $('total').textContent = precio(p.total);
+    $('cPagar').classList.toggle('hidden', p.estado !== 'pagando');
+    $('bPagar').classList.toggle('hidden', !p.link);
+    if (p.link) { $('bPagar').href = p.link.url; $('bPagar').textContent = '💳 Pagar ' + precio(p.total) + (p.link.titulo ? ' · ' + p.link.titulo : ''); }
+    $('cDatos').classList.toggle('hidden', !t.datos_pago || !['pagando', 'recibido'].includes(p.estado));
+    $('datos').textContent = t.datos_pago || '';
+    const tel = String(t.telefono || '').replace(/\D/g, '');
+    $('bWsp').classList.toggle('hidden', !tel);
+    $('bWsp').href = 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Hola, hice un pedido de ' + precio(p.total) + ' en ' + t.nombre + ': ' + location.href);
+    $('bTienda').href = '../t/?s=' + encodeURIComponent(t.slug);
+    $('bCancelar').classList.toggle('hidden', !['pagando', 'en_revision', 'recibido', 'preparando'].includes(p.estado));
+    $('cCalif').classList.toggle('hidden', p.estado !== 'entregado' || p.calificado);
+    $('calif').innerHTML = [1, 2, 3, 4, 5].map((n) => '<button type="button" data-n="' + n + '" aria-label="' + n + ' estrellas">★</button>').join('');
+    clearInterval(timer);
+    if (p.estado === 'pagando') {
+      const tic = () => { const s = Math.max(0, Math.round((new Date(p.retenido_hasta) - Date.now()) / 1000)); $('reloj').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (!s) cargar(); };
+      tic(); timer = setInterval(tic, 1000);
+    }
+  }
+  $('fComp').onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+      const r = await Cuenta.rpc('subir_comprobante', { p_ref: tk, p_img: await Core.comprobante(f) });
+      if (!r.ok) throw new Error(r.error);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {});
+      Core.toast('✅ Comprobante enviado'); cargar();
+    } catch (err) { Core.toast(err.message); }
+  };
+  $('bCancelar').onclick = async () => {
+    if (!confirm('¿Cancelar tu pedido?')) return;
+    try {
+      const r = await Cuenta.rpc('cancelar_pedido', { p_ref: tk });
+      if (!r.ok) throw new Error(r.error);
+      Cuenta.sb.functions.invoke('enviar').catch(() => {});
+      Core.toast(r.devolucion === 'pendiente' ? 'Cancelado: la tienda te devolverá el pago' : r.devolucion === 'sin_devolucion' ? 'Cancelado fuera de plazo: sin devolución' : 'Pedido cancelado');
+      cargar();
+    } catch (err) { Core.toast(err.message); }
+  };
+  $('calif').onclick = async (e) => {
+    const n = e.target.dataset.n; if (!n) return;
+    try { const r = await Cuenta.rpc('calificar_pedido', { p_ref: tk, p_estrellas: +n }); if (!r.ok) throw new Error(r.error); Core.toast('⭐ ¡Gracias!'); cargar(); }
+    catch (err) { Core.toast(err.message); }
+  };
+  await cargar();
+  setInterval(() => { if (!document.hidden && p && ['en_revision', 'recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado)) cargar(); }, 30000);
+})();
+</script>
+</body>
+</html>

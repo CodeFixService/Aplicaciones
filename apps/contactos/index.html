@@ -64,6 +64,7 @@
   Core.registerSW('../../');
   Core.marca();
   const yo = await Cuenta.require('../../');
+  Cuenta.nav('contactos');
   if (yo.role !== 'client') { location.replace('../../'); return; }
   const premium = !!yo.is_pro, limite = premium ? 20 : 3;
   $('planTag').textContent = premium ? 'PREMIUM' : 'FREE';
