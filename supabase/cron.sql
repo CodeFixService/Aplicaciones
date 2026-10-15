@@ -32,3 +32,10 @@ select cron.schedule('limpiar-registros', '0 8 * * *', $$ select public.limpiar_
 create extension if not exists http with schema extensions;
 select cron.unschedule(jobid) from cron.job where jobname = 'avisar-version';
 select cron.schedule('avisar-version', '17 * * * *', $$ select public.avisar_version_nueva(); $$);
+
+-- Cada minuto: los pedidos sin comprobante a tiempo se liberan solos.
+select cron.unschedule(jobid) from cron.job where jobname = 'expirar-retenciones';
+select cron.schedule('expirar-retenciones', '* * * * *', $$ select public.expirar_retenciones(); $$);
+-- Cada día: borra comprobantes viejos y pedidos expirados (los demás registros ya los limpia "limpiar-registros").
+select cron.unschedule(jobid) from cron.job where jobname = 'limpiar-comprobantes';
+select cron.schedule('limpiar-comprobantes', '10 8 * * *', $$ select public.limpiar('comprobantes'); select public.limpiar('pedidos'); $$);

@@ -8,7 +8,7 @@ import webpush from 'npm:web-push@3.6.7';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const VERSION = '3.2';
+const VERSION = '3.3';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
 const BRAND = 'FichaPro · CodeFix';
@@ -123,7 +123,7 @@ export async function crearUsuario(jwt: string, b: NuevoUsuario) {
   if (password.length < 6) return { ok: false, error: 'La contraseña debe tener al menos 6 caracteres' };
   const negocio = b.negocio && /^[0-9a-f-]{36}$/i.test(b.negocio) ? b.negocio : null;
   const { data: prep, error: e1 } = await db.rpc('prepare_user_invite', {
-    p_caller: who.user.id, p_email: email, p_nombre: String(b.nombre || ''), p_rol: b.tipo === 'user' ? 'user' : 'client',
+    p_caller: who.user.id, p_email: email, p_nombre: String(b.nombre || ''), p_rol: b.tipo === 'user' ? 'user' : b.tipo === 'equipo' ? 'equipo' : 'client',
     p_negocio: negocio,
   });
   if (e1) return { ok: false, error: e1.message };
@@ -137,6 +137,27 @@ export async function crearUsuario(jwt: string, b: NuevoUsuario) {
     return { ok: false, error: /already|registered|exists/i.test(m) ? 'Ese correo ya tiene cuenta' : m };
   }
   return { ok: true, id: nu.user.id };
+}
+
+// El cliente crea su cuenta desde la página de su tienda (t/?s=…): queda asociado a ella.
+type Registro = { slug?: string; email?: string; password?: string; nombre?: string };
+export async function registroCliente(b: Registro) {
+  const db = adminDb();
+  const email = String(b.email || '').trim().toLowerCase();
+  const password = String(b.password || '');
+  if (password.length < 6) return { ok: false, error: 'La contraseña debe tener al menos 6 caracteres' };
+  const { data: prep, error: e1 } = await db.rpc('prepare_registro_cliente', { p_slug: String(b.slug || ''), p_email: email, p_nombre: String(b.nombre || '') });
+  if (e1) return { ok: false, error: e1.message };
+  if (!prep?.ok) return prep;
+  const { data: nu, error: e2 } = await db.auth.admin.createUser({
+    email, password, email_confirm: true, user_metadata: { empresa: String(b.nombre || '').trim() },
+  });
+  if (e2 || !nu?.user) {
+    await db.rpc('cancel_user_invite', { p_email: email });
+    const m = (e2 && e2.message) || 'No se pudo crear la cuenta';
+    return { ok: false, error: /already|registered|exists/i.test(m) ? 'Ese correo ya tiene cuenta: ingresa con él' : m };
+  }
+  return { ok: true };
 }
 
 async function run() {
@@ -183,6 +204,10 @@ if (Deno.env.get('SUPABASE_URL')) {
       if (body && body.accion === 'crear_usuario') {
         const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
         try { return json(await crearUsuario(jwt, body)); }
+        catch (e) { return json({ ok: false, error: 'Error del servidor: ' + String((e as Error).message || e) }); }
+      }
+      if (body && body.accion === 'registro_cliente') {
+        try { return json(await registroCliente(body)); }
         catch (e) { return json({ ok: false, error: 'Error del servidor: ' + String((e as Error).message || e) }); }
       }
       const out = await run();
