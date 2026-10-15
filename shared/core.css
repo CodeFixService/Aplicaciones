@@ -203,11 +203,11 @@ nav.tabs.sub { position: sticky; top: calc(61px + env(safe-area-inset-top)); bot
 nav.tabs.sub button { flex: 1 0 auto; flex-direction: row; gap: 6px; font-size: 13px; padding: 8px 12px; }
 nav.tabs.sub button span { font-size: 16px; }
 nav.tabs.sub button .ico-svg { width: 17px; height: 17px; }
-nav.tabs.app a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 14px; padding: 7px 2px;
+nav.tabs.abajo a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 14px; padding: 7px 2px;
   color: var(--muted); font-size: 11.5px; font-weight: 600; text-decoration: none; position: relative; }
-nav.tabs.app a .ico-svg { width: 22px; height: 22px; }
-nav.tabs.app a.on { color: var(--brand); background: var(--brand-soft); }
-nav.tabs.app a .badge { position: absolute; top: 2px; right: calc(50% - 22px); min-width: 17px; height: 17px; padding: 0 4px; border-radius: 99px;
+nav.tabs.abajo a .ico-svg { width: 22px; height: 22px; }
+nav.tabs.abajo a.on { color: var(--brand); background: var(--brand-soft); }
+nav.tabs.abajo a .badge { position: absolute; top: 2px; right: calc(50% - 22px); min-width: 17px; height: 17px; padding: 0 4px; border-radius: 99px;
   background: var(--bad); color: #fff; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
 .hoja { position: fixed; left: 0; right: 0; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 40; margin: 0 auto; max-width: 520px; padding: 0 12px; }
 .hoja > div { background: var(--card); border: 1px solid var(--brand-line); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(15,23,42,.25);
@@ -221,3 +221,4 @@ nav.tabs.app a .badge { position: absolute; top: 2px; right: calc(50% - 22px); m
 .califica { display: inline-flex; gap: 2px; }
 .califica button { width: 34px; height: 34px; padding: 0; font-size: 20px; border-radius: 10px; background: var(--field); color: #9ca3af; box-shadow: none; }
 .califica button:hover { color: #f59e0b; }
+[hidden] { display: none !important; }

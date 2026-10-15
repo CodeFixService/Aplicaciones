@@ -3696,7 +3696,7 @@ begin
   if x.id is null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
   if x.estado <> 'entregado' then return jsonb_build_object('ok', false, 'error', 'Podrás calificar cuando el pedido esté entregado'); end if;
   if p_estrellas is null or p_estrellas < 1 or p_estrellas > 5 then return jsonb_build_object('ok', false, 'error', 'Elige de 1 a 5 estrellas'); end if;
-  tienda := public.negocio_de(auth.uid()) = x.negocio_id and x.token is distinct from p_ref;
+  tienda := coalesce(public.negocio_de(auth.uid()) = x.negocio_id, false) and x.token is distinct from p_ref;
   if not tienda and x.cliente_id is not null and x.cliente_id is distinct from auth.uid() and x.token is distinct from p_ref then
     return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado');
   end if;
@@ -3725,6 +3725,24 @@ language sql stable security definer set search_path = '' as $$
     'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null)
   from public.profiles t
   where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
+$$;
+
+-- El equipo ve el catálogo de su negocio (para vender en la Caja).
+create or replace function public.catalog_of(p_negocio uuid)
+returns table (nombre text, precio numeric, precio_premium numeric, tiene_premium boolean, categoria text,
+               clave text, nuevo boolean, solo_premium boolean, bloqueado boolean, descripcion text, opciones text)
+language sql stable security definer set search_path = '' as $$
+  select c.nombre,
+         case when b.bloq then null else c.precio end,
+         case when b.ve then c.precio_premium end,
+         c.precio_premium is not null, c.categoria, c.client_key, c.created_at > now() - interval '7 days',
+         c.solo_premium, b.bloq, c.descripcion, c.opciones
+  from public.catalog_items c
+  cross join lateral (select public.is_pro(auth.uid()) or c.owner_id = auth.uid() or public.is_admin() as ve) v
+  cross join lateral (select v.ve, c.solo_premium and not v.ve as bloq) b
+  where c.owner_id = p_negocio
+    and (c.owner_id = auth.uid() or public.is_admin() or public.puede_comprar(auth.uid(), p_negocio) or public.negocio_de(auth.uid()) = p_negocio)
+  order by c.categoria, c.nombre
 $$;
 
 -- ---------- Tienda pública (sin cuenta) ----------

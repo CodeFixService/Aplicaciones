@@ -339,8 +339,8 @@
         ? [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'], ['chat', 'chat', 'Chat', 'apps/mensajes/']]
         : [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'],
            ['fichas', 'paleta', 'Fichas', 'apps/fichas/'], ['mas', 'ajustes', 'Más', '#ajustes']];
-    let n = document.querySelector('nav.tabs.app');
-    if (!n) { n = document.createElement('nav'); n.className = 'tabs app'; document.body.appendChild(n); }
+    let n = document.querySelector('nav.tabs.abajo');
+    if (!n) { n = document.createElement('nav'); n.className = 'tabs abajo'; document.body.appendChild(n); }
     document.body.classList.add('con-nav');
     n.innerHTML = items.map(([k, i, t, u]) => '<a href="' + r + u + '" data-k="' + k + '" class="' + (k === activo ? 'on' : '') + '">' + ICO(i) + t +
       (k === 'chat' || k === 'pedidos' ? '<span class="badge" hidden></span>' : '') + '</a>').join('');
@@ -359,17 +359,17 @@
     try {
       const { data } = await sb.rpc('chat_list');
       const m = (data || []).reduce((s, c) => s + (c.no_leidos || 0), 0);
-      document.querySelectorAll('nav.tabs.app [data-k=chat] .badge, #atMsg').forEach((b) => { b.textContent = m; b.hidden = !m; });
+      document.querySelectorAll('nav.tabs.abajo [data-k=chat] .badge, #atMsg').forEach((b) => { b.textContent = m; b.hidden = !m; });
     } catch (e) { /* sin red */ }
     if (account.role !== 'client') {
       try {
         const { data } = await sb.rpc('hoy_negocio');
         const p = data ? data.revisar + data.activos : 0;
-        document.querySelectorAll('nav.tabs.app [data-k=pedidos] .badge').forEach((b) => { b.textContent = p; b.hidden = !p; });
+        document.querySelectorAll('nav.tabs.abajo [data-k=pedidos] .badge').forEach((b) => { b.textContent = p; b.hidden = !p; });
       } catch (e) { /* base anterior */ }
     }
   }
-  setInterval(() => { if (!document.hidden && document.querySelector('nav.tabs.app')) contar(); }, 60000);
+  setInterval(() => { if (!document.hidden && document.querySelector('nav.tabs.abajo')) contar(); }, 60000);
 
   /* ---------- v5.0: pedir activar notificaciones (al abrir, máx. cada 30 min, hasta que estén activas) ---------- */
   async function ofrecerPush() {

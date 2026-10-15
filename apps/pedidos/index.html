@@ -129,11 +129,16 @@
   /* ---------- Pedidos: comprobantes, estados, devoluciones y calificación ---------- */
   const ESTADOS = { pagando: '⏳ Esperando pago', en_revision: '🧾 Comprobante por revisar', recibido: '📥 Recibido', preparando: '👨‍🍳 Preparando',
     listo: '✅ Listo', en_camino: '🚚 En camino', entregado: '🎉 Entregado', cancelado: '❌ Cancelado', rechazado: '❌ Rechazado', expirado: '⌛ Expirado' };
-  let filtro = params.has('f') ? params.get('f') : 'revisar', pedidos = [];
+  let filtro = params.has('f') ? params.get('f') : 'revisar', pedidos = [], auto = !params.has('f');
   const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
   async function cargar() {
     document.querySelectorAll('#filtros button').forEach((x) => { x.classList.toggle('on', x.dataset.f === filtro); x.classList.toggle('alt', x.dataset.f !== filtro); });
-    try { pedidos = await Cuenta.rpc('pedidos_tienda', { p_estado: filtro || null }); }
+    try {
+      pedidos = await Cuenta.rpc('pedidos_tienda', { p_estado: filtro || null });
+      // Sin comprobantes por revisar, se abre en "Activos" para que nunca quede oculto un pedido nuevo.
+      if (auto && filtro === 'revisar' && !pedidos.length) { auto = false; filtro = 'activos'; return cargar(); }
+      auto = false;
+    }
     catch (e) { $('lista').innerHTML = '<p class="empty">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
     pintar();
   }
@@ -207,6 +212,50 @@
       cargar(); Cuenta.contar();
     } catch (err) { Core.toast(err.message); }
   };
+
+  /* ---------- Cupones (Pro) ---------- */
+  async function cargarCupones() {
+    $('cupLock').classList.toggle('hidden', pro);
+    $('cupPro').classList.toggle('hidden', !pro);
+    if (!pro) return;
+    try {
+      const l = await Cuenta.rpc('mis_cupones');
+      $('cupones').innerHTML = l.length ? l.map((c) => '<li><div class="grow"><b>' + Core.esc(c.codigo) + '</b> · −' + c.porcentaje + '%<div class="muted">' +
+        (c.hasta ? 'Hasta el ' + new Date(c.hasta + 'T12:00').toLocaleDateString('es') : 'Sin vencimiento') + ' · usado ' + c.usos + ' vez/veces</div></div>' +
+        '<button class="small danger" data-c="' + c.id + '" aria-label="Eliminar">✕</button></li>').join('') : '<li class="empty">Aún no creas cupones</li>';
+    } catch (e) { $('cupones').innerHTML = '<li class="empty">⚠️ ' + Core.esc(e.message) + '</li>'; }
+  }
+  $('bCupon').onclick = async () => {
+    try {
+      await Cuenta.rpc('guardar_cupon', { p_codigo: $('cCodigo').value, p_porcentaje: parseInt($('cPct').value, 10), p_hasta: $('cHasta').value || null });
+      $('cCodigo').value = ''; $('cPct').value = ''; $('cHasta').value = '';
+      Core.toast('🎟️ Cupón guardado: compártelo con tus clientes'); cargarCupones();
+    } catch (err) { Core.toast(err.message); }
+  };
+  $('cupones').onclick = async (e) => {
+    const id = e.target.dataset.c;
+    if (!id || !confirm('¿Eliminar este cupón?')) return;
+    await Cuenta.rpc('borrar_cupon', { p_id: id }).catch(() => {});
+    cargarCupones();
+  };
+
+  /* ---------- Estadísticas (Pro) ---------- */
+  async function cargarStats() {
+    $('stLock').classList.toggle('hidden', pro);
+    $('stPro').classList.toggle('hidden', !pro);
+    if (!pro) return;
+    try {
+      const s = await Cuenta.rpc('estadisticas_tienda');
+      $('sPed').textContent = s.pedidos; $('sVen').textContent = precio(s.ventas); $('sCli').textContent = s.clientes;
+      const fila = (a, b) => '<li><span class="grow">' + a + '</span><b>' + b + '</b></li>';
+      $('sTop').innerHTML = s.top_productos.length ? s.top_productos.map((p) => fila(Core.esc(p.nombre), p.cant + ' · ' + precio(p.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
+      $('sMejores').innerHTML = s.mejores_clientes.length ? s.mejores_clientes.map((c) => fila(Core.esc(c.nombre), c.pedidos + ' pedidos · ' + precio(c.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
+      $('sVistas').innerHTML = s.vistas.length ? s.vistas.map((v) => fila(Core.esc(v.titulo), '👁️ ' + v.vistas)).join('') : '<li class="empty">Aún no publicas fichas</li>';
+    } catch (e) { Core.toast(e.message); }
+  }
+
+  cargar();
+  if (new URLSearchParams(location.search).get('v') === 'resenas') show('resenas');
 
   cargar();
   if (params.get('v') === 'cupones' || params.get('v') === 'stats') show(params.get('v'));

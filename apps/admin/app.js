@@ -699,6 +699,8 @@
   };
 
 
+  const V = ['resumen', 'negocios', 'clientes', 'pagos', 'ajustes'];
   const h = location.hash.slice(1);
-  show(['resumen', 'negocios', 'clientes', 'pagos', 'ajustes'].includes(h) ? h : 'resumen');
+  show(V.includes(h) ? h : 'resumen');
+  addEventListener('hashchange', () => { const x = location.hash.slice(1); if (V.includes(x) && !$('v-' + x).classList.contains('on')) show(x); });
 })();
