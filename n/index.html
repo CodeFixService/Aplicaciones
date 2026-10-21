@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>Crea la tienda de tu negocio gratis · FichaPro</title>
+<meta name="description" content="Tu tienda online con link y QR, pedidos, caja y stock. Gratis para empezar.">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../shared/core.css">
+<script src="../shared/core.js"></script>
+<style>
+  header.top h1::before { display: none; }
+  .hero { text-align: center; padding: 18px 6px 4px; }
+  .hero .ico { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 20px; display: grid; place-items: center; font-size: 32px;
+    background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 55%, #000)); box-shadow: 0 10px 30px color-mix(in srgb, var(--brand) 35%, transparent); }
+  .hero h2 { justify-content: center; font-size: 25px; line-height: 1.2; margin: 0 0 8px; }
+  .hero p { margin: 0 auto; max-width: 440px; }
+  .regalo { display: inline-block; margin-top: 12px; padding: 6px 12px; border-radius: 99px; font-weight: 700; font-size: 14px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b); color: var(--premium-ink); }
+  .beneficios { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 0; }
+  .beneficios div { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; font-size: 14px; }
+  .beneficios b { display: block; font-size: 22px; margin-bottom: 4px; }
+  .rubros { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 6px; }
+  .rubros button { background: var(--field); color: var(--text); box-shadow: none; border: 2px solid transparent; padding: 10px 8px;
+    font-size: 14px; justify-content: flex-start; text-align: left; gap: 6px; }
+  .rubros button.on { border-color: var(--brand); background: var(--brand-soft); }
+  .form { max-width: 520px; margin: 0 auto; }
+  .paso { color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin: 16px 0 4px; }
+  .terms { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--muted); margin: 14px 0 0; }
+  .terms input { margin-top: 2px; flex: none; }
+</style>
+</head>
+<body>
+<header class="top"><h1>FichaPro</h1><a href="../" style="width:auto;padding:0 12px;font-size:14px;font-weight:600;margin-left:auto">Ingresar</a></header>
+<main>
+  <div class="hero">
+    <div class="ico">🏪</div>
+    <h2>Crea la tienda online de tu negocio, gratis</h2>
+    <p class="muted">Para emprendimientos, pymes y negocios de cualquier rubro: productos o servicios, con o sin local.</p>
+    <span class="regalo hidden" id="regalo"></span>
+  </div>
+  <div class="beneficios">
+    <div><b>🔗</b>Tu tienda con link y QR para WhatsApp e Instagram</div>
+    <div><b>🛒</b>Pedidos online y pagos con comprobante</div>
+    <div><b>🧮</b>Caja rápida, stock y reportes</div>
+    <div><b>🖼️</b>Fichas publicitarias y avisos a tus clientes</div>
+  </div>
+
+  <div class="card form hidden" id="cerrado"><h2>Registro pausado</h2><p class="muted">Por ahora las cuentas de negocio se crean con el administrador. Escríbenos y te ayudamos.</p></div>
+
+  <form class="card form" id="fReg" autocomplete="on">
+    <h2>✨ Crea tu cuenta</h2>
+    <div class="paso">1 · Tu negocio</div>
+    <label for="rNeg">Nombre del negocio</label><input id="rNeg" maxlength="80" autocomplete="organization" placeholder="Ej: Dulces Rosita" required>
+    <label>¿A qué se dedica?</label>
+    <div class="rubros" id="rubros"></div>
+    <label for="rTel">WhatsApp del negocio (para recibir pedidos)</label><input id="rTel" inputmode="tel" autocomplete="tel" placeholder="56912345678">
+    <div class="paso">2 · Tu acceso</div>
+    <label for="rMail">Correo</label><input id="rMail" type="email" autocomplete="email" required>
+    <label for="rPass">Contraseña (mínimo 6)</label><input id="rPass" type="password" minlength="6" autocomplete="new-password" required>
+    <label class="terms"><input type="checkbox" id="rTerm"> <span>Acepto los <a href="../apps/legal/" target="_blank">términos de uso y la privacidad</a>.</span></label>
+    <p class="err" id="rErr"></p>
+    <div class="btns"><button id="bCrear" type="submit" style="flex:1">🚀 Crear mi tienda gratis</button></div>
+    <p class="muted" style="font-size:13px;text-align:center">Sin tarjeta. Partes en el plan Gratis y cuando quieras te pasas a Pro.</p>
+  </form>
+</main>
+<script src="../shared/config.js"></script>
+<script src="../shared/vendor/supabase.js"></script>
+<script src="../shared/cuenta.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  Core.registerSW('../');
+  Core.marca();
+  let rubro = '';
+  $('rubros').innerHTML = Core.RUBROS.map(([i, n]) => '<button type="button" data-r="' + Core.esc(n) + '"><span>' + i + '</span>' + Core.esc(n) + '</button>').join('');
+  $('rubros').onclick = (e) => {
+    const b = e.target.closest('[data-r]'); if (!b) return;
+    rubro = b.dataset.r;
+    $('rubros').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  };
+  // ¿Registro abierto? ¿Cuántos días de Pro de regalo?
+  try {
+    const [abierto, r] = await Promise.all([Cuenta.rpc('registro_negocios_abierto'), Cuenta.rpc('reglas')]);
+    if (abierto === false) { $('fReg').classList.add('hidden'); $('cerrado').classList.remove('hidden'); }
+    if (r && r.dias_regalo > 0) { $('regalo').textContent = '🎁 Incluye ' + r.dias_regalo + ' días de Pro gratis'; $('regalo').classList.remove('hidden'); }
+  } catch (e) { /* sin red: el servidor igual valida al crear */ }
+
+  $('fReg').onsubmit = async (e) => {
+    e.preventDefault();
+    $('rErr').textContent = '';
+    const neg = $('rNeg').value.trim(), email = $('rMail').value.trim(), pass = $('rPass').value;
+    if (!neg) return ($('rErr').textContent = 'Escribe el nombre de tu negocio');
+    if (!rubro) return ($('rErr').textContent = 'Elige a qué se dedica tu negocio (si no está, toca ✨ Otro)');
+    if (!$('rTerm').checked) return ($('rErr').textContent = 'Acepta los términos para crear tu cuenta');
+    $('bCrear').disabled = true;
+    try {
+      const acc = await Cuenta.signUp(email, pass, neg, { tipo: 'negocio', rubro, telefono: $('rTel').value });
+      if (!acc) { $('rErr').textContent = '✅ Cuenta creada. Confirma tu correo con el enlace que te enviamos y luego ingresa.'; return; }
+      try { await Cuenta.rpc('accept_terms'); } catch (err) { /* lo pide al entrar */ }
+      location.replace('../?bienvenida=1');
+    } catch (err) {
+      $('rErr').textContent = /Database error|saving new user/i.test(err.message) ? 'No se pudo crear la cuenta. Revisa los datos o intenta en un rato.' : err.message;
+    } finally { $('bCrear').disabled = false; }
+  };
+})();
+</script>
+</body>
+</html>

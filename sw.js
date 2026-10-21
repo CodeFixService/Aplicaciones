@@ -47,7 +47,9 @@ const FILES = [
   't/',
   't/index.html',
   'r/',
-  'r/index.html'
+  'r/index.html',
+  'n/',
+  'n/index.html'
 ];
 
 const META = 'meta';

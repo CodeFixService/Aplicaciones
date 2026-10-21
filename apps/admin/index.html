@@ -118,8 +118,17 @@
 
   <!-- NEGOCIOS -->
   <section class="view" id="v-negocios">
+    <div class="card upsell" id="cRegistro"><h2>📲 Registro abierto de negocios</h2>
+      <p class="muted" style="margin-top:0">Publica este link o QR donde quieras (redes, ferias, afiches): cualquier negocio crea su cuenta Gratis sola,
+        elige su rubro y parte con los días de Pro de regalo. Después te compra el Pro desde Mi plan. Se cierra en Ajustes → Reglas.</p>
+      <input id="regLink" readonly aria-label="Link de registro de negocios">
+      <div class="btns"><button class="small" id="regShare" type="button">📤 Compartir</button><button class="small alt" id="regCopiar" type="button">📋 Copiar</button>
+        <button class="small alt" id="regQR" type="button">QR</button><a class="btn small alt" id="regVer" target="_blank" rel="noopener">👁️ Ver</a></div>
+      <div id="regQRbox" class="hidden" style="text-align:center;margin-top:10px"><img id="regQRimg" alt="QR de registro" style="width:220px;background:#fff;border-radius:12px;padding:8px">
+        <div class="btns" style="justify-content:center"><button class="small alt" id="regQRdl" type="button">⬇️ Descargar QR para imprimir</button></div></div>
+    </div>
     <div class="card"><h2>➕ Crear negocio</h2>
-      <p class="muted" style="margin-top:0">Solo tú creas negocios. Parten con la prueba Pro gratis (días en Ajustes → Reglas) y luego pasan solos a Gratis; el Pro sigue cuando apruebas su comprobante (o se lo das tú).</p>
+      <p class="muted" style="margin-top:0">Los negocios se pueden registrar solos con el link de arriba, o los creas tú aquí. Parten con la prueba Pro gratis (días en Ajustes → Reglas) y luego pasan solos a Gratis; el Pro sigue cuando apruebas su comprobante (o se lo das tú).</p>
       <div class="row" style="flex-wrap:wrap"><div style="min-width:160px"><label for="nNombre">Nombre del negocio</label><input id="nNombre" maxlength="80" autocomplete="off"></div>
         <div style="min-width:180px"><label for="nEmail">Correo del dueño</label><input id="nEmail" type="email" autocomplete="off"></div></div>
       <label for="nClave">Contraseña</label>
@@ -130,7 +139,7 @@
       <div class="btns hidden" id="nCredBtns"><button class="ok small" id="nWsp">💬 Enviar por WhatsApp</button><button class="alt small" id="nCopiar">Copiar</button></div>
     </div>
     <input id="nBuscar" placeholder="Buscar negocio…" aria-label="Buscar negocio" style="margin-bottom:10px">
-    <div class="seg2" id="nSeg"><button class="small on" data-f="">Todos</button><button class="small alt" data-f="pro">⭐ Pro</button><button class="small alt" data-f="free">Gratis</button>
+    <div class="seg2" id="nSeg"><button class="small on" data-f="">Todos</button><button class="small alt" data-f="pro">⭐ Pro</button><button class="small alt" data-f="free">Gratis</button><button class="small alt" data-f="solos">🆕 Se registraron solos</button>
       <button class="small alt" data-f="vence">⏳ Por vencer</button><button class="small alt" data-f="inactivos">💤 Sin actividad 7 días</button><button class="small alt" data-f="susp">⛔ Suspendidos</button></div>
     <p class="muted" id="nCuenta"></p>
     <div class="lista2" id="nLista"></div>
@@ -237,6 +246,7 @@
 </nav>
 
 <script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/qrcode.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
 <script src="../../shared/cuenta.js"></script>
 <script src="app.js"></script>

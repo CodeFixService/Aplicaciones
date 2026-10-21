@@ -118,7 +118,8 @@
         <div class="btns"><button id="lBtn" type="submit" style="flex:1">Ingresar</button></div>
       </form>
       <p class="muted" style="text-align:center"><a href="#" id="lOlvide">¿Olvidaste tu contraseña?</a></p>
-      <p class="muted" style="text-align:center;font-size:13px">¿No tienes cuenta? Pídela a tu tienda o a CodeFix.</p>
+      <a class="btn alt" href="n/" style="display:flex;justify-content:center;margin-top:6px">🏪 ¿Tienes un negocio? Crea tu tienda gratis</a>
+      <p class="muted" style="text-align:center;font-size:13px">¿Eres cliente de una tienda? Pide tu cuenta a la tienda.</p>
     </div>
   </section>
 
@@ -224,6 +225,8 @@
         <label for="eTel">WhatsApp de la tienda (para recibir pedidos)</label>
         <input id="eTel" inputmode="tel" placeholder="56912345678">
       </div>
+      <label for="tRubro">¿A qué se dedica tu negocio?</label>
+      <select id="tRubro"><option value="">Elige un rubro…</option></select>
       <label for="tLogo">Logo (sale arriba, al lado del nombre, y en tus fichas)</label>
       <div class="row" style="align-items:center"><input type="file" accept="image/*" id="tLogo" style="flex:2"><button class="alt small" id="bQuitarLogo" type="button" style="flex:none">Quitar</button></div>
       <label for="tPago">Datos para transferencia</label>
@@ -450,6 +453,10 @@
     const volver = params.get('volver');
     if (volver && volver.startsWith('/') && !volver.startsWith('//')) { location.replace(volver); return; }
     if (params.get('cliente')) history.replaceState(null, '', location.pathname);
+    if (params.get('bienvenida')) {
+      history.replaceState(null, '', location.pathname);
+      setTimeout(() => Core.toast('🎉 ¡Tu tienda está creada! Sigue la lista "Te falta configurar" y compártela.'), 600);
+    }
     if (!acc.terms_at) { showView('v-terms'); return; }
     // FichaPro: el admin solo administra; el cliente entra directo a su tienda.
     if (acc.is_admin) { location.replace('apps/admin/'); return; }
@@ -669,7 +676,10 @@
     try { t = await Cuenta.rpc('tienda_info', { p_negocio: acc.id }) || {}; } catch (e) { /* sin red */ }
     const falta = [];
     if (!acc.logo) falta.push(['#ajustes', 'Sube tu logo y elige tu color']);
-    if (!h.productos) falta.push(['apps/caja/#productos', 'Agrega tus productos con foto y precio']);
+    // Ejemplo según el rubro, para que cualquier negocio (productos o servicios) sepa qué cargar.
+    const rb = Core.RUBROS.find((x) => x[1] === t.rubro);
+    if (!h.productos) falta.push(['apps/caja/#productos', 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '')]);
+    if (!t.rubro) falta.push(['#ajustes', 'Elige a qué se dedica tu negocio']);
     if (!h.link_pago) falta.push(['#links', 'Pega tu link de pago para cobrar pedidos online']);
     if (!acc.telefono) falta.push(['#ajustes', 'Escribe el WhatsApp de tu tienda']);
     if (!t.horario) falta.push(['#ajustes', 'Escribe tu horario de atención']);
@@ -802,8 +812,10 @@
       $('tVacHasta').value = t.vacaciones_hasta || ''; $('tVacMsg').value = t.vacaciones_msg || '';
       $('rowVac').classList.toggle('hidden', !t.vacaciones_hasta);
       $('tDescPrem').value = t.desc_premium ? t.desc_premium : '';
+      $('tRubro').value = t.rubro || '';
     } catch (e) { /* sin red */ }
   }
+  $('tRubro').innerHTML += Core.RUBROS.map(([i, n]) => '<option value="' + Core.esc(n) + '">' + i + ' ' + Core.esc(n) + '</option>').join('');
   $('tVac').onchange = () => {
     $('rowVac').classList.toggle('hidden', !$('tVac').checked);
     if ($('tVac').checked && !$('tVacHasta').value) $('tVacHasta').focus();
@@ -816,6 +828,7 @@
     if (dp < 0 || dp > 50) { $('tDescPrem').focus(); return Core.toast('⭐ El descuento Premium va de 0 a 50%'); }
     try {
       await Cuenta.rpc('set_desc_premium', { p_pct: dp });
+      await Cuenta.rpc('set_mi_rubro', { p_rubro: $('tRubro').value });
       await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value });
       await Cuenta.rpc('set_vacaciones', { p_hasta: $('tVac').checked ? $('tVacHasta').value : null, p_msg: $('tVacMsg').value });
       pintar(await Cuenta.rpc('set_mi_tienda', { p_datos_pago: $('tPago').value, p_horario: $('tHorario').value,

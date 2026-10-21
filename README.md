@@ -147,3 +147,7 @@ Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares 
 - **Admin**: 🎁 cada negocio nuevo parte con 7 días de Pro gratis (Reglas → "Días de Pro gratis") y 📅 plan anual
   (Ajustes → Precios y links → plan anual; el pago se aprueba por 365 días).
 - **Limpieza**: sin solicitudes de "probar 7 días", sin "Novedades CodeFix" y sin textos "CodeFix Apps".
+- **🏪 Registro abierto de negocios** (`n/`): cualquier pyme o emprendimiento crea su cuenta Gratis sola, elige su rubro
+  (14 opciones, productos o servicios) y parte con los días de Pro de regalo. El link y el QR para publicar están en
+  Administración → Negocios; te llega un aviso por cada negocio nuevo. Se cierra con la regla "Registro abierto de negocios" = 0.
+  Los clientes siguen entrando solo con invitación o desde la tienda.

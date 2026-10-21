@@ -330,7 +330,19 @@
     (document.querySelector('main') || document.body).appendChild(el);
   }
 
+  // Rubros para el registro de negocios: cada uno trae ejemplos para guiar la primera carga.
+  const RUBROS = [
+    ['🍰', 'Comida y repostería', 'Torta de chocolate · $15.000'], ['🍔', 'Restaurante y delivery', 'Completo italiano · $3.500'],
+    ['🛒', 'Almacén y minimarket', 'Pan amasado (kg) · $2.200'], ['👗', 'Ropa y accesorios', 'Polerón con capucha (S, M, L) · $18.990'],
+    ['💅', 'Belleza y estética', 'Manicure semipermanente · $12.000'], ['💪', 'Salud y deporte', 'Clase de yoga · $6.000'],
+    ['🔧', 'Servicios y oficios', 'Visita técnica · $20.000'], ['💻', 'Tecnología', 'Cambio de pantalla · $35.000'],
+    ['🎨', 'Artesanía y regalos', 'Taza personalizada · $7.990'], ['🐾', 'Mascotas', 'Baño y corte · $14.000'],
+    ['🏠', 'Hogar y decoración', 'Cojín decorativo · $9.990'], ['🌱', 'Plantas y jardín', 'Suculenta en macetero · $4.500'],
+    ['📚', 'Clases y cursos', 'Clase particular (1 h) · $10.000'], ['✨', 'Otro', 'Tu producto o servicio · $10.000']
+  ];
+
   global.Core = {
+    RUBROS,
     store, uid, money, esc, toast, registerSW, askNotify, notify, download,
     backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION
   };

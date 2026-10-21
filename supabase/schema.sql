@@ -3779,6 +3779,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 -- ---------- Admin: negocios, clientes, resumen y limpieza ----------
+drop function if exists public.admin_negocios();
 create or replace function public.admin_negocios()
 returns table (id uuid, empresa text, email text, telefono text, slug text, logo text, color text, pro boolean, pro_until timestamptz,
                suspendido boolean, visto_at timestamptz, creado timestamptz, clientes int, equipo int, productos int, pedidos_mes int,
@@ -4467,6 +4468,106 @@ begin
   end if;
   return jsonb_build_object('comprobantes', k, 'avisos', a, 'mensajes', m, 'pedidos', p);
 end $$;
+
+-- ---------- 🏪 Registro abierto de negocios (link y QR públicos: /n/) ----------
+-- Cualquier negocio crea su cuenta Free sola (con los días de Pro de regalo) y después compra el Pro.
+-- Los clientes y el equipo siguen entrando solo con invitación. Se cierra con la regla "registro_negocios" = 0.
+alter table public.profiles add column if not exists rubro text;
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  inv public.user_invites;
+  es_admin boolean := lower(new.email) = public.admin_email();
+  nom text := left(trim(coalesce(meta ->> 'empresa', '')), 80);
+  tel text := left(regexp_replace(coalesce(meta ->> 'telefono', ''), '\D', '', 'g'), 15);
+begin
+  select * into inv from public.user_invites
+  where email = lower(new.email) and created_at > now() - interval '1 hour';
+  if not es_admin and inv.email is null then
+    if meta ->> 'tipo' = 'negocio' and public.regla('registro_negocios', 1) > 0 then
+      if nom = '' then raise exception 'Escribe el nombre de tu negocio'; end if;
+      if (select count(*) from public.profiles where role = 'user' and created_by is null and created_at > now() - interval '1 hour') >= 30 then
+        raise exception 'Muchos registros seguidos. Intenta en un rato.';
+      end if;
+      insert into public.profiles (id, email, empresa, role, telefono, rubro)
+      values (new.id, lower(new.email), nom, 'user', nullif(tel, ''), left(nullif(trim(coalesce(meta ->> 'rubro', '')), ''), 40))
+      on conflict (id) do nothing;
+      perform public.notify_user(public.admin_id(), '🏪 Nuevo negocio: ' || nom,
+        coalesce(nullif(trim(meta ->> 'rubro'), ''), 'Sin rubro') || ' · ' || lower(new.email) || ' · se registró solo', 'apps/admin/#negocios');
+      return new;
+    end if;
+    raise exception 'El registro está cerrado. Pide tu acceso a tu tienda o al administrador.';
+  end if;
+  insert into public.profiles (id, email, empresa, role, negocio_id, created_by)
+  values (new.id, lower(new.email), left(coalesce(nullif(meta ->> 'empresa', ''), inv.nombre, ''), 80),
+    case when es_admin then 'admin' else inv.role end,
+    case when not es_admin and inv.role in ('client', 'equipo') then inv.negocio_id end, inv.created_by)
+  on conflict (id) do nothing;
+  delete from public.user_invites where email = lower(new.email);
+  return new;
+end $$;
+-- ¿Está abierto? (la página /n/ lo pregunta antes de mostrar el formulario)
+create or replace function public.registro_negocios_abierto() returns boolean
+language sql stable security definer set search_path = '' as $$ select public.regla('registro_negocios', 1) > 0 $$;
+create or replace function public.reglas() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('retencion_min', public.regla('retencion_min', 30), 'cancel_min', public.regla('cancel_min', 10),
+    'comprobantes_dias', public.regla('comprobantes_dias', 30), 'aviso1_dias', public.regla('aviso1_dias', 15),
+    'aviso2_dias', public.regla('aviso2_dias', 5), 'dias_regalo', public.regla('dias_regalo', 7), 'max_rechazos', public.regla('max_rechazos', 3),
+    'registro_negocios', public.regla('registro_negocios', 1))
+$$;
+create or replace function public.admin_set_regla(p_k text, p_v int) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  if p_k not in ('retencion_min', 'cancel_min', 'comprobantes_dias', 'aviso1_dias', 'aviso2_dias', 'dias_regalo', 'max_rechazos', 'registro_negocios') then
+    raise exception 'Regla no válida';
+  end if;
+  if p_v is null or p_v < 0 or p_v > 10000 then raise exception 'Valor no válido'; end if;
+  insert into public.app_settings (key, value) values ('regla_' || p_k, p_v::text) on conflict (key) do update set value = excluded.value;
+  perform public.auditar('Regla', p_k || ' = ' || p_v);
+end $$;
+-- El negocio puede cambiar su rubro en Ajustes → Mi tienda.
+create or replace function public.set_mi_rubro(p_rubro text) returns void
+language sql security definer set search_path = '' as $$
+  update public.profiles set rubro = left(nullif(trim(coalesce(p_rubro, '')), ''), 40) where id = auth.uid() and role = 'user'
+$$;
+-- Admin: el listado de negocios muestra el rubro y si se registró solo.
+drop function if exists public.admin_negocios();
+create or replace function public.admin_negocios()
+returns table (id uuid, empresa text, email text, telefono text, slug text, logo text, color text, pro boolean, pro_until timestamptz,
+               suspendido boolean, visto_at timestamptz, creado timestamptz, clientes int, equipo int, productos int, pedidos_mes int,
+               link_pago boolean, estrellas numeric, pago_revision boolean, rubro text, autoregistro boolean)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  return query select p.id, p.empresa, p.email, p.telefono, p.slug, p.logo, p.color, public.is_pro(p.id), p.pro_until, p.suspended, p.visto_at, p.created_at,
+    (select count(*)::int from public.profiles c where c.negocio_id = p.id and c.role = 'client'),
+    (select count(*)::int from public.profiles c where c.negocio_id = p.id and c.role = 'equipo'),
+    (select count(*)::int from public.catalog_items c where c.owner_id = p.id),
+    (select count(*)::int from public.pedidos x where x.negocio_id = p.id and x.created_at >= date_trunc('month', now())),
+    public.link_activo(p.id, 'pedido') is not null, (public.estrellas_tienda(p.id) ->> 'promedio')::numeric,
+    exists (select 1 from public.pagos g where g.user_id = p.id and g.estado = 'en_revision'), p.rubro, p.created_by is null
+  from public.profiles p where p.role = 'user' order by p.created_at desc;
+end $$;
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', case when public.is_pro(t.id) then t.sellos_meta end, 'sellos_premio', t.sellos_premio,
+    'pro', public.is_pro(t.id), 'logo', t.logo, 'color', t.color,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'desc_premium', t.desc_premium, 'rubro', t.rubro)
+  from public.profiles t
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
+$$;
+revoke all on function public.registro_negocios_abierto(), public.set_mi_rubro(text), public.admin_negocios() from public;
+grant execute on function public.registro_negocios_abierto() to anon, authenticated;
+grant execute on function public.set_mi_rubro(text), public.admin_negocios() to authenticated;
+revoke all on function public.set_mi_rubro(text), public.admin_negocios() from anon;
 
 -- Beneficios nuevos en la lista de los planes (solo si el administrador no los había cambiado).
 update public.planes set beneficios = '["🛒 Recordatorio de carrito: el cliente que no terminó su pedido recibe un aviso", "📣 Vende por WhatsApp en 1 toque (foto + ofertas)", "📊 Reporte semanal: cuánto vendiste y tu producto top", "⚠️ Aviso de stock bajo", "Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]'::jsonb

@@ -314,12 +314,31 @@
   /* ---------- Negocios ---------- */
   let negocios = [], nFiltro = '';
   async function cargarNegocios() { negocios = await Cuenta.rpc('admin_negocios'); pintarNegocios(); }
+  // 📲 Link y QR del registro abierto de negocios (página n/).
+  const regLink = Core.rootUrl() + 'n/';
+  $('regLink').value = regLink; $('regVer').href = regLink;
+  function qrReg(px) {
+    const qr = qrcode(0, 'M'); qr.addData(regLink); qr.make();
+    const n = qr.getModuleCount(), m = 4, c = document.createElement('canvas'), k = Math.max(1, Math.floor(px / (n + 2 * m)));
+    c.width = c.height = k * (n + 2 * m);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let j = 0; j < n; j++) if (qr.isDark(r, j)) g.fillRect((j + m) * k, (r + m) * k, k, k);
+    return c;
+  }
+  $('regQR').onclick = () => { $('regQRimg').src = qrReg(440).toDataURL(); $('regQRbox').classList.toggle('hidden'); };
+  $('regQRdl').onclick = () => qrReg(1200).toBlob((b) => Core.download('qr-crea-tu-tienda.png', b));
+  $('regCopiar').onclick = () => Core.copiar(regLink, '📋 Link copiado');
+  $('regShare').onclick = async () => {
+    const txt = '🏪 ¿Tienes un negocio o emprendimiento? Crea tu tienda online gratis (link, QR, pedidos y caja): ' + regLink;
+    if (navigator.share) { try { await navigator.share({ title: 'Crea tu tienda gratis', text: txt }); return; } catch (e) { return; } }
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  };
   $('nBuscar').oninput = () => pintarNegocios();
   seg('nSeg', (b) => { nFiltro = b.dataset.f; pintarNegocios(); });
   function pintarNegocios() {
     const t = $('nBuscar').value.trim().toLowerCase(), semana = Date.now() - 7 * 864e5, siete = Date.now() + 7 * 864e5;
     const l = negocios.filter((n) => (!t || (n.empresa + ' ' + n.email).toLowerCase().includes(t)) && (!nFiltro ||
-      (nFiltro === 'pro' && n.pro) || (nFiltro === 'free' && !n.pro) || (nFiltro === 'susp' && n.suspendido) ||
+      (nFiltro === 'pro' && n.pro) || (nFiltro === 'free' && !n.pro) || (nFiltro === 'susp' && n.suspendido) || (nFiltro === 'solos' && n.autoregistro) ||
       (nFiltro === 'vence' && n.pro && n.pro_until && new Date(n.pro_until) < siete) || (nFiltro === 'inactivos' && (!n.visto_at || new Date(n.visto_at) < semana))));
     $('nCuenta').textContent = l.length + ' negocio(s)';
     const app = Core.rootUrl();
@@ -328,7 +347,8 @@
       return '<div class="card"><div class="neg"><div class="lg" style="background-color:' + Core.esc(n.color || '#2563eb') + ';' + lg + '">' + (lg ? '' : Core.esc((n.empresa || '?').charAt(0).toUpperCase())) + '</div>' +
         '<div class="grow" style="min-width:0"><b>' + Core.esc(n.empresa || n.email) + '</b> ' + (n.pro ? '<span class="pill pro">PRO</span>' : '<span class="pill">GRATIS</span>') +
         (n.suspendido ? ' <span class="pill bad">Suspendido</span>' : '') + (n.pago_revision ? ' <span class="pill warn">🧾 Pago por revisar</span>' : '') +
-        (n.link_pago ? '' : ' <span class="pill warn">Sin link de pago</span>') +
+        (n.link_pago ? '' : ' <span class="pill warn">Sin link de pago</span>') + (n.autoregistro ? ' <span class="pill ok">🆕 Se registró solo</span>' : '') +
+        (n.rubro ? '<div class="muted">🏷️ ' + Core.esc(n.rubro) + '</div>' : '') +
         '<div class="muted">' + Core.esc(n.email) + (n.telefono ? ' · +' + Core.esc(n.telefono) : '') + '</div>' +
         '<div class="muted">' + (n.pro ? '⭐ Pro hasta ' + (n.pro_until ? fecha(n.pro_until) : 'siempre') : n.pro_until ? 'Pro venció el ' + fecha(n.pro_until) : 'Nunca fue Pro') +
         ' · 🟢 entró ' + hace(n.visto_at) + '</div>' +
@@ -530,7 +550,8 @@
   const REGLAS = [['retencion_min', 'Minutos que el pedido queda apartado esperando el pago'], ['cancel_min', 'Minutos para cancelar con devolución (desde que paga)'],
     ['comprobantes_dias', 'Días que se guardan los comprobantes'], ['aviso1_dias', 'Primer aviso de vencimiento (días antes)'],
     ['aviso2_dias', 'Segundo aviso de vencimiento (días antes)'], ['dias_regalo', 'Días de Pro gratis para cada negocio nuevo (0 = sin prueba)'],
-    ['max_rechazos', 'Comprobantes que se pueden rechazar por pedido antes de cerrarlo (el cliente sube otro mientras tanto)']];
+    ['max_rechazos', 'Comprobantes que se pueden rechazar por pedido antes de cerrarlo (el cliente sube otro mientras tanto)'],
+    ['registro_negocios', 'Registro abierto de negocios (1 = cualquiera crea su cuenta Gratis con el link/QR; 0 = solo tú los creas)']];
   async function cargarReglas() {
     const r = await Cuenta.rpc('reglas');
     $('reglasBody').innerHTML = REGLAS.map(([k, t]) => '<label for="rg' + k + '">' + t + '</label><input id="rg' + k + '" inputmode="numeric" value="' + r[k] + '">').join('');
