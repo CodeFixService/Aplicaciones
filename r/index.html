@@ -17,6 +17,7 @@
   .grande { font-size: 22px; font-weight: 800; }
   .reloj { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; }
   pre { white-space: pre-wrap; font: inherit; margin: 6px 0; }
+  .aviso { font-size: 14px; padding: 8px 10px; border-radius: 10px; margin: 0 0 10px; background: color-mix(in srgb, #ef4444 12%, var(--card)); border: 1px solid color-mix(in srgb, #ef4444 35%, transparent); }
 </style>
 </head>
 <body>
@@ -27,6 +28,9 @@
   <div id="ped" class="hidden">
     <div class="card"><div class="grande" id="estado"></div><p class="muted" id="estadoTxt" style="margin:4px 0 0"></p></div>
     <div class="card hidden" id="cPagar"><h2>💳 Paga y sube tu comprobante</h2>
+      <p class="aviso hidden" id="rechazo"></p>
+      <span class="muted">Monto a pagar</span>
+      <div class="montoPagar"><b id="monto"></b><button class="small alt" id="bCopiarMonto" type="button">📋 Copiar monto</button></div>
       <p class="muted" style="margin-top:0">Tu pedido y su stock quedan apartados por:</p><div class="reloj" id="reloj"></div>
       <div class="btns"><a class="btn ok" id="bPagar" target="_blank" rel="noopener" style="flex:1">💳 Pagar</a></div>
       <div class="btns"><label class="btn" for="fComp" style="flex:1">📷 Subir foto del comprobante</label><input type="file" accept="image/*" id="fComp" class="hidden"></div>
@@ -66,12 +70,17 @@
     if (/^#[0-9a-f]{6}$/i.test(t.color || '')) Core.tema.aplicar(t.color);
     if (/^data:image\//.test(t.logo || '')) $('lg').style.backgroundImage = 'url("' + t.logo + '")'; else $('lg').textContent = (t.nombre || '?').charAt(0).toUpperCase();
     $('estado').textContent = (E[p.estado] || [p.estado])[0];
-    $('estadoTxt').textContent = (p.motivo ? p.motivo + ' · ' : '') + ((E[p.estado] || [])[1] || '') +
+    $('estadoTxt').textContent = (p.motivo && p.estado !== 'pagando' ? p.motivo + ' · ' : '') + ((E[p.estado] || [])[1] || '') +
       (p.devolucion === 'pendiente' ? ' La tienda te devolverá el pago.' : p.devolucion === 'hecha' ? ' Pago devuelto.' : '');
     $('detalle').textContent = p.lineas.map((l) => l.cant + ' × ' + l.nombre + ' — ' + precio(l.subtotal)).join('\n') + '\n' +
+      (p.descuento > 0 ? 'Descuento: −' + precio(p.descuento) + '\n' : '') +
       (p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') + ' (costo según distancia)' : '🏪 Retiro en tienda');
     $('total').textContent = precio(p.total);
     $('cPagar').classList.toggle('hidden', p.estado !== 'pagando');
+    $('monto').textContent = precio(p.total);
+    // Comprobante rechazado: el pedido sigue apartado y se puede subir otro.
+    $('rechazo').classList.toggle('hidden', !(p.estado === 'pagando' && p.motivo));
+    $('rechazo').innerHTML = '❌ <b>La tienda rechazó tu comprobante</b>: ' + Core.esc(p.motivo || '') + '. Revisa el pago y sube otro.';
     $('bPagar').classList.toggle('hidden', !p.link);
     if (p.link) { $('bPagar').href = p.link.url; $('bPagar').textContent = '💳 Pagar ' + precio(p.total) + (p.link.titulo ? ' · ' + p.link.titulo : ''); }
     $('cDatos').classList.toggle('hidden', !t.datos_pago || !['pagando', 'recibido'].includes(p.estado));
@@ -89,6 +98,7 @@
       tic(); timer = setInterval(tic, 1000);
     }
   }
+  $('bCopiarMonto').onclick = () => p && Core.copiar(Math.round(Number(p.total)), '📋 Monto copiado: ' + precio(p.total));
   $('fComp').onchange = async (e) => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f) return;

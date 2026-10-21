@@ -64,6 +64,8 @@
   let info = null;
   try { info = await Cuenta.rpc('negocio_publico', { p_id: negocio }); } catch (e) { /* sin red */ }
   if (!info) { $('form').classList.add('hidden'); $('cCuenta').classList.add('hidden'); $('off').classList.remove('hidden'); return; }
+  // Página antigua: ahora todo está en la tienda (productos, pedidos, cuenta y "Recibir ofertas").
+  if (info.slug) { location.replace('../../t/?s=' + encodeURIComponent(info.slug)); return; }
   $('titulo').textContent = info.empresa || 'Ofertas exclusivas';
   $('bCuenta').href = '../../?cliente=' + negocio;
   // ¿Aún no tienes cuenta? Se la pides a la tienda por WhatsApp.

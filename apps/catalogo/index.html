@@ -118,6 +118,7 @@
     <div class="card hidden" id="cCarro">
       <h2>🛒 Mi pedido</h2>
       <div id="lineas"></div>
+      <p class="muted hidden" id="premTip" style="margin:8px 0 0"></p>
       <div class="total"><span>Total</span><span id="carTotal">$0</span></div>
       <label>¿Cómo lo recibes?</label>
       <div class="entrega" id="entrega">
@@ -170,22 +171,16 @@
   Cuenta.nav(new URLSearchParams(location.search).get('v') === 'pedidos' ? 'pedidos' : 'tienda');
   const params = new URLSearchParams(location.search);
   const esCliente = yo.role === 'client';
-  // ?modo=codefix: la empresa entra a la "tienda" de CodeFix (le compra al administrador).
-  const modoCF = params.get('modo') === 'codefix' && !esCliente;
-  // Comprador: el cliente en su tienda, o la empresa en CodeFix. Si no, es la vista previa de la propia tienda.
-  const comprador = esCliente || (modoCF && !yo.is_admin);
+  // Comprador: el cliente en su tienda. Si no, es la vista previa de la propia tienda (el negocio y su equipo).
+  const comprador = esCliente;
   const premium = !!yo.is_pro;
-  const db0 = Core.store('tienda:' + yo.id);
-  let negocio = esCliente ? yo.negocio_id : yo.id;
-  if (modoCF) {
-    try { negocio = await Cuenta.rpc('admin_id'); db0.set('adminId', negocio); } catch (e) { negocio = db0.get('adminId', null); }
-  }
-  $('titulo').textContent = esCliente ? (yo.negocio || 'Tienda') : modoCF ? 'Novedades CodeFix' : 'Mi tienda (vista del cliente)';
+  const negocio = esCliente ? yo.negocio_id : yo.id;
+  $('titulo').textContent = esCliente ? (yo.negocio || 'Tienda') : 'Mi tienda (vista del cliente)';
   if (premium) { $('tag').textContent = esCliente ? 'PREMIUM' : 'PRO'; $('tag').classList.add('pro'); $('tag').classList.remove('hidden'); }
   const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
   const db = Core.store('tienda:' + yo.id + ':' + negocio);
   const FAV_FREE = 5;
-  const quienPremium = modoCF ? 'empresas Pro' : 'clientes Premium';
+  const quienPremium = 'clientes Premium';
 
   /* ---------- Datos (con copia para usar sin internet) ---------- */
   // Si el servidor falla y no hay copia guardada, se muestra el motivo (no una lista vacía muda).
@@ -227,6 +222,7 @@
   pintarEstado();
 
   const precioDe = (i) => i.precio_premium != null ? i.precio_premium : i.precio;
+  const descPrem = Number(tienda.desc_premium) || 0; // % de descuento que la tienda da a sus clientes Premium
   const esImg = (u) => /^(https?:\/\/|data:image\/)/i.test(u || '');
   const mensaje = (txt, etiqueta) => comprador ? '<a class="btn small alt" href="../mensajes/?con=' + negocio + '&txt=' +
     encodeURIComponent(txt) + '">' + (etiqueta || '💬 Enviar mensaje') + '</a>' : '';
@@ -240,7 +236,7 @@
       $('t' + k).classList.toggle('on', v === k.toLowerCase());
       $('v' + k).classList.toggle('hidden', v !== k.toLowerCase());
     });
-    history.replaceState(null, '', location.pathname + '?' + (modoCF ? 'modo=codefix&' : '') + 'v=' + v);
+    history.replaceState(null, '', location.pathname + '?v=' + v);
     if (v === 'ofertas' && !ofertas) cargarOfertas();
     if (v === 'pedidos') cargarPedidos();
     guardarCarro();
@@ -252,9 +248,6 @@
   $('tPedidos').classList.toggle('hidden', !comprador);
   if (!comprador) {
     $('ofTip').textContent = '👁️ Así ven tus clientes tus fichas y campañas. Cada ficha que guardas en FichaPro aparece aquí.';
-    $('ofTip').classList.remove('hidden');
-  } else if (modoCF) {
-    $('ofTip').textContent = '📣 Promociones y anuncios de CodeFix para todas las empresas.';
     $('ofTip').classList.remove('hidden');
   }
 
@@ -284,14 +277,10 @@
     } catch (e) { /* sin red: quedan sin imagen */ }
   }
   async function cargarOfertas() {
-    const origen = modoCF ? 'codefix' : 'tienda';
+    const origen = 'tienda';
     const pubs = await traer('ver_publicaciones', { p_origen: origen, p_con_imagen: false }, 'publicaciones', []);
     await ponerImagenes(pubs, origen);
-    let camp;
-    if (modoCF) {
-      camp = (await traer('my_inbox', {}, 'inbox', [])).filter((n) => n.de === 'CodeFix' && esImg(n.image))
-        .map((n) => ({ id: n.id, title: n.title, body: n.body, image: n.image, fecha: n.sent_at, leido: true }));
-    } else camp = await traer('my_offers', {}, 'ofertas', []);
+    const camp = await traer('my_offers', {}, 'ofertas', []);
     if (fallos.publicaciones && !fallos.ofertas) fallos.ofertas = fallos.publicaciones;
     ofertas = pubs.map((x) => ({ id: x.id, pub: true, title: x.titulo, body: x.detalle, precio: x.precio, precio_num: x.precio_num,
       image: x.imagen, fecha: x.fecha, tipo: x.tipo, vip: !!x.vip, bloqueada: !!x.bloqueada, leido: true }))
@@ -324,7 +313,7 @@
   }
   function pintarOfertas() {
     $('ofertas').innerHTML = ofertas.length ? ofertas.map(tarjeta).join('') : '<p class="empty" style="grid-column:1/-1">' +
-      vacio('ofertas', comprador ? (modoCF ? 'CodeFix aún no publica novedades.' : 'La tienda aún no publica ofertas.')
+      vacio('ofertas', comprador ? 'La tienda aún no publica ofertas.'
         : 'Aún no publicas nada. Guarda una ficha en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
   }
   $('ofertas').onclick = (e) => {
@@ -363,7 +352,8 @@
         (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
               : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Más barato con Premium</span>' : '')) +
         (stock[i.clave] != null && stock[i.clave] <= 3 ? '<span class="pill ' + (stock[i.clave] ? 'warn' : 'bad') + '" style="align-self:flex-start">' + (stock[i.clave] ? 'Quedan ' + stock[i.clave] : 'Agotado') + '</span>' : '') +
-        (comprador ? '<div class="acc">' + (stock[i.clave] === 0 ? '<button class="alt" disabled>Agotado</button>' : '<button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>') +
+        (comprador ? '<div class="acc">' + (stock[i.clave] === 0 ? (avisos.includes(i.clave) ? '<button class="alt" data-avisa="' + Core.esc(i.clave) + '">🔕 Te avisaremos</button>'
+          : '<button class="alt" data-avisa="' + Core.esc(i.clave) + '">🔔 Avísame' + (premium ? '' : ' ⭐') + '</button>') : '<button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>') +
           mensaje('Hola, me interesa: ' + i.nombre, '💬 Preguntar') + '</div>' : '') + '</div>';
     }).join('') : '<p class="empty" style="grid-column:1/-1">' + (items.length ? (cat === '__fav' ? 'Aún no marcas favoritos' : 'Sin resultados')
       : vacio('catalogo', comprador ? 'La tienda aún no publica productos.' : 'Aún no publicas productos: agrégalos en Caja Rápida → Productos.')) + '</p>';
@@ -383,6 +373,7 @@
       else favs.push(k);
       db.set('favs', favs); pintar();
     }
+    if (b.dataset.avisa !== undefined) return avisame(b.dataset.avisa, b);
     if (b.dataset.add !== undefined) {
       const it = items.find((x) => x.clave === b.dataset.add);
       let opcion = null;
@@ -396,6 +387,24 @@
   };
 
   $('zoom').onclick = () => $('zoom').classList.add('hidden');
+
+  /* ---------- 🔔 Avísame cuando llegue (Premium) ---------- */
+  let avisos = [];
+  async function cargarAvisos() {
+    if (!comprador || !premium) return;
+    try { avisos = await Cuenta.rpc('mis_avisos_stock', { p_negocio: negocio }) || []; pintar(); } catch (e) { /* base anterior */ }
+  }
+  async function avisame(clave, b) {
+    if (!premium) { Core.toast('⭐ "Avísame cuando llegue" es de Premium'); return; }
+    const quiero = !avisos.includes(clave);
+    b.disabled = true;
+    try {
+      await Cuenta.rpc('avisame_stock', { p_negocio: negocio, p_clave: clave, p_quiero: quiero });
+      avisos = quiero ? avisos.concat(clave) : avisos.filter((x) => x !== clave);
+      Core.toast(quiero ? '🔔 Te avisaremos apenas vuelva a haber' : 'Aviso quitado');
+      pintar();
+    } catch (err) { Core.toast(err.message); b.disabled = false; }
+  }
 
   /* ---------- 📷 Fotos de productos: se guardan en el celular y solo se bajan las nuevas o cambiadas ---------- */
   const fotos = {};
@@ -432,9 +441,22 @@
     : items.find((x) => x.clave === l.clave && !x.bloqueado) || null;
   const lineasCarro = () => carro.map((l) => ({ l, i: itemDe(l) })).filter((x) => x.i);
   const totalCarro = () => lineasCarro().reduce((s, x) => s + precioDe(x.i) * x.l.cant, 0);
+  // El carrito también queda en el servidor: si no terminas el pedido, la tienda (Pro) te lo recuerda al día siguiente.
+  let carroEnviado = null, carroTimer = null;
+  function syncCarro() {
+    if (!esCliente) return;
+    const items = carro.map((l) => ({ clave: l.clave, cant: l.cant, nombre: itemDe(l) ? itemDe(l).nombre : '' }));
+    const j = JSON.stringify(items);
+    if (j === carroEnviado) return;
+    clearTimeout(carroTimer);
+    carroTimer = setTimeout(() => {
+      Cuenta.rpc('guardar_carrito', { p_negocio: negocio, p_items: items }).then(() => { carroEnviado = j; }).catch(() => {});
+    }, 1500);
+  }
   function guardarCarro() {
     carro = carro.filter((l) => l.cant > 0 && itemDe(l));
     db.set('carro', carro);
+    syncCarro();
     const n = carro.reduce((s, l) => s + l.cant, 0);
     $('barra').classList.toggle('hidden', !n || !comprador || vistaActual === 'pedidos');
     $('barTxt').textContent = '🛒 Ver pedido (' + n + ')';
@@ -449,7 +471,11 @@
       '<div class="qty"><button class="alt" data-n="' + carro.indexOf(l) + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
       '</b><button class="alt" data-n="' + carro.indexOf(l) + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('');
     const t = totalCarro(), d = cupon ? Math.round(t * cupon.pct / 100) : 0;
-    $('carTotal').textContent = precio(t - d) + (d ? ' (−' + precio(d) + ')' : '');
+    const dp = premium && descPrem ? Math.min(Math.round(t * descPrem / 100), t - d) : 0;
+    $('carTotal').textContent = precio(t - d - dp) + (d + dp ? ' (−' + precio(d + dp) + ')' : '');
+    $('premTip').classList.toggle('hidden', !descPrem || !comprador);
+    $('premTip').innerHTML = !descPrem ? '' : premium ? '⭐ Descuento Premium: <b>−' + precio(dp) + '</b> (' + descPrem + '%)'
+      : '⭐ Con <a href="../../#plan">Premium</a> pagarías <b>' + descPrem + '% menos</b> en esta tienda.';
   }
   $('lineas').onclick = (e) => {
     const { n, d } = e.target.dataset;
@@ -490,7 +516,7 @@
   function textoPedido(r) {
     return '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + (l.opcion ? ' (' + l.opcion + ')' : '') + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
       (r && r.descuento > 0 ? '\nDescuento: −' + precio(r.descuento) : '') +
-      '\nTotal: ' + precio(r ? r.total : totalCarro()) + (premium ? ' (precios Premium)' : '') +
+      '\nTotal: ' + precio(r ? r.total : totalCarro()) + (r && r.desc_premium > 0 ? ' (con descuento Premium)' : '') +
       '\nEntrega: ' + (entrega === 'despacho' ? '🚚 Despacho a ' + $('dir').value.trim() + ' (costo de despacho según distancia, por pagar)' : '🏪 Retiro en tienda') +
       ($('nota').value.trim() ? '\nNota: ' + $('nota').value.trim() : '');
   }
@@ -507,7 +533,7 @@
       if (!r.ok) throw new Error(r.error);
       if (porWsp) window.open('https://wa.me/' + wspTienda + '?text=' + encodeURIComponent(textoPedido(r)), '_blank');
       Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato a la tienda
-      carro = []; $('nota').value = ''; $('cupon').value = ''; cupon = null; $('cuponTxt').textContent = '';
+      carro = []; carroEnviado = '[]'; $('nota').value = ''; $('cupon').value = ''; cupon = null; $('cuponTxt').textContent = '';
       guardarCarro(); cargarPedidos();
       Core.toast(r.estado === 'pagando' ? '⏳ Pedido apartado: paga con el link y sube el comprobante aquí abajo' : '✅ Pedido enviado (' + precio(r.total) + '). Te avisaremos cada cambio de estado.');
       cargarStock();
@@ -542,14 +568,18 @@
       '<li><div class="grow"><b>' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) + ' · ' + precio(p.total) + '</b> ' +
       '<span class="pill est">' + (ESTADOS[p.estado] || p.estado) + '</span>' +
       '<pre>' + Core.esc(p.lineas.map((l) => l.cant + ' × ' + l.nombre).join('\n') + '\n' + (p.entrega === 'despacho' ? '🚚 Despacho: ' + (p.direccion || '') : '🏪 Retiro en tienda') +
-        (p.descuento > 0 ? '\nCupón ' + p.cupon + ': −' + precio(p.descuento) : '')) + '</pre>' +
-      (p.estado === 'pagando' ? '<p class="aviso">⏳ Tu pedido está apartado <b>' + quedan(p.retenido_hasta) + ' min</b>. Paga con el link de la tienda y sube la foto del comprobante.</p>' : '') +
+        (p.descuento - (p.desc_premium || 0) > 0 ? '\nCupón ' + (p.cupon || '') + ': −' + precio(p.descuento - (p.desc_premium || 0)) : '') +
+        (p.desc_premium > 0 ? '\n⭐ Descuento Premium: −' + precio(p.desc_premium) : '')) + '</pre>' +
+      (p.estado === 'pagando' && p.motivo ? '<p class="aviso">❌ <b>Comprobante rechazado</b>: ' + Core.esc(p.motivo) + '. Revisa el pago y sube otro.</p>' : '') +
+      (p.estado === 'pagando' ? '<p class="aviso">⏳ Tu pedido está apartado <b>' + quedan(p.retenido_hasta) + ' min</b>. Paga <b>' + precio(p.total) + '</b> con el link de la tienda y sube la foto del comprobante.</p>' : '') +
+      (p.estado === 'rechazado' && p.motivo ? '<p class="muted" style="margin:6px 0 0">❌ ' + Core.esc(p.motivo) + '</p>' : '') +
       (p.estado === 'en_revision' ? '<p class="muted" style="margin:6px 0 0">🧾 La tienda está revisando tu comprobante.</p>' : '') +
       (p.devolucion === 'pendiente' ? '<p class="muted" style="margin:6px 0 0">💸 La tienda te devolverá el pago.</p>' : '') +
       (p.estado === 'entregado' && !p.calificado ? '<div style="margin-top:8px"><span class="muted">Califica tu compra: </span><span class="califica">' +
         [1, 2, 3, 4, 5].map((k) => '<button type="button" data-cal="' + p.id + '" data-n="' + k + '" aria-label="' + k + ' estrellas">★</button>').join('') + '</span></div>' : '') +
       '</div><div class="acc" style="display:flex;gap:6px;flex-wrap:wrap">' +
-      (p.estado === 'pagando' && links[p.id] ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(links[p.id].url) + '">💳 Pagar</a>' : '') +
+      (p.estado === 'pagando' ? '<button class="small alt" data-monto="' + Math.round(Number(p.total)) + '">📋 Copiar monto</button>' : '') +
+      (p.estado === 'pagando' && links[p.id] ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(links[p.id].url) + '">💳 Pagar ' + precio(p.total) + '</a>' : '') +
       (p.estado === 'pagando' ? '<button class="small" data-comp="' + p.id + '">📷 Subir comprobante</button>' : '') +
       (['pagando', 'en_revision', 'recibido', 'preparando'].includes(p.estado) ? '<button class="small alt" data-can="' + p.id + '">Cancelar</button>' : '') +
       '<button class="small alt" data-rep="' + n + '">🔁 Repetir</button>' +
@@ -580,6 +610,7 @@
     const b = e.target.closest('button');
     if (!b) return;
     try {
+      if (b.dataset.monto) { Core.copiar(b.dataset.monto, '📋 Monto copiado: ' + precio(b.dataset.monto)); return; }
       if (b.dataset.comp) { compDe = b.dataset.comp; fComp.click(); return; }
       if (b.dataset.can) {
         if (!confirm('¿Cancelar este pedido?')) return;
@@ -606,7 +637,7 @@
   };
 
   pintar(); guardarCarro();
-  cargarStock();
+  cargarStock(); cargarAvisos();
   cargarFotos();
   const v = params.get('v');
   vista(['ofertas', 'pedidos'].includes(v) && !(v === 'pedidos' && !comprador) ? v : 'productos');

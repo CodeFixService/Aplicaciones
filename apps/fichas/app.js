@@ -906,7 +906,8 @@
   };
 
   /* ---------- Suscriptores (Pro) ---------- */
-  const linkSubs = Core.rootUrl() + 'apps/suscribirse/?n=' + cuenta.id;
+  // El enlace lleva a la tienda: ahí ven productos y ofertas, piden, y tocan "🔔 Recibir ofertas" (sin cuenta).
+  const linkSubs = cuenta.slug ? Core.rootUrl() + 't/?s=' + encodeURIComponent(cuenta.slug) : Core.rootUrl() + 'apps/suscribirse/?n=' + cuenta.id;
   async function renderSubs() {
     const pro = licensed();
     $('subsPro').classList.toggle('hidden', !pro);

@@ -9,6 +9,8 @@ Si aparece un aviso de operación destructiva, toca **Run this query** (es norma
 
 ## 2. Configurar el inicio de sesión
 - **Authentication → Sign In / Providers → Email**: apaga **Confirm email** → Save.
+- **Authentication → Sign In / Providers**: deja encendido **Allow new users to sign up** (lo usa el registro abierto de negocios en `n/`;
+  los clientes igual necesitan invitación, eso lo controla la base de datos).
 - **Authentication → URL Configuration**: Site URL `https://codefixservice.github.io/Aplicaciones/` →
   Save. Redirect URLs → Add URL `https://codefixservice.github.io/Aplicaciones/**` → Save URLs.
 

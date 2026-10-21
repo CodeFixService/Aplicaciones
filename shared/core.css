@@ -222,3 +222,14 @@ nav.tabs.abajo a .badge { position: absolute; top: 2px; right: calc(50% - 22px);
 .califica button { width: 34px; height: 34px; padding: 0; font-size: 20px; border-radius: 10px; background: var(--field); color: #9ca3af; box-shadow: none; }
 .califica button:hover { color: #f59e0b; }
 [hidden] { display: none !important; }
+/* Elegir con un toque (motivos del rechazo, etc.) */
+.elegir { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; padding: 16px;
+  background: rgba(15,23,42,.45); }
+.elegir > div { width: 100%; max-width: 440px; display: grid; gap: 8px; padding: 16px; background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(15,23,42,.3); margin-bottom: env(safe-area-inset-bottom); }
+.elegir b { font-size: 16px; margin-bottom: 4px; }
+.elegir button { width: 100%; justify-content: flex-start; text-align: left; }
+.elegir button.small { justify-content: center; text-align: center; }
+/* Total grande para pagar, con botón Copiar monto */
+.montoPagar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.montoPagar b { font-size: 30px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }

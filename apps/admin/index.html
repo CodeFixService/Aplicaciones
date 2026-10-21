@@ -17,8 +17,8 @@
   .st-sent { background: color-mix(in srgb, #10b981 16%, transparent); color: #059669; border-color: transparent; }
   .st-failed { background: color-mix(in srgb, #ef4444 16%, transparent); color: #dc2626; border-color: transparent; }
   .st-cancelled { background: var(--line); }
-  #solicitudes li, #reportes li { flex-wrap: wrap; }
-  #solicitudes li > .grow, #reportes li > .grow { flex: 1 1 100%; }
+  #reportes li { flex-wrap: wrap; }
+  #reportes li > .grow { flex: 1 1 100%; }
   .acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
   .acc button, .acc select { width: auto; padding: 7px 12px; font-size: 13px; border-radius: 10px; }
   .uso { margin: 10px 0; }
@@ -98,7 +98,7 @@
       <h2>💰 Ingresos</h2>
       <div class="stats" id="ingresos"></div>
       <h2 style="margin-top:14px">⏰ Planes que vencen en 7 días</h2>
-      <p class="muted">A los 3 días del vencimiento se les avisa solo. Puedes avisarles antes con un toque.</p>
+      <p class="muted">Se les avisa solo 15 y 5 días antes (editable en Ajustes → Reglas). Puedes avisarles antes con un toque.</p>
       <ul class="list" id="vencen"></ul>
     </div>
     <div class="card" id="cServidor"><h2>🖥️ Servidor <span class="pill" id="usoPill"></span></h2><div id="usoBarras"></div>
@@ -114,17 +114,21 @@
       <h2>🚩 Reportes <span class="pill" id="nRep">0</span></h2>
       <ul class="list" id="reportes"></ul>
     </div>
-    <div class="card" id="cSolicitudes">
-      <h2>🔔 Solicitudes pendientes <span class="pill" id="nSol">0</span></h2>
-      <p class="muted">Pruebas de 7 días y avisos de pago. Revisa tu Mercado Pago antes de aprobar un pago.</p>
-      <ul class="list" id="solicitudes"></ul>
-    </div>
   </section>
 
   <!-- NEGOCIOS -->
   <section class="view" id="v-negocios">
+    <div class="card upsell" id="cRegistro"><h2>📲 Registro abierto de negocios</h2>
+      <p class="muted" style="margin-top:0">Publica este link o QR donde quieras (redes, ferias, afiches): cualquier negocio crea su cuenta Gratis sola,
+        elige su rubro y parte con los días de Pro de regalo. Después te compra el Pro desde Mi plan. Se cierra en Ajustes → Reglas.</p>
+      <input id="regLink" readonly aria-label="Link de registro de negocios">
+      <div class="btns"><button class="small" id="regShare" type="button">📤 Compartir</button><button class="small alt" id="regCopiar" type="button">📋 Copiar</button>
+        <button class="small alt" id="regQR" type="button">QR</button><a class="btn small alt" id="regVer" target="_blank" rel="noopener">👁️ Ver</a></div>
+      <div id="regQRbox" class="hidden" style="text-align:center;margin-top:10px"><img id="regQRimg" alt="QR de registro" style="width:220px;background:#fff;border-radius:12px;padding:8px">
+        <div class="btns" style="justify-content:center"><button class="small alt" id="regQRdl" type="button">⬇️ Descargar QR para imprimir</button></div></div>
+    </div>
     <div class="card"><h2>➕ Crear negocio</h2>
-      <p class="muted" style="margin-top:0">Solo tú creas negocios. Parten en Gratis; el Pro se activa cuando apruebas su comprobante (o se lo das tú).</p>
+      <p class="muted" style="margin-top:0">Los negocios se pueden registrar solos con el link de arriba, o los creas tú aquí. Parten con la prueba Pro gratis (días en Ajustes → Reglas) y luego pasan solos a Gratis; el Pro sigue cuando apruebas su comprobante (o se lo das tú).</p>
       <div class="row" style="flex-wrap:wrap"><div style="min-width:160px"><label for="nNombre">Nombre del negocio</label><input id="nNombre" maxlength="80" autocomplete="off"></div>
         <div style="min-width:180px"><label for="nEmail">Correo del dueño</label><input id="nEmail" type="email" autocomplete="off"></div></div>
       <label for="nClave">Contraseña</label>
@@ -135,7 +139,7 @@
       <div class="btns hidden" id="nCredBtns"><button class="ok small" id="nWsp">💬 Enviar por WhatsApp</button><button class="alt small" id="nCopiar">Copiar</button></div>
     </div>
     <input id="nBuscar" placeholder="Buscar negocio…" aria-label="Buscar negocio" style="margin-bottom:10px">
-    <div class="seg2" id="nSeg"><button class="small on" data-f="">Todos</button><button class="small alt" data-f="pro">⭐ Pro</button><button class="small alt" data-f="free">Gratis</button>
+    <div class="seg2" id="nSeg"><button class="small on" data-f="">Todos</button><button class="small alt" data-f="pro">⭐ Pro</button><button class="small alt" data-f="free">Gratis</button><button class="small alt" data-f="solos">🆕 Se registraron solos</button>
       <button class="small alt" data-f="vence">⏳ Por vencer</button><button class="small alt" data-f="inactivos">💤 Sin actividad 7 días</button><button class="small alt" data-f="susp">⛔ Suspendidos</button></div>
     <p class="muted" id="nCuenta"></p>
     <div class="lista2" id="nLista"></div>
@@ -167,7 +171,8 @@
       <button class="small alt" data-a="registro">📜 Registro</button><button class="small alt" data-a="cuenta">👤 Mi cuenta</button>
     </div>
     <div class="aj" id="aj-links"><div class="card"><h2>💳 Precio y link del Pro / Premium</h2>
-      <p class="muted" style="margin-top:0">2 espacios por plan; solo uno activo. El precio que ven es el del espacio activo. Ellos pagan ahí y suben el comprobante: lo apruebas en Pagos.</p>
+      <p class="muted" style="margin-top:0">2 espacios por plan; solo uno activo. El precio que ven es el del espacio activo. Ellos pagan ahí y suben el comprobante: lo apruebas en Pagos.
+        Si activas un plan anual, también les aparece y al subir el comprobante marcan "plan anual" (se aprueba por 365 días).</p>
       <div id="linksAdmin"></div></div></div>
     <div class="aj hidden" id="aj-planes"><div id="planesBody"></div></div>
     <div class="aj hidden" id="aj-reglas"><div class="card"><h2>⚖️ Reglas</h2><div id="reglasBody"></div><div class="btns"><button id="bReglas">Guardar reglas</button></div></div></div>
@@ -241,6 +246,7 @@
 </nav>
 
 <script src="../../shared/config.js"></script>
+<script src="../../shared/vendor/qrcode.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
 <script src="../../shared/cuenta.js"></script>
 <script src="app.js"></script>

@@ -3067,10 +3067,12 @@ begin
     'Revisa el pago Premium en Administración → Pagos', 'apps/admin/#pagos');
   return jsonb_build_object('ok', true);
 end $$;
+drop function if exists public.mis_pagos();
 create or replace function public.mis_pagos() returns table (id uuid, tipo text, monto int, estado text, motivo text, fecha timestamptz)
 language sql stable security definer set search_path = '' as $$
   select id, tipo, monto, estado, motivo, created_at from public.pagos where user_id = auth.uid() order by created_at desc limit 20
 $$;
+drop function if exists public.admin_pagos(text);
 create or replace function public.admin_pagos(p_estado text)
 returns table (id uuid, user_id uuid, nombre text, email text, rol text, tipo text, monto int, estado text, motivo text,
                fecha timestamptz, revisado timestamptz, pro_until timestamptz, tiene_comprobante boolean)
@@ -3783,6 +3785,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 -- ---------- Admin: negocios, clientes, resumen y limpieza ----------
+drop function if exists public.admin_negocios();
 create or replace function public.admin_negocios()
 returns table (id uuid, empresa text, email text, telefono text, slug text, logo text, color text, pro boolean, pro_until timestamptz,
                suspendido boolean, visto_at timestamptz, creado timestamptz, clientes int, equipo int, productos int, pedidos_mes int,
@@ -3931,6 +3934,664 @@ grant execute on function public.admin_plan_guardar(text, text, text, jsonb, int
   public.admin_limpiar(text), public.tienda_info(uuid), public.crear_pedido(uuid, jsonb, text, text, text, text), public.publicar_ficha(text, text, text, text, text, text, boolean, numeric),
   public.catalog_upsert(text, text, numeric, numeric, text, boolean, text, text), public.set_mis_respuestas(jsonb), public.admin_set_setting(text, text)
   to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.1 · Comprobantes con reintento, plan anual, prueba Pro
+--  automática y beneficios que venden Premium:
+--  Negocio Pro → recordatorio de carrito, reporte semanal, aviso de stock bajo.
+--  Cliente Premium → descuento de la tienda, prioridad en la fila, "avísame
+--  cuando llegue". Limpieza: sin solicitudes de prueba ni "Novedades CodeFix".
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.1'::text $$;
+
+-- ---------- Columnas nuevas ----------
+alter table public.pedidos add column if not exists rechazos int not null default 0;
+alter table public.pedidos add column if not exists desc_premium numeric(12, 2) not null default 0;
+alter table public.pagos add column if not exists anual boolean not null default false;
+alter table public.profiles add column if not exists desc_premium int not null default 0;
+alter table public.profiles drop constraint if exists profiles_desc_premium_check;
+alter table public.profiles add constraint profiles_desc_premium_check check (desc_premium between 0 and 50);
+
+-- ---------- Reglas: días de Pro gratis para cada negocio nuevo (por defecto 7) ----------
+create or replace function public.reglas() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('retencion_min', public.regla('retencion_min', 30), 'cancel_min', public.regla('cancel_min', 10),
+    'comprobantes_dias', public.regla('comprobantes_dias', 30), 'aviso1_dias', public.regla('aviso1_dias', 15),
+    'aviso2_dias', public.regla('aviso2_dias', 5), 'dias_regalo', public.regla('dias_regalo', 7), 'max_rechazos', public.regla('max_rechazos', 3))
+$$;
+create or replace function public.admin_set_regla(p_k text, p_v int) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  if p_k not in ('retencion_min', 'cancel_min', 'comprobantes_dias', 'aviso1_dias', 'aviso2_dias', 'dias_regalo', 'max_rechazos') then raise exception 'Regla no válida'; end if;
+  if p_v is null or p_v < 0 or p_v > 10000 then raise exception 'Valor no válido'; end if;
+  insert into public.app_settings (key, value) values ('regla_' || p_k, p_v::text) on conflict (key) do update set value = excluded.value;
+  perform public.auditar('Regla', p_k || ' = ' || p_v);
+end $$;
+-- Antes la regla existía pero no hacía nada (quedaba en 0): se pasa a 7 una sola vez.
+do $$ begin
+  if not exists (select 1 from public.app_settings where key = 'mig_51_regalo') then
+    update public.app_settings set value = '7' where key = 'regla_dias_regalo' and value = '0';
+    insert into public.app_settings (key, value) values ('mig_51_regalo', '1');
+  end if;
+end $$;
+
+-- Prueba Pro automática: el negocio nuevo parte con N días de Pro.
+create or replace function public.regalo_nuevo_negocio() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare d int := public.regla('dias_regalo', 7);
+begin
+  if new.role = 'user' and d > 0 and new.plan = 'free' and new.pro_until is null then
+    new.plan := 'pro'; new.pro_until := now() + make_interval(days => d); new.trial_used := true;
+  end if;
+  return new;
+end $$;
+drop trigger if exists profiles_regalo on public.profiles;
+create trigger profiles_regalo before insert on public.profiles for each row execute function public.regalo_nuevo_negocio();
+create or replace function public.slug_nuevo_negocio() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.role = 'user' and new.slug is null then perform public.asegurar_slug(new.id); end if;
+  if new.role = 'user' and new.plan = 'pro' and new.pro_until is not null then
+    perform public.notify_user(new.id, '🎁 ¡Tienes Pro gratis hasta el ' || to_char(new.pro_until at time zone 'America/Santiago', 'DD-MM') || '!',
+      'Prueba cupones, sellos, equipo, estadísticas y avisos automáticos. Después sigues en Gratis o lo renuevas en Mi plan.', './#plan');
+  end if;
+  return new;
+end $$;
+
+-- Las solicitudes de "probar 7 días" ya no se usan (la prueba es automática; el pago va con comprobante).
+create or replace function public.request_pro(p_kind text, p_note text default null) returns jsonb
+language sql security definer set search_path = '' as $$
+  select jsonb_build_object('ok', false, 'error', 'Ahora se paga con el link y subiendo el comprobante en Mi plan.')
+$$;
+update public.requests set status = 'rejected', resolved_at = now() where status = 'pending' and kind = 'trial';
+
+-- ---------- Plan anual: links propios y el pago guarda si es anual ----------
+alter table public.links_pago drop constraint if exists links_pago_tipo_check;
+alter table public.links_pago add constraint links_pago_tipo_check check (tipo in ('pedido', 'premium_negocio', 'premium_cliente', 'anual_negocio', 'anual_cliente'));
+create or replace function public.set_link_pago(p_tipo text, p_slot int, p_titulo text, p_url text, p_precio int, p_activo boolean)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare u text := trim(coalesce(p_url, ''));
+begin
+  if p_tipo = 'pedido' then
+    if not exists (select 1 from public.profiles where id = auth.uid() and role in ('user', 'admin') and not suspended) then raise exception 'Solo el dueño del negocio'; end if;
+  elsif p_tipo in ('premium_negocio', 'premium_cliente', 'anual_negocio', 'anual_cliente') then
+    if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  else raise exception 'Tipo no válido'; end if;
+  if p_slot not in (1, 2) then raise exception 'Espacio no válido'; end if;
+  if u <> '' and u !~* '^https://' then raise exception 'El link debe empezar con https://'; end if;
+  if coalesce(p_activo, false) and u = '' then raise exception 'Para activarlo, pega el link de pago'; end if;
+  if p_precio is not null and (p_precio < 0 or p_precio > 99999999) then raise exception 'Precio no válido'; end if;
+  insert into public.links_pago (owner_id, tipo, slot, titulo, url, precio, activo)
+  values (auth.uid(), p_tipo, p_slot, left(trim(coalesce(p_titulo, '')), 80), left(u, 500),
+          case when p_tipo = 'pedido' then null else p_precio end, coalesce(p_activo, false))
+  on conflict (owner_id, tipo, slot) do update set titulo = excluded.titulo, url = excluded.url, precio = excluded.precio, activo = excluded.activo;
+  if coalesce(p_activo, false) then
+    update public.links_pago set activo = false where owner_id = auth.uid() and tipo = p_tipo and slot <> p_slot;
+  end if;
+  if p_tipo <> 'pedido' then perform public.auditar('Link de pago', p_tipo || ' espacio ' || p_slot || case when p_activo then ' (activo)' else '' end); end if;
+end $$;
+-- El precio no sirve en los links de pedidos (el total cambia en cada pedido).
+update public.links_pago set precio = null where tipo = 'pedido' and precio is not null;
+create or replace function public.premium_info() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'negocio', public.link_activo(public.admin_id(), 'premium_negocio'), 'cliente', public.link_activo(public.admin_id(), 'premium_cliente'),
+    'negocio_anual', public.link_activo(public.admin_id(), 'anual_negocio'), 'cliente_anual', public.link_activo(public.admin_id(), 'anual_cliente'),
+    'planes', public.planes_publicos())
+$$;
+
+drop function if exists public.subir_pago_premium(text);
+create or replace function public.subir_pago_premium(p_comprobante text, p_anual boolean default false) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me public.profiles; t text; l jsonb; anual boolean;
+begin
+  select * into me from public.profiles where id = auth.uid();
+  if me.id is null or me.role not in ('user', 'client') then return jsonb_build_object('ok', false, 'error', 'Solo negocios y clientes'); end if;
+  if not public.img_ok(p_comprobante, 400000) then return jsonb_build_object('ok', false, 'error', 'Sube una foto del comprobante'); end if;
+  if exists (select 1 from public.pagos where user_id = me.id and estado = 'en_revision') then
+    return jsonb_build_object('ok', false, 'error', 'Ya tienes un comprobante en revisión. Te avisamos apenas lo revisemos.');
+  end if;
+  t := case when me.role = 'client' then 'premium_cliente' else 'premium_negocio' end;
+  l := public.link_activo(public.admin_id(), case when me.role = 'client' then 'anual_cliente' else 'anual_negocio' end);
+  anual := coalesce(p_anual, false) and l is not null;
+  if not anual then l := public.link_activo(public.admin_id(), t); end if;
+  insert into public.pagos (user_id, tipo, monto, comprobante, anual) values (me.id, t, (l ->> 'precio')::int, p_comprobante, anual);
+  perform public.notify_user(public.admin_id(), '💰 Comprobante de ' || coalesce(nullif(me.empresa, ''), me.email) || case when anual then ' (anual)' else '' end,
+    'Revisa el pago Premium en Administración → Pagos', 'apps/admin/#pagos');
+  return jsonb_build_object('ok', true);
+end $$;
+drop function if exists public.mis_pagos();
+create or replace function public.mis_pagos() returns table (id uuid, tipo text, monto int, estado text, motivo text, fecha timestamptz, anual boolean, dias int)
+language sql stable security definer set search_path = '' as $$
+  select id, tipo, monto, estado, motivo, created_at, anual, dias from public.pagos where user_id = auth.uid() order by created_at desc limit 20
+$$;
+drop function if exists public.admin_pagos(text);
+create or replace function public.admin_pagos(p_estado text)
+returns table (id uuid, user_id uuid, nombre text, email text, rol text, tipo text, monto int, estado text, motivo text,
+               fecha timestamptz, revisado timestamptz, pro_until timestamptz, tiene_comprobante boolean, anual boolean, dias int)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  return query select x.id, x.user_id, coalesce(nullif(p.empresa, ''), p.email), p.email, p.role, x.tipo, x.monto, x.estado, x.motivo,
+    x.created_at, x.revisado_at, p.pro_until, x.comprobante is not null, x.anual, x.dias
+  from public.pagos x join public.profiles p on p.id = x.user_id
+  where p_estado is null or p_estado = '' or x.estado = p_estado order by x.created_at desc limit 200;
+end $$;
+drop function if exists public.admin_revisar_pago(uuid, boolean, text);
+create or replace function public.admin_revisar_pago(p_id uuid, p_aprobar boolean, p_motivo text, p_dias int default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pagos; d int; hasta timestamptz;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  select * into x from public.pagos where id = p_id and estado = 'en_revision';
+  if x.id is null then raise exception 'Ese pago ya fue revisado'; end if;
+  if coalesce(p_aprobar, false) then
+    d := coalesce(nullif(p_dias, 0), case when x.anual then 365 end,
+                  (select duracion_dias from public.planes where codigo = case when x.tipo = 'premium_cliente' then 'cliente_pro' else 'negocio_pro' end), 30);
+    if d < 1 or d > 3650 then raise exception 'Días no válidos'; end if;
+    update public.profiles set plan = 'pro', pro_until = greatest(now(), coalesce(case when plan = 'pro' then pro_until end, now())) + make_interval(days => d),
+      aviso_venc_at = null
+    where id = x.user_id returning pro_until into hasta;
+    update public.pagos set estado = 'aprobado', dias = d, revisado_at = now() where id = x.id;
+    perform public.notify_user(x.user_id, '⭐ ¡Pago aprobado!', 'Tu plan Pro/Premium está activo hasta el ' || to_char(hasta at time zone 'America/Santiago', 'DD-MM-YYYY'), './#plan');
+  else
+    update public.pagos set estado = 'rechazado', motivo = nullif(left(trim(coalesce(p_motivo, '')), 200), ''), revisado_at = now() where id = x.id;
+    perform public.notify_user(x.user_id, '❌ Comprobante rechazado', coalesce(nullif(trim(p_motivo), ''), 'Revisa el comprobante y vuelve a subirlo.') || ' Puedes subir otro en Mi plan.', './#plan');
+  end if;
+  perform public.auditar(case when p_aprobar then 'Pago aprobado' || coalesce(' (' || d || ' días)', '') else 'Pago rechazado' end, x.tipo || ' · ' || x.user_id);
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ---------- Comprobante rechazado: el pedido vuelve a "Esperando pago" ----------
+create or replace function public.revisar_comprobante(p_id uuid, p_aprobar boolean, p_motivo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; m text := nullif(left(trim(coalesce(p_motivo, '')), 200), ''); hasta timestamptz;
+begin
+  select * into x from public.pedidos where id = p_id and negocio_id = public.negocio_de(auth.uid()) and estado = 'en_revision';
+  if x.id is null then raise exception 'Pedido no encontrado o ya revisado'; end if;
+  if coalesce(p_aprobar, false) then
+    perform public.mover_stock(x, -1);
+    update public.pedidos set estado = 'preparando', pagado_at = now(), stock_descontado = true, motivo = null, updated_at = now() where id = x.id;
+    perform public.aviso_cliente(x, '✅ Pago aprobado', 'Estamos preparando tu pedido');
+    return jsonb_build_object('ok', true, 'estado', 'preparando');
+  end if;
+  if x.rechazos + 1 < public.regla('max_rechazos', 3) then
+    -- Le da otra oportunidad: el pedido y su stock siguen apartados con tiempo nuevo para subir otro comprobante.
+    hasta := greatest(coalesce(x.retenido_hasta, now()), now() + make_interval(mins => public.regla('retencion_min', 30)));
+    update public.pedidos set estado = 'pagando', motivo = coalesce(m, 'Comprobante rechazado'), rechazos = x.rechazos + 1,
+      comprobante = null, comprobante_at = null, retenido_hasta = hasta, updated_at = now() where id = x.id;
+    perform public.aviso_cliente(x, '❌ Comprobante rechazado: sube otro', coalesce(m, 'Revisa el pago') || ' · Tienes ' ||
+      greatest(1, round(extract(epoch from hasta - now()) / 60))::int || ' min para subir otro.');
+    return jsonb_build_object('ok', true, 'estado', 'pagando');
+  end if;
+  update public.pedidos set estado = 'rechazado', motivo = m, rechazos = x.rechazos + 1, updated_at = now() where id = x.id;
+  perform public.aviso_cliente(x, '❌ Comprobante rechazado', coalesce(m, 'Escríbele a la tienda'));
+  return jsonb_build_object('ok', true, 'estado', 'rechazado');
+end $$;
+-- Al subir el comprobante nuevo se borra el motivo del rechazo anterior.
+create or replace function public.subir_comprobante(p_ref text, p_img text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref);
+begin
+  if x.id is null or (x.cliente_id is not null and x.cliente_id is distinct from auth.uid() and x.token is distinct from p_ref) then
+    return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado');
+  end if;
+  if x.estado <> 'pagando' then return jsonb_build_object('ok', false, 'error', case when x.estado = 'expirado' then 'Se acabó el tiempo para pagar: haz el pedido de nuevo' else 'Este pedido ya no espera pago' end); end if;
+  if x.retenido_hasta < now() then
+    update public.pedidos set estado = 'expirado' where id = x.id;
+    return jsonb_build_object('ok', false, 'error', 'Se acabó el tiempo para pagar: haz el pedido de nuevo');
+  end if;
+  if not public.img_ok(p_img, 400000) then return jsonb_build_object('ok', false, 'error', 'Sube una foto del comprobante'); end if;
+  update public.pedidos set estado = 'en_revision', comprobante = p_img, comprobante_at = now(), motivo = null, updated_at = now() where id = x.id;
+  perform public.notify_user(x.negocio_id, '🧾 Comprobante por revisar' || case when x.rechazos > 0 then ' (reintento)' else '' end,
+    coalesce(x.invitado_nombre, 'Un cliente') || ' · $' || to_char(x.total, 'FM999G999G999'), 'apps/pedidos/');
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ---------- Descuento Premium (lo define cada tienda) y prioridad en la fila ----------
+create or replace function public.set_desc_premium(p_pct int) returns int
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and role = 'user' and not suspended) then raise exception 'Solo el dueño del negocio'; end if;
+  if p_pct is null or p_pct < 0 or p_pct > 50 then raise exception 'Elige entre 0 y 50%%'; end if;
+  update public.profiles set desc_premium = p_pct where id = auth.uid();
+  return p_pct;
+end $$;
+-- ¿Este cliente es Premium para la tienda? (solo clientes con cuenta)
+create or replace function public.es_cliente_premium(c uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select c is not null and exists (select 1 from public.profiles p where p.id = c and p.role = 'client') and public.is_pro(c)
+$$;
+
+create or replace function public.guardar_pedido(p_negocio uuid, p_cliente uuid, p_nombre text, p_tel text, p_items jsonb, p_entrega text,
+                                                 p_direccion text, p_nota text, p_cupon text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare a jsonb; pct int := 0; desc_ numeric := 0; dp numeric := 0; sub numeric; ped public.pedidos; l jsonb := public.link_activo(p_negocio, 'pedido');
+  quien text; prem boolean := public.es_cliente_premium(p_cliente);
+begin
+  if public.en_vacaciones(p_negocio) then return jsonb_build_object('ok', false, 'error', 'La tienda está de vacaciones. Podrás pedir a su regreso.'); end if;
+  if p_entrega not in ('retiro', 'despacho') then return jsonb_build_object('ok', false, 'error', 'Elige despacho o retiro en tienda'); end if;
+  if p_entrega = 'despacho' and coalesce(trim(p_direccion), '') = '' then return jsonb_build_object('ok', false, 'error', 'Escribe la dirección de despacho'); end if;
+  a := public.armar_pedido(p_negocio, p_items);
+  if a ? 'error' then return jsonb_build_object('ok', false, 'error', a ->> 'error'); end if;
+  sub := (a ->> 'sub')::numeric;
+  if coalesce(trim(p_cupon), '') <> '' then
+    begin pct := public.validar_cupon(p_negocio, p_cupon);
+    exception when others then return jsonb_build_object('ok', false, 'error', 'Cupón no válido o vencido'); end;
+    desc_ := round(sub * pct / 100.0);
+    update public.cupones set usos = usos + 1 where owner_id = p_negocio and codigo = upper(regexp_replace(p_cupon, '[^A-Za-z0-9]', '', 'g'));
+  end if;
+  if prem then dp := round(sub * coalesce((select desc_premium from public.profiles where id = p_negocio), 0) / 100.0); end if;
+  dp := least(dp, sub - desc_);
+  insert into public.pedidos (negocio_id, cliente_id, invitado_nombre, invitado_tel, lineas, subtotal, descuento, desc_premium, total, cupon, entrega, direccion, nota,
+                              estado, retenido_hasta, token)
+  values (p_negocio, p_cliente, p_nombre, p_tel, a -> 'lineas', sub, desc_ + dp, dp, sub - desc_ - dp,
+          nullif(upper(regexp_replace(coalesce(p_cupon, ''), '[^A-Za-z0-9]', '', 'g')), ''), p_entrega,
+          case when p_entrega = 'despacho' then left(trim(p_direccion), 200) end, nullif(left(trim(coalesce(p_nota, '')), 300), ''),
+          case when l is null then 'recibido' else 'pagando' end,
+          case when l is null then null else now() + make_interval(mins => public.regla('retencion_min', 30)) end,
+          left(replace(gen_random_uuid()::text, '-', ''), 24))
+  returning * into ped;
+  quien := coalesce(p_nombre, (select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = p_cliente));
+  perform public.notify_user(p_negocio, case when prem then '⭐ ' else '' end || case when l is null then '📦 Nuevo pedido de ' else '⏳ Pedido por pagar de ' end || quien,
+    'Total $' || to_char(ped.total, 'FM999G999G999') || ' · ' || case when p_entrega = 'despacho' then 'Despacho' else 'Retiro en tienda' end ||
+    case when prem then ' · Cliente Premium' else '' end, 'apps/pedidos/');
+  return jsonb_build_object('ok', true, 'id', ped.id, 'token', ped.token, 'subtotal', ped.subtotal, 'descuento', ped.descuento, 'desc_premium', ped.desc_premium,
+    'total', ped.total, 'estado', ped.estado, 'retenido_hasta', ped.retenido_hasta, 'link', l);
+end $$;
+
+create or replace function public.ver_pedido(p_ref text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref); t public.profiles;
+begin
+  if x.id is null then return null; end if;
+  select * into t from public.profiles where id = x.negocio_id;
+  return jsonb_build_object('id', x.id, 'token', x.token, 'estado', x.estado, 'lineas', x.lineas, 'subtotal', x.subtotal, 'descuento', x.descuento,
+    'desc_premium', x.desc_premium, 'total', x.total, 'entrega', x.entrega, 'direccion', x.direccion, 'nota', x.nota, 'fecha', x.created_at,
+    'retenido_hasta', x.retenido_hasta, 'rechazos', x.rechazos,
+    'tiene_comprobante', x.comprobante is not null, 'devolucion', x.devolucion, 'motivo', x.motivo, 'nombre', x.invitado_nombre,
+    'tienda', jsonb_build_object('nombre', t.empresa, 'slug', t.slug, 'logo', t.logo, 'color', t.color, 'telefono', t.telefono, 'datos_pago', t.datos_pago),
+    'link', case when x.estado = 'pagando' then public.link_activo(x.negocio_id, 'pedido') end,
+    'cancel_min', public.regla('cancel_min', 10),
+    'calificado', exists (select 1 from public.calificaciones c where c.pedido_id = x.id and not c.de_negocio));
+end $$;
+
+drop function if exists public.pedidos_tienda(text);
+create or replace function public.pedidos_tienda(p_estado text default null)
+returns table (id uuid, cliente_id uuid, cliente text, telefono text, lineas jsonb, subtotal numeric, descuento numeric,
+               total numeric, cupon text, entrega text, direccion text, nota text, estado text, fecha timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, invitado boolean, calificado boolean, cliente_estrellas numeric,
+               premium boolean, desc_premium numeric, rechazos int, motivo text)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.cliente_id, coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1), x.invitado_nombre, 'Cliente'),
+         coalesce(c.telefono, x.invitado_tel), x.lineas, x.subtotal, x.descuento, x.total, x.cupon, x.entrega, x.direccion, x.nota, x.estado,
+         x.created_at, x.retenido_hasta, x.comprobante is not null, x.devolucion, x.cliente_id is null,
+         exists (select 1 from public.calificaciones q where q.pedido_id = x.id and q.de_negocio),
+         (select round(avg(q.estrellas), 1) from public.calificaciones q join public.pedidos y on y.id = q.pedido_id
+          where q.de_negocio and ((x.cliente_id is not null and y.cliente_id = x.cliente_id) or (x.cliente_id is null and y.invitado_tel = x.invitado_tel))),
+         pr.premium, x.desc_premium, x.rechazos, x.motivo
+  from public.pedidos x left join public.profiles c on c.id = x.cliente_id
+  cross join lateral (select c.role = 'client' and public.is_pro(c.id) as premium) pr
+  where x.negocio_id = public.negocio_de(auth.uid())
+    and (p_estado is null or (p_estado = 'activos' and x.estado in ('recibido', 'preparando', 'listo', 'en_camino'))
+         or (p_estado = 'revisar' and x.estado = 'en_revision') or (p_estado = 'pagando' and x.estado = 'pagando')
+         or (p_estado = 'devolver' and x.devolucion = 'pendiente')
+         or (p_estado = 'historial' and x.estado in ('entregado', 'cancelado', 'rechazado', 'expirado')) or x.estado = p_estado)
+  -- ⭐ Los pedidos pendientes de clientes Premium van primero en la fila.
+  order by (coalesce(pr.premium, false) and x.estado in ('pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino')) desc, x.created_at desc
+  limit 300
+$$;
+
+drop function if exists public.mis_pedidos(uuid);
+create or replace function public.mis_pedidos(p_negocio uuid default null)
+returns table (id uuid, negocio text, lineas jsonb, subtotal numeric, descuento numeric, total numeric, cupon text,
+               entrega text, direccion text, nota text, estado text, fecha timestamptz, actualizado timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, calificado boolean, token text,
+               desc_premium numeric, motivo text, rechazos int)
+language sql stable security definer set search_path = '' as $$
+  select x.id, t.empresa, x.lineas, x.subtotal, x.descuento, x.total, x.cupon,
+         x.entrega, x.direccion, x.nota, x.estado, x.created_at, x.updated_at, x.retenido_hasta, x.comprobante is not null, x.devolucion,
+         exists (select 1 from public.calificaciones q where q.pedido_id = x.id and not q.de_negocio), x.token, x.desc_premium, x.motivo, x.rechazos
+  from public.pedidos x join public.profiles t on t.id = x.negocio_id
+  where x.cliente_id = auth.uid() and (p_negocio is null or x.negocio_id = p_negocio)
+  order by x.created_at desc limit 50
+$$;
+
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', case when public.is_pro(t.id) then t.sellos_meta end, 'sellos_premio', t.sellos_premio,
+    'pro', public.is_pro(t.id), 'logo', t.logo, 'color', t.color,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'desc_premium', t.desc_premium)
+  from public.profiles t
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
+$$;
+
+-- Tienda pública: dice si es Pro (para "🔔 Recibir ofertas" sin cuenta, lo que hacía la página vieja de suscribirse).
+create or replace function public.tienda_publica(p_slug text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug, 'telefono', t.telefono, 'horario', t.horario, 'abierto', t.abierto,
+    'logo', t.logo, 'color', t.color, 'datos_pago', t.datos_pago,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'retencion_min', public.regla('retencion_min', 30), 'pro', public.is_pro(t.id), 'desc_premium', t.desc_premium)
+  from public.profiles t where t.slug = lower(trim(coalesce(p_slug, ''))) and t.role = 'user' and not t.suspended
+$$;
+-- La página vieja de suscribirse redirige a la tienda: necesita su dirección corta.
+create or replace function public.negocio_publico(p_id uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('empresa', p.empresa, 'pro', public.is_pro(p.id), 'telefono', p.telefono, 'slug', p.slug)
+  from public.profiles p where p.id = p_id and p.role = 'user' and not p.suspended
+$$;
+
+-- Mi cuenta: suma la dirección corta de la tienda (FichaPro → link y QR de la tienda).
+create or replace function public.my_account() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'id', p.id, 'email', p.email, 'empresa', p.empresa, 'plan', p.plan, 'role', p.role,
+    'pro_until', p.pro_until, 'suspended', p.suspended, 'trial_used', p.trial_used,
+    'mute_offers', p.mute_offers, 'terms_at', p.terms_at,
+    'negocio_id', p.negocio_id, 'negocio', n.empresa, 'telefono', p.telefono, 'negocio_telefono', n.telefono,
+    'logo', p.logo, 'negocio_logo', n.logo, 'color', p.color, 'negocio_color', n.color,
+    'avisos_limpios_at', p.avisos_limpios_at, 'slug', coalesce(p.slug, n.slug),
+    'is_pro', public.is_pro(p.id), 'is_admin', public.is_admin())
+  from public.profiles p left join public.profiles n on n.id = p.negocio_id
+  where p.id = auth.uid()
+$$;
+
+-- ---------- 🛒 Recordatorio de carrito (tiendas Pro) ----------
+create table if not exists public.carritos (
+  cliente_id uuid not null references public.profiles (id) on delete cascade,
+  negocio_id uuid not null references public.profiles (id) on delete cascade,
+  items      jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  avisado_at timestamptz,
+  primary key (cliente_id, negocio_id)
+);
+alter table public.carritos enable row level security;
+revoke all on public.carritos from anon, authenticated;
+create or replace function public.guardar_carrito(p_negocio uuid, p_items jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+declare l jsonb := '[]'::jsonb; it jsonb;
+begin
+  if not public.puede_comprar(auth.uid(), p_negocio) or not exists (select 1 from public.profiles where id = auth.uid() and role = 'client') then return; end if;
+  if jsonb_typeof(coalesce(p_items, '[]'::jsonb)) <> 'array' then return; end if;
+  for it in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) limit 50 loop
+    continue when jsonb_typeof(it) <> 'object' or coalesce(it ->> 'clave', '') = '';
+    l := l || jsonb_build_object('clave', left(it ->> 'clave', 60), 'cant', least(greatest(coalesce((it ->> 'cant')::int, 1), 1), 99),
+      'nombre', left(it ->> 'nombre', 80));
+  end loop;
+  if jsonb_array_length(l) = 0 then
+    delete from public.carritos where cliente_id = auth.uid() and negocio_id = p_negocio;
+  else
+    insert into public.carritos (cliente_id, negocio_id, items) values (auth.uid(), p_negocio, l)
+    on conflict (cliente_id, negocio_id) do update set items = excluded.items, updated_at = now(), avisado_at = null
+      where public.carritos.items is distinct from excluded.items;
+  end if;
+end $$;
+create or replace function public.crear_pedido(p_negocio uuid, p_items jsonb, p_entrega text, p_direccion text,
+                                               p_nota text, p_cupon text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r jsonb;
+begin
+  if not public.puede_comprar(auth.uid(), p_negocio) then return jsonb_build_object('ok', false, 'error', 'No puedes pedirle a esta tienda'); end if;
+  if (select count(*) from public.pedidos where cliente_id = auth.uid() and created_at > now() - interval '1 day') >= 20 then
+    return jsonb_build_object('ok', false, 'error', 'Máximo 20 pedidos por día');
+  end if;
+  r := public.guardar_pedido(p_negocio, auth.uid(), null, null, p_items, p_entrega, p_direccion, p_nota, p_cupon);
+  if (r ->> 'ok')::boolean then delete from public.carritos where cliente_id = auth.uid() and negocio_id = p_negocio; end if;
+  return r;
+end $$;
+-- Cada hora (de 10 a 20 h de Chile): carritos sin pedir de hace más de 20 horas reciben un aviso, una vez.
+create or replace function public.recordar_carritos() returns int
+language plpgsql security definer set search_path = '' as $$
+declare r record; n int := 0; h int := extract(hour from now() at time zone 'America/Santiago');
+begin
+  if h < 10 or h > 20 then return 0; end if;
+  for r in select k.*, t.empresa from public.carritos k join public.profiles t on t.id = k.negocio_id
+           join public.profiles c on c.id = k.cliente_id
+           where k.avisado_at is null and k.updated_at < now() - interval '20 hours' and k.updated_at > now() - interval '4 days'
+             and not t.suspended and not c.suspended and c.negocio_id = k.negocio_id and public.is_pro(t.id) and not public.en_vacaciones(t.id)
+           limit 500 loop
+    perform public.notify_user(r.cliente_id, '🛒 Tu pedido en ' || coalesce(nullif(r.empresa, ''), 'la tienda') || ' te espera',
+      'Dejaste ' || jsonb_array_length(r.items) || ' producto(s) en el carrito. ¡Termina tu pedido con un toque!', 'apps/catalogo/?v=pedidos');
+    update public.carritos set avisado_at = now() where cliente_id = r.cliente_id and negocio_id = r.negocio_id;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+-- ---------- 📊 Reporte semanal (cada lunes, tiendas Pro) ----------
+create or replace function public.reporte_semanal() returns int
+language plpgsql security definer set search_path = '' as $$
+declare r record; n int := 0; ven numeric; cnt int; top text; d timestamptz := now() - interval '7 days';
+begin
+  for r in select id from public.profiles where role = 'user' and not suspended and public.is_pro(id) loop
+    select coalesce(sum(total), 0), count(*) into ven, cnt from public.pedidos
+      where negocio_id = r.id and (pagado_at >= d or (pagado_at is null and estado = 'entregado' and updated_at >= d));
+    select l ->> 'nombre' into top from public.pedidos x, jsonb_array_elements(x.lineas) l
+      where x.negocio_id = r.id and x.created_at >= d and x.estado not in ('cancelado', 'expirado', 'rechazado')
+      group by 1 order by sum((l ->> 'cant')::int) desc limit 1;
+    perform public.notify_user(r.id,
+      case when cnt > 0 then '📊 Tu semana: vendiste $' || to_char(ven, 'FM999G999G999') else '📊 Tu semana en FichaPro' end,
+      case when cnt > 0 then cnt || ' pedido(s) online' || coalesce(' · Tu producto top fue ' || top, '') || '. ¡Vamos por más!'
+           else 'Esta semana no hubo ventas online. Comparte tu tienda por WhatsApp desde Hoy 📣' end, './');
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+-- ---------- ⚠️ Stock bajo (tiendas Pro) y 🔔 "Avísame cuando llegue" (clientes Premium) ----------
+create table if not exists public.avisos_stock (
+  cliente_id uuid not null references public.profiles (id) on delete cascade,
+  negocio_id uuid not null references public.profiles (id) on delete cascade,
+  clave      text not null,
+  created_at timestamptz not null default now(),
+  primary key (cliente_id, negocio_id, clave)
+);
+alter table public.avisos_stock enable row level security;
+revoke all on public.avisos_stock from anon, authenticated;
+create or replace function public.avisame_stock(p_negocio uuid, p_clave text, p_quiero boolean default true) returns boolean
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.puede_comprar(auth.uid(), p_negocio) then raise exception 'No puedes pedirle a esta tienda'; end if;
+  if not coalesce(p_quiero, true) then
+    delete from public.avisos_stock where cliente_id = auth.uid() and negocio_id = p_negocio and clave = p_clave;
+    return false;
+  end if;
+  if not public.es_cliente_premium(auth.uid()) then raise exception '⭐ "Avísame cuando llegue" es de Premium'; end if;
+  if not exists (select 1 from public.catalog_items where owner_id = p_negocio and client_key = p_clave) then raise exception 'Producto no encontrado'; end if;
+  if (select count(*) from public.avisos_stock where cliente_id = auth.uid()) >= 30 then raise exception 'Máximo 30 avisos a la vez'; end if;
+  insert into public.avisos_stock (cliente_id, negocio_id, clave) values (auth.uid(), p_negocio, left(p_clave, 60)) on conflict do nothing;
+  return true;
+end $$;
+create or replace function public.mis_avisos_stock(p_negocio uuid) returns setof text
+language sql stable security definer set search_path = '' as $$
+  select clave from public.avisos_stock where cliente_id = auth.uid() and negocio_id = p_negocio
+$$;
+create or replace function public.stock_avisos() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare r record;
+begin
+  if new.stock is null or new.stock is not distinct from old.stock then return new; end if;
+  if new.stock <= 2 and old.stock > 2 and public.is_pro(new.owner_id) then
+    perform public.notify_user(new.owner_id, case when new.stock = 0 then '⚠️ Se agotó ' else '⚠️ Quedan ' || new.stock || ' de ' end || new.nombre,
+      'Repón el stock para no perder ventas.', 'apps/caja/#productos');
+  end if;
+  if new.stock > coalesce(old.stock, 0) and new.stock - public.apartado(new.owner_id, new.client_key) > 0 then
+    for r in delete from public.avisos_stock where negocio_id = new.owner_id and clave = new.client_key returning cliente_id loop
+      perform public.notify_user(r.cliente_id, '🔔 ¡Llegó ' || new.nombre || '!', 'Volvió a haber stock. Pídelo antes de que se agote.', 'apps/catalogo/');
+    end loop;
+  end if;
+  return new;
+end $$;
+drop trigger if exists catalog_stock_avisos on public.catalog_items;
+create trigger catalog_stock_avisos after update of stock on public.catalog_items for each row execute function public.stock_avisos();
+
+-- ---------- 📣 Vender por WhatsApp (Hoy, Pro): ofertas y productos para compartir ----------
+create or replace function public.kit_whatsapp() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null then raise exception 'Sin permiso'; end if;
+  if not public.is_pro(n) then raise exception '⭐ Vender por WhatsApp es de la versión Pro'; end if;
+  return jsonb_build_object(
+    'empresa', (select empresa from public.profiles where id = n), 'slug', (select slug from public.profiles where id = n),
+    'ofertas', (select coalesce(jsonb_agg(z), '[]') from (select titulo, precio from public.publicaciones where owner_id = n order by updated_at desc limit 3) z),
+    'productos', (select coalesce(jsonb_agg(z), '[]') from (select nombre, precio from public.catalog_items c where owner_id = n
+                   and (c.stock is null or c.stock > 0) order by c.created_at desc limit 5) z),
+    'imagen', (select imagen from public.publicaciones where owner_id = n and imagen like 'data:image/%' order by updated_at desc limit 1),
+    'foto', (select foto from public.catalog_items where owner_id = n and foto is not null order by foto_at desc limit 1));
+end $$;
+
+-- ---------- Limpieza: carritos viejos ----------
+create or replace function public.limpiar(p_que text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare a int := 0; c int := 0; m int := 0; p int := 0; k int := 0; d int := public.regla('comprobantes_dias', 30); r jsonb;
+begin
+  if p_que in ('comprobantes', 'todo') then
+    update public.pedidos set comprobante = null where comprobante is not null and estado not in ('en_revision') and comprobante_at < now() - make_interval(days => d);
+    get diagnostics k = row_count;
+    update public.pagos set comprobante = null where comprobante is not null and estado <> 'en_revision' and created_at < now() - make_interval(days => d);
+    get diagnostics c = row_count; k := k + c; c := 0;
+  end if;
+  if p_que in ('avisos', 'mensajes', 'todo') then
+    r := public.limpiar_registros(); a := (r ->> 'avisos')::int + (r ->> 'campanas')::int; m := (r ->> 'mensajes')::int;
+  end if;
+  if p_que in ('pedidos', 'todo') then
+    delete from public.pedidos where estado in ('expirado', 'rechazado') and updated_at < now() - interval '60 days';
+    get diagnostics p = row_count;
+    delete from public.carritos where updated_at < now() - interval '30 days';
+    delete from public.avisos_stock where created_at < now() - interval '90 days';
+  end if;
+  return jsonb_build_object('comprobantes', k, 'avisos', a, 'mensajes', m, 'pedidos', p);
+end $$;
+
+-- ---------- 🏪 Registro abierto de negocios (link y QR públicos: /n/) ----------
+-- Cualquier negocio crea su cuenta Free sola (con los días de Pro de regalo) y después compra el Pro.
+-- Los clientes y el equipo siguen entrando solo con invitación. Se cierra con la regla "registro_negocios" = 0.
+alter table public.profiles add column if not exists rubro text;
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  inv public.user_invites;
+  es_admin boolean := lower(new.email) = public.admin_email();
+  nom text := left(trim(coalesce(meta ->> 'empresa', '')), 80);
+  tel text := left(regexp_replace(coalesce(meta ->> 'telefono', ''), '\D', '', 'g'), 15);
+begin
+  select * into inv from public.user_invites
+  where email = lower(new.email) and created_at > now() - interval '1 hour';
+  if not es_admin and inv.email is null then
+    if meta ->> 'tipo' = 'negocio' and public.regla('registro_negocios', 1) > 0 then
+      if nom = '' then raise exception 'Escribe el nombre de tu negocio'; end if;
+      if (select count(*) from public.profiles where role = 'user' and created_by is null and created_at > now() - interval '1 hour') >= 30 then
+        raise exception 'Muchos registros seguidos. Intenta en un rato.';
+      end if;
+      insert into public.profiles (id, email, empresa, role, telefono, rubro)
+      values (new.id, lower(new.email), nom, 'user', nullif(tel, ''), left(nullif(trim(coalesce(meta ->> 'rubro', '')), ''), 40))
+      on conflict (id) do nothing;
+      perform public.notify_user(public.admin_id(), '🏪 Nuevo negocio: ' || nom,
+        coalesce(nullif(trim(meta ->> 'rubro'), ''), 'Sin rubro') || ' · ' || lower(new.email) || ' · se registró solo', 'apps/admin/#negocios');
+      return new;
+    end if;
+    raise exception 'El registro está cerrado. Pide tu acceso a tu tienda o al administrador.';
+  end if;
+  insert into public.profiles (id, email, empresa, role, negocio_id, created_by)
+  values (new.id, lower(new.email), left(coalesce(nullif(meta ->> 'empresa', ''), inv.nombre, ''), 80),
+    case when es_admin then 'admin' else inv.role end,
+    case when not es_admin and inv.role in ('client', 'equipo') then inv.negocio_id end, inv.created_by)
+  on conflict (id) do nothing;
+  delete from public.user_invites where email = lower(new.email);
+  return new;
+end $$;
+-- ¿Está abierto? (la página /n/ lo pregunta antes de mostrar el formulario)
+create or replace function public.registro_negocios_abierto() returns boolean
+language sql stable security definer set search_path = '' as $$ select public.regla('registro_negocios', 1) > 0 $$;
+create or replace function public.reglas() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('retencion_min', public.regla('retencion_min', 30), 'cancel_min', public.regla('cancel_min', 10),
+    'comprobantes_dias', public.regla('comprobantes_dias', 30), 'aviso1_dias', public.regla('aviso1_dias', 15),
+    'aviso2_dias', public.regla('aviso2_dias', 5), 'dias_regalo', public.regla('dias_regalo', 7), 'max_rechazos', public.regla('max_rechazos', 3),
+    'registro_negocios', public.regla('registro_negocios', 1))
+$$;
+create or replace function public.admin_set_regla(p_k text, p_v int) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  if p_k not in ('retencion_min', 'cancel_min', 'comprobantes_dias', 'aviso1_dias', 'aviso2_dias', 'dias_regalo', 'max_rechazos', 'registro_negocios') then
+    raise exception 'Regla no válida';
+  end if;
+  if p_v is null or p_v < 0 or p_v > 10000 then raise exception 'Valor no válido'; end if;
+  insert into public.app_settings (key, value) values ('regla_' || p_k, p_v::text) on conflict (key) do update set value = excluded.value;
+  perform public.auditar('Regla', p_k || ' = ' || p_v);
+end $$;
+-- El negocio puede cambiar su rubro en Ajustes → Mi tienda.
+create or replace function public.set_mi_rubro(p_rubro text) returns void
+language sql security definer set search_path = '' as $$
+  update public.profiles set rubro = left(nullif(trim(coalesce(p_rubro, '')), ''), 40) where id = auth.uid() and role = 'user'
+$$;
+-- Admin: el listado de negocios muestra el rubro y si se registró solo.
+drop function if exists public.admin_negocios();
+create or replace function public.admin_negocios()
+returns table (id uuid, empresa text, email text, telefono text, slug text, logo text, color text, pro boolean, pro_until timestamptz,
+               suspendido boolean, visto_at timestamptz, creado timestamptz, clientes int, equipo int, productos int, pedidos_mes int,
+               link_pago boolean, estrellas numeric, pago_revision boolean, rubro text, autoregistro boolean)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  return query select p.id, p.empresa, p.email, p.telefono, p.slug, p.logo, p.color, public.is_pro(p.id), p.pro_until, p.suspended, p.visto_at, p.created_at,
+    (select count(*)::int from public.profiles c where c.negocio_id = p.id and c.role = 'client'),
+    (select count(*)::int from public.profiles c where c.negocio_id = p.id and c.role = 'equipo'),
+    (select count(*)::int from public.catalog_items c where c.owner_id = p.id),
+    (select count(*)::int from public.pedidos x where x.negocio_id = p.id and x.created_at >= date_trunc('month', now())),
+    public.link_activo(p.id, 'pedido') is not null, (public.estrellas_tienda(p.id) ->> 'promedio')::numeric,
+    exists (select 1 from public.pagos g where g.user_id = p.id and g.estado = 'en_revision'), p.rubro, p.created_by is null
+  from public.profiles p where p.role = 'user' order by p.created_at desc;
+end $$;
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', case when public.is_pro(t.id) then t.sellos_meta end, 'sellos_premio', t.sellos_premio,
+    'pro', public.is_pro(t.id), 'logo', t.logo, 'color', t.color,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'desc_premium', t.desc_premium, 'rubro', t.rubro)
+  from public.profiles t
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
+$$;
+revoke all on function public.registro_negocios_abierto(), public.set_mi_rubro(text), public.admin_negocios() from public;
+grant execute on function public.registro_negocios_abierto() to anon, authenticated;
+grant execute on function public.set_mi_rubro(text), public.admin_negocios() to authenticated;
+revoke all on function public.set_mi_rubro(text), public.admin_negocios() from anon;
+
+-- Beneficios nuevos en la lista de los planes (solo si el administrador no los había cambiado).
+update public.planes set beneficios = '["🛒 Recordatorio de carrito: el cliente que no terminó su pedido recibe un aviso", "📣 Vende por WhatsApp en 1 toque (foto + ofertas)", "📊 Reporte semanal: cuánto vendiste y tu producto top", "⚠️ Aviso de stock bajo", "Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]'::jsonb
+where codigo = 'negocio_pro' and beneficios = '["Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]'::jsonb;
+update public.planes set beneficios = '["⭐ El descuento Premium de tu tienda en cada pedido", "⭐ Tus pedidos aparecen primero en la fila", "🔔 Avísame cuando llegue (productos agotados)", "Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]'::jsonb
+where codigo = 'cliente_pro' and beneficios = '["Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]'::jsonb;
+
+-- Permisos 5.1
+revoke all on function public.regalo_nuevo_negocio(), public.es_cliente_premium(uuid), public.recordar_carritos(), public.reporte_semanal(),
+  public.stock_avisos() from public, anon, authenticated;
+revoke all on function public.subir_pago_premium(text, boolean), public.mis_pagos(), public.admin_pagos(text), public.admin_revisar_pago(uuid, boolean, text, int),
+  public.pedidos_tienda(text), public.mis_pedidos(uuid), public.set_desc_premium(int), public.guardar_carrito(uuid, jsonb), public.avisame_stock(uuid, text, boolean),
+  public.mis_avisos_stock(uuid), public.kit_whatsapp(), public.crear_pedido(uuid, jsonb, text, text, text, text), public.revisar_comprobante(uuid, boolean, text)
+  from public, anon;
+grant execute on function public.subir_pago_premium(text, boolean), public.mis_pagos(), public.admin_pagos(text), public.admin_revisar_pago(uuid, boolean, text, int),
+  public.pedidos_tienda(text), public.mis_pedidos(uuid), public.set_desc_premium(int), public.guardar_carrito(uuid, jsonb), public.avisame_stock(uuid, text, boolean),
+  public.mis_avisos_stock(uuid), public.kit_whatsapp(), public.crear_pedido(uuid, jsonb, text, text, text, text), public.revisar_comprobante(uuid, boolean, text)
+  to authenticated;
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".
 --  Pega este archivo en Supabase → SQL Editor → Run (después de schema.sql
@@ -3953,7 +4614,7 @@ select cron.schedule(
   $$
 );
 
--- Cada día (10:00 hora de Chile aprox.): avisa a quienes se les vence el plan en 3 días.
+-- Cada día (10:00 hora de Chile aprox.): avisa a quienes se les vence el plan (15 y 5 días antes, editable en Reglas).
 select cron.unschedule(jobid) from cron.job where jobname = 'avisar-vencimientos';
 select cron.schedule('avisar-vencimientos', '0 13 * * *', $$ select public.avisar_vencimientos(); $$);
 
@@ -3972,3 +4633,9 @@ select cron.schedule('expirar-retenciones', '* * * * *', $$ select public.expira
 -- Cada día: borra comprobantes viejos y pedidos expirados (los demás registros ya los limpia "limpiar-registros").
 select cron.unschedule(jobid) from cron.job where jobname = 'limpiar-comprobantes';
 select cron.schedule('limpiar-comprobantes', '10 8 * * *', $$ select public.limpiar('comprobantes'); select public.limpiar('pedidos'); $$);
+-- Cada hora: recordatorio de carritos sin pedir (tiendas Pro; la función solo avisa de 10 a 20 h de Chile).
+select cron.unschedule(jobid) from cron.job where jobname = 'recordar-carritos';
+select cron.schedule('recordar-carritos', '23 * * * *', $$ select public.recordar_carritos(); $$);
+-- Cada lunes (9:00 de Chile aprox.): reporte semanal de ventas a las tiendas Pro.
+select cron.unschedule(jobid) from cron.job where jobname = 'reporte-semanal';
+select cron.schedule('reporte-semanal', '7 12 * * 1', $$ select public.reporte_semanal(); $$);

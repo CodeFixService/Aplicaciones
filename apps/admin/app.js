@@ -18,7 +18,7 @@
   }
   const fallo = (e) => Core.toast(e.message || String(e));
   let perfiles = {};
-  const DB_VERSION = '5.0';
+  const DB_VERSION = '5.1';
 
   /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
   const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, pagos: cargarPagos, ajustes: () => verAjuste(ajuste) };
@@ -54,7 +54,7 @@
       .map(([k, v]) => '<tr><td>' + Core.esc(k) + '</td><td class="r">' + MB(v) + '</td></tr>').join('');
     $('usoTxt').textContent = 'Comprobantes guardados: ' + u.comprobantes + ' (' + MB(u.comprobantes_bytes) + '). ' +
       (pct >= 90 ? 'Casi lleno: limpia o pasa a Supabase Pro.' : pct >= 70 ? 'Va subiendo: programa una limpieza.' : 'Todo bien.');
-    await Promise.all([cargarSolicitudes(), cargarReportes(), cargarIngresos(), cargarActividad()]);
+    await Promise.all([cargarPerfiles().then(cargarReportes), cargarIngresos(), cargarActividad()]);
   }
   $('cServidor').onclick = async (e) => {
     const b = e.target.closest('[data-l]');
@@ -284,47 +284,11 @@
       '<div class="ejes"><span>hace 2 semanas</span><span>hoy</span></div>';
   }
 
-  /* ---------- Solicitudes (prueba 7 días / pago) ---------- */
-  let solicitudes = [];
-  async function cargarSolicitudes() {
-    const [reqs, users] = await Promise.all([
-      q(sb.from('requests').select('*').eq('status', 'pending').order('created_at', { ascending: true })),
-      q(sb.from('profiles').select('id,email,empresa,role'))
-    ]);
-    solicitudes = reqs;
+  /* ---------- Nombres de las cuentas (para los reportes) ---------- */
+  async function cargarPerfiles() {
+    const users = await q(sb.from('profiles').select('id,email,empresa,role'));
     perfiles = Object.fromEntries(users.map((u) => [u.id, u]));
-    $('nSol').textContent = reqs.length;
-    $('solicitudes').innerHTML = reqs.length ? reqs.map((r) => {
-      const u = perfiles[r.user_id] || {};
-      const tipo = r.kind === 'trial' ? '🎁 Prueba 7 días' : '💰 Avisa que pagó';
-      return '<li><div class="grow"><b>' + Core.esc(u.empresa || u.email || '') + '</b> <span class="pill">' + (u.role === 'client' ? 'Cliente' : 'Empresa') + '</span>' +
-        '<div>' + tipo + '</div><div class="muted">' + Core.esc(u.email || '') + ' · ' + fechaHora(r.created_at) + '</div></div>' +
-        '<div class="acc">' + (r.kind === 'trial'
-          ? '<button class="ok" data-a="si" data-id="' + r.id + '" data-d="7">Dar 7 días</button>'
-          : '<select data-a="pago" data-id="' + r.id + '" aria-label="Activar plan"><option value="">Activar…</option>' +
-            '<option value="30">1 mes</option><option value="90">3 meses</option><option value="365">1 año</option><option value="0">Permanente</option></select>') +
-        '<button class="danger" data-a="no" data-id="' + r.id + '">Rechazar</button></div></li>';
-    }).join('') : '<li class="empty">Nada pendiente 🎉</li>';
   }
-  async function resolver(id, aprobar, dias) {
-    try {
-      await Cuenta.rpc('admin_resolve_request', { p_id: id, p_approve: aprobar, p_days: dias });
-      Core.toast(aprobar ? '✅ Activado. Le llegará un aviso.' : 'Solicitud rechazada');
-      sb.functions.invoke('enviar').catch(() => {});
-      cargarResumen();
-    } catch (err) { fallo(err); }
-  }
-  $('solicitudes').onclick = (e) => {
-    const { a, id, d } = e.target.dataset;
-    if (a === 'si') resolver(id, true, +d);
-    if (a === 'no' && confirm('¿Rechazar esta solicitud?')) resolver(id, false, null);
-  };
-  $('solicitudes').onchange = (e) => {
-    const { a, id } = e.target.dataset;
-    if (a !== 'pago' || e.target.value === '') return;
-    const dias = +e.target.value;
-    resolver(id, true, dias === 0 ? null : dias);
-  };
 
   /* ---------- Reportes ---------- */
   async function cargarReportes() {
@@ -350,12 +314,31 @@
   /* ---------- Negocios ---------- */
   let negocios = [], nFiltro = '';
   async function cargarNegocios() { negocios = await Cuenta.rpc('admin_negocios'); pintarNegocios(); }
+  // 📲 Link y QR del registro abierto de negocios (página n/).
+  const regLink = Core.rootUrl() + 'n/';
+  $('regLink').value = regLink; $('regVer').href = regLink;
+  function qrReg(px) {
+    const qr = qrcode(0, 'M'); qr.addData(regLink); qr.make();
+    const n = qr.getModuleCount(), m = 4, c = document.createElement('canvas'), k = Math.max(1, Math.floor(px / (n + 2 * m)));
+    c.width = c.height = k * (n + 2 * m);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let j = 0; j < n; j++) if (qr.isDark(r, j)) g.fillRect((j + m) * k, (r + m) * k, k, k);
+    return c;
+  }
+  $('regQR').onclick = () => { $('regQRimg').src = qrReg(440).toDataURL(); $('regQRbox').classList.toggle('hidden'); };
+  $('regQRdl').onclick = () => qrReg(1200).toBlob((b) => Core.download('qr-crea-tu-tienda.png', b));
+  $('regCopiar').onclick = () => Core.copiar(regLink, '📋 Link copiado');
+  $('regShare').onclick = async () => {
+    const txt = '🏪 ¿Tienes un negocio o emprendimiento? Crea tu tienda online gratis (link, QR, pedidos y caja): ' + regLink;
+    if (navigator.share) { try { await navigator.share({ title: 'Crea tu tienda gratis', text: txt }); return; } catch (e) { return; } }
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  };
   $('nBuscar').oninput = () => pintarNegocios();
   seg('nSeg', (b) => { nFiltro = b.dataset.f; pintarNegocios(); });
   function pintarNegocios() {
     const t = $('nBuscar').value.trim().toLowerCase(), semana = Date.now() - 7 * 864e5, siete = Date.now() + 7 * 864e5;
     const l = negocios.filter((n) => (!t || (n.empresa + ' ' + n.email).toLowerCase().includes(t)) && (!nFiltro ||
-      (nFiltro === 'pro' && n.pro) || (nFiltro === 'free' && !n.pro) || (nFiltro === 'susp' && n.suspendido) ||
+      (nFiltro === 'pro' && n.pro) || (nFiltro === 'free' && !n.pro) || (nFiltro === 'susp' && n.suspendido) || (nFiltro === 'solos' && n.autoregistro) ||
       (nFiltro === 'vence' && n.pro && n.pro_until && new Date(n.pro_until) < siete) || (nFiltro === 'inactivos' && (!n.visto_at || new Date(n.visto_at) < semana))));
     $('nCuenta').textContent = l.length + ' negocio(s)';
     const app = Core.rootUrl();
@@ -364,7 +347,8 @@
       return '<div class="card"><div class="neg"><div class="lg" style="background-color:' + Core.esc(n.color || '#2563eb') + ';' + lg + '">' + (lg ? '' : Core.esc((n.empresa || '?').charAt(0).toUpperCase())) + '</div>' +
         '<div class="grow" style="min-width:0"><b>' + Core.esc(n.empresa || n.email) + '</b> ' + (n.pro ? '<span class="pill pro">PRO</span>' : '<span class="pill">GRATIS</span>') +
         (n.suspendido ? ' <span class="pill bad">Suspendido</span>' : '') + (n.pago_revision ? ' <span class="pill warn">🧾 Pago por revisar</span>' : '') +
-        (n.link_pago ? '' : ' <span class="pill warn">Sin link de pago</span>') +
+        (n.link_pago ? '' : ' <span class="pill warn">Sin link de pago</span>') + (n.autoregistro ? ' <span class="pill ok">🆕 Se registró solo</span>' : '') +
+        (n.rubro ? '<div class="muted">🏷️ ' + Core.esc(n.rubro) + '</div>' : '') +
         '<div class="muted">' + Core.esc(n.email) + (n.telefono ? ' · +' + Core.esc(n.telefono) : '') + '</div>' +
         '<div class="muted">' + (n.pro ? '⭐ Pro hasta ' + (n.pro_until ? fecha(n.pro_until) : 'siempre') : n.pro_until ? 'Pro venció el ' + fecha(n.pro_until) : 'Nunca fue Pro') +
         ' · 🟢 entró ' + hace(n.visto_at) + '</div>' +
@@ -464,11 +448,15 @@
     const E = { en_revision: '🧾 Por revisar', aprobado: '✅ Aprobado', rechazado: '❌ Rechazado' };
     $('pLista').innerHTML = pagos.length ? pagos.map((x) => '<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap">' +
       '<div class="grow" style="min-width:180px"><b>' + Core.esc(x.nombre) + '</b> <span class="pill">' + (x.rol === 'client' ? 'Cliente' : 'Negocio') + '</span>' +
+      (x.anual ? ' <span class="pill pro">📅 Anual</span>' : '') +
       '<div class="muted">' + Core.esc(x.email) + ' · ' + fechaHora(x.fecha) + '</div>' +
-      '<div class="muted">' + (x.monto ? Core.money(x.monto) + ' · ' : '') + (x.pro_until ? 'Pro hasta ' + fecha(x.pro_until) : 'Sin Pro') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') + '</div></div>' +
+      '<div class="muted">' + (x.monto ? Core.money(x.monto) + ' · ' : '') + (x.pro_until ? 'Pro hasta ' + fecha(x.pro_until) : 'Sin Pro') +
+        (x.dias ? ' · ' + x.dias + ' días' : '') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') + '</div></div>' +
       '<span class="pill">' + E[x.estado] + '</span></div>' +
       '<div class="acc" style="margin-top:8px">' + (x.tiene_comprobante ? '<button class="alt" data-ver="' + x.id + '">🧾 Ver comprobante</button>' : '') +
-      (x.estado === 'en_revision' ? '<button class="ok" data-ok="' + x.id + '">✅ Aprobar</button><button class="danger" data-no="' + x.id + '">Rechazar</button>' : '') + '</div>' +
+      (x.estado === 'en_revision' ? '<button class="ok" data-ok="' + x.id + '" data-d="' + (x.anual ? 365 : 0) + '">✅ Aprobar ' + (x.anual ? '1 año' : '1 mes') + '</button>' +
+        '<button class="alt" data-ok="' + x.id + '" data-d="' + (x.anual ? 30 : 365) + '">' + (x.anual ? 'Aprobar solo 30 días' : '📅 Aprobar 1 año') + '</button>' +
+        '<button class="danger" data-no="' + x.id + '">Rechazar</button>' : '') + '</div>' +
       '<div data-img="' + x.id + '"></div></div>').join('') : '<p class="empty">' + (pFiltro === 'en_revision' ? 'Nada por revisar 🎉' : 'Sin pagos') + '</p>';
   }
   $('pLista').onclick = async (e) => {
@@ -482,11 +470,14 @@
         box.querySelector('[data-dl]') && (box.querySelector('[data-dl]').onclick = () => fetch(img).then((r) => r.blob()).then((bl) => Core.download('comprobante.jpg', bl)));
       }
       if (b.dataset.ok) {
-        await Cuenta.rpc('admin_revisar_pago', { p_id: b.dataset.ok, p_aprobar: true, p_motivo: null });
-        sb.functions.invoke('enviar').catch(() => {}); Core.toast('✅ Aprobado: Pro activo'); cargarPagos().catch(fallo);
+        const d = +b.dataset.d || null; // null = lo que pagó (anual: 365; mensual: días del plan en Ajustes → Planes)
+        if (d === 365 && !confirm('¿Aprobar 1 año (365 días)? Revisa que haya pagado el plan anual.')) return;
+        await Cuenta.rpc('admin_revisar_pago', { p_id: b.dataset.ok, p_aprobar: true, p_motivo: null, p_dias: d });
+        sb.functions.invoke('enviar').catch(() => {}); Core.toast('✅ Aprobado: Pro activo' + (d === 365 ? ' por 1 año' : '')); cargarPagos().catch(fallo);
       }
       if (b.dataset.no) {
-        const m = prompt('Motivo del rechazo (le llega a la persona):', 'El comprobante no se ve claro');
+        const m = await Core.elegir('¿Por qué lo rechazas? (le llega a la persona)', ['📷 La foto no se ve clara', '💸 No vemos el pago en la cuenta',
+          '🔢 El monto no coincide con el precio del plan', '📅 El comprobante es de otra fecha o persona'], 'Escribe el motivo:');
         if (m === null) return;
         await Cuenta.rpc('admin_revisar_pago', { p_id: b.dataset.no, p_aprobar: false, p_motivo: m });
         sb.functions.invoke('enviar').catch(() => {}); Core.toast('Rechazado'); cargarPagos().catch(fallo);
@@ -505,12 +496,13 @@
   }
   async function cargarLinks() {
     const l = await Cuenta.rpc('mis_links_pago');
-    $('linksAdmin').innerHTML = [['premium_negocio', '🏪 Pro de negocios'], ['premium_cliente', '👤 Premium de clientes']].map(([t, nom]) =>
+    $('linksAdmin').innerHTML = [['premium_negocio', '🏪 Pro de negocios (mensual)'], ['premium_cliente', '👤 Premium de clientes (mensual)'],
+      ['anual_negocio', '📅 Pro de negocios: plan anual (ej. 12 meses al precio de 10)'], ['anual_cliente', '📅 Premium de clientes: plan anual']].map(([t, nom]) =>
       '<h2 style="margin-top:10px">' + nom + '</h2>' + [1, 2].map((n) => {
         const x = l.find((y) => y.tipo === t && y.slot === n) || {}, k = t + n;
         return '<div class="slotpago' + (x.activo ? ' on' : '') + '"><b>Espacio ' + n + (x.activo ? ' · ✅ Activo' : '') + '</b>' +
           '<div class="row" style="flex-wrap:wrap"><div style="min-width:120px"><label for="lp' + k + '">Precio ($)</label><input id="lp' + k + '" inputmode="numeric" value="' + (x.precio == null ? '' : x.precio) + '"></div>' +
-          '<div style="min-width:160px;flex:2"><label for="lt' + k + '">Texto</label><input id="lt' + k + '" maxlength="80" value="' + Core.esc(x.titulo || '') + '" placeholder="Pro mensual"></div></div>' +
+          '<div style="min-width:160px;flex:2"><label for="lt' + k + '">Texto</label><input id="lt' + k + '" maxlength="80" value="' + Core.esc(x.titulo || '') + '" placeholder="' + (/^anual/.test(t) ? 'Pro anual: 12 meses al precio de 10' : 'Pro mensual') + '"></div></div>' +
           '<label for="lu' + k + '">Link de pago</label><input id="lu' + k + '" type="url" placeholder="https://mpago.la/…" value="' + Core.esc(x.url || '') + '">' +
           '<label class="chk"><input type="checkbox" id="la' + k + '"' + (x.activo ? ' checked' : '') + '> Activo</label>' +
           '<div class="btns"><button class="small" data-t="' + t + '" data-n="' + n + '">Guardar</button></div></div>';
@@ -557,7 +549,9 @@
   };
   const REGLAS = [['retencion_min', 'Minutos que el pedido queda apartado esperando el pago'], ['cancel_min', 'Minutos para cancelar con devolución (desde que paga)'],
     ['comprobantes_dias', 'Días que se guardan los comprobantes'], ['aviso1_dias', 'Primer aviso de vencimiento (días antes)'],
-    ['aviso2_dias', 'Segundo aviso de vencimiento (días antes)']];
+    ['aviso2_dias', 'Segundo aviso de vencimiento (días antes)'], ['dias_regalo', 'Días de Pro gratis para cada negocio nuevo (0 = sin prueba)'],
+    ['max_rechazos', 'Comprobantes que se pueden rechazar por pedido antes de cerrarlo (el cliente sube otro mientras tanto)'],
+    ['registro_negocios', 'Registro abierto de negocios (1 = cualquiera crea su cuenta Gratis con el link/QR; 0 = solo tú los creas)']];
   async function cargarReglas() {
     const r = await Cuenta.rpc('reglas');
     $('reglasBody').innerHTML = REGLAS.map(([k, t]) => '<label for="rg' + k + '">' + t + '</label><input id="rg' + k + '" inputmode="numeric" value="' + r[k] + '">').join('');

@@ -68,6 +68,14 @@
         <div class="btns"><button id="bPedir" style="flex:1">📨 Enviar pedido</button></div>
       </div>
     </section>
+    <div class="card hidden" id="cAvisos" style="margin-top:16px"><h2>🔔 Recibe las ofertas</h2>
+      <p class="muted" style="margin-top:0">Sin cuenta: te llegan como notificación (o por correo) cuando la tienda publique ofertas.</p>
+      <details><summary class="muted" style="cursor:pointer">Quiero recibir ofertas</summary>
+        <label for="sNom">Tu nombre</label><input id="sNom" maxlength="60" autocomplete="given-name">
+        <label for="sMail">Correo (opcional)</label><input id="sMail" type="email" autocomplete="email" placeholder="para recibirlas también por correo">
+        <p class="muted hidden" id="sIos" style="font-size:13px">En iPhone: toca Compartir → <b>Agregar a inicio</b>, abre desde ahí y vuelve a tocar el botón. O deja tu correo.</p>
+        <div class="btns"><button id="bAvisos">🔔 Recibir ofertas</button></div></details>
+    </div>
     <div class="card" id="cCuenta" style="margin-top:16px"><h2>✨ ¿Quieres tu cuenta?</h2>
       <p class="muted" style="margin-top:0">Con cuenta guardas tus pedidos, tus favoritos y recibes avisos de ofertas. Es gratis y quedas con esta tienda.</p>
       <details><summary class="muted" style="cursor:pointer">Crear mi cuenta</summary>
@@ -236,6 +244,25 @@
       Cuenta.sb.functions.invoke('enviar').catch(() => {});
       location.href = '../r/?t=' + r.token;
     } catch (err) { Core.toast(err.message); } finally { $('bPedir').disabled = false; }
+  };
+
+  /* ---------- 🔔 Recibir ofertas sin cuenta (tiendas Pro; antes era la página "suscribirse") ---------- */
+  let conCuenta = false;
+  try { conCuenta = !!Cuenta.account; } catch (e) { conCuenta = false; }
+  $('cAvisos').classList.toggle('hidden', !t.pro || conCuenta);
+  if (!Cuenta.pushSupported() && /iPhone|iPad/.test(navigator.userAgent)) $('sIos').classList.remove('hidden');
+  $('bAvisos').onclick = async () => {
+    const email = $('sMail').value.trim();
+    let sub = null;
+    $('bAvisos').disabled = true;
+    try {
+      try { sub = await Cuenta.pushSubscription(); } catch (e) { if (!email) throw e; } // sin push pero con correo: también vale
+      const r = await Cuenta.rpc('subscribe_negocio', { p_negocio: t.id, p_nombre: $('sNom').value.trim(), p_email: email || null,
+        p_endpoint: sub ? sub.endpoint : null, p_p256dh: sub ? sub.keys.p256dh : null, p_auth: sub ? sub.keys.auth : null });
+      if (!r.ok) throw new Error(r.error);
+      $('cAvisos').innerHTML = '<h2>✅ ¡Listo!</h2><p class="muted" style="margin:0">' + (sub ? 'Te avisaremos con una notificación' : 'Te escribiremos') +
+        (sub && email ? ' y por correo' : '') + ' cuando haya ofertas de ' + Core.esc(t.empresa) + '.</p>';
+    } catch (err) { Core.toast(err.message); } finally { const b = $('bAvisos'); if (b) b.disabled = false; }
   };
 
   /* ---------- Crear cuenta desde la tienda ---------- */
