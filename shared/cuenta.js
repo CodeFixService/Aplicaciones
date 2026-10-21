@@ -371,15 +371,22 @@
   }
   setInterval(() => { if (!document.hidden && document.querySelector('nav.tabs.abajo')) contar(); }, 60000);
 
-  /* ---------- v5.0: pedir activar notificaciones (al abrir, máx. cada 30 min, hasta que estén activas) ---------- */
+  /* ---------- Pedir activar notificaciones hasta que estén activas:
+     cada vez que se abre la app y, mientras sigue abierta, cada 1 hora. ---------- */
+  const PUSH_CADA = 36e5; // 1 hora
+  let pushTimer = null;
   async function ofrecerPush() {
     try {
       if (!pushSupported() || !account) return;
+      if (!pushTimer) pushTimer = setInterval(() => { if (!document.hidden) ofrecerPush(); }, 6e4);
       if (Notification.permission === 'granted' && await suscripcionActual()) return;
       const k = 'cfx:pushPedido', t = +localStorage.getItem(k) || 0;
-      if (Date.now() - t < 18e5) return;
-      localStorage.setItem(k, String(Date.now()));
+      // Al abrir la app (primera pantalla de esta sesión) se muestra siempre; después, una vez por hora.
+      let inicio = false;
+      try { inicio = !sessionStorage.getItem('cfx:pushSesion'); sessionStorage.setItem('cfx:pushSesion', '1'); } catch (e) { inicio = false; }
+      if (!inicio && Date.now() - t < PUSH_CADA) return;
       if (document.getElementById('cfxPush')) return;
+      localStorage.setItem(k, String(Date.now()));
       const d = document.createElement('div');
       d.className = 'hoja'; d.id = 'cfxPush';
       const negado = Notification.permission === 'denied';
