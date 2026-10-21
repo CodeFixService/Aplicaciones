@@ -195,22 +195,64 @@
     });
   }
 
-  // Foto de comprobante: legible pero liviana (máx. 1100 px, JPEG, < 400 KB).
+  // Foto de comprobante: legible pero liviana (máx. 1000 px, JPEG, ~120 KB). Si aún pesa, baja calidad y luego tamaño.
   function comprobante(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        const k = Math.min(1, 1100 / Math.max(img.width, img.height));
-        const c = document.createElement('canvas');
-        c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
-        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-        let q = 0.75, d = c.toDataURL('image/jpeg', q);
-        while (d.length > 390000 && q > 0.3) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+        const c = document.createElement('canvas'), g = c.getContext('2d');
+        let lado = 1000, d = '';
+        for (let vuelta = 0; vuelta < 4; vuelta++, lado = Math.round(lado * 0.8)) {
+          const k = Math.min(1, lado / Math.max(img.width, img.height));
+          c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+          g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+          let q = 0.7;
+          d = c.toDataURL('image/jpeg', q);
+          while (d.length > 160000 && q > 0.4) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+          if (d.length <= 160000) break;
+        }
         resolve(d);
       };
       img.onerror = () => reject(new Error('No se pudo leer la imagen'));
       img.src = typeof src === 'string' ? src : URL.createObjectURL(src);
     });
+  }
+
+  // Elegir con un toque (ej. motivo del rechazo). Devuelve el texto elegido, o null si cierra.
+  // "✏️ Otro…" pide escribirlo. opciones: lista de textos.
+  function elegir(titulo, opciones, otro) {
+    return new Promise((resolve) => {
+      const d = document.createElement('div');
+      d.className = 'elegir';
+      d.innerHTML = '<div role="dialog" aria-label="' + esc(titulo) + '"><b>' + esc(titulo) + '</b>' +
+        opciones.map((o, i) => '<button type="button" class="alt" data-i="' + i + '">' + esc(o) + '</button>').join('') +
+        (otro ? '<button type="button" class="alt" data-otro="1">✏️ Otro…</button>' : '') +
+        '<button type="button" class="small" data-x="1">Cancelar</button></div>';
+      const fin = (v) => { d.remove(); resolve(v); };
+      d.onclick = (e) => {
+        const b = e.target.closest('button');
+        if (e.target === d || (b && b.dataset.x)) return fin(null);
+        if (!b) return;
+        if (b.dataset.otro) { const t = prompt(otro, ''); return fin(t && t.trim() ? t.trim() : null); }
+        fin(opciones[+b.dataset.i]);
+      };
+      document.body.appendChild(d);
+    });
+  }
+
+  // Copiar al portapapeles (con respaldo para celulares antiguos).
+  function copiar(texto, aviso) {
+    const ok = () => toast(aviso || '📋 Copiado');
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(String(texto)).then(ok).catch(() => copiarViejo(texto, ok));
+    copiarViejo(texto, ok);
+    return Promise.resolve();
+  }
+  function copiarViejo(texto, ok) {
+    const t = document.createElement('textarea');
+    t.value = String(texto); t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); ok(); } catch (e) { toast(String(texto)); }
+    t.remove();
   }
 
   function readImage(file, maxSide) {
@@ -277,7 +319,7 @@
 
   // Pie de página con la marca del autor en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.0';
+  const APP_VERSION = '5.1';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -290,6 +332,6 @@
 
   global.Core = {
     store, uid, money, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, logoChico, fotoChica, comprobante, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION
+    backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION
   };
 })(window);

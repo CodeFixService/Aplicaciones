@@ -200,7 +200,7 @@
 
   // Mensaje con los datos de acceso para enviar por WhatsApp.
   function mensajeAcceso(d) {
-    return 'Hola ' + d.nombre + ' 👋\nTe creamos tu cuenta en ' + (d.tienda || 'CodeFix Apps') + '.\n\n' +
+    return 'Hola ' + d.nombre + ' 👋\nTe creamos tu cuenta en ' + (d.tienda || 'FichaPro') + '.\n\n' +
       '📲 Entra aquí e instala la app: ' + rootUrl() + '\n' +
       '👤 Correo: ' + d.email + '\n🔑 Contraseña: ' + d.password + '\n\n' +
       'Te recomendamos cambiar la contraseña en "Mi cuenta" la primera vez que entres.';

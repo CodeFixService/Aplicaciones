@@ -80,10 +80,7 @@
   .ayuda.emprende { bottom: calc(138px + env(safe-area-inset-bottom)); font-size: 19px; }
   .app.bloq { opacity: .55; filter: grayscale(1); }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
-  .solicitudes { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--text);
-    border: 2px solid var(--premium); background: linear-gradient(160deg, color-mix(in srgb, var(--premium) 14%, var(--card)), var(--card) 70%); }
-  .solicitudes .num { font-size: 30px; font-weight: 800; min-width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center;
-    background: var(--premium); color: var(--premium-ink); }
+  .anual { margin-top: 12px; padding: 12px; border-radius: var(--radius-sm); border: 2px dashed var(--premium); }
 </style>
 </head>
 <body>
@@ -159,12 +156,6 @@
       <p class="muted" id="baseTxt"></p>
     </div>
 
-    <a class="card solicitudes hidden" id="cSol" href="apps/admin/#solicitudes">
-      <div class="num" id="solNum">0</div>
-      <div class="grow"><b>Solicitudes pendientes</b><div class="muted">Pruebas de 7 días y avisos de pago. Toca para revisarlas.</div></div>
-      <span style="font-size:22px">›</span>
-    </a>
-
     <a class="card mini hidden" id="cMiCaja" href="apps/caja/"><span style="font-size:26px">🧮</span><div class="grow"><b>Mi Caja</b><div class="muted">Tus ventas, productos y finanzas (Premium)</div></div><span style="font-size:22px">›</span></a>
     <!-- Hoy (negocio y equipo) -->
     <div id="hoy" class="hidden">
@@ -176,6 +167,7 @@
         <input id="hoyLink" readonly aria-label="Link de tu tienda">
         <div class="btns"><button class="small" id="hoyCompartir" type="button">📤 Compartir</button><button class="small alt" id="hoyQR" type="button">QR</button>
           <a class="btn small alt" id="hoyVer" target="_blank" rel="noopener">👁️ Ver</a></div>
+        <div class="btns"><button class="small ok" id="hoyVender" type="button" style="flex:1">📣 Vender por WhatsApp (foto + ofertas) <span class="pill pro" id="hoyVenderPro">PRO</span></button></div>
         <div id="hoyQRbox" class="hidden" style="text-align:center;margin-top:10px"><img id="hoyQRimg" alt="QR de tu tienda" style="width:220px;background:#fff;border-radius:12px;padding:8px">
           <div class="btns" style="justify-content:center"><button class="small alt" id="hoyQRdl" type="button">⬇️ Descargar QR</button></div></div>
       </div>
@@ -252,13 +244,17 @@
         </div>
         <p class="muted" style="margin:4px 0 0">Cada pedido entregado suma un sello a tu cliente.</p>
       </div>
+      <label for="tDescPrem">⭐ Descuento para clientes Premium (%)</label>
+      <input id="tDescPrem" inputmode="numeric" placeholder="0 (sin descuento) · máximo 50">
+      <p class="muted" style="margin:4px 0 0">Se descuenta solo en los pedidos de tus clientes con Premium, y sus pedidos te aparecen primero con ⭐.</p>
       <div class="btns"><button id="bTienda">Guardar mi tienda</button></div>
     </div>
 
     <div class="card hidden" id="cLinks"><span id="links"></span>
       <h2>💳 Links de pago</h2>
-      <p class="muted">Pega el link de tu Mercado Pago (o similar). El cliente paga ahí y sube la foto del comprobante: el pedido y el stock quedan apartados
-        mientras lo revisas. Tienes 2 espacios; solo uno queda activo.</p>
+      <p class="muted">Pega el link de tu Mercado Pago (o similar). El cliente ve el total de su pedido en grande con un botón <b>📋 Copiar monto</b>,
+        paga ahí y sube la foto del comprobante: el pedido y el stock quedan apartados mientras lo revisas. Si rechazas el comprobante, puede subir otro.
+        Tienes 2 espacios; solo uno queda activo.</p>
       <div id="linksBody"></div>
     </div>
 
@@ -290,12 +286,14 @@
         <h2 id="proTitulo">⭐ Versión Pro</h2>
         <div class="precio hidden" id="proPrecio"></div>
         <ul class="feat" id="proFeat"></ul>
+        <div class="anual hidden" id="proAnual"><b>📅 Plan anual</b><div class="precio" id="anualPrecio"></div><div class="muted" id="anualTxt"></div>
+          <div class="btns"><a class="btn small warn" id="bComprarAnual" href="#" target="_blank" rel="noopener">Pagar plan anual</a></div></div>
         <div class="btns">
           <a class="btn warn hidden" id="bComprar" href="#" target="_blank" rel="noopener" style="flex:1">Comprar ahora</a>
           <label class="btn alt" for="fComprobante" style="flex:1">📷 Subir comprobante</label>
           <input type="file" accept="image/*" id="fComprobante" class="hidden">
-          <button class="hidden" id="bPrueba"></button><button class="hidden" id="bPague"></button>
         </div>
+        <label class="terms hidden" id="rowAnual"><input type="checkbox" id="pAnual"> <span>El comprobante es del <b>plan anual</b></span></label>
         <p class="muted" id="proNota"></p>
       </div>
       <ul class="list" id="planPagos"></ul>
@@ -474,7 +472,7 @@
     contarMensajes();
     if (acc.role === 'client') contarOfertas();
     Cuenta.settings().then((s) => { ajustes = s || {}; pintarPro(Cuenta.account); });
-    if (acc.is_admin) { contarSolicitudes(); revisarBase(); }
+    if (acc.is_admin) revisarBase();
   }
 
   $('tBtn').onclick = async () => {
@@ -483,21 +481,13 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '5.0';
+  const DB_VERSION = '5.1';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
     $('cBase').classList.toggle('hidden', v === DB_VERSION);
     $('baseTxt').textContent = 'La app es la versión ' + DB_VERSION + ' y la base de datos ' + (v ? 'es la ' + v : 'es anterior a la 3.5') +
       '. Sin actualizarla, los clientes no ven productos ni ofertas. Corre el paso 3 de la guía (Supabase → SQL Editor).';
-  }
-
-  async function contarSolicitudes() {
-    try {
-      const st = await Cuenta.rpc('admin_stats');
-      $('solNum').textContent = st.pendientes;
-      $('cSol').classList.toggle('hidden', !st.pendientes);
-    } catch (e) { /* sin red */ }
   }
 
   const APPS = {
@@ -519,7 +509,6 @@
     tag.classList.remove('hidden', 'pro', 'admin');
     tag.textContent = acc.is_admin ? 'ADMIN' : acc.is_pro ? (cliente ? 'PREMIUM' : 'PRO') : 'FREE';
     if (acc.is_admin) tag.classList.add('admin'); else if (acc.is_pro) tag.classList.add('pro');
-    $('titulo').textContent = cliente && acc.negocio ? acc.negocio : 'CodeFix Apps';
     $('hola').textContent = 'Hola' + (acc.empresa ? ', ' + acc.empresa : '') + ' 👋';
     const plan = acc.is_admin ? 'Administrador general'
       : acc.is_pro ? (cliente ? 'Cliente Premium' : 'Versión Pro') + (acc.pro_until ? ' hasta el ' + new Date(acc.pro_until).toLocaleDateString('es') : ' permanente')
@@ -580,7 +569,7 @@
     $('cPro').classList.toggle('hidden', !!acc.is_pro && !vence);
     $('cProMini').classList.toggle('hidden', !!acc.is_pro);
     $('miniTitulo').textContent = cliente ? 'Hazte Premium' : 'Pásate a Pro';
-    $('miniTxt').textContent = cliente ? 'Tu propia Caja, colores, más contactos y más.' : 'Push y correos a tus clientes, cupones, sellos, estadísticas y más.';
+    $('miniTxt').textContent = cliente ? 'Descuentos de tu tienda, prioridad en tus pedidos, tu propia Caja y más.' : 'Recordatorio de carrito, reporte semanal, cupones, sellos, equipo y más.';
     if (acc.is_pro && !vence) return;
     $('proTitulo').textContent = acc.is_pro ? '⏰ Renueva tu plan' : cliente ? '⭐ Hazte Premium' : '⭐ Versión Pro';
     const pi = premium && premium[cliente ? 'cliente' : 'negocio'];
@@ -590,18 +579,31 @@
     if (precio) $('proPrecio').innerHTML = '$' + Number(precio).toLocaleString('es-CL') + ' <small>por ' + ((plan && plan.duracion_dias) || 30) + ' días</small>';
     $('proFeat').innerHTML = (cliente
       ? [
-         'Tu propia Caja con 📈 Finanzas: metas, gastos y ganancia real', 'Elige el color de tu app y tu ícono',
-         'Favoritos ilimitados (gratis: 5)', 'Insignia de cliente Premium']
-      : ['Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10), sin marca de agua', 'Todas las plantillas (Foto completa y Menú) y QR',
-         'Cupones de descuento y tarjeta de sellos para tus clientes', '📊 Estadísticas: vistas, productos más pedidos y mejores clientes',
-         '📈 Finanzas: metas, gastos y ganancia real', 'Push y correos automáticos, y respaldo diario en la nube',
-         '⭐ Responde y destaca las reseñas de tus clientes', '⚡ 20 respuestas rápidas en el chat (Free: 3) y 🎨 color propio para tu tienda']
+         '⭐ El descuento Premium que da tu tienda en cada pedido', '⭐ Tus pedidos aparecen primero en la fila de la tienda',
+         '🔔 "Avísame cuando llegue" para productos agotados', 'Tu propia Caja con 📈 Finanzas: metas, gastos y ganancia real',
+         'Elige el color de tu app y tu ícono', 'Favoritos ilimitados (gratis: 5)']
+      : ['🛒 Recordatorio de carrito: si un cliente no termina su pedido, le llega un aviso al día siguiente',
+         '📣 Vende por WhatsApp en 1 toque: tu tienda con foto y ofertas', '📊 Reporte semanal automático: cuánto vendiste y tu producto top',
+         '⚠️ Aviso de stock bajo (quedan 2 o menos)', 'Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10)',
+         'Cupones de descuento, tarjeta de sellos y equipo de hasta 5 personas', '📊 Estadísticas: vistas, productos más pedidos y mejores clientes',
+         'Push y correos automáticos, y respaldo diario en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
     if (plan && plan.beneficios && plan.beneficios.length) $('proFeat').innerHTML = plan.beneficios.map((t) => '<li>' + Core.esc(t) + '</li>').join('');
     const link = pi && /^https:\/\//.test(pi.url || '') ? pi.url : /^https:\/\//.test(ajustes.payment_link || '') ? ajustes.payment_link : '';
     $('bComprar').classList.toggle('hidden', !link);
     if (link) $('bComprar').href = link;
-    $('bPrueba').classList.add('hidden');
+    // Plan anual (si el administrador activó su link): 12 meses con descuento.
+    const an = premium && premium[cliente ? 'cliente_anual' : 'negocio_anual'];
+    const hayAnual = !!(an && /^https:\/\//.test(an.url || ''));
+    $('proAnual').classList.toggle('hidden', !hayAnual); $('rowAnual').classList.toggle('hidden', !hayAnual);
+    if (!hayAnual) $('pAnual').checked = false;
+    if (hayAnual) {
+      $('bComprarAnual').href = an.url;
+      $('anualPrecio').innerHTML = an.precio != null ? '$' + Number(an.precio).toLocaleString('es-CL') + ' <small>por 12 meses</small>' : '<small>12 meses</small>';
+      const ahorro = precio && an.precio != null ? Math.round(Number(precio) * 12 * 30 / ((plan && plan.duracion_dias) || 30)) - Number(an.precio) : 0;
+      $('anualTxt').textContent = (an.titulo ? an.titulo + ' · ' : '') + (ahorro > 0 ? 'Ahorras $' + ahorro.toLocaleString('es-CL') + ' al año.' : 'Pagas una vez y te olvidas por un año.') +
+        ' Al subir el comprobante marca "plan anual".';
+    }
     $('proNota').textContent = link
       ? '1) Paga con el botón. 2) Sube la foto del comprobante. Se activa por ' + ((plan && plan.duracion_dias) || 30) + ' días apenas lo aprobemos.'
       : 'Sube la foto del comprobante de tu pago y lo activamos apenas lo revisemos.';
@@ -660,6 +662,7 @@
     const dueno = acc.role === 'user';
     hoyLink = Core.rootUrl() + 't/?s=' + encodeURIComponent(h.slug);
     $('hoyTienda').classList.toggle('hidden', !dueno);
+    $('hoyVenderPro').classList.toggle('hidden', !!acc.is_pro);
     $('hoyLink').value = hoyLink; $('hoyVer').href = hoyLink;
     if (!dueno) { $('hoyFalta').classList.add('hidden'); return; }
     let t = {};
@@ -687,6 +690,30 @@
     const txt = '🛍️ Pide en ' + (Cuenta.account.empresa || 'mi tienda') + ': ' + hoyLink;
     if (navigator.share) { try { await navigator.share({ title: Cuenta.account.empresa || 'Mi tienda', text: txt }); return; } catch (e) { return; } }
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  };
+
+  // 📣 Vender por WhatsApp (Pro): comparte la tienda con su foto y las ofertas en 1 toque.
+  $('hoyVender').onclick = async () => {
+    const b = $('hoyVender');
+    if (!Cuenta.isPro()) { Core.toast('⭐ Vender por WhatsApp con foto y ofertas es de la versión Pro'); location.hash = 'plan'; return; }
+    b.disabled = true;
+    try {
+      const k = await Cuenta.rpc('kit_whatsapp');
+      const p = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
+      const ofs = (k.ofertas || []).map((o) => '🔥 ' + o.titulo + (o.precio ? ' — ' + o.precio : ''));
+      const prods = (k.productos || []).map((x) => '• ' + x.nombre + ' — ' + p(x.precio));
+      const txt = '🛍️ *' + (k.empresa || 'Mi tienda') + '*\n' + (ofs.length ? '\n' + ofs.join('\n') + '\n' : '') +
+        (prods.length ? '\n' + prods.join('\n') + '\n' : '') + '\n🛒 Pide aquí: ' + hoyLink;
+      const img = k.imagen || k.foto;
+      if (img && navigator.canShare) {
+        try {
+          const blob = await (await fetch(img)).blob();
+          const file = new File([blob], 'tienda.jpg', { type: blob.type || 'image/jpeg' });
+          if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: txt, title: k.empresa || 'Mi tienda' }); return; }
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+    } catch (err) { Core.toast(err.message); } finally { b.disabled = false; }
   };
 
   /* ---------- Links de pago del negocio (2 espacios, uno activo) ---------- */
@@ -746,8 +773,9 @@
     try {
       const l = await Cuenta.rpc('mis_pagos');
       const E = { en_revision: '🧾 En revisión', aprobado: '✅ Aprobado', rechazado: '❌ Rechazado' };
-      $('planPagos').innerHTML = l.map((x) => '<li><div class="grow"><b>' + E[x.estado] + '</b>' + (x.monto ? ' · ' + Core.money(x.monto) : '') +
-        '<div class="muted">' + new Date(x.fecha).toLocaleDateString('es') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') + '</div></div></li>').join('');
+      $('planPagos').innerHTML = l.map((x) => '<li><div class="grow"><b>' + E[x.estado] + '</b>' + (x.anual ? ' · 📅 Anual' : '') + (x.monto ? ' · ' + Core.money(x.monto) : '') +
+        '<div class="muted">' + new Date(x.fecha).toLocaleDateString('es') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') +
+        (x.estado === 'rechazado' ? ' · Puedes subir otro comprobante' : '') + '</div></div></li>').join('');
     } catch (e) { /* base anterior */ }
   }
   $('fComprobante').onchange = async (e) => {
@@ -755,7 +783,7 @@
     e.target.value = '';
     if (!f) return;
     try {
-      const r = await Cuenta.rpc('subir_pago_premium', { p_comprobante: await Core.comprobante(f) });
+      const r = await Cuenta.rpc('subir_pago_premium', { p_comprobante: await Core.comprobante(f), p_anual: $('pAnual').checked });
       if (!r.ok) throw new Error(r.error);
       Cuenta.sb.functions.invoke('enviar').catch(() => {});
       Core.toast('✅ Comprobante enviado. Te avisamos apenas se apruebe.'); cargarPagos();
@@ -773,6 +801,7 @@
       $('tVac').checked = !!t.vacaciones_hasta;
       $('tVacHasta').value = t.vacaciones_hasta || ''; $('tVacMsg').value = t.vacaciones_msg || '';
       $('rowVac').classList.toggle('hidden', !t.vacaciones_hasta);
+      $('tDescPrem').value = t.desc_premium ? t.desc_premium : '';
     } catch (e) { /* sin red */ }
   }
   $('tVac').onchange = () => {
@@ -783,7 +812,10 @@
     const meta = parseInt($('tSellos').value, 10);
     if (!isNaN(meta) && !Cuenta.isPro()) return Core.toast('⭐ La tarjeta de sellos es de la versión Pro');
     if ($('tVac').checked && !$('tVacHasta').value) { $('tVacHasta').focus(); return Core.toast('🌴 Elige hasta qué día estás de vacaciones'); }
+    const dp = parseInt($('tDescPrem').value, 10) || 0;
+    if (dp < 0 || dp > 50) { $('tDescPrem').focus(); return Core.toast('⭐ El descuento Premium va de 0 a 50%'); }
     try {
+      await Cuenta.rpc('set_desc_premium', { p_pct: dp });
       await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value });
       await Cuenta.rpc('set_vacaciones', { p_hasta: $('tVac').checked ? $('tVacHasta').value : null, p_msg: $('tVacMsg').value });
       pintar(await Cuenta.rpc('set_mi_tienda', { p_datos_pago: $('tPago').value, p_horario: $('tHorario').value,
@@ -811,7 +843,7 @@
     const wsp = String((s && s.contact_whatsapp) || '').replace(/\D/g, '');
     if (!wsp) return;
     $('bEmprende').href = 'https://wa.me/' + wsp + '?text=' + encodeURIComponent('Hola 👋 Soy cliente de ' + (acc.negocio || 'una tienda') +
-      ' en CodeFix y quiero emprender con mi propia tienda. ¿Cómo lo hago?');
+      ' en FichaPro y quiero emprender con mi propia tienda. ¿Cómo lo hago?');
     $('bEmprende').classList.remove('hidden');
   }
 
@@ -908,17 +940,6 @@
   }
 
   /* ---------- Pro / Premium ---------- */
-  async function solicitar(kind, btn) {
-    btn.disabled = true;
-    try {
-      const r = await Cuenta.rpc('request_pro', { p_kind: kind, p_note: null });
-      if (!r.ok) throw new Error(r.error);
-      Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato al administrador
-      Core.toast(kind === 'trial' ? '✅ Solicitud enviada. Te avisaremos cuando esté activa.' : '✅ Aviso enviado. Activaremos tu cuenta apenas confirmemos el pago.');
-    } catch (err) { Core.toast(err.message); } finally { btn.disabled = false; }
-  }
-  $('bPrueba').onclick = () => solicitar('trial', $('bPrueba'));
-  $('bPague').onclick = () => solicitar('payment', $('bPague'));
   $('kBtn').onclick = async () => {
     $('kErr').textContent = '';
     try { pintar(await Cuenta.redeem($('kKey').value)); Core.toast('🎉 ¡Activado!'); }

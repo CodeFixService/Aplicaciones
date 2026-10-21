@@ -133,3 +133,17 @@ Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares 
   Las conexiones no se cruzan; solo se ve nombre y tienda. Free: 3 contactos y 1 mensaje a la vez;
   Premium: 20 contactos y hasta 5 mensajes seguidos. Anti-spam: 3 solicitudes al día, 30 días tras un rechazo,
   100 mensajes al día, bloquear y reportar. Las empresas no ven las conexiones.
+
+## Versión 5.1
+- **Comprobantes livianos**: la app los achica a ~120 KB (antes hasta 400 KB), así caben ~3 veces más en el plan gratis de Supabase.
+- **Comprobante rechazado con reintento**: la tienda elige el motivo con un toque y el pedido vuelve a "Esperando pago" (con tiempo nuevo)
+  para que el cliente suba otro. Al 3.er rechazo se cierra (editable en Administración → Ajustes → Reglas).
+- **Pagar un pedido**: el cliente ve el total en grande con **📋 Copiar monto**. Los links de pedidos ya no guardan precio.
+- **Un solo link público**: la página vieja de "suscribirse" lleva a la tienda; ahí está **🔔 Recibir ofertas** (sin cuenta, tiendas Pro).
+- **Negocio Pro**: 🛒 recordatorio de carrito al día siguiente, 📣 vender por WhatsApp en 1 toque (Hoy), 📊 reporte semanal cada lunes
+  y ⚠️ aviso de stock bajo (quedan 2 o menos).
+- **Cliente Premium**: ⭐ descuento que define cada tienda (Ajustes → Mi tienda), ⭐ sus pedidos primero en la fila y
+  🔔 "avísame cuando llegue" en productos agotados.
+- **Admin**: 🎁 cada negocio nuevo parte con 7 días de Pro gratis (Reglas → "Días de Pro gratis") y 📅 plan anual
+  (Ajustes → Precios y links → plan anual; el pago se aprueba por 365 días).
+- **Limpieza**: sin solicitudes de "probar 7 días", sin "Novedades CodeFix" y sin textos "CodeFix Apps".

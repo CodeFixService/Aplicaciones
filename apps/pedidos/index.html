@@ -34,6 +34,7 @@
   .est5 { color: #f59e0b; letter-spacing: 1px; }
   .resp { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--field); margin-top: 8px; }
   .ped .dest { border: 2px solid #f59e0b; }
+  .ped .prem { border: 2px solid var(--premium); }
 </style>
 </head>
 <body>
@@ -130,6 +131,7 @@
   const ESTADOS = { pagando: '⏳ Esperando pago', en_revision: '🧾 Comprobante por revisar', recibido: '📥 Recibido', preparando: '👨‍🍳 Preparando',
     listo: '✅ Listo', en_camino: '🚚 En camino', entregado: '🎉 Entregado', cancelado: '❌ Cancelado', rechazado: '❌ Rechazado', expirado: '⌛ Expirado' };
   let filtro = params.has('f') ? params.get('f') : 'revisar', pedidos = [], auto = !params.has('f');
+  const MOTIVOS = ['📷 La foto no se ve clara', '💸 No vemos el pago en la cuenta', '🔢 El monto no coincide con el total', '📅 El comprobante es de otra fecha o persona'];
   const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
   async function cargar() {
     document.querySelectorAll('#filtros button').forEach((x) => { x.classList.toggle('on', x.dataset.f === filtro); x.classList.toggle('alt', x.dataset.f !== filtro); });
@@ -151,16 +153,21 @@
         : p.estado === 'listo' || p.estado === 'en_camino' ? ['entregado'] : [];
       const abierto = ['pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado);
       const tel = String(p.telefono || '').replace(/\D/g, '');
-      return '<div class="card"><div class="cab"><div><b>' + Core.esc(p.cliente) + '</b>' + (p.invitado ? ' <span class="pill">Sin cuenta</span>' : '') +
+      return '<div class="card' + (p.premium && abierto ? ' prem' : '') + '"><div class="cab"><div><b>' + Core.esc(p.cliente) + '</b>' +
+        (p.premium ? ' <span class="pill pro">⭐ Premium</span>' : '') + (p.invitado ? ' <span class="pill">Sin cuenta</span>' : '') +
         (p.cliente_estrellas ? ' <span class="estrellas5">★ ' + p.cliente_estrellas + '</span>' : '') +
         '<div class="muted">' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) +
         (p.estado === 'pagando' && p.retenido_hasta ? ' · apartado ' + quedan(p.retenido_hasta) : '') + '</div></div>' +
         '<span class="pill est-' + p.estado + '">' + (ESTADOS[p.estado] || p.estado) + '</span></div>' +
         '<pre>' + Core.esc(p.lineas.map((x) => x.cant + ' × ' + x.nombre + ' — ' + precio(x.subtotal)).join('\n')) + '</pre>' +
-        (p.descuento > 0 ? '<div class="muted">Cupón ' + Core.esc(p.cupon) + ': −' + precio(p.descuento) + '</div>' : '') +
+        (p.descuento - (p.desc_premium || 0) > 0 ? '<div class="muted">Cupón ' + Core.esc(p.cupon || '') + ': −' + precio(p.descuento - (p.desc_premium || 0)) + '</div>' : '') +
+        (p.desc_premium > 0 ? '<div class="muted">⭐ Descuento Premium: −' + precio(p.desc_premium) + '</div>' : '') +
         '<div class="total">Total ' + precio(p.total) + '</div>' +
         '<div class="muted">' + (p.entrega === 'despacho' ? '🚚 Despacho a ' + Core.esc(p.direccion || '') + ' (cobrar despacho según distancia)' : '🏪 Retiro en tienda') + '</div>' +
         (p.nota ? '<div class="muted">📝 ' + Core.esc(p.nota) + '</div>' : '') +
+        (p.rechazos > 0 && ['pagando', 'en_revision'].includes(p.estado) ? '<div class="aviso">🔁 Comprobante rechazado ' + p.rechazos + (p.rechazos === 1 ? ' vez' : ' veces') +
+          (p.estado === 'pagando' && p.motivo ? ' (' + Core.esc(p.motivo) + ')' : '') + (p.estado === 'en_revision' ? ': este es el reintento' : ': esperando otro comprobante') + '</div>' : '') +
+        (p.estado === 'rechazado' && p.motivo ? '<div class="muted">❌ ' + Core.esc(p.motivo) + '</div>' : '') +
         (p.devolucion === 'pendiente' ? '<div class="aviso">💸 <b>Devuelve el pago</b>: canceló a tiempo.</div>' : p.devolucion === 'hecha' ? '<div class="muted">💸 Devuelto</div>' : '') +
         '<div data-img="' + p.id + '"></div>' +
         '<div class="acc">' +
@@ -192,10 +199,12 @@
       }
       if (b.dataset.rev) {
         const si = b.dataset.si === '1';
-        const motivo = si ? null : prompt('Motivo (le llega al cliente):', 'No vemos el pago en la cuenta');
+        // Motivos de un toque. Mientras le queden intentos, el pedido vuelve a "Esperando pago" para que suba otro.
+        const motivo = si ? null : await Core.elegir('¿Por qué lo rechazas? (le llega al cliente)', MOTIVOS, 'Escribe el motivo:');
         if (!si && motivo === null) return;
-        await Cuenta.rpc('revisar_comprobante', { p_id: b.dataset.rev, p_aprobar: si, p_motivo: motivo });
-        Core.toast(si ? '✅ Pago aprobado: se descontó el stock' : 'Comprobante rechazado');
+        const r = await Cuenta.rpc('revisar_comprobante', { p_id: b.dataset.rev, p_aprobar: si, p_motivo: motivo });
+        Core.toast(si ? '✅ Pago aprobado: se descontó el stock'
+          : r && r.estado === 'pagando' ? '🔁 Rechazado: el pedido sigue apartado para que suba otro comprobante' : 'Comprobante rechazado: pedido cerrado');
       }
       if (b.dataset.e) {
         if (b.dataset.e === 'cancelado' && !confirm('¿Cancelar este pedido? Se le avisará al cliente.')) return;
@@ -253,9 +262,6 @@
       $('sVistas').innerHTML = s.vistas.length ? s.vistas.map((v) => fila(Core.esc(v.titulo), '👁️ ' + v.vistas)).join('') : '<li class="empty">Aún no publicas fichas</li>';
     } catch (e) { Core.toast(e.message); }
   }
-
-  cargar();
-  if (new URLSearchParams(location.search).get('v') === 'resenas') show('resenas');
 
   cargar();
   if (params.get('v') === 'cupones' || params.get('v') === 'stats') show(params.get('v'));

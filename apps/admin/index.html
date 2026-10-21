@@ -17,8 +17,8 @@
   .st-sent { background: color-mix(in srgb, #10b981 16%, transparent); color: #059669; border-color: transparent; }
   .st-failed { background: color-mix(in srgb, #ef4444 16%, transparent); color: #dc2626; border-color: transparent; }
   .st-cancelled { background: var(--line); }
-  #solicitudes li, #reportes li { flex-wrap: wrap; }
-  #solicitudes li > .grow, #reportes li > .grow { flex: 1 1 100%; }
+  #reportes li { flex-wrap: wrap; }
+  #reportes li > .grow { flex: 1 1 100%; }
   .acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
   .acc button, .acc select { width: auto; padding: 7px 12px; font-size: 13px; border-radius: 10px; }
   .uso { margin: 10px 0; }
@@ -98,7 +98,7 @@
       <h2>💰 Ingresos</h2>
       <div class="stats" id="ingresos"></div>
       <h2 style="margin-top:14px">⏰ Planes que vencen en 7 días</h2>
-      <p class="muted">A los 3 días del vencimiento se les avisa solo. Puedes avisarles antes con un toque.</p>
+      <p class="muted">Se les avisa solo 15 y 5 días antes (editable en Ajustes → Reglas). Puedes avisarles antes con un toque.</p>
       <ul class="list" id="vencen"></ul>
     </div>
     <div class="card" id="cServidor"><h2>🖥️ Servidor <span class="pill" id="usoPill"></span></h2><div id="usoBarras"></div>
@@ -114,17 +114,12 @@
       <h2>🚩 Reportes <span class="pill" id="nRep">0</span></h2>
       <ul class="list" id="reportes"></ul>
     </div>
-    <div class="card" id="cSolicitudes">
-      <h2>🔔 Solicitudes pendientes <span class="pill" id="nSol">0</span></h2>
-      <p class="muted">Pruebas de 7 días y avisos de pago. Revisa tu Mercado Pago antes de aprobar un pago.</p>
-      <ul class="list" id="solicitudes"></ul>
-    </div>
   </section>
 
   <!-- NEGOCIOS -->
   <section class="view" id="v-negocios">
     <div class="card"><h2>➕ Crear negocio</h2>
-      <p class="muted" style="margin-top:0">Solo tú creas negocios. Parten en Gratis; el Pro se activa cuando apruebas su comprobante (o se lo das tú).</p>
+      <p class="muted" style="margin-top:0">Solo tú creas negocios. Parten con la prueba Pro gratis (días en Ajustes → Reglas) y luego pasan solos a Gratis; el Pro sigue cuando apruebas su comprobante (o se lo das tú).</p>
       <div class="row" style="flex-wrap:wrap"><div style="min-width:160px"><label for="nNombre">Nombre del negocio</label><input id="nNombre" maxlength="80" autocomplete="off"></div>
         <div style="min-width:180px"><label for="nEmail">Correo del dueño</label><input id="nEmail" type="email" autocomplete="off"></div></div>
       <label for="nClave">Contraseña</label>
@@ -167,7 +162,8 @@
       <button class="small alt" data-a="registro">📜 Registro</button><button class="small alt" data-a="cuenta">👤 Mi cuenta</button>
     </div>
     <div class="aj" id="aj-links"><div class="card"><h2>💳 Precio y link del Pro / Premium</h2>
-      <p class="muted" style="margin-top:0">2 espacios por plan; solo uno activo. El precio que ven es el del espacio activo. Ellos pagan ahí y suben el comprobante: lo apruebas en Pagos.</p>
+      <p class="muted" style="margin-top:0">2 espacios por plan; solo uno activo. El precio que ven es el del espacio activo. Ellos pagan ahí y suben el comprobante: lo apruebas en Pagos.
+        Si activas un plan anual, también les aparece y al subir el comprobante marcan "plan anual" (se aprueba por 365 días).</p>
       <div id="linksAdmin"></div></div></div>
     <div class="aj hidden" id="aj-planes"><div id="planesBody"></div></div>
     <div class="aj hidden" id="aj-reglas"><div class="card"><h2>⚖️ Reglas</h2><div id="reglasBody"></div><div class="btns"><button id="bReglas">Guardar reglas</button></div></div></div>
