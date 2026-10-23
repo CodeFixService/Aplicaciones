@@ -17,8 +17,11 @@
     return data;
   }
   const fallo = (e) => Core.toast(e.message || String(e));
+  // Arriba: tu logo en vez del escudo 🛡️ (si aún no lo subes, queda el escudo).
+  const pintarLogoArriba = () => $('bInicio').classList.toggle('logo', !!Cuenta.aplicarLogo(Cuenta.account));
+  pintarLogoArriba();
   let perfiles = {};
-  const DB_VERSION = '5.1';
+  const DB_VERSION = '5.2';
 
   /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
   const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, pagos: cargarPagos, ajustes: () => verAjuste(ajuste) };
@@ -314,6 +317,27 @@
   /* ---------- Negocios ---------- */
   let negocios = [], nFiltro = '';
   async function cargarNegocios() { negocios = await Cuenta.rpc('admin_negocios'); pintarNegocios(); }
+  // 🧹 Cuentas que no se usan: primero se buscan y se revisan; después se borran (el servidor vuelve a comprobar cada una).
+  let inactivas = [];
+  $('bInBuscar').onclick = async () => {
+    const d = parseInt($('inDias').value, 10) || 0;
+    try {
+      inactivas = await Cuenta.rpc('admin_cuentas_inactivas', { p_dias: d });
+      $('inLista').innerHTML = inactivas.length ? inactivas.map((x) => '<li><div class="grow"><b>' + Core.esc(x.empresa || x.email) + '</b>' +
+        (x.autoregistro ? ' <span class="pill ok">🆕 Se registró solo</span>' : '') + '<div class="muted">' + Core.esc(x.email) + (x.rubro ? ' · ' + Core.esc(x.rubro) : '') +
+        ' · creada el ' + fecha(x.creado) + ' · entró ' + hace(x.visto_at) + '</div></div></li>').join('') : '<li class="empty">Ninguna cuenta sin uso 🎉</li>';
+      $('inBtns').classList.toggle('hidden', !inactivas.length);
+      $('bInBorrar').textContent = 'Borrar estas ' + inactivas.length + ' cuenta(s)';
+    } catch (err) { fallo(err); }
+  };
+  $('bInBorrar').onclick = async () => {
+    if (!inactivas.length || !confirm('¿Borrar ' + inactivas.length + ' cuenta(s) sin uso? No se puede deshacer.')) return;
+    try {
+      const n = await Cuenta.rpc('admin_borrar_inactivas', { p_ids: inactivas.map((x) => x.id), p_dias: parseInt($('inDias').value, 10) || 0 });
+      Core.toast('🧹 Cuentas borradas: ' + n); inactivas = []; $('inLista').innerHTML = ''; $('inBtns').classList.add('hidden'); cargarNegocios().catch(fallo);
+    } catch (err) { fallo(err); }
+  };
+
   // 📲 Link y QR del registro abierto de negocios (página n/).
   const regLink = Core.rootUrl() + 'n/';
   $('regLink').value = regLink; $('regVer').href = regLink;
@@ -562,6 +586,13 @@
       Core.toast('⚖️ Reglas guardadas');
     } catch (err) { fallo(err); }
   };
+  async function limpiarRegistro(dias) {
+    if (!confirm(dias ? '¿Borrar los cambios de hace más de ' + dias + ' días?' : '¿Borrar todo el registro de cambios?')) return;
+    try { const n = await Cuenta.rpc('admin_limpiar_auditoria', { p_dias: dias }); Core.toast('🧹 Borrados: ' + n); cargarRegistro().catch(fallo); }
+    catch (err) { fallo(err); }
+  }
+  $('bRegViejo').onclick = () => limpiarRegistro(30);
+  $('bRegTodo').onclick = () => limpiarRegistro(0);
   async function cargarRegistro() {
     const l = await Cuenta.rpc('admin_auditoria');
     $('regLista').innerHTML = l.length ? l.map((x) => '<li><div class="grow"><b>' + Core.esc(x.accion) + '</b><div class="muted">' + Core.esc(x.detalle) + '</div></div><span class="muted">' + fechaHora(x.created_at) + '</span></li>').join('')
@@ -631,8 +662,37 @@
     try { await Cuenta.rpc('cancel_notification', { p_id: id }); cargarAvisos(); } catch (err) { fallo(err); }
   };
 
+  /* ---------- 🎨 Mi marca: logo, nombre y color del administrador ---------- */
+  function pintarMarca() {
+    const a = Cuenta.account || {};
+    const ok = Cuenta.esLogo(a.logo);
+    $('mLogoVer').style.backgroundImage = ok ? 'url("' + a.logo + '")' : '';
+    $('mLogoVer').textContent = ok ? '' : '🛡️';
+    $('mNombre').value = a.empresa || '';
+    const actual = Core.tema.get(a.id).toLowerCase();
+    $('mColores').innerHTML = Core.tema.colores.map(([n, c]) => '<button type="button" class="' + (c === actual ? 'on' : '') + '" data-c="' + c +
+      '" title="' + n + '" aria-label="' + n + '" style="background:' + c + '"></button>').join('');
+    $('mColor').value = actual;
+    pintarLogoArriba();
+  }
+  async function guardarMarca(fn, args, aviso) {
+    try { const acc = await Cuenta.rpc(fn, args); if (acc) Object.assign(Cuenta.account, acc); localStorage.setItem('cfx:cuenta', JSON.stringify(Cuenta.account)); pintarMarca(); Core.toast(aviso); }
+    catch (err) { fallo(err); }
+  }
+  $('mLogo').onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (f) guardarMarca('set_mi_logo', { p_logo: await Core.logoChico(f) }, '✅ Logo guardado');
+  };
+  $('bQuitarMLogo').onclick = () => guardarMarca('set_mi_logo', { p_logo: null }, 'Logo quitado');
+  $('bMNombre').onclick = () => guardarMarca('update_my_company', { p_empresa: $('mNombre').value }, '✅ Nombre guardado');
+  const ponerColor = (c) => { Core.tema.set(Cuenta.uid(), c); guardarMarca('set_mi_color', { p_color: c }, '🎨 Color guardado'); };
+  $('mColores').onclick = (e) => { const c = e.target.dataset.c; if (c) ponerColor(c); };
+  $('mColor').oninput = (e) => Core.tema.aplicar(e.target.value);
+  $('mColor').onchange = (e) => ponerColor(e.target.value);
+
   /* ---------- Ajustes ---------- */
   async function cargarAjustes() {
+    pintarMarca();
     const v = await Cuenta.rpc('public_settings');
     $('sWsp').value = v.contact_whatsapp || '';
     const s = await Cuenta.rpc('admin_secret_status');

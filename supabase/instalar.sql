@@ -4592,6 +4592,80 @@ grant execute on function public.subir_pago_premium(text, boolean), public.mis_p
   public.pedidos_tienda(text), public.mis_pedidos(uuid), public.set_desc_premium(int), public.guardar_carrito(uuid, jsonb), public.avisame_stock(uuid, text, boolean),
   public.mis_avisos_stock(uuid), public.kit_whatsapp(), public.crear_pedido(uuid, jsonb, text, text, text, text), public.revisar_comprobante(uuid, boolean, text)
   to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.2 · Limpieza del administrador (registro de cambios y
+--  cuentas que no se usan) y logo de la marca como respaldo.
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.2'::text $$;
+
+-- 📜 Borrar el registro de cambios (solo el administrador). p_dias = 0 borra todo; si no, lo anterior a esos días.
+create or replace function public.admin_limpiar_auditoria(p_dias int) returns int
+language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  if p_dias is null or p_dias < 0 then raise exception 'Días no válidos'; end if;
+  delete from public.auditoria where created_at < now() - make_interval(days => p_dias);
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- 🧹 Cuentas de negocio que no se usan: sin Pro, sin productos, pedidos, clientes ni fichas,
+-- creadas y sin entrar hace p_dias o más. Nunca toca negocios Pro ni al administrador.
+create or replace function public.es_cuenta_inactiva(u uuid, p_dias int) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.profiles p where p.id = u and p.role = 'user' and not public.is_pro(p.id)
+    and p.created_at < now() - make_interval(days => p_dias)
+    and coalesce(p.visto_at, p.created_at) < now() - make_interval(days => p_dias)
+    and not exists (select 1 from public.catalog_items c where c.owner_id = p.id)
+    and not exists (select 1 from public.pedidos x where x.negocio_id = p.id)
+    and not exists (select 1 from public.profiles c where c.negocio_id = p.id and c.role = 'client')
+    and not exists (select 1 from public.publicaciones f where f.owner_id = p.id)
+    and not exists (select 1 from public.pagos g where g.user_id = p.id and g.estado = 'en_revision'))
+$$;
+create or replace function public.admin_cuentas_inactivas(p_dias int)
+returns table (id uuid, empresa text, email text, rubro text, creado timestamptz, visto_at timestamptz, autoregistro boolean)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  if p_dias is null or p_dias < 7 then raise exception 'Elige 7 días o más'; end if;
+  return query select p.id, p.empresa, p.email, p.rubro, p.created_at, p.visto_at, p.created_by is null
+  from public.profiles p where p.role = 'user' and public.es_cuenta_inactiva(p.id, p_dias)
+  order by coalesce(p.visto_at, p.created_at) limit 500;
+end $$;
+create or replace function public.admin_borrar_inactivas(p_ids uuid[], p_dias int) returns int
+language plpgsql security definer set search_path = '' as $$
+declare r record; n int := 0;
+begin
+  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
+  if p_dias is null or p_dias < 7 then raise exception 'Elige 7 días o más'; end if;
+  -- Se vuelve a revisar cada cuenta: si en el intertanto la usaron, no se borra.
+  for r in select p.id, p.email from public.profiles p where p.id = any(coalesce(p_ids, '{}')) and public.es_cuenta_inactiva(p.id, p_dias) loop
+    delete from auth.users where id in (select id from public.profiles where negocio_id = r.id and role = 'equipo');
+    delete from auth.users where id = r.id;
+    n := n + 1;
+  end loop;
+  perform public.auditar('Borró cuentas sin uso', n || ' negocio(s) sin actividad en ' || p_dias || ' días');
+  return n;
+end $$;
+
+-- Logo, color y nombre de la marca (el administrador): se ven cuando una empresa aún no sube su logo,
+-- en el ingreso y en el registro de negocios.
+create or replace function public.marca_publica() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('logo', p.logo, 'color', p.color, 'nombre', nullif(p.empresa, ''))
+  from public.profiles p where p.id = public.admin_id()
+$$;
+
+revoke all on function public.admin_limpiar_auditoria(int), public.admin_cuentas_inactivas(int), public.admin_borrar_inactivas(uuid[], int)
+  from public, anon;
+grant execute on function public.admin_limpiar_auditoria(int), public.admin_cuentas_inactivas(int), public.admin_borrar_inactivas(uuid[], int)
+  to authenticated;
+revoke all on function public.es_cuenta_inactiva(uuid, int) from public, anon, authenticated;
+revoke all on function public.marca_publica() from public;
+grant execute on function public.marca_publica() to anon, authenticated;
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".
 --  Pega este archivo en Supabase → SQL Editor → Run (después de schema.sql

@@ -151,3 +151,10 @@ Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares 
   (14 opciones, productos o servicios) y parte con los días de Pro de regalo. El link y el QR para publicar están en
   Administración → Negocios; te llega un aviso por cada negocio nuevo. Se cierra con la regla "Registro abierto de negocios" = 0.
   Los clientes siguen entrando solo con invitación o desde la tienda.
+
+## Versión 5.2
+- **🎨 Mi marca** (Administración → Ajustes → Mi cuenta): tu logo, nombre y color. Tu logo reemplaza al escudo 🛡️ de arriba.
+- **Logo arriba**: cada negocio (y su equipo) ve el suyo; el cliente, el de su tienda. Si aún no lo suben, o sin sesión
+  (ingreso, registro de negocios, tienda pública sin logo), sale el tuyo.
+- **🧹 Solo el administrador** puede borrar el registro de cambios (todo o lo de más de 30 días) y las cuentas de negocio que no se usan
+  (sin Pro, productos, pedidos, clientes ni fichas, y sin entrar en N días). Primero se ve la lista y se confirma.
