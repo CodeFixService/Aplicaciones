@@ -26,18 +26,24 @@
     } catch (e) { /* sin espacio */ }
   }
 
-  // Logo arriba, al lado del nombre: la empresa ve el suyo; el cliente, el de su tienda.
+  // Logo y color de la marca (el administrador): respaldo mientras la empresa no sube su logo, o sin sesión.
+  let marca = {};
+  try { marca = JSON.parse(localStorage.getItem('cfx:marca')) || {}; } catch (e) { marca = {}; }
+  const esLogo = (l) => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(l || '');
+  // Logo arriba, al lado del nombre: la empresa (y su equipo) ve el suyo; el cliente, el de su tienda; si no hay, el de la marca.
   function aplicarLogo(a) {
-    const logo = a && (a.role === 'client' ? a.negocio_logo : a.logo);
-    const ok = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(logo || '');
-    document.documentElement.classList.toggle('con-logo', ok);
-    if (ok) document.documentElement.style.setProperty('--logo', 'url("' + logo + '")');
+    const propio = a && (a.role === 'client' || a.role === 'equipo' ? a.negocio_logo : a.logo);
+    const logo = esLogo(propio) ? propio : esLogo(marca.logo) ? marca.logo : '';
+    document.documentElement.classList.toggle('con-logo', !!logo);
+    if (logo) document.documentElement.style.setProperty('--logo', 'url("' + logo + '")');
+    return logo;
   }
   aplicarLogo(account);
   if (global.Core && account) global.Core.tema.usar(account.id, account.role === 'client' ? account.negocio_color : null);
 
   function friendly(err) {
     const m = (err && (err.message || err.error_description || err)) + '';
+    if (/Signups not allowed/i.test(m)) return 'El registro de cuentas está pausado. Escríbenos y te ayudamos a crear tu cuenta.';
     if (/Invalid login credentials/i.test(m)) return 'Correo o contraseña incorrectos';
     if (/Email not confirmed/i.test(m)) return 'Primero confirma tu correo (revisa tu bandeja y spam)';
     if (/User already registered/i.test(m)) return 'Ese correo ya tiene cuenta. Inicia sesión.';
@@ -403,7 +409,14 @@
     } catch (e) { /* sin soporte */ }
   }
 
+  // Trae la marca del servidor (una vez por pantalla) y la deja guardada para usarla sin internet.
+  const marcaLista = !sb ? Promise.resolve(marca) : sb.rpc('marca_publica').then(({ data }) => {
+    if (data) { marca = data; try { localStorage.setItem('cfx:marca', JSON.stringify(data)); } catch (e) { /* sin espacio */ } aplicarLogo(account); }
+    return marca;
+  }, () => marca);
+
   global.Cuenta = {
+    marca: () => marca, marcaLista, esLogo,
     nav, contar, ofrecerPush,
     configured, sb, refresh, require, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora, aplicarLogo,

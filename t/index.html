@@ -111,7 +111,11 @@
   document.title = t.empresa + ' · FichaPro';
   $('titulo').textContent = t.empresa;
   if (/^#[0-9a-f]{6}$/i.test(t.color || '')) Core.tema.aplicar(t.color);
-  if (/^data:image\//.test(t.logo || '')) $('lg').style.backgroundImage = 'url("' + t.logo + '")'; else $('lg').textContent = (t.empresa || '?').charAt(0).toUpperCase();
+  if (/^data:image\//.test(t.logo || '')) $('lg').style.backgroundImage = 'url("' + t.logo + '")'; else {
+      // Tienda sin logo: el logo de la marca (si no hay, su inicial).
+      $('lg').textContent = (t.empresa || '?').charAt(0).toUpperCase();
+      Cuenta.marcaLista.then((m) => { if (Cuenta.esLogo(m.logo)) { $('lg').textContent = ''; $('lg').style.background = '#fff url("' + m.logo + '") center / cover no-repeat'; } });
+    }
   $('bIngresar').href = '../?volver=' + encodeURIComponent('/apps/catalogo/');
   $('tienda').classList.remove('hidden');
   const est = [];

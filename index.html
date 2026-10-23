@@ -408,6 +408,15 @@
     }).catch(() => {});
   }
   setModo(modo);
+  // Ingreso sin sesión: logo y color de la marca.
+  Cuenta.marcaLista.then((m) => {
+    if (Cuenta.account) return;
+    if (m && /^#[0-9a-f]{6}$/i.test(m.color || '')) Core.tema.aplicar(m.color);
+    if (!clienteDe && m && Cuenta.esLogo(m.logo)) {
+      $('loginLogo').textContent = '';
+      $('loginLogo').style.background = '#fff url("' + m.logo + '") center / cover no-repeat';
+    }
+  });
 
   $('fLogin').onsubmit = async (e) => {
     e.preventDefault();
@@ -488,7 +497,7 @@
   };
 
   // La app y la base de datos deben ser de la misma versión.
-  const DB_VERSION = '5.1';
+  const DB_VERSION = '5.2';
   async function revisarBase() {
     let v = '';
     try { v = await Cuenta.rpc('db_version'); } catch (e) { if (/Sin conexión/.test(e.message)) return; }
