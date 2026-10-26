@@ -10,6 +10,7 @@ const FILES = [
   'icons/icon-512.png',
   'shared/core.css',
   'shared/core.js',
+  'shared/iconos.js',
   'shared/config.js',
   'shared/cuenta.js',
   'shared/vendor/supabase.js',
