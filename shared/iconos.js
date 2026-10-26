@@ -156,10 +156,12 @@
     if (!t || (t.parentElement && t.parentElement.closest(FUERA))) return;
     const m = RX.exec(t.data); if (!m) return;
     const clave = m[2].replace(/️/g, ''), d = M[clave]; if (!d) return;
+    // ¿Queda texto después del emoji? (también el que viene en otra etiqueta: "🔄 <b>Hay que…</b>")
+    const queda = el.textContent.replace(m[0], '').trim();
     const resto = t.data.slice(m[0].length);
-    if (!resto.trim() && el.matches('button, .btn') && esSelector(el)) return;
+    if (!queda && el.matches('button, .btn') && esSelector(el)) return;
     const s = document.createElement('span');
-    s.className = 'ic-e' + (d[1] ? ' ' + d[1] : '') + (resto.trim() ? '' : ' solo');
+    s.className = 'ic-e' + (d[1] ? ' ' + d[1] : '') + (queda ? '' : ' solo');
     s.innerHTML = svg(d[0]);
     t.parentNode.insertBefore(s, t);
     t.data = resto;
