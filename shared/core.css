@@ -233,3 +233,80 @@ nav.tabs.abajo a .badge { position: absolute; top: 2px; right: calc(50% - 22px);
 /* Total grande para pagar, con botón Copiar monto */
 .montoPagar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
 .montoPagar b { font-size: 30px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+/* ===== v5.6 · Misma línea visual que la Billetera (familia CodeFix): botones, tarjetas, barra de abajo,
+   menú "Más", formularios, avisos y ventanas. Solo cambia el aspecto; cada empresa mantiene su color. ===== */
+:root { --radius: 14px; --radius-sm: 12px; }
+body { line-height: 1.45; }
+h1, h2, h3 { line-height: 1.2; }
+main { padding: 12px 16px; }
+/* Encabezado */
+header.top { background: color-mix(in srgb, var(--bg) 88%, transparent); padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: 10px; }
+header.top h1 { font-size: 1.15em; font-weight: 800; min-width: 0; }
+header.top h1::before { width: 34px; height: 34px; border-radius: 10px; background: var(--brand); }
+header.top a, header.top button.icon, .icono-top { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 20px; box-shadow: none; }
+header.top .atajos a .ic-e svg { width: 20px; height: 20px; }
+/* Tarjetas */
+.card { border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+.card h2 { font-size: 1.05em; font-weight: 750; }
+.stats .card { padding: 12px; }
+.stats b { font-size: 1.25em; font-weight: 800; }
+/* Botones: el principal con el color de la empresa; el secundario blanco con borde (como la Billetera) */
+button, .btn { min-height: 48px; padding: 0 18px; border-radius: 12px; font-weight: 700; box-shadow: none; border: 1px solid transparent; }
+/* Botones chicos de selección (colores, íconos, estrellas) conservan su tamaño */
+.swatches button, .califica button, .iconos button, .galeria button, .qty button, .estrellas button, .acc button, .rapidas button { min-height: 0; }
+button.alt, .btn.alt { background: var(--card); color: var(--text); border-color: var(--line); }
+button.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+button.small, .btn.small { min-height: 38px; padding: 0 12px; font-size: .88em; border-radius: 10px; }
+.seg button { background: var(--card); color: var(--text); border-color: var(--line); }
+.seg button.on { border-color: var(--brand); }
+/* Formularios */
+label { font-size: .9em; font-weight: 650; color: var(--text); margin: 14px 0 5px; }
+input, select, textarea { min-height: 48px; padding: 10px 13px; border-radius: 12px; background: var(--card); font-size: max(16px, 1em); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: 0; box-shadow: none; }
+input[type=checkbox], input[type=radio] { min-height: 0; width: 22px; height: 22px; padding: 0; }
+input[type=color] { min-height: 44px; }
+input[type=file] { min-height: 0; }
+.muted { color: var(--muted); font-size: .88em; }
+/* Etiquetas */
+.pill { font-size: .72em; font-weight: 700; padding: 3px 8px; border-radius: 10px; border: 0; }
+/* Listas y menú "Más": filas con ícono en cajita de color */
+.list li { padding: 12px 0; }
+.mini { min-height: 40px; }
+.ic-caja { width: 36px; height: 36px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex: none; }
+.ic-caja .ic-e { margin: 0; }
+.ic-caja .ic-e svg, .ic-caja .ico-svg { width: 20px; height: 20px; }
+.ic-caja.rojo { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.sec { font-size: .74em; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 750; margin: 18px 4px 8px; }
+/* Barra de abajo: fondo de tarjeta, activo con el color de la empresa (sin pastilla) */
+nav.tabs:not(.sub) { background: var(--card); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 6px 2px calc(6px + env(safe-area-inset-bottom)); gap: 0; }
+nav.tabs:not(.sub) button, nav.tabs.abajo a { font-size: .72em; padding: 6px 0; border-radius: 0; border: 0; min-height: 0; white-space: nowrap; }
+nav.tabs:not(.sub) button.on, nav.tabs.abajo a.on { background: none; color: var(--brand); }
+nav.tabs:not(.sub) button .ico-svg, nav.tabs.abajo a .ico-svg { width: 24px; height: 24px; }
+nav.tabs.sub { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; gap: 6px; }
+nav.tabs.sub button { min-height: 38px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: .85em; }
+nav.tabs.sub button.on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+/* En computador la barra pasa a la izquierda, como en la Billetera */
+@media (min-width: 900px) {
+  body.con-nav { padding-left: 230px; padding-bottom: 24px; }
+  nav.tabs.abajo { top: 0; right: auto; width: 210px; flex-direction: column; justify-content: flex-start; gap: 4px; padding: 80px 10px 10px; border-top: 0; border-right: 1px solid var(--line); }
+  nav.tabs.abajo a { flex: none; flex-direction: row; gap: 10px; padding: 12px 14px; border-radius: 12px; font-size: .95em; }
+  nav.tabs.abajo a.on { background: var(--brand-soft); }
+  nav.tabs.abajo a .ico-svg { width: 20px; height: 20px; }
+  nav.tabs.abajo a .badge { position: static; margin-left: auto; }
+  body.con-nav .hoja, body.con-nav .ayuda { bottom: 24px; }
+}
+/* Avisos flotantes */
+#toast { background: #111827; color: #fff; border-radius: 12px; font-weight: 600; padding: 12px 14px; box-shadow: 0 6px 20px rgba(0,0,0,.3); width: max-content; max-width: min(92vw, 420px); }
+/* Ventanas (elegir, avisos de abajo): hoja que sube desde abajo */
+.elegir { padding: 0; background: rgba(0,0,0,.45); animation: cfxAparece .15s; }
+.elegir > div { max-width: 520px; border-radius: 20px 20px 0 0; border: 0; padding: 20px 18px calc(18px + env(safe-area-inset-bottom)); margin: 0; box-shadow: none; }
+@media (min-width: 640px) { .elegir { align-items: center; } .elegir > div { border-radius: 20px; } }
+@keyframes cfxAparece { from { opacity: 0; } }
+.hoja > div { border-color: var(--line); border-radius: var(--radius); }
+.actualizar, .instalar { border-radius: 12px; }
+footer.marca { font-size: .75em; padding: 20px 8px 8px; }
+.card.lista { padding: 0 14px; }
+header.top .atajos a .ico-svg { width: 20px; height: 20px; }
+header.top h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+header.top h1::before { display: inline-block; vertical-align: middle; margin-right: 10px; }

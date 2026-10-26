@@ -149,6 +149,8 @@
     descargar: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
     nueva: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>',
     contactos: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+    campana: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+    tarjeta: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
     estrella: '<path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
   };
   const ico = (n) => '<svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
@@ -317,16 +319,15 @@
   };
   aplicarTema(tema.get()); // antes de pintar, sin parpadeo
 
-  // Pie de página con la marca del autor en todas las pantallas.
+  // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.5';
+  const APP_VERSION = '5.6';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
     const el = document.createElement('footer');
     el.className = 'marca';
-    el.innerHTML = '© ' + new Date().getFullYear() + ' <b>' + esc(cfg.MARCA || 'CodeFix') + '</b> · ' +
-      esc(cfg.AUTOR || '') + '. Todos los derechos reservados. Prohibida su reventa. <span class="ver">v' + APP_VERSION + '</span>';
+    el.innerHTML = '© ' + new Date().getFullYear() + ' <b>' + esc(cfg.MARCA || 'CodeFix') + '</b>. Todos los derechos reservados. Prohibida su reventa. <span class="ver">v' + APP_VERSION + '</span>';
     (document.querySelector('main') || document.body).appendChild(el);
   }
 

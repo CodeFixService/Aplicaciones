@@ -354,8 +354,8 @@
     const h = document.querySelector('header.top');
     if (h && !h.querySelector('.atajos')) {
       const d = document.createElement('div'); d.className = 'atajos';
-      d.innerHTML = (a.role === 'client' ? '' : '<a href="' + r + 'apps/mensajes/" aria-label="Mensajes">💬<span class="badge" hidden id="atMsg"></span></a>') +
-        '<a href="' + r + (a.role === 'client' ? '#cuenta' : '') + '#avisos" aria-label="Avisos">🔔</a>';
+      d.innerHTML = (a.role === 'client' ? '' : '<a href="' + r + 'apps/mensajes/" aria-label="Mensajes">' + ICO('chat') + '<span class="badge" hidden id="atMsg"></span></a>') +
+        '<a href="' + r + (a.role === 'client' ? '#cuenta' : '') + '#avisos" aria-label="Avisos">' + ICO('campana') + '</a>';
       h.appendChild(d);
     }
     contar();
