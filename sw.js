@@ -11,6 +11,7 @@ const FILES = [
   'shared/core.css',
   'shared/core.js',
   'shared/iconos.js',
+  'shared/instalar.js',
   'shared/config.js',
   'shared/cuenta.js',
   'shared/vendor/supabase.js',
