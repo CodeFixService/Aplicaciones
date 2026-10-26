@@ -1,0 +1,41 @@
+/* CodeFix · Núcleo · Diseño común de todas las apps (mismo archivo en cada repositorio).
+   Misma familia visual (la de la Billetera): fondo, tarjetas, textos, bordes, radios, sombras, letra y modo oscuro.
+   Cada app conserva SU color de marca (--brand / --marca), y el que elige el negocio en la app sigue mandando
+   (se aplica en línea sobre <html> y le gana a este archivo). Se carga DESPUÉS del CSS propio de cada app.
+   Las variables tienen los nombres de todas las apps (brand/bg/card/text… y marca/fondo/tarjeta/texto…). */
+:root {
+  --cfx-fondo: #f3f5f7; --cfx-tarjeta: #ffffff; --cfx-campo: #f7f9fb; --cfx-texto: #111827; --cfx-texto-2: #5b6472;
+  --cfx-borde: #e2e7ec; --cfx-sombra: 0 1px 2px rgba(15, 23, 42, .06), 0 4px 14px rgba(15, 23, 42, .05);
+  --cfx-radio: 14px; --cfx-radio-chico: 12px;
+  --cfx-letra: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --cfx-ok: #16a34a; --cfx-mal: #dc2626; --cfx-aviso: #ea580c;
+}
+:root, :root[data-theme="light"] {
+  /* nombres de CodeFix Apps, Barbería, BiciTaller, Estaciona y Centro de Mando */
+  --bg: var(--cfx-fondo); --card: var(--cfx-tarjeta); --card2: var(--cfx-campo); --field: var(--cfx-campo);
+  --text: var(--cfx-texto); --ink: var(--cfx-texto); --muted: var(--cfx-texto-2); --line: var(--cfx-borde);
+  --shadow: var(--cfx-sombra); --radius: var(--cfx-radio); --radius-sm: var(--cfx-radio-chico); --r: var(--cfx-radio); --r-sm: var(--cfx-radio-chico);
+  --font: var(--cfx-letra); --ok: var(--cfx-ok); --bad: var(--cfx-mal);
+  /* nombres de la Billetera */
+  --fondo: var(--cfx-fondo); --tarjeta: var(--cfx-tarjeta); --texto: var(--cfx-texto); --texto-2: var(--cfx-texto-2);
+  --borde: var(--cfx-borde); --sombra: var(--cfx-sombra); --radio: var(--cfx-radio);
+}
+/* Modo oscuro: automático según el celular, o el que elija la persona en la app */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.claro):not(.light) {
+    --cfx-fondo: #0e1318; --cfx-tarjeta: #161d25; --cfx-campo: #1b232d; --cfx-texto: #e8edf2; --cfx-texto-2: #9aa6b2;
+    --cfx-borde: #263240; --cfx-sombra: none;
+  }
+}
+:root[data-theme="dark"], html.dark, html.oscuro, body.dark, body.oscuro {
+  --cfx-fondo: #0e1318; --cfx-tarjeta: #161d25; --cfx-campo: #1b232d; --cfx-texto: #e8edf2; --cfx-texto-2: #9aa6b2;
+  --cfx-borde: #263240; --cfx-sombra: none;
+  --bg: var(--cfx-fondo); --card: var(--cfx-tarjeta); --card2: var(--cfx-campo); --field: var(--cfx-campo);
+  --text: var(--cfx-texto); --ink: var(--cfx-texto); --muted: var(--cfx-texto-2); --line: var(--cfx-borde); --shadow: var(--cfx-sombra);
+  --fondo: var(--cfx-fondo); --tarjeta: var(--cfx-tarjeta); --texto: var(--cfx-texto); --texto-2: var(--cfx-texto-2);
+  --borde: var(--cfx-borde); --sombra: var(--cfx-sombra);
+}
+/* Detalles comunes que dan la misma "familia" sin cambiar cómo funciona cada pantalla */
+body { font-family: var(--cfx-letra); -webkit-font-smoothing: antialiased; }
+input, select, textarea, button { font-family: inherit; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 45%, transparent); outline-offset: 2px; }

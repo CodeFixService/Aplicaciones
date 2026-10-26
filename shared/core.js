@@ -319,7 +319,7 @@
 
   // Pie de página con la marca del autor en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.4';
+  const APP_VERSION = '5.5';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
