@@ -655,7 +655,7 @@
       ['apps/pedidos/?v=cupones', 'ticket', 'Promociones: cupones y sellos'], ['apps/pedidos/?v=stats', 'grafico', 'Estadísticas'],
       ['apps/catalogo/?v=ofertas', 'ojo', 'Ver mi tienda como cliente'], ['apps/mensajes/', 'chat', 'Mensajes']]],
       ['Cobros y equipo', [['#links', 'tarjeta', 'Links de pago'], ['#equipo', 'contactos', 'Mi equipo'], ['#plan', 'estrella', 'Mi plan']]]];
-    $('masL').innerHTML = G.map(([t, L]) => '<div class="sec">' + t + '</div><div class="card lista"><ul class="list">' + L.map(([u, i, x]) =>
+    $('masL').innerHTML = G.map(([t, L]) => '<div class="sec">' + t + '</div><div class="lista"><ul class="list cfx-grilla">' + L.map(([u, i, x]) =>
       '<li><a class="mini" href="' + u + '" style="width:100%"><span class="ic-caja">' + Core.ico(i) + '</span><span class="grow">' + x + '</span><span class="muted">›</span></a></li>').join('') + '</ul></div>').join('') +
       '<div class="sec">Configuración</div>';
   }

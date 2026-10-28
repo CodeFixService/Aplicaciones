@@ -16,11 +16,17 @@
     if (!campo || !campo.isConnected) return ocultar();
     const r = campo.getBoundingClientRect();
     if (!r.width || r.bottom < 0 || r.top > innerHeight) return ocultar();
-    const alto = campo.tagName === 'TEXTAREA' ? 34 : Math.min(36, r.height - 8);
+    // Tamaño según el campo (en campos chicos el botón se achica) y el texto no queda debajo del micrófono.
+    const alto = Math.max(22, Math.min(campo.tagName === 'TEXTAREA' ? 34 : 34, r.height - 10, r.width / 5));
+    if (!campo.dataset.cfxPad) { campo.dataset.cfxPad = campo.style.paddingRight || '-'; campo.style.paddingRight = (alto + 12) + 'px'; }
     b.style.cssText = 'position:fixed;z-index:130;width:' + alto + 'px;height:' + alto + 'px;left:' + Math.round(r.right - alto - 6) + 'px;top:' + Math.round(campo.tagName === 'TEXTAREA' ? r.bottom - alto - 6 : r.top + (r.height - alto) / 2) + 'px';
     b.hidden = false;
   }
-  function ocultar() { if (!rec) b.hidden = true; }
+  function ocultar() {
+    if (rec) return;
+    b.hidden = true;
+    document.querySelectorAll('[data-cfx-pad]').forEach((c) => { if (c !== document.activeElement) { c.style.paddingRight = c.dataset.cfxPad === '-' ? '' : c.dataset.cfxPad; delete c.dataset.cfxPad; } });
+  }
   // Dentro de una ventana (dialog) el botón va en la ventana: si no, quedaría detrás de ella.
   document.addEventListener('focusin', (e) => { if (sirve(e.target)) { campo = e.target; const cont = campo.closest('dialog[open]') || document.body; if (b.parentNode !== cont) cont.appendChild(b); ubicar(); } });
   document.addEventListener('focusout', () => setTimeout(() => { if (!rec && !(document.activeElement && sirve(document.activeElement))) ocultar(); }, 150));

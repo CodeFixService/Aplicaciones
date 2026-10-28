@@ -19,6 +19,9 @@
     'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);box-shadow:0 6px 18px rgba(15,23,42,.25),0 0 0 1px rgba(15,23,42,.06);font-size:20px;display:flex;align-items:center;justify-content:center;opacity:.92}' +
     '.cfx-boya i{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#dc2626;color:#fff;font:700 11px/18px system-ui,sans-serif;font-style:normal;padding:0 4px;box-sizing:border-box}' +
     '@media(min-width:900px){.cfx-boya{bottom:24px;left:auto;right:24px}}' +
+    // ⋮ arriba a la derecha (dentro del encabezado de la app): Inicio, Atrás, ayuda y Cerrar sesión.
+    '.cfx-boya.cfx-punto{position:relative;left:auto;right:auto;bottom:auto;top:auto;flex:none;width:40px;height:40px;margin-left:6px;background:transparent;box-shadow:none;opacity:1;color:inherit}' +
+    '.cfx-boya.cfx-punto svg{width:22px;height:22px}.cfx-boya.cfx-fijo{top:calc(8px + env(safe-area-inset-top));right:8px;bottom:auto;left:auto}' +
     'dialog.cfx-ayuda{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;z-index:2147483100;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;font-family:var(--cfx-letra,system-ui,sans-serif)}' +
     'dialog.cfx-ayuda::backdrop{background:transparent}@media(min-width:600px){dialog.cfx-ayuda{align-items:center}}' +
     '.cfx-ayuda>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;border-radius:20px 20px 0 0;box-sizing:border-box;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}' +
@@ -50,26 +53,50 @@
   }
   function cerrar() { if (abierta) { try { abierta.close(); } catch (e) { abierta.remove(); } abierta = null; } }
 
-  // ---------- Botón 🛟 ----------
+  // ---------- Botón ⋮ (arriba, en el encabezado de cada app) ----------
+  const PUNTOS = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+  function encabezado() {
+    return [...document.querySelectorAll('header.top, header.cab, .cab, header, .topbar, .top')].find((h) => {
+      const r = h.getBoundingClientRect(); return r.width > 200 && r.height >= 36 && r.height <= 130 && r.top <= 8 && getComputedStyle(h).display !== 'none';
+    }) || null;
+  }
   function pintarBoya() {
     if (!R) return;
     if (!boya) {
-      boya = document.createElement('button'); boya.type = 'button'; boya.className = 'cfx-boya no-ico'; boya.setAttribute('aria-label', 'Ayuda y soporte');
-      boya.onclick = menu; document.body.appendChild(boya);
+      boya = document.createElement('button'); boya.type = 'button'; boya.className = 'cfx-boya no-ico'; boya.setAttribute('aria-label', 'Menú: inicio, ayuda y cerrar sesión');
+      boya.onclick = menu;
     }
+    const h = encabezado();
+    if (h && boya.parentNode !== h) { h.appendChild(boya); boya.classList.add('cfx-punto'); boya.classList.remove('cfx-fijo'); }
+    else if (!h && !boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-punto', 'cfx-fijo'); boya.style.position = 'fixed'; boya.style.background = 'var(--cfx-tarjeta,#fff)'; }
     const n = pend().length + (estado.sin_leer || 0);
-    boya.innerHTML = '🛟' + (n ? '<i>' + n + '</i>' : '');
+    boya.innerHTML = PUNTOS + (n ? '<i>' + n + '</i>' : '');
+  }
+  // Inicio: la primera pantalla de la app en esta sesión. Cerrar sesión: el botón de la app, o se borra la sesión guardada.
+  function inicio() { cerrar(); let u = ''; try { u = sessionStorage.getItem('cfx-inicio') || ''; } catch (e) { /* nada */ } location.href = u || RAIZ; }
+  function salir() {
+    cerrar();
+    const b = [...document.querySelectorAll('button, a')].find((x) => /^\s*(🚪\s*)?(cerrar sesión|salir)\s*$/i.test(x.textContent || '') && x !== boya);
+    if (b) return b.click();
+    try { Object.keys(localStorage).filter((k) => /-auth$|^sb-/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* nada */ }
+    location.href = RAIZ;
   }
   function menu() {
-    const p = pend().length, caja = dialogo('<h2>🛟 Ayuda</h2><div class="ca-cuerpo">' +
+    const p = pend().length, caja = dialogo('<h2>Menú</h2><div class="ca-cuerpo">' +
+      '<button type="button" class="ca-op" data-a="inicio"><span>🏠</span><b>Ir al inicio</b></button>' +
+      (pila().length > 1 ? '<button type="button" class="ca-op" data-a="atras"><span>⬅️</span><b>Volver a lo anterior</b></button>' : '') +
       (estado.items.length ? '<button type="button" class="ca-op" data-a="guia"><span>🧭</span><b>Guía para partir</b>' + (p ? '<i>' + p + ' pendiente' + (p > 1 ? 's' : '') + '</i>' : '✅') + '</button>' : '') +
       '<button type="button" class="ca-op" data-a="chat"><span>💬</span><b>Chat con soporte</b>' + (estado.sin_leer ? '<i>' + estado.sin_leer + '</i>' : '') + '</button>' +
       '<button type="button" class="ca-op" data-a="terminos"><span>📄</span><b>Términos y condiciones</b></button>' +
       (window.CFX_PAGOS ? '<button type="button" class="ca-op" data-a="premium"><span>⭐</span><b>Premium y pagos</b></button>' : '') +
+      '<button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button>' +
       '</div><div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>');
     caja.onclick = (ev) => {
       const b = ev.target.closest('[data-a]'); if (!b) return;
       const a = b.dataset.a;
+      if (a === 'inicio') return inicio();
+      if (a === 'atras') { cerrar(); return history.back(); }
+      if (a === 'salir') return salir();
       if (a === 'guia') guia(); else if (a === 'chat') chat({ rpc: R }); else if (a === 'terminos') terminos(); else { cerrar(); window.CFX_PAGOS.abrir({ rpc: R }); }
     };
   }
@@ -202,12 +229,33 @@
     if (!o || !o.rpc) return;
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
+    try { if (!sessionStorage.getItem('cfx-inicio')) sessionStorage.setItem('cfx-inicio', location.pathname + location.search); } catch (e) { /* nada */ }
     revisar();
     if (primera) {
       setInterval(revisar, 5 * 60 * 1000);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
     }
   }
+  // ---------- "Volver" vuelve a la pantalla anterior (no al inicio) ----------
+  // Se guarda el recorrido de la sesión; los botones "Volver"/"‹" de cualquier app hacen history.back() si hay una pantalla anterior.
+  function pila() { try { return JSON.parse(sessionStorage.getItem('cfx-pila') || '[]'); } catch (e) { return []; } }
+  function anotar() {
+    const l = pila(), u = location.pathname + location.search + location.hash;
+    if (l[l.length - 1] === u) return;
+    if (l[l.length - 2] === u) l.pop(); else l.push(u);
+    try { sessionStorage.setItem('cfx-pila', JSON.stringify(l.slice(-40))); } catch (e) { /* nada */ }
+  }
+  anotar(); addEventListener('hashchange', anotar); addEventListener('popstate', anotar);
+  const VOLVER = /^\s*(‹|←|⬅️?|<)?\s*(volver|atrás|atras)?\s*$/i;
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button, a'); if (!b || b.closest('dialog, .modal, .sheet, .cfx-mv')) return;
+    const t = (b.textContent || '').trim(), al = b.getAttribute('aria-label') || '';
+    if (!(/volver|atrás/i.test(al) || (t && t.length <= 12 && VOLVER.test(t) && /[‹←⬅<]|volver|atr/i.test(t)))) return;
+    const l = pila();
+    // Solo en pantallas con dirección propia (#…): las vistas internas sin dirección usan su propio Volver.
+    if (location.hash.length > 1 && l.length > 1 && !b.hasAttribute('data-sin-atras')) { e.preventDefault(); e.stopImmediatePropagation(); history.back(); }
+  }, true);
+
   window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar };
   // La app pudo pedirlo antes de que este archivo cargara (CFX_AYUDA_PEND = { rpc, app }).
   if (window.CFX_AYUDA_PEND) iniciar(window.CFX_AYUDA_PEND);
