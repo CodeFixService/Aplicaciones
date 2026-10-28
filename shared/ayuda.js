@@ -18,7 +18,7 @@
     '.cfx-boya{position:fixed;left:10px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:2147481000;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;' +
     'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);box-shadow:0 6px 18px rgba(15,23,42,.25),0 0 0 1px rgba(15,23,42,.06);font-size:20px;display:flex;align-items:center;justify-content:center;opacity:.92}' +
     '.cfx-boya i{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#dc2626;color:#fff;font:700 11px/18px system-ui,sans-serif;font-style:normal;padding:0 4px;box-sizing:border-box}' +
-    '@media(min-width:900px){.cfx-boya{bottom:24px}}' +
+    '@media(min-width:900px){.cfx-boya{bottom:24px;left:auto;right:24px}}' +
     'dialog.cfx-ayuda{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;z-index:2147483100;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;font-family:var(--cfx-letra,system-ui,sans-serif)}' +
     'dialog.cfx-ayuda::backdrop{background:transparent}@media(min-width:600px){dialog.cfx-ayuda{align-items:center}}' +
     '.cfx-ayuda>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;border-radius:20px 20px 0 0;box-sizing:border-box;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}' +
