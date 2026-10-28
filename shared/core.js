@@ -177,19 +177,21 @@
     });
   }
 
-  // Foto de producto: máx. 480 px, JPEG liviano (~20-35 KB). Si aún pesa mucho, baja la calidad.
+  // Calidad de fotos según su uso: viene del núcleo (fotos.js); estos valores son el respaldo.
+  const FOTO = (k) => (global.CFX_FOTO && global.CFX_FOTO[k]) || { comprobante: { lado: 1000, calidad: 0.6, kb: 110 }, documento: { lado: 1400, calidad: 0.72, kb: 300 }, vitrina: { lado: 1080, calidad: 0.8, kb: 220 }, portada: { lado: 1280, calidad: 0.8, kb: 300 }, perfil: { lado: 400, calidad: 0.8, kb: 45 }, logo: { lado: 256, calidad: 0.85, kb: 30 } }[k];
+  // Foto de producto (vitrina): tamaño y calidad del núcleo (fotos.js) para que se vea bien en el teléfono.
   function fotoChica(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        const k = Math.min(1, 480 / Math.max(img.width, img.height));
+        const V = FOTO('vitrina'), k = Math.min(1, V.lado / Math.max(img.width, img.height)); // vitrina: que no se pixele en el teléfono
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
         const g = c.getContext('2d');
         g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
         g.drawImage(img, 0, 0, c.width, c.height);
-        let q = 0.72, d = c.toDataURL('image/jpeg', q);
-        while (d.length > 58000 && q > 0.3) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+        let q = V.calidad, d = c.toDataURL('image/jpeg', q);
+        while (d.length > V.kb * 1400 && q > 0.4) { q -= 0.08; d = c.toDataURL('image/jpeg', q); }
         resolve(d);
       };
       img.onerror = () => reject(new Error('No se pudo leer la imagen'));
@@ -203,15 +205,15 @@
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas'), g = c.getContext('2d');
-        let lado = 1000, d = '';
+        let lado = FOTO('comprobante').lado, d = '';
         for (let vuelta = 0; vuelta < 4; vuelta++, lado = Math.round(lado * 0.8)) {
           const k = Math.min(1, lado / Math.max(img.width, img.height));
           c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
           g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
           let q = 0.7;
           d = c.toDataURL('image/jpeg', q);
-          while (d.length > 160000 && q > 0.4) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
-          if (d.length <= 160000) break;
+          while (d.length > FOTO('comprobante').kb * 1400 && q > 0.4) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+          if (d.length <= FOTO('comprobante').kb * 1400) break;
         }
         resolve(d);
       };

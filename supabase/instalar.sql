@@ -2758,7 +2758,7 @@ language plpgsql security definer set search_path = '' as $$
 declare f text := nullif(trim(coalesce(p_foto, '')), ''); t timestamptz := case when f is null then null else now() end;
 begin
   if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
-  if f is not null and (f !~ '^data:image/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$' or length(f) > 60000) then
+  if f is not null and (f !~ '^data:image/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$' or length(f) > 320000) then -- vitrina (núcleo fotos.js)
     raise exception 'Foto no válida o muy pesada';
   end if;
   update public.catalog_items set foto = f, foto_at = t where owner_id = auth.uid() and client_key = p_key;
@@ -4598,7 +4598,7 @@ grant execute on function public.subir_pago_premium(text, boolean), public.mis_p
 --  cuentas que no se usan) y logo de la marca como respaldo.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.2'::text $$;
+language sql immutable as $$ select '5.3'::text $$;
 
 -- 📜 Borrar el registro de cambios (solo el administrador). p_dias = 0 borra todo; si no, lo anterior a esos días.
 create or replace function public.admin_limpiar_auditoria(p_dias int) returns int
