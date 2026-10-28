@@ -6,7 +6,7 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 | App | Para qué sirve |
 |-----|----------------|
 | **Inicio** (`index.html`) | Iniciar sesión / crear cuenta / recuperar contraseña, activar Pro con una key, bandeja de avisos. |
-| **FichaPro** (`apps/fichas`) | Fichas publicitarias, clientes, campañas por WhatsApp y, en Pro, envío automático por push y correo a suscriptores. |
+| **Órbita** (`apps/fichas`) | Fichas publicitarias, clientes, campañas por WhatsApp y, en Pro, envío automático por push y correo a suscriptores. |
 | **Caja Rápida** (`apps/caja`) | Ventas, productos, stock y reportes. |
 | **Administración** (`apps/admin`) | Solo el administrador general: usuarios, keys Pro, avisos a todos, ajustes de push y Gmail. |
 | **Suscribirse** (`apps/suscribirse`) | Página pública (sin cuenta) donde los clientes de un negocio Pro se suscriben a sus ofertas. |
@@ -15,20 +15,20 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 | Rol | Qué ve |
 |---|---|
 | **Administrador** (solo Josué) | Todo: empresas, clientes de cada empresa (con filtros), keys, solicitudes de prueba/pago, reportes, avisos a todos, link de pago y precios. Mensajes sin límite. |
-| **Empresa** | FichaPro, Caja Rápida, Mensajes con sus clientes y con soporte, enlace/QR para invitar clientes. Free o Pro. |
+| **Empresa** | Órbita, Caja Rápida, Mensajes con sus clientes y con soporte, enlace/QR para invitar clientes. Free o Pro. |
 | **Cliente** | Su cuenta la crea su empresa (o el admin). Ve **Ofertas** (las campañas de su tienda, con la ficha) y **Productos**, y escribe a la tienda con un toque (💬 Escribir a la tienda). Normal o Premium (precios especiales). |
 
 ## Cuentas (registro cerrado)
 - La app solo muestra **Iniciar sesión**. Nadie puede registrarse solo: el servidor rechaza cualquier alta sin invitación.
 - **Administración → Usuarios → Crear usuario**: el admin crea empresas y clientes de cualquier empresa.
-- **FichaPro → Clientes**: cada empresa crea sus propios clientes (Free: 30, Pro: 2000), con WhatsApp opcional.
+- **Órbita → Clientes**: cada empresa crea sus propios clientes (Free: 30, Pro: 2000), con WhatsApp opcional.
   Esa misma lista se usa para las campañas por WhatsApp (también admite contactos solo de WhatsApp).
 - Al crear la cuenta se arma el mensaje con el enlace, el correo y la contraseña para enviarlo por WhatsApp.
 - En el primer ingreso cada persona acepta los términos; luego puede cambiar su contraseña en **Mi cuenta**.
 
 ## Ofertas y productos para clientes
 - Todo producto nuevo de **Caja** se publica en el catálogo (casilla marcada); **Publicar todos** sube los que faltaban.
-- Toda campaña de **FichaPro** se publica en **Ofertas** de los clientes a su hora (Free: dentro de la app; Pro: además push y correo).
+- Toda campaña de **Órbita** se publica en **Ofertas** de los clientes a su hora (Free: dentro de la app; Pro: además push y correo).
 - Cada celular recibe solo los avisos de la cuenta con sesión abierta: al cerrar sesión deja de recibirlos.
 - El cliente tiene **Ofertas**, **Productos** y **Pedidos**: marca ❤️ favoritos (gratis: 5; Premium: ilimitados), ve los ✨ nuevos,
   arma un 🛒 pedido que llega a la tienda por el chat y puede repetir pedidos anteriores.
@@ -36,10 +36,10 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 - El pedido se envía por el chat de la app o por WhatsApp (el de la tienda, que la empresa guarda en **Mi empresa**).
 - Cliente Premium: además elige el color de su app y su ícono.
 - El cliente solo chatea con su tienda; el administrador chatea solo con las empresas.
-- **Cadena de publicaciones**: cada ficha que se guarda en FichaPro se publica sola. Las del admin las ven todas las
+- **Cadena de publicaciones**: cada ficha que se guarda en Órbita se publica sola. Las del admin las ven todas las
   empresas en **📣 Novedades CodeFix**; las de cada empresa, sus clientes en **🏷️ Ofertas**. La empresa revisa lo que
   ven sus clientes en **👁️ Mi tienda**. Borrar la ficha la quita.
-- Las campañas que el admin hace en FichaPro llegan a los **Avisos** de todas las empresas.
+- Las campañas que el admin hace en Órbita llegan a los **Avisos** de todas las empresas.
 - Si la base de datos quedó en una versión anterior, el inicio del admin lo avisa.
 - La versión de la app se ve al pie de cada pantalla. Con internet siempre se carga lo último; sin internet, la copia guardada.
 
@@ -89,7 +89,7 @@ Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares 
   horario, abierto/cerrado, tarjeta de sellos), Notificaciones, Mi plan, Legal y Zona peligrosa (cerrar sesión / eliminar cuenta).
 - **❓ Ayuda** abajo: la empresa abre el chat con CodeFix; el cliente, con su tienda.
 - **Un acceso por rol**: cliente → 🛍️ Tienda (Ofertas · Productos · Pedido) y 💵 Mi Caja (Premium);
-  empresa → FichaPro, Caja, 📦 Pedidos, Mensajes, 👁️ Mi tienda y 📣 Novedades CodeFix.
+  empresa → Órbita, Caja, 📦 Pedidos, Mensajes, 👁️ Mi tienda y 📣 Novedades CodeFix.
 - **Plantillas**: todas se publican al guardar (Oferta, Evento, Foto completa, Menú); se quitó "Producto". Free: Oferta + Evento.
   El Menú puede traer los precios desde la Caja.
 - **VIP**: fichas y productos "Solo Premium" con marco y cinta roja. Quien no es Premium/Pro los ve en gris con ⭐ Hazte Premium.
@@ -105,7 +105,7 @@ Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares 
 - Los pagos son por transferencia; la pasarela de pago queda para una versión futura.
 
 ## Versión 3.8
-- **Logo arriba**, al lado del nombre: la empresa (y el admin) lo sube en FichaPro → Ajustes o en ⚙️ Ajustes → Mi tienda;
+- **Logo arriba**, al lado del nombre: la empresa (y el admin) lo sube en Órbita → Ajustes o en ⚙️ Ajustes → Mi tienda;
   el cliente ve el de su tienda. Se guarda liviano (~6 KB).
 - **🚀 Emprende** (solo clientes): botón chico arriba del ❓ que abre el WhatsApp del administrador
   (Administración → Ajustes → WhatsApp de contacto) con "Soy cliente de [tienda] y quiero emprender".

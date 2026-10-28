@@ -112,7 +112,7 @@
     }
     setTimeout(ofrecerPush, 1500);
     // Núcleo (premium.js): con Pro/Premium la app se ve dorada y la primera vez saluda.
-    if (!a.is_admin && a.role !== 'equipo') (window.CFX_PREMIUM ? Promise.resolve() : new Promise((r) => addEventListener('load', r))).then(() => window.CFX_PREMIUM && CFX_PREMIUM.marcar({ premium: !!a.is_pro, id: a.id, hasta: a.pro_until }));
+    if (!a.is_admin && a.role !== 'equipo') (window.CFX_PREMIUM ? Promise.resolve() : new Promise((r) => addEventListener('load', r))).then(() => window.CFX_PREMIUM && (window.CFX_AYUDA_PEND = { rpc: rpc, app: 'orbita' }, window.CFX_AYUDA && CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND), true) && CFX_PREMIUM.marcar({ premium: !!a.is_pro, id: a.id, hasta: a.pro_until }));
     return a;
   }
 
@@ -208,7 +208,7 @@
 
   // Mensaje con los datos de acceso para enviar por WhatsApp.
   function mensajeAcceso(d) {
-    return 'Hola ' + d.nombre + ' 👋\nTe creamos tu cuenta en ' + (d.tienda || 'FichaPro') + '.\n\n' +
+    return 'Hola ' + d.nombre + ' 👋\nTe creamos tu cuenta en ' + (d.tienda || 'Órbita') + '.\n\n' +
       '📲 Entra aquí e instala la app: ' + rootUrl() + '\n' +
       '👤 Correo: ' + d.email + '\n🔑 Contraseña: ' + d.password + '\n\n' +
       'Te recomendamos cambiar la contraseña en "Mi cuenta" la primera vez que entres.';

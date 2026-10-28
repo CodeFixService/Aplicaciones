@@ -1,7 +1,7 @@
 {
-  "name": "FichaPro",
-  "short_name": "FichaPro",
-  "description": "FichaPro: tu tienda, caja, pedidos y fichas publicitarias en el celular.",
+  "name": "Órbita",
+  "short_name": "Órbita",
+  "description": "Órbita: tu tienda, caja, pedidos y fichas publicitarias en el celular.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
@@ -13,13 +13,19 @@
       "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [
@@ -53,5 +59,19 @@
         }
       ]
     }
-  ]
+  ],
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
+  "handle_links": "preferred",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "manifest.webmanifest"
+    }
+  ],
+  "prefer_related_applications": false
 }

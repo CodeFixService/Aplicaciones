@@ -297,8 +297,8 @@
     if (!licensed()) {
       ctx.save();
       ctx.font = font('700', 26); ctx.textAlign = 'right';
-      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillText('Hecho con FichaPro · CodeFix · versión Free', W - 28, H - 123);
-      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillText('Hecho con FichaPro · CodeFix · versión Free', W - 30, H - 125);
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillText('Hecho con Órbita · CodeFix · versión Free', W - 28, H - 123);
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillText('Hecho con Órbita · CodeFix · versión Free', W - 30, H - 125);
       ctx.restore();
     }
     if (f === ficha) pintarSeleccion();
@@ -493,7 +493,7 @@
     });
     f.pubAt = Date.now();
   }
-  // Fichas que aún no están publicadas (o cambiaron): se publican al abrir FichaPro.
+  // Fichas que aún no están publicadas (o cambiaron): se publican al abrir Órbita.
   async function publicarFichasPendientes() {
     const pend = fichas.filter((f) => !f.pubAt || f.pubAt < (f.fecha || 0));
     let n = 0;
@@ -896,7 +896,7 @@
     catch (err) { Core.toast('Logo: ' + err.message); }
   }
   $('bNotif').onclick = async () => Core.toast(await Core.askNotify() ? 'Notificaciones activadas' : 'Permiso denegado');
-  $('bProbar').onclick = () => Core.notify('FichaPro', { body: 'Así te avisaré de tus campañas 📣' });
+  $('bProbar').onclick = () => Core.notify('Órbita', { body: 'Así te avisaré de tus campañas 📣' });
   $('bActivar').onclick = async () => {
     try {
       await Cuenta.redeem($('l-key').value);

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
-<title>FichaPro</title>
+<title>Órbita</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="shared/tema.css">
 <script src="shared/humano.js"></script>
 <script src="shared/core.js"></script>
+<script src="shared/despacho.js"></script>
 <style>
   .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
   .app {
@@ -86,7 +87,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">FichaPro</h1><span id="planTag" class="pill hidden"></span><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
+<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">Órbita</h1><span id="planTag" class="pill hidden"></span><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
 <main>
   <div class="instalar hidden" id="cInstalar">
     <div style="font-size:30px">📲</div>
@@ -263,6 +264,8 @@
       <div id="linksBody"></div>
     </div>
 
+    <div class="card hidden" id="cDespacho"><span id="despacho"></span><div id="despachoBody"></div></div>
+
     <div class="card hidden" id="cEquipo"><span id="equipo"></span>
       <h2>🧑‍🍳 Mi equipo <span class="pill pro">PRO</span></h2>
       <p class="muted">Ven Hoy, Caja, Pedidos y Mensajes. No ven tus links de pago, tu plan ni tus ajustes.</p>
@@ -346,11 +349,11 @@
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo)$/.test(location.hash);
+  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho)$/.test(location.hash);
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     showView(enAjustes() ? 'v-ajustes' : 'v-home');
-    const ancla = /^#(plan|premium)$/.test(location.hash) ? 'cPlan' : /^#(avisos|links|equipo)$/.test(location.hash) ? location.hash.slice(1) : null;
+    const ancla = /^#(plan|premium)$/.test(location.hash) ? 'cPlan' : /^#(avisos|links|equipo|despacho)$/.test(location.hash) ? location.hash.slice(1) : null;
     if (ancla) setTimeout(() => $(ancla).scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
   }
@@ -469,7 +472,7 @@
       setTimeout(() => Core.toast('🎉 ¡Tu tienda está creada! Sigue la lista "Te falta configurar" y compártela.'), 600);
     }
     if (!acc.terms_at) { showView('v-terms'); return; }
-    // FichaPro: el admin solo administra; el cliente entra directo a su tienda.
+    // Órbita: el admin solo administra; el cliente entra directo a su tienda.
     if (acc.is_admin) { location.replace('apps/admin/'); return; }
     if (acc.role === 'client' && !/^#(cuenta|avisos|ajustes|plan|premium)$/.test(location.hash)) { location.replace('apps/catalogo/'); return; }
     pintar(acc);
@@ -482,6 +485,8 @@
     if (acc.role === 'user') { cargarLinks(); cargarEquipo(); }
     cargarPagos();
     // Núcleo (pagos.js): tienda nueva que debe su primer pago → pantalla de activación.
+    // Núcleo (ayuda.js): 🛟 guía para partir, chat con soporte y términos.
+    if (!acc.is_admin && acc.role !== 'equipo') { window.CFX_AYUDA_PEND = { rpc: (f, x) => Cuenta.rpc(f, x), app: 'orbita' }; if (window.CFX_AYUDA) CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND); }
     if (acc.role === 'user') { const ir = () => CFX_PAGOS.revisar({ rpc: (f, a) => Cuenta.rpc(f, a), salir: () => $('bSalir').click() }); if (window.CFX_PAGOS) ir(); else addEventListener('load', ir); }
     Cuenta.ofrecerPush();
     // Empresas de antes de la 4.0: su color pasa a la tienda una sola vez.
@@ -511,7 +516,7 @@
   }
 
   const APPS = {
-    fichas: ['apps/fichas/', 'paleta', 'FichaPro', 'Fichas publicitarias, campañas y avisos a tus clientes'],
+    fichas: ['apps/fichas/', 'paleta', 'Fichas', 'Fichas publicitarias, campañas y avisos a tus clientes'],
     caja: ['apps/caja/', 'caja', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
     mensajes: ['apps/mensajes/', 'chat', 'Mensajes', 'Chat con tus clientes y con soporte'],
     mensajesCli: ['apps/mensajes/', 'chat', 'Mensajes', 'Chat con la tienda y tus contactos'],
@@ -545,12 +550,13 @@
       $('tiendaLogo').textContent = lg ? '' : acc.negocio.trim().charAt(0).toUpperCase();
     }
 
-    // FichaPro: el negocio y su equipo ven "Hoy"; las secciones están en la barra de abajo.
+    // Órbita: el negocio y su equipo ven "Hoy"; las secciones están en la barra de abajo.
     $('hoy').classList.toggle('hidden', cliente);
-    $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'FichaPro') : (acc.empresa || 'FichaPro'));
+    $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Órbita') : (acc.empresa || 'Órbita'));
     const dueno = acc.role === 'user';
     $('bVerif').classList.toggle('hidden', !dueno);
-    ['cTienda', 'cLinks', 'cEquipo', 'cMas', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
+    ['cTienda', 'cLinks', 'cDespacho', 'cEquipo', 'cMas', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
+    if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x)); }
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
     $('cMiCaja').classList.toggle('hidden', !cliente);
@@ -843,7 +849,7 @@
     const wsp = String((s && s.contact_whatsapp) || '').replace(/\D/g, '');
     if (!wsp) return;
     $('bEmprende').href = 'https://wa.me/' + wsp + '?text=' + encodeURIComponent('Hola 👋 Soy cliente de ' + (acc.negocio || 'una tienda') +
-      ' en FichaPro y quiero emprender con mi propia tienda. ¿Cómo lo hago?');
+      ' en Órbita y quiero emprender con mi propia tienda. ¿Cómo lo hago?');
     $('bEmprende').classList.remove('hidden');
   }
 
@@ -1012,5 +1018,6 @@
 <script src="shared/pagos.js"></script>
 <script src="shared/verificar.js"></script>
 <script src="shared/premium.js"></script>
+<script src="shared/ayuda.js"></script>
 </body>
 </html>

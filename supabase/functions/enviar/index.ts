@@ -11,7 +11,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 const VERSION = '3.3';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
-const BRAND = 'FichaPro · CodeFix';
+const BRAND = 'Órbita · CodeFix';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -83,7 +83,7 @@ export async function deliver(
         host: 'smtp.gmail.com', port: 465, secure: true, pool: true,
         auth: { user: secrets.gmail_user, pass: secrets.gmail_app_password.replace(/\s/g, '') },
       });
-      const from = `"${(secrets.mail_from_name || 'FichaPro').replace(/"/g, '')}" <${secrets.gmail_user}>`;
+      const from = `"${(secrets.mail_from_name || 'Órbita').replace(/"/g, '')}" <${secrets.gmail_user}>`;
       const limit = Math.min(emailsLeft, EMAILS_PER_NOTIFICATION);
       if (emails.length > limit) errors.push(`Se enviaron ${limit} de ${emails.length} correos por el límite diario de Gmail`);
       for (const t of emails.slice(0, Math.max(0, limit))) {

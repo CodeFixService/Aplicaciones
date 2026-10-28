@@ -3,6 +3,19 @@
    Si el administrador guardó la "site key" (Centro de Mando → Control → Humano), antes de entrar o crear una cuenta aparece
    "Confirma que no eres un robot" y el token viaja a Supabase (gotrue_meta_security.captcha_token). Sin site key no hace nada.
    Para que Supabase lo exija: Authentication → Attack Protection → CAPTCHA (Turnstile) con la "secret key". */
+// Sesión vinculada: el Centro de Mando abre el panel de esta app con ?cfx-entrar=… (una sesión propia, de un solo uso)
+// y queda iniciada sin escribir la contraseña. Se guarda antes de que la app cree su conexión y se borra de la dirección.
+(function () {
+  try {
+    const q = new URLSearchParams(location.search), v = q.get('cfx-entrar');
+    if (!v) return;
+    q.delete('cfx-entrar');
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+    const d = JSON.parse(decodeURIComponent(escape(atob(v.replace(/-/g, '+').replace(/_/g, '/')))));
+    if (!/^[a-z]{2,6}-auth$/.test(d.k) || !d.rt) return;
+    localStorage.setItem(d.k, JSON.stringify({ access_token: d.at || 'x', refresh_token: d.rt, token_type: 'bearer', expires_in: 0, expires_at: 1, user: d.u || null }));
+  } catch (e) { /* link dañado: entra normal */ }
+})();
 (function () {
   'use strict';
   if (window.CFX_HUMANO || !window.fetch) return;

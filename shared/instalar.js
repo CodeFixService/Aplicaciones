@@ -1,6 +1,8 @@
 /* CodeFix · Instalar la app y activar notificaciones (mismo archivo en todas las apps).
    Insiste con un aviso abajo de la pantalla, en este orden:
-   1) Si el link se abrió dentro de WhatsApp, Instagram, Facebook o TikTok → "Abrir en el navegador"
+   0) Si la app YA está instalada y se abrió en el navegador (o dentro de WhatsApp, Instagram…) → "Abrir en la app"
+      (salta directo a la app instalada; nada de elegir navegador).
+   1) Si el link se abrió dentro de WhatsApp, Instagram, Facebook o TikTok y la app no está instalada → "Abrir en el navegador"
       (ahí no se puede instalar ni recibir notificaciones).
    2) Si la app no está instalada → "Instalar" (Android: instala con un toque; iPhone: Compartir → Agregar a inicio).
    3) Si hay sesión y las notificaciones no están activas → "Activar notificaciones" (usa la función de cada app).
@@ -20,6 +22,9 @@
   let promptInstalar = null;
   addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); promptInstalar = e; });
   addEventListener('appinstalled', () => { guardar('instalada', Date.now()); cerrar(); });
+  // ¿Está instalada en este teléfono? (Chrome lo sabe gracias a related_applications del manifiesto)
+  let yaInstalada = false;
+  try { if (navigator.getInstalledRelatedApps) navigator.getInstalledRelatedApps().then((l) => { yaInstalada = !!(l && l.length); }).catch(() => {}); } catch (e) { /* nada */ }
 
   // Cómo se activan las notificaciones en cada app (cada una guarda la suscripción a su manera).
   function adaptador() {
@@ -77,7 +82,16 @@
     document.body.appendChild(hoja);
   }
 
-  // ---------- Los tres avisos ----------
+  // ---------- Los avisos ----------
+  // Android abre el link con la app instalada (sin "elegir navegador"); si no se pudo, queda la indicación del ícono.
+  function abrirEnApp() {
+    const u = location.host + location.pathname + location.search + location.hash;
+    mostrar('Ábrela en la app', 'Ya tienes ' + nombre + ' instalada. Ahí te llegan los avisos y entras más rápido.', '',
+      'Abrir la app', async () => {
+        location.href = 'intent://' + u + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
+        setTimeout(() => { const p = hoja && hoja.querySelector('p'); if (p && !document.hidden) p.textContent = 'Si no se abrió, toca el ícono de ' + nombre + ' en tu pantalla de inicio.'; }, 1800);
+      });
+  }
   function abrirEnNavegador() {
     if (esAndroid) {
       const u = location.host + location.pathname + location.search;
@@ -123,8 +137,9 @@
     if (pos && Date.now() - pos < CADA && sessionStorage.getItem('cfx-inst:visto')) return;
     try { sessionStorage.setItem('cfx-inst:visto', '1'); } catch (e) { /* nada */ }
     const movil = esIOS || esAndroid;
+    if (esAndroid && !instalada() && (yaInstalada || (enApp && leer('instalada')))) return abrirEnApp();
     if (enApp && movil) return abrirEnNavegador();
-    if (movil && !instalada() && !(leer('instalada') && !promptInstalar && Date.now() - leer('instalada') < 7 * 864e5)) return pedirInstalar();
+    if (movil && !instalada() && !yaInstalada && !(leer('instalada') && !promptInstalar && Date.now() - leer('instalada') < 7 * 864e5)) return pedirInstalar();
     const ad = adaptador();
     if (!ad || !pushPosible()) return;
     let haySesion = false; try { haySesion = await ad.sesion(); } catch (e) { /* sin sesión */ }

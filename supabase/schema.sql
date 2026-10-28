@@ -1327,7 +1327,7 @@ grant execute on function public.set_my_phone(text) to authenticated;
 grant execute on function public.db_version() to anon, authenticated;
 
 -- =====================================================================
---  VERSIÓN 3.6: publicaciones (las fichas de FichaPro se ven en la cadena)
+--  VERSIÓN 3.6: publicaciones (las fichas de Órbita se ven en la cadena)
 --    Admin   → sus fichas las ven todas las empresas ("Novedades CodeFix").
 --    Empresa → sus fichas las ven sus clientes ("Ofertas").
 --  La imagen se guarda en la misma fila (no depende del almacenamiento).
@@ -2813,7 +2813,7 @@ grant execute on function public.set_foto_producto(text, text), public.fotos_cat
   public.admin_uso() to authenticated;
 
 -- =====================================================================
---  VERSIÓN 5.0 · FichaPro: planes editables, pagos con comprobante, links de
+--  VERSIÓN 5.0 · Órbita: planes editables, pagos con comprobante, links de
 --  2 espacios, pedidos con retención y stock, tienda pública sin cuenta,
 --  equipo del negocio, calificaciones por pedido (solo estrellas) y sin VIP.
 -- =====================================================================
@@ -2897,12 +2897,13 @@ revoke all on public.planes from anon, authenticated;
 insert into public.planes (codigo, nombre, descripcion, beneficios, limites) values
  ('negocio_free', 'Gratis', 'Para partir', '["Tienda con link y QR", "Caja Rápida", "Pedidos online"]',
   '{"productos": 50, "clientes": 50, "fichas": 10, "respuestas": 3, "equipo": 0, "pedidos_mes": 30}'),
- ('negocio_pro', 'Pro', 'Todo FichaPro', '["Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]',
+ ('negocio_pro', 'Pro', 'Todo Órbita', '["Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]',
   '{"productos": 200, "clientes": 300, "fichas": 60, "respuestas": 20, "equipo": 5, "pedidos_mes": 100000}'),
  ('cliente_free', 'Gratis', 'Cliente', '[]', '{"contactos": 3, "favoritos": 5, "mensajes_seguidos": 1}'),
  ('cliente_pro', 'Premium', 'Cliente Premium', '["Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]',
   '{"contactos": 20, "favoritos": 1000, "mensajes_seguidos": 5}')
 on conflict (codigo) do nothing;
+update public.planes set descripcion = 'Todo Órbita' where codigo = 'negocio_pro' and descripcion = 'Todo FichaPro';  -- nuevo nombre de la app
 
 create or replace function public.plan_de(u uuid) returns text
 language sql stable security definer set search_path = '' as $$
@@ -4286,7 +4287,7 @@ language sql stable security definer set search_path = '' as $$
   from public.profiles p where p.id = p_id and p.role = 'user' and not p.suspended
 $$;
 
--- Mi cuenta: suma la dirección corta de la tienda (FichaPro → link y QR de la tienda).
+-- Mi cuenta: suma la dirección corta de la tienda (Órbita → link y QR de la tienda).
 create or replace function public.my_account() returns jsonb
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object(
@@ -4375,7 +4376,7 @@ begin
       where x.negocio_id = r.id and x.created_at >= d and x.estado not in ('cancelado', 'expirado', 'rechazado')
       group by 1 order by sum((l ->> 'cant')::int) desc limit 1;
     perform public.notify_user(r.id,
-      case when cnt > 0 then '📊 Tu semana: vendiste $' || to_char(ven, 'FM999G999G999') else '📊 Tu semana en FichaPro' end,
+      case when cnt > 0 then '📊 Tu semana: vendiste $' || to_char(ven, 'FM999G999G999') else '📊 Tu semana en Órbita' end,
       case when cnt > 0 then cnt || ' pedido(s) online' || coalesce(' · Tu producto top fue ' || top, '') || '. ¡Vamos por más!'
            else 'Esta semana no hubo ventas online. Comparte tu tienda por WhatsApp desde Hoy 📣' end, './');
     n := n + 1;

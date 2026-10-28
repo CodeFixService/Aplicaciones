@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="../../shared/tema.css">
 <script src="../../shared/humano.js"></script>
 <script src="../../shared/core.js"></script>
+<script src="../../shared/despacho.js"></script>
 <style>
   body { padding-bottom: 96px; }
   .seg { display: flex; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; padding: 4px; margin-bottom: 14px; }
@@ -249,7 +250,7 @@
   $('tPedidos').onclick = () => vista('pedidos');
   $('tPedidos').classList.toggle('hidden', !comprador);
   if (!comprador) {
-    $('ofTip').textContent = '👁️ Así ven tus clientes tus fichas y campañas. Cada ficha que guardas en FichaPro aparece aquí.';
+    $('ofTip').textContent = '👁️ Así ven tus clientes tus fichas y campañas. Cada ficha que guardas en Fichas aparece aquí.';
     $('ofTip').classList.remove('hidden');
   }
 
@@ -316,7 +317,7 @@
   function pintarOfertas() {
     $('ofertas').innerHTML = ofertas.length ? ofertas.map(tarjeta).join('') : '<p class="empty" style="grid-column:1/-1">' +
       vacio('ofertas', comprador ? 'La tienda aún no publica ofertas.'
-        : 'Aún no publicas nada. Guarda una ficha en FichaPro y aparecerá aquí para tus clientes.') + '</p>';
+        : 'Aún no publicas nada. Guarda una ficha en Fichas y aparecerá aquí para tus clientes.') + '</p>';
   }
   $('ofertas').onclick = (e) => {
     const b = e.target.closest('[data-addpub]');
@@ -519,18 +520,20 @@
     return '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + (l.opcion ? ' (' + l.opcion + ')' : '') + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
       (r && r.descuento > 0 ? '\nDescuento: −' + precio(r.descuento) : '') +
       '\nTotal: ' + precio(r ? r.total : totalCarro()) + (r && r.desc_premium > 0 ? ' (con descuento Premium)' : '') +
-      '\nEntrega: ' + (entrega === 'despacho' ? '🚚 Despacho a ' + $('dir').value.trim() + ' (costo de despacho según distancia, por pagar)' : '🏪 Retiro en tienda') +
+      '\nEntrega: ' + (entrega === 'despacho' ? '🚚 Despacho a ' + $('dir').value.trim() + (r && r.despacho > 0 ? ' (' + precio(r.despacho) + ', incluido en el total)' : '') : '🏪 Retiro en tienda') +
       ($('nota').value.trim() ? '\nNota: ' + $('nota').value.trim() : '');
   }
   async function enviarPedido(porWsp) {
     if (!lineasCarro().length) return;
     if (entrega === 'despacho' && !$('dir').value.trim()) { $('dir').focus(); return Core.toast('Escribe la dirección de despacho'); }
+    let dirFinal = $('dir').value;
+    if (entrega === 'despacho') { try { dirFinal = Despacho.direccion($('dir').value); } catch (e) { return Core.toast(e.message); } }
     const btn = porWsp ? $('bWspPed') : $('bEnviarPed');
     btn.disabled = true;
     try {
       const r = await Cuenta.rpc('crear_pedido', {
         p_negocio: negocio, p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant, opcion: l.opcion || null })), p_entrega: entrega,
-        p_direccion: $('dir').value, p_nota: $('nota').value, p_cupon: cupon ? cupon.codigo : null
+        p_direccion: dirFinal, p_nota: $('nota').value, p_cupon: cupon ? cupon.codigo : null
       });
       if (!r.ok) throw new Error(r.error);
       if (porWsp) window.open('https://wa.me/' + wspTienda + '?text=' + encodeURIComponent(textoPedido(r)), '_blank');
@@ -554,6 +557,8 @@
     $('cPago').classList.remove('hidden');
     $('pagoTxt').textContent = tienda.datos_pago;
   }
+  // Despacho por comuna (lo configura la tienda en Ajustes → Despacho).
+  Despacho.montar({ cfg: tienda.despacho, monto: () => totalCarro(), alCambiar: pintarCarro });
   $('bCopiarPago').onclick = () => navigator.clipboard.writeText(tienda.datos_pago || '').then(() => Core.toast('📋 Datos copiados'));
 
   /* ---------- Mis pedidos (con estado) y tarjeta de sellos ---------- */
@@ -655,5 +660,6 @@
 <script src="../../shared/pagos.js"></script>
 <script src="../../shared/verificar.js"></script>
 <script src="../../shared/premium.js"></script>
+<script src="../../shared/ayuda.js"></script>
 </body>
 </html>
