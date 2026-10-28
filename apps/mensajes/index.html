@@ -64,7 +64,7 @@
         <input id="buscar" placeholder="Buscar conversación…" aria-label="Buscar conversación">
         <button class="small" id="bNuevo">＋ Nuevo</button>
       </div>
-      <p class="muted" style="font-size:12px;margin:8px 14px 0">🕒 Los mensajes se borran solos a los 7 días.</p>
+      <p class="muted" style="font-size:12px;margin:8px 14px 0">🕒 Los mensajes se borran solos a los 30 días (te avisamos antes).</p>
       <div id="convs"></div>
       <div id="picker" class="hidden" style="padding:12px">
         <p class="muted">¿A quién quieres escribir?</p>
@@ -76,6 +76,7 @@
         <button class="small alt" id="bVolverLista" aria-label="Volver a la lista">‹</button>
         <div class="av" id="cabAv">C</div>
         <div class="grow"><b id="cabNombre"></b><div class="muted" id="cabSub"></div></div>
+        <button class="small alt" id="bBorrarChat" aria-label="Borrar chat">🗑️</button>
         <button class="small alt" id="bBloquear">Bloquear</button>
       </div>
       <div class="msgs" id="msgs"><div class="vacio">Elige una conversación o toca <b>＋ Nuevo</b>.</div></div>
@@ -278,6 +279,12 @@
     } catch (err) { Core.toast(err.message); }
   };
 
+  $('bBorrarChat').onclick = async () => {
+    if (!actual || !confirm('¿Borrar toda la conversación con ' + actual.nombre + '? Se borra para los dos.')) return;
+    try { await Cuenta.rpc('chat_borrar', { p_other: actual.id }); Core.toast('Chat borrado'); actual = null; $('wrap').classList.remove('abierto'); $('cab').classList.add('hidden'); $('comp').classList.add('hidden');
+      $('msgs').innerHTML = '<div class="vacio">Elige una conversación o toca <b>＋ Nuevo</b>.</div>'; cargarLista(); }
+    catch (err) { Core.toast(err.message); }
+  };
   $('bBloquear').onclick = async () => {
     if (!actual) return;
     if (!bloqueado && !confirm('¿Bloquear a ' + actual.nombre + '? Ninguno de los dos podrá escribir hasta que desbloquees.')) return;
@@ -321,5 +328,6 @@
 <script src="../../shared/auto.js"></script>
 <script src="../../shared/fotos.js"></script>
 <script src="../../shared/voz.js"></script>
+<script src="../../shared/respaldo.js"></script>
 </body>
 </html>

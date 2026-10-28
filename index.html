@@ -308,6 +308,13 @@
       </details>
     </div>
 
+    <div class="card hidden" id="cRespaldo">
+      <h2>💾 Respaldo de mi tienda</h2>
+      <p class="muted">Descarga en Excel tus productos, pedidos, clientes, fichas, cupones y reseñas. Guárdalo donde quieras.
+        Los avisos y mensajes se borran solos a los 30 días (te avisamos antes); tus pedidos y productos no.</p>
+      <div class="btns"><button class="alt" id="bRespaldo">⬇️ Descargar respaldo (Excel)</button></div>
+    </div>
+
     <div class="card">
       <h2>📄 Legal</h2>
       <p class="muted"><a href="apps/legal/">Términos de uso y política de privacidad</a></p>
@@ -546,7 +553,7 @@
     $('hoy').classList.toggle('hidden', cliente);
     $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'FichaPro') : (acc.empresa || 'FichaPro'));
     const dueno = acc.role === 'user';
-    ['cTienda', 'cLinks', 'cEquipo', 'cMas'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
+    ['cTienda', 'cLinks', 'cEquipo', 'cMas', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
     $('cMiCaja').classList.toggle('hidden', !cliente);
@@ -932,11 +939,13 @@
         (/^https?:\/\//i.test(n.image || '') ? '<img src="' + Core.esc(n.image) + '" alt="" loading="lazy">' : '') +
         (/^https?:\/\//i.test(n.url || '') ? '<div class="btns"><a class="btn small alt" href="' + Core.esc(n.url) + '" target="_blank" rel="noopener">Ver más</a></div>'
           : /^(apps\/[a-z]+\/|\.\/)/.test(n.url || '') ? '<div class="btns"><a class="btn small alt" href="' + Core.esc(n.url) + '">Abrir</a></div>' : '') +
-        '</div></div></li>'
+        '</div></div><button class="alt small" data-ocultar="' + n.id + '" aria-label="Borrar aviso" style="flex:none;padding:2px 9px">✕</button></li>'
       ).join('') : '<li class="empty">Sin avisos por ahora</li>';
     } catch (e) { $('inbox').innerHTML = '<li class="empty">Sin conexión</li>'; }
   }
   $('inbox').onclick = (e) => {
+    const x = e.target.closest('[data-ocultar]');
+    if (x) { x.closest('li').remove(); Cuenta.rpc('ocultar_aviso', { p_id: x.dataset.ocultar }).catch(() => {}); return; }
     const li = e.target.closest('li[data-id]');
     if (!li || e.target.closest('a')) return;
     li.classList.toggle('abierto');
@@ -1004,6 +1013,10 @@
     catch (err) { Core.toast(err.message); }
   };
   $('bSalir').onclick = async () => { await Cuenta.signOut(); location.replace('./'); };
+  $('bRespaldo').onclick = async () => {
+    try { CFX_RESPALDO.excel('respaldo-' + (Cuenta.account.empresa || 'tienda'), await Cuenta.rpc('mi_respaldo')); Core.toast('Respaldo descargado'); }
+    catch (err) { Core.toast(err.message); }
+  };
   $('bEliminar').onclick = async () => {
     if ($('delConfirm').value.trim().toUpperCase() !== 'ELIMINAR') return Core.toast('Escribe ELIMINAR para confirmar');
     const uid = Cuenta.uid();
@@ -1026,5 +1039,6 @@
 <script src="shared/auto.js"></script>
 <script src="shared/fotos.js"></script>
 <script src="shared/voz.js"></script>
+<script src="shared/respaldo.js"></script>
 </body>
 </html>
