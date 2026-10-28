@@ -307,8 +307,8 @@
     const d = document.createElement('div');
     d.id = 'cfxUpd'; d.className = 'actualizar';
     d.innerHTML = '<div class="grow"><b>🔄 Hay una versión nueva</b><br><span>Tienes la v' + actual + ' · Nueva: v' + nueva +
-      (soloAdmin ? ' · al actualizar se libera para todos' : '') + '</span></div><button class="small" type="button">Actualizar</button>';
-    d.querySelector('button').onclick = () => actualizarAhora(d.querySelector('button'), soloAdmin ? nueva : null);
+      (soloAdmin ? ' · solo tú: pruébala y libérala en Ajustes → Versión' : '') + '</span></div><button class="small" type="button">Actualizar</button>';
+    d.querySelector('button').onclick = () => actualizarAhora(d.querySelector('button'), null); // el admin prueba primero; libera aparte
     (document.querySelector('main') || document.body).prepend(d);
   }
   // liberar: el admin, al actualizar, deja la versión liberada para todos (y les llega el aviso).

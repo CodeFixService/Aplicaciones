@@ -21,7 +21,7 @@
   const pintarLogoArriba = () => $('bInicio').classList.toggle('logo', !!Cuenta.aplicarLogo(Cuenta.account));
   pintarLogoArriba();
   let perfiles = {};
-  const DB_VERSION = '5.3';
+  const DB_VERSION = '5.4';
 
   /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
   const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, pagos: cargarPagos, ajustes: () => verAjuste(ajuste) };
@@ -41,7 +41,7 @@
   async function cargarResumen() {
     const r = await Cuenta.rpc('admin_resumen');
     $('cBase').classList.toggle('hidden', r.version === DB_VERSION);
-    $('baseTxt').textContent = 'La app es la ' + DB_VERSION + ' y la base de datos la ' + r.version + '. Corre el paso 3 de la guía (Supabase → SQL Editor).';
+    $('baseTxt').textContent = 'La app es la ' + DB_VERSION + ' y la base de datos la ' + r.version + '. Se actualiza sola en máximo 10 minutos (no borra datos).';
     $('tabPagos').textContent = r.pagos_por_revisar; $('tabPagos').classList.toggle('hidden', !r.pagos_por_revisar);
     $('cPagosAlerta').classList.toggle('hidden', !r.pagos_por_revisar);
     $('cPagosAlerta').innerHTML = '💰 Tienes <b>' + r.pagos_por_revisar + '</b> comprobante(s) de Pro/Premium por revisar ›';
@@ -710,7 +710,7 @@
   }
   let verPublicada = '';
   $('bLiberar').onclick = async () => {
-    if (!verPublicada || !confirm('¿Liberar la v' + verPublicada + '? A todos les aparecerá el botón "Actualizar".')) return;
+    if (!verPublicada || !confirm('¿Liberar la v' + verPublicada + '? A todos se les actualiza sola.')) return;
     try { await Cuenta.rpc('admin_set_setting', { p_key: 'version_liberada', p_value: verPublicada }); Core.toast('✅ v' + verPublicada + ' liberada para todos'); cargarAjustes(); }
     catch (err) { fallo(err); }
   };

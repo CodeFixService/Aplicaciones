@@ -4598,7 +4598,7 @@ grant execute on function public.subir_pago_premium(text, boolean), public.mis_p
 --  cuentas que no se usan) y logo de la marca como respaldo.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.3'::text $$;
+language sql immutable as $$ select '5.4'::text $$;
 
 -- 📜 Borrar el registro de cambios (solo el administrador). p_dias = 0 borra todo; si no, lo anterior a esos días.
 create or replace function public.admin_limpiar_auditoria(p_dias int) returns int
@@ -4715,7 +4715,7 @@ select cron.unschedule(jobid) from cron.job where jobname = 'reporte-semanal';
 -- =====================================================================
 -- Actualización automática (núcleo CodeFix): cada 10 minutos la base revisa GitHub (rama main).
 --   · Si hay una base nueva (version.json), descarga y ejecuta este mismo instalar.sql (no borra datos).
---   · Si solo cambió la app, la libera para que los celulares se actualicen solos.
+--   · La app la liberas tú cuando la pruebes (panel de la app o Centro de Mando → Liberar).
 --   Si algo falla no cambia nada y lo reintenta en la siguiente vuelta. Hay que correr este archivo UNA vez.
 -- =====================================================================
 create or replace function public.auto_actualizar() returns text
@@ -4733,14 +4733,7 @@ begin
     execute codigo;
     return 'base actualizada a ' || (public.db_version())::text;
   end if;
-  -- Solo cambió la app (la base ya está al día): se libera para que los celulares se actualicen solos.
-  if v_app ~ re and v_bd = (public.db_version())::text then
-    lib := (select value from public.app_settings where key = 'version_liberada');
-    if lib is null or lib !~ re or string_to_array(v_app, '.')::int[] > string_to_array(lib, '.')::int[] then
-      insert into public.app_settings (key, value) values ('version_liberada', v_app) on conflict (key) do update set value = excluded.value;
-      return 'app liberada ' || v_app;
-    end if;
-  end if;
+  -- La app NO se libera sola: la liberas tú desde el panel o el Centro de Mando después de probarla.
   return 'al día';
 exception when others then
   return 'sin cambios: ' || sqlerrm;
