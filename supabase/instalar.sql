@@ -4674,7 +4674,7 @@ grant execute on function public.marca_publica() to anon, authenticated;
 --  · Funciones comunes cfx_* para el Centro de Mando (respaldo, limpieza e inventario).
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.6'::text $$;
+language sql immutable as $$ select '5.7'::text $$;
 
 alter table public.notification_reads add column if not exists oculto boolean not null default false;
 alter table public.profiles add column if not exists aviso_limpieza_at timestamptz;
@@ -4858,6 +4858,35 @@ language sql security definer set search_path = '' as $$ select public.notify_us
 create or replace function public.cfx_avisar_admin(p_titulo text, p_cuerpo text) returns void
 language sql security definer set search_path = '' as $$ select public.notify_user(public.admin_id(), p_titulo, p_cuerpo, 'apps/admin/') $$;
 
+-- Ganchos de administración para el núcleo (planes, textos, a quién avisar y verificación).
+create or replace function public.cfx_planes_app() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('grupo', m.g, 'clave', k, 'free', f.limites -> k, 'premium', p.limites -> k) order by m.g, k), '[]')
+  from (values ('negocio', 'negocio_free', 'negocio_pro'), ('cliente', 'cliente_free', 'cliente_pro')) m(g, fc, pc) join public.planes f on f.codigo = m.fc join public.planes p on p.codigo = m.pc,
+  lateral (select jsonb_object_keys(f.limites || p.limites) as k) x
+$$;
+create or replace function public.cfx_plan_guardar_app(p_grupo text, p_clave text, p_free jsonb, p_premium jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+declare fc text; pc text;
+begin
+  select m.fc, m.pc into fc, pc from (values ('negocio', 'negocio_free', 'negocio_pro'), ('cliente', 'cliente_free', 'cliente_pro')) m(g, fc, pc) where m.g = p_grupo;
+  if fc is null or p_clave !~ '^[a-z_]{2,40}$' then raise exception 'Plan no válido'; end if;
+  update public.planes set limites = limites || jsonb_build_object(p_clave, p_free) where codigo = fc;
+  update public.planes set limites = limites || jsonb_build_object(p_clave, p_premium) where codigo = pc;
+end $$;
+create or replace function public.cfx_textos_app() returns jsonb
+language sql stable security definer set search_path = '' as $$ select '[]'::jsonb $$;
+create or replace function public.cfx_texto_guardar_app(p_clave text, p_valor text) returns void
+language plpgsql security definer set search_path = '' as $$ begin raise exception 'Esta app no tiene textos editables'; end $$;
+create or replace function public.cfx_destinatarios(p_destino text) returns setof uuid
+language sql stable security definer set search_path = '' as $$
+  select id from public.profiles where not suspended and role in ('user', 'client')
+    and (p_destino = 'todos' or (p_destino = 'negocios' and role = 'user') or (p_destino = 'clientes' and role = 'client')
+      or (p_destino = 'premium' and public.is_pro(id)) or (p_destino = 'gratis' and not public.is_pro(id)))
+$$;
+create or replace function public.cfx_marcar_verificado(p_cuenta uuid, p_si boolean) returns void
+language sql security definer set search_path = '' as $$ select null::void $$;
+
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
 -- CodeFix · Pagos (igual en las 6 apps; lo reparte nucleo/sincronizar.py). Se administra desde el Centro de Mando → Pagos.
@@ -4893,6 +4922,7 @@ create table if not exists public.cfx_pagos (
   creado      timestamptz not null default now(),
   resuelto    timestamptz
 );
+alter table public.cfx_pagos add column if not exists cupon text;
 create index if not exists cfx_pagos_cuenta_idx on public.cfx_pagos (cuenta, creado desc);
 create index if not exists cfx_pagos_estado_idx on public.cfx_pagos (estado, creado);
 alter table public.cfx_pagos enable row level security;
@@ -4917,22 +4947,24 @@ begin
                where cuenta = (y ->> 'id')::uuid order by creado desc limit 1) x));
 end $$;
 
-create or replace function public.cfx_pago_pedir(p_periodo text, p_monto int, p_medio text, p_comprobante text, p_nota text default '') returns uuid
+drop function if exists public.cfx_pago_pedir(text, int, text, text, text);
+create or replace function public.cfx_pago_pedir(p_periodo text, p_monto int, p_medio text, p_comprobante text, p_nota text default '', p_cupon text default null) returns uuid
 language plpgsql security definer set search_path = '' as $$
-declare y jsonb := public.cfx_yo(); i uuid;
+declare y jsonb := public.cfx_yo(); i uuid; cup text := nullif(upper(trim(coalesce(p_cupon, ''))), '');
 begin
   if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
   if y ->> 'rol' not in ('negocio', 'cliente') and p_periodo <> 'otro' then raise exception 'Pide al dueño de la cuenta que haga el pago'; end if;
   if p_periodo not in ('inicio', 'mensual', 'anual', 'otro') or p_medio not in ('link', 'transferencia') then raise exception 'Datos no válidos'; end if;
   if coalesce(p_monto, 0) < 1 then raise exception 'Escribe el monto que pagaste'; end if;
   if coalesce(length(p_comprobante), 0) < 200 then raise exception 'Sube la foto del comprobante'; end if;
+  if cup is not null then perform public.cfx_cupon_ver(cup); end if;
   if exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente') then raise exception 'Ya tienes un pago en revisión. Te avisamos apenas se apruebe.'; end if;
   if (select count(*) from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and creado > now() - interval '1 day') >= 5 then raise exception 'Demasiados intentos hoy. Escribe a soporte.'; end if;
-  insert into public.cfx_pagos (cuenta, email, nombre, rol, periodo, monto, medio, nota, comprobante)
+  insert into public.cfx_pagos (cuenta, email, nombre, rol, periodo, monto, medio, nota, comprobante, cupon)
   values ((y ->> 'id')::uuid, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), case when y ->> 'rol' in ('negocio', 'cliente') then y ->> 'rol' else 'otro' end,
-          p_periodo, p_monto, p_medio, left(coalesce(p_nota, ''), 300), p_comprobante)
+          p_periodo, p_monto, p_medio, left(coalesce(p_nota, ''), 300), p_comprobante, cup)
   returning id into i;
-  perform public.cfx_avisar_admin('💳 Pago por revisar', coalesce(nullif(y ->> 'nombre', ''), y ->> 'email') || ' · $' || p_monto || ' (' || p_periodo || ')');
+  perform public.cfx_avisar_admin('💳 Pago por revisar', coalesce(nullif(y ->> 'nombre', ''), y ->> 'email') || ' · $' || p_monto || ' (' || p_periodo || ')' || coalesce(' · cupón ' || cup, ''));
   return i;
 end $$;
 
@@ -5028,18 +5060,265 @@ end $$;
 
 revoke all on function public.cfx_exento_email(text, boolean) from public, anon;
 grant execute on function public.cfx_exento_email(text, boolean) to authenticated;
-revoke all on function public.cfx_pago_estado(), public.cfx_pago_pedir(text, int, text, text, text), public.cfx_pagos_config(), public.cfx_pagos_config_guardar(jsonb),
+revoke all on function public.cfx_pago_estado(), public.cfx_pago_pedir(text, int, text, text, text, text), public.cfx_pagos_config(), public.cfx_pagos_config_guardar(jsonb),
   public.cfx_pagos_lista(text), public.cfx_pago_comprobante(uuid), public.cfx_pago_resolver(uuid, boolean, int, text), public.cfx_exento(uuid, boolean, text) from public, anon;
-grant execute on function public.cfx_pago_estado(), public.cfx_pago_pedir(text, int, text, text, text), public.cfx_pagos_config(), public.cfx_pagos_config_guardar(jsonb),
+grant execute on function public.cfx_pago_estado(), public.cfx_pago_pedir(text, int, text, text, text, text), public.cfx_pagos_config(), public.cfx_pagos_config_guardar(jsonb),
   public.cfx_pagos_lista(text), public.cfx_pago_comprobante(uuid), public.cfx_pago_resolver(uuid, boolean, int, text), public.cfx_exento(uuid, boolean, text) to authenticated;
 revoke all on function public.cfx_yo(), public.cfx_dar_premium(uuid, text, int), public.cfx_avisar(uuid, text, text), public.cfx_avisar_admin(text, text) from public, anon, authenticated;
+-- ---------------------------------------------------------------------
+-- CodeFix · Administración común (igual en las 6 apps; se maneja desde el Centro de Mando → Control).
+--   Planes (interruptores sí/no y límites), textos, aviso a todos, keys de Premium, cupones de descuento,
+--   verificación de identidad y registro de lo que hace el administrador.
+--   Cada app define antes: cfx_planes_app(), cfx_plan_guardar_app(text, text, jsonb, jsonb), cfx_textos_app(),
+--   cfx_texto_guardar_app(text, text), cfx_destinatarios(text) y cfx_marcar_verificado(uuid, boolean).
+-- ---------------------------------------------------------------------
+create table if not exists public.cfx_registro (
+  id bigserial primary key, quien text not null default '', accion text not null, detalle text not null default '', creado timestamptz not null default now());
+create table if not exists public.cfx_keys (
+  id uuid primary key default gen_random_uuid(), hash text not null unique, ultimos text not null, rol text not null check (rol in ('negocio', 'cliente')),
+  dias int not null check (dias between 1 and 3660), nota text not null default '', creado timestamptz not null default now(),
+  usada_por uuid, usada_email text, usada_at timestamptz, revocada boolean not null default false);
+create table if not exists public.cfx_cupones (
+  codigo text primary key check (codigo ~ '^[A-Z0-9-]{3,20}$'), pct int not null check (pct between 1 and 100), usos_max int, usos int not null default 0,
+  vence date, activo boolean not null default true, creado timestamptz not null default now());
+create table if not exists public.cfx_verificaciones (
+  cuenta uuid primary key, email text not null default '', nombre text not null default '', rut text not null, documento text not null default '',
+  frente text, reverso text, selfie text, estado text not null default 'pendiente' check (estado in ('pendiente', 'aprobada', 'rechazada')),
+  motivo text not null default '', creado timestamptz not null default now(), resuelto timestamptz);
+alter table public.cfx_registro enable row level security;
+alter table public.cfx_keys enable row level security;
+alter table public.cfx_cupones enable row level security;
+alter table public.cfx_verificaciones enable row level security;
+revoke all on public.cfx_registro, public.cfx_keys, public.cfx_cupones, public.cfx_verificaciones from anon, authenticated;
+
+create or replace function public.cfx_anotar(p_accion text, p_detalle text) returns void
+language sql security definer set search_path = '' as $$
+  insert into public.cfx_registro (quien, accion, detalle) values (coalesce((select email from auth.users where id = auth.uid()), 'sistema'), left(p_accion, 60), left(coalesce(p_detalle, ''), 400))
+$$;
+create or replace function public.cfx_registro_lista(p_limite int default 200) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select coalesce(jsonb_agg(x order by x.id desc), '[]') from (select * from public.cfx_registro order by id desc limit greatest(1, least(coalesce(p_limite, 200), 2000))) x);
+end $$;
+
+-- ---------- Planes: [{grupo, clave, free, premium}] (números o sí/no) ----------
+create or replace function public.cfx_planes() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return public.cfx_planes_app();
+end $$;
+create or replace function public.cfx_plan_guardar(p_grupo text, p_clave text, p_free jsonb, p_premium jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  if jsonb_typeof(p_free) not in ('number', 'boolean') or jsonb_typeof(p_premium) not in ('number', 'boolean') then raise exception 'Valor no válido'; end if;
+  perform public.cfx_plan_guardar_app(p_grupo, p_clave, p_free, p_premium);
+  perform public.cfx_anotar('plan', p_grupo || '.' || p_clave || ': gratis ' || p_free::text || ' · premium ' || p_premium::text);
+end $$;
+
+-- ---------- Textos: [{clave, valor}] ----------
+create or replace function public.cfx_textos() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return public.cfx_textos_app();
+end $$;
+create or replace function public.cfx_texto_guardar(p_clave text, p_valor text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  perform public.cfx_texto_guardar_app(p_clave, left(coalesce(p_valor, ''), 2000));
+  perform public.cfx_anotar('texto', p_clave);
+end $$;
+
+-- ---------- Aviso a todos: destino todos | negocios | clientes | premium | gratis ----------
+create or replace function public.cfx_aviso_masivo(p_destino text, p_titulo text, p_cuerpo text) returns int
+language plpgsql security definer set search_path = '' as $$
+declare u uuid; n int := 0;
+begin
+  perform public.cfx_es_admin();
+  if trim(coalesce(p_titulo, '')) = '' then raise exception 'Escribe el título'; end if;
+  if p_destino not in ('todos', 'negocios', 'clientes', 'premium', 'gratis') then raise exception 'Destino no válido'; end if;
+  for u in select * from public.cfx_destinatarios(p_destino) loop
+    perform public.cfx_avisar(u, left(p_titulo, 80), left(coalesce(p_cuerpo, ''), 240));
+    n := n + 1;
+  end loop;
+  perform public.cfx_anotar('aviso', p_destino || ' (' || n || '): ' || p_titulo);
+  return n;
+end $$;
+
+-- ---------- Keys de Premium (de un solo uso). Se guardan cifradas: el código completo solo se ve al crearlas. ----------
+create or replace function public.cfx_keys_crear(p_n int, p_rol text, p_dias int, p_nota text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c text; out jsonb := '[]'::jsonb;
+begin
+  perform public.cfx_es_admin();
+  if p_rol not in ('negocio', 'cliente') or coalesce(p_dias, 0) not between 1 and 3660 or coalesce(p_n, 0) not between 1 and 50 then raise exception 'Datos no válidos'; end if;
+  for i in 1..p_n loop
+    c := upper(replace(gen_random_uuid()::text, '-', ''));
+    c := 'CFX-' || substr(c, 1, 4) || '-' || substr(c, 5, 4) || '-' || substr(c, 9, 4);
+    insert into public.cfx_keys (hash, ultimos, rol, dias, nota) values (encode(sha256(convert_to(c, 'UTF8')), 'hex'), right(c, 4), p_rol, p_dias, left(coalesce(p_nota, ''), 120));
+    out := out || to_jsonb(c);
+  end loop;
+  perform public.cfx_anotar('keys', p_n || ' keys ' || p_rol || ' de ' || p_dias || ' días');
+  return out;
+end $$;
+create or replace function public.cfx_keys_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select coalesce(jsonb_agg(to_jsonb(k) - 'hash' order by k.creado desc), '[]') from (select * from public.cfx_keys order by creado desc limit 300) k);
+end $$;
+create or replace function public.cfx_key_revocar(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  update public.cfx_keys set revocada = true where id = p_id and usada_por is null;
+  perform public.cfx_anotar('key revocada', p_id::text);
+end $$;
+create or replace function public.cfx_key_canjear(p_codigo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare y jsonb := public.cfx_yo(); k public.cfx_keys; h timestamptz; c text := upper(trim(coalesce(p_codigo, '')));
+begin
+  if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
+  if (select count(*) from public.cfx_registro where accion = 'key fallida' and detalle = (y ->> 'id') and creado > now() - interval '1 hour') >= 10 then
+    raise exception 'Demasiados intentos. Prueba en una hora.';
+  end if;
+  select * into k from public.cfx_keys where hash = encode(sha256(convert_to(c, 'UTF8')), 'hex') for update;
+  if k.id is null or k.revocada or k.usada_por is not null then
+    insert into public.cfx_registro (quien, accion, detalle) values (coalesce(y ->> 'email', ''), 'key fallida', y ->> 'id');
+    raise exception 'Key no válida o ya usada';
+  end if;
+  if k.rol <> coalesce(y ->> 'rol', '') then raise exception 'Esta key es para cuentas de %', case when k.rol = 'negocio' then 'negocio' else 'cliente' end; end if;
+  h := public.cfx_dar_premium((y ->> 'id')::uuid, k.rol, k.dias);
+  update public.cfx_keys set usada_por = (y ->> 'id')::uuid, usada_email = y ->> 'email', usada_at = now() where id = k.id;
+  insert into public.cfx_exentos (cuenta, nota) values ((y ->> 'id')::uuid, 'Key ' || k.ultimos) on conflict (cuenta) do nothing;
+  perform public.cfx_avisar_admin('🔑 Key canjeada', coalesce(y ->> 'email', '') || ' · ' || k.dias || ' días');
+  return jsonb_build_object('hasta', h, 'dias', k.dias);
+end $$;
+
+-- ---------- Cupones de descuento (se aplican al pagar Premium) ----------
+create or replace function public.cfx_cupon_ver(p_codigo text) returns int
+language plpgsql stable security definer set search_path = '' as $$
+declare c public.cfx_cupones;
+begin
+  if auth.uid() is null then raise exception 'Inicia sesión'; end if;
+  select * into c from public.cfx_cupones where codigo = upper(trim(coalesce(p_codigo, '')));
+  if c.codigo is null or not c.activo or (c.vence is not null and c.vence < current_date) or (c.usos_max is not null and c.usos >= c.usos_max) then
+    raise exception 'Cupón no válido o vencido';
+  end if;
+  return c.pct;
+end $$;
+create or replace function public.cfx_cupones_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select coalesce(jsonb_agg(to_jsonb(c) order by c.creado desc), '[]') from public.cfx_cupones c);
+end $$;
+create or replace function public.cfx_cupon_guardar(p_codigo text, p_pct int, p_usos_max int default null, p_vence date default null, p_activo boolean default true) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  insert into public.cfx_cupones (codigo, pct, usos_max, vence, activo) values (upper(trim(p_codigo)), p_pct, p_usos_max, p_vence, coalesce(p_activo, true))
+  on conflict (codigo) do update set pct = excluded.pct, usos_max = excluded.usos_max, vence = excluded.vence, activo = excluded.activo;
+  perform public.cfx_anotar('cupón', upper(trim(p_codigo)) || ' ' || p_pct || '%');
+end $$;
+create or replace function public.cfx_cupon_borrar(p_codigo text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  delete from public.cfx_cupones where codigo = upper(trim(p_codigo));
+end $$;
+
+-- ---------- Verificación de identidad (RUT, N° de documento, fotos de la cédula y selfie). Las fotos se borran al revisar. ----------
+create or replace function public.cfx_rut_ok(r text) returns boolean
+language plpgsql immutable as $$
+declare s text := upper(regexp_replace(coalesce(r, ''), '[^0-9kK]', '', 'g')); cuerpo text; dv text; suma int := 0; m int := 2; res text;
+begin
+  if length(s) < 2 then return false; end if;
+  cuerpo := left(s, length(s) - 1); dv := right(s, 1);
+  if cuerpo !~ '^[0-9]+$' then return false; end if;
+  for i in reverse length(cuerpo)..1 loop
+    suma := suma + substr(cuerpo, i, 1)::int * m; m := case when m = 7 then 2 else m + 1 end;
+  end loop;
+  res := case 11 - suma % 11 when 11 then '0' when 10 then 'K' else (11 - suma % 11)::text end;
+  return res = dv;
+end $$;
+create or replace function public.cfx_verif_estado() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select (select jsonb_build_object('estado', estado, 'motivo', motivo, 'creado', creado, 'resuelto', resuelto) from public.cfx_verificaciones where cuenta = auth.uid())
+$$;
+create or replace function public.cfx_verif_enviar(p_rut text, p_documento text, p_frente text, p_reverso text, p_selfie text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare y jsonb := public.cfx_yo(); r text := upper(regexp_replace(coalesce(p_rut, ''), '[^0-9kK]', '', 'g'));
+begin
+  if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
+  if not public.cfx_rut_ok(r) then raise exception 'RUT no válido'; end if;
+  if exists (select 1 from public.cfx_verificaciones where rut = r and cuenta <> (y ->> 'id')::uuid and estado <> 'rechazada') then raise exception 'Ese RUT ya está en otra cuenta'; end if;
+  if exists (select 1 from public.cfx_verificaciones where cuenta = (y ->> 'id')::uuid and estado = 'aprobada') then raise exception 'Tu identidad ya está verificada'; end if;
+  if coalesce(length(p_frente), 0) < 200 or coalesce(length(p_reverso), 0) < 200 or coalesce(length(p_selfie), 0) < 200 then raise exception 'Faltan fotos'; end if;
+  if length(p_frente) > 500000 or length(p_reverso) > 500000 or length(p_selfie) > 500000 then raise exception 'Fotos muy pesadas'; end if;
+  insert into public.cfx_verificaciones (cuenta, email, nombre, rut, documento, frente, reverso, selfie, estado, motivo, creado, resuelto)
+  values ((y ->> 'id')::uuid, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), r, left(coalesce(p_documento, ''), 20), p_frente, p_reverso, p_selfie, 'pendiente', '', now(), null)
+  on conflict (cuenta) do update set rut = excluded.rut, documento = excluded.documento, frente = excluded.frente, reverso = excluded.reverso, selfie = excluded.selfie,
+    estado = 'pendiente', motivo = '', creado = now(), resuelto = null;
+  perform public.cfx_avisar_admin('🪪 Verificación por revisar', coalesce(nullif(y ->> 'nombre', ''), y ->> 'email'));
+end $$;
+create or replace function public.cfx_verif_lista(p_estado text default 'pendiente') returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select coalesce(jsonb_agg(x order by x.creado desc), '[]') from (select cuenta, email, nombre, rut, documento, estado, motivo, creado, resuelto
+    from public.cfx_verificaciones where p_estado = 'todos' or estado = p_estado order by creado desc limit 200) x);
+end $$;
+create or replace function public.cfx_verif_fotos(p_cuenta uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select jsonb_build_object('frente', frente, 'reverso', reverso, 'selfie', selfie) from public.cfx_verificaciones where cuenta = p_cuenta);
+end $$;
+create or replace function public.cfx_verif_resolver(p_cuenta uuid, p_aprobar boolean, p_motivo text default '') returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  update public.cfx_verificaciones set estado = case when p_aprobar then 'aprobada' else 'rechazada' end, motivo = left(coalesce(p_motivo, ''), 200),
+    resuelto = now(), frente = null, reverso = null, selfie = null where cuenta = p_cuenta and estado = 'pendiente';
+  if not found then raise exception 'No hay una verificación pendiente'; end if;
+  perform public.cfx_marcar_verificado(p_cuenta, p_aprobar);
+  perform public.cfx_avisar(p_cuenta, case when p_aprobar then '🪪 Identidad verificada' else '🪪 Verificación rechazada' end,
+    case when p_aprobar then 'Ya apareces como persona verificada.' else coalesce(nullif(p_motivo, ''), 'Revisa las fotos') || '. Puedes enviarla de nuevo.' end);
+  perform public.cfx_anotar(case when p_aprobar then 'verificación aprobada' else 'verificación rechazada' end, p_cuenta::text);
+end $$;
+
+create or replace function public.cfx_cupon_usado() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.estado = 'aprobado' and old.estado = 'pendiente' and new.cupon is not null then update public.cfx_cupones set usos = usos + 1 where codigo = new.cupon; end if;
+  return new;
+end $$;
+drop trigger if exists cfx_cupon_usado on public.cfx_pagos;
+create trigger cfx_cupon_usado after update of estado on public.cfx_pagos for each row execute function public.cfx_cupon_usado();
+
+revoke all on function public.cfx_anotar(text, text), public.cfx_cupon_usado() from public, anon, authenticated;
+revoke all on function public.cfx_registro_lista(int), public.cfx_planes(), public.cfx_plan_guardar(text, text, jsonb, jsonb), public.cfx_textos(), public.cfx_texto_guardar(text, text),
+  public.cfx_aviso_masivo(text, text, text), public.cfx_keys_crear(int, text, int, text), public.cfx_keys_lista(), public.cfx_key_revocar(uuid), public.cfx_key_canjear(text),
+  public.cfx_cupon_ver(text), public.cfx_cupones_lista(), public.cfx_cupon_guardar(text, int, int, date, boolean), public.cfx_cupon_borrar(text),
+  public.cfx_verif_estado(), public.cfx_verif_enviar(text, text, text, text, text), public.cfx_verif_lista(text), public.cfx_verif_fotos(uuid), public.cfx_verif_resolver(uuid, boolean, text) from public, anon;
+grant execute on function public.cfx_registro_lista(int), public.cfx_planes(), public.cfx_plan_guardar(text, text, jsonb, jsonb), public.cfx_textos(), public.cfx_texto_guardar(text, text),
+  public.cfx_aviso_masivo(text, text, text), public.cfx_keys_crear(int, text, int, text), public.cfx_keys_lista(), public.cfx_key_revocar(uuid), public.cfx_key_canjear(text),
+  public.cfx_cupon_ver(text), public.cfx_cupones_lista(), public.cfx_cupon_guardar(text, int, int, date, boolean), public.cfx_cupon_borrar(text),
+  public.cfx_verif_estado(), public.cfx_verif_enviar(text, text, text, text, text), public.cfx_verif_lista(text), public.cfx_verif_fotos(uuid), public.cfx_verif_resolver(uuid, boolean, text) to authenticated;
+revoke all on function public.cfx_planes_app(), public.cfx_plan_guardar_app(text, text, jsonb, jsonb), public.cfx_textos_app(), public.cfx_texto_guardar_app(text, text),
+  public.cfx_destinatarios(text), public.cfx_marcar_verificado(uuid, boolean) from public, anon, authenticated;
 -- ---------------------------------------------------------------------
 -- CodeFix · Inventario (igual en las 6 apps; lo usa el Centro de Mando → Apps → Respaldo y limpieza).
 --   Muestra las tablas que esta versión ya NO usa (restos de versiones antiguas) con cuántas filas tienen.
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_config', 'public.cfx_exentos', 'public.cfx_pagos', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.user_invites'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_pagos', 'public.cfx_registro', 'public.cfx_verificaciones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.user_invites'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;

@@ -19,7 +19,7 @@
     '.cfx-pago button.cp-si,.cfx-pago .cp-tabs button.on{background:var(--cp-color);color:#fff}.cfx-pago button:disabled{opacity:.6}' +
     '.cfx-pago .cp-caja{border:1px solid var(--cfx-borde,#e2e7ec);border-radius:14px;padding:12px;margin:8px 0}.cfx-pago .cp-monto{font-size:28px;font-weight:800;margin:2px 0}' +
     '.cfx-pago .cp-fila{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.cfx-pago .cp-fila>*{flex:1 1 140px}.cfx-pago a.cp-btn{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;background:var(--cp-color);color:#fff;font-weight:700;text-decoration:none}' +
-    '.cfx-pago label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}.cfx-pago input{width:100%;box-sizing:border-box;min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;padding:8px 12px}' +
+    '.cfx-pago summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--cfx-texto-2,#5b6472)}.cfx-pago label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}.cfx-pago input{width:100%;box-sizing:border-box;min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;padding:8px 12px}' +
     '.cfx-pago .cp-err{color:var(--cfx-mal,#dc2626);font-weight:600;min-height:1em}.cfx-pago .cp-ok{background:color-mix(in srgb,var(--cfx-ok,#16a34a) 14%,transparent);border-radius:12px;padding:10px 12px;margin:10px 0}' +
     '.cfx-pago .cp-dato{display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:3px 0}.cfx-pago .cp-dato span{color:var(--cfx-texto-2,#5b6472)}.cfx-pago img.cp-vista{max-width:100%;max-height:180px;border-radius:10px;margin-top:8px}';
   document.head.appendChild(css);
@@ -82,7 +82,7 @@
     try { e = await o.rpc('cfx_pago_estado'); } catch (x) { caja.innerHTML = '<p class="cp-err">' + esc(x.message || x) + '</p><button type="button" data-x>Cerrar</button>'; caja.querySelector('[data-x]').onclick = cerrar; return; }
     // comoNegocio: la app pide el pago de negocio aunque la cuenta aún no lo sea (Estaciona: al publicar el primer estacionamiento).
     if (o.comoNegocio && e.yo && e.yo.rol === 'cliente') e.yo.rol = 'negocio';
-    const obligatorio = !!(o.obligatorio || e.bloqueado || (o.comoNegocio && e.debe_inicio));
+    let obligatorio = !!(o.obligatorio || e.bloqueado || (o.comoNegocio && e.debe_inicio));
     const c = e.config || {}, t = c.transferencia || {}, pct = Number(c.comision_pct) || 0;
     const L = planes(e), medios = [c.link ? 'link' : null, t.numero ? 'transferencia' : null].filter(Boolean);
     let plan = L[0], medio = medios[0], foto = null;
@@ -90,12 +90,18 @@
     const pie = (obligatorio ? (o.salir ? '<button type="button" data-salir style="width:100%;margin-top:10px">' + esc(o.salirTexto || 'Cerrar sesión') + '</button>' : '') : '<button type="button" data-x style="width:100%;margin-top:10px">Ahora no</button>') +
       (c.whatsapp ? '<p style="text-align:center"><a href="https://wa.me/' + esc(String(c.whatsapp).replace(/\D/g, '')) + '" target="_blank" rel="noopener">¿Dudas? Escríbenos por WhatsApp</a></p>' : '');
     const u = e.ultimo;
+    const keyHtml = '<details style="margin-top:8px"><summary>🔑 Tengo una key</summary><div class="cp-fila"><input id="cpKey" placeholder="CFX-XXXX-XXXX-XXXX" autocapitalize="characters"><button type="button" data-key>Activar</button></div><p class="cp-err" id="cpKeyErr"></p></details>';
     if (u && u.estado === 'pendiente') {
       caja.innerHTML = '<h2>⏳ Pago en revisión</h2><div class="cp-ok">Recibimos tu comprobante de <b>' + pesos(u.monto) + '</b>. Te avisamos apenas se apruebe (normalmente el mismo día).</div>' + pie;
     } else if (!medios.length) {
-      caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : '⭐ Hazte Premium') + '</h2><p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + pie;
+      caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : '⭐ Hazte Premium') + '</h2><p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + keyHtml + pie;
     } else {
-      const monto = () => { const b = plan.k === 'otro' ? Number((caja.querySelector('#cpOtro') || {}).value || 0) : plan.p; return medio === 'link' ? Math.ceil(b * (1 + pct / 100)) : b; };
+      let cupon = null;  // { codigo, pct }: descuento sobre el precio del plan (no sobre "otro monto")
+      const monto = () => {
+        let b = plan.k === 'otro' ? Number((caja.querySelector('#cpOtro') || {}).value || 0) : plan.p;
+        if (cupon && plan.k !== 'otro') b = Math.round(b * (100 - cupon.pct) / 100);
+        return medio === 'link' ? Math.ceil(b * (1 + pct / 100)) : b;
+      };
       const pintar = () => {
         caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : '⭐ Hazte Premium') + '</h2>' +
           (obligatorio ? '<p>Para empezar a usar la app haz tu primer pago. Te da ' + esc(plan.d) + '; después puedes seguir en Premium o quedar en la versión gratis.</p>' : '<p>Paga con link o transferencia y sube la foto del comprobante. Lo revisamos y se activa.</p>') +
@@ -110,7 +116,10 @@
               '<div class="cp-fila"><button type="button" data-datos>📋 Copiar datos</button><button type="button" data-copiar>📋 Copiar monto</button></div>') + '</div>' +
           '<label for="cpFoto">Foto del comprobante</label><input id="cpFoto" type="file" accept="image/*">' + (foto ? '<img class="cp-vista" alt="Comprobante" src="' + foto + '">' : '') +
           '<label for="cpPagado">Monto que pagaste</label><input id="cpPagado" type="number" inputmode="numeric" value="' + (monto() || '') + '">' +
-          '<p class="cp-err" id="cpErr"></p><button type="button" class="cp-si" data-enviar style="width:100%">Enviar comprobante</button>' + pie;
+          '<p class="cp-err" id="cpErr"></p><button type="button" class="cp-si" data-enviar style="width:100%">Enviar comprobante</button>' +
+          '<details style="margin-top:12px"><summary>🏷️ Tengo un cupón</summary><div class="cp-fila"><input id="cpCupon" placeholder="CUPÓN" autocapitalize="characters" value="' + esc(cupon ? cupon.codigo : '') + '"><button type="button" data-cupon>Aplicar</button></div>' +
+            (cupon ? '<p>Cupón ' + esc(cupon.codigo) + ': ' + cupon.pct + '% de descuento.</p>' : '') + '</details>' +
+          keyHtml + pie;
         if (plan.k === 'otro') { const i = caja.querySelector('#cpOtro'); i.value = o._otro || ''; i.oninput = () => { o._otro = i.value; caja.querySelector('#cpMonto').textContent = pesos(monto()); caja.querySelector('#cpPagado').value = monto() || ''; }; }
         if (o._pagado) caja.querySelector('#cpPagado').value = o._pagado;
         caja.querySelector('#cpPagado').oninput = (ev) => { o._pagado = ev.target.value; };
@@ -121,8 +130,13 @@
         try { foto = await achicar(ev.target.files[0]); pintar(); } catch (x) { caja.querySelector('#cpErr').textContent = x.message; }
       });
       caja.addEventListener('click', async (ev) => {
-        const b = ev.target.closest('[data-p],[data-m],[data-copiar],[data-datos],[data-enviar]'); if (!b) return;
+        const b = ev.target.closest('[data-p],[data-m],[data-copiar],[data-datos],[data-enviar],[data-cupon],[data-key]'); if (!b) return;
         if (b.dataset.p) { plan = L[+b.dataset.p]; o._pagado = ''; pintar(); }
+        else if ('cupon' in b.dataset) {
+          const cod = caja.querySelector('#cpCupon').value.trim().toUpperCase();
+          try { cupon = { codigo: cod, pct: await o.rpc('cfx_cupon_ver', { p_codigo: cod }) }; o._pagado = ''; pintar(); caja.querySelector('details').open = true; }
+          catch (x) { caja.querySelector('#cpErr').textContent = (x && x.message) || String(x); }
+        } else if ('key' in b.dataset) return;
         else if (b.dataset.m) { medio = b.dataset.m; o._pagado = ''; pintar(); }
         else if ('copiar' in b.dataset) { await copiar(String(monto())); b.textContent = '✓ Copiado'; }
         else if ('datos' in b.dataset) { await copiar([t.titular, t.rut, t.banco, t.tipo, t.numero, t.correo].filter(Boolean).join('\n')); b.textContent = '✓ Copiado'; }
@@ -132,18 +146,26 @@
           if (pagado < 1) { err.textContent = 'Escribe el monto que pagaste'; return; }
           b.disabled = true; b.textContent = 'Enviando…';
           try {
-            await o.rpc('cfx_pago_pedir', { p_periodo: plan.k, p_monto: pagado, p_medio: medio, p_comprobante: foto, p_nota: plan.k === 'otro' ? 'Otro monto' : '' });
+            await o.rpc('cfx_pago_pedir', { p_periodo: plan.k, p_monto: pagado, p_medio: medio, p_comprobante: foto, p_nota: plan.k === 'otro' ? 'Otro monto' : '', p_cupon: cupon ? cupon.codigo : null });
             caja.innerHTML = '<h2>✅ ¡Recibido!</h2><div class="cp-ok">Revisamos tu comprobante y te avisamos apenas se active.</div>' + pie;
             if (o.alPagar) o.alPagar();
           } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = 'Enviar comprobante'; }
         }
       });
     }
-    caja.addEventListener('click', (ev) => {
-      if (ev.target.closest('[data-x]')) cerrar();
+    caja.addEventListener('click', async (ev) => {
+      if (ev.target.closest('[data-key]')) {
+        try {
+          const r = await o.rpc('cfx_key_canjear', { p_codigo: caja.querySelector('#cpKey').value });
+          caja.innerHTML = '<h2>🎉 ¡Listo!</h2><div class="cp-ok">Premium activo por ' + r.dias + ' días.</div><button type="button" data-x style="width:100%;margin-top:10px">Continuar</button>';
+          obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar();
+        } catch (x) { caja.querySelector('#cpKeyErr').textContent = (x && x.message) || String(x); }
+        return;
+      }
+      if (ev.target.closest('[data-x]')) { cerrar(); if (e.bloqueado || e.debe_inicio) location.reload(); }
       if (ev.target.closest('[data-salir]')) { cerrar(); o.salir(); }
     });
-    if (!obligatorio) capa.addEventListener('click', (ev) => { if (ev.target === capa) cerrar(); });
+    capa.addEventListener('click', (ev) => { if (ev.target === capa && !obligatorio) cerrar(); });
     capa.addEventListener('cancel', (ev) => { ev.preventDefault(); if (!obligatorio) cerrar(); });
     if (obligatorio) alFrente(capa);
     return e;

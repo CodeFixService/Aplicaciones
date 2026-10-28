@@ -200,7 +200,7 @@
     <div class="card">
       <h2>👤 Mi perfil</h2>
       <label for="eNombre" id="lblNombre">Nombre</label><input id="eNombre" maxlength="80">
-      <div class="btns"><button class="small" id="eBtn">Guardar</button></div>
+      <div class="btns"><button class="small" id="eBtn">Guardar</button><button class="small alt hidden" id="bVerif">🪪 Verificar identidad</button></div>
       <div id="rowIcono" class="hidden">
         <label>Tu ícono <span class="pill pro" id="icoPill">PREMIUM</span></label>
         <div class="iconos" id="iconos"></div>
@@ -548,6 +548,7 @@
     $('hoy').classList.toggle('hidden', cliente);
     $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'FichaPro') : (acc.empresa || 'FichaPro'));
     const dueno = acc.role === 'user';
+    $('bVerif').classList.toggle('hidden', !dueno);
     ['cTienda', 'cLinks', 'cEquipo', 'cMas', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
@@ -979,6 +980,7 @@
     catch (err) { Core.toast(err.message); }
   };
   $('bSalir').onclick = async () => { await Cuenta.signOut(); location.replace('./'); };
+  $('bVerif').onclick = () => CFX_VERIFICAR.abrir({ rpc: (f, a) => Cuenta.rpc(f, a) });
   $('bRespaldo').onclick = async () => {
     try { CFX_RESPALDO.excel('respaldo-' + (Cuenta.account.empresa || 'tienda'), await Cuenta.rpc('mi_respaldo')); Core.toast('Respaldo descargado'); }
     catch (err) { Core.toast(err.message); }
@@ -1007,5 +1009,6 @@
 <script src="shared/voz.js"></script>
 <script src="shared/respaldo.js"></script>
 <script src="shared/pagos.js"></script>
+<script src="shared/verificar.js"></script>
 </body>
 </html>
