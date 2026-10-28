@@ -111,6 +111,8 @@
       return new Promise(() => {});
     }
     setTimeout(ofrecerPush, 1500);
+    // Núcleo (premium.js): con Pro/Premium la app se ve dorada y la primera vez saluda.
+    if (!a.is_admin && a.role !== 'equipo') (window.CFX_PREMIUM ? Promise.resolve() : new Promise((r) => addEventListener('load', r))).then(() => window.CFX_PREMIUM && CFX_PREMIUM.marcar({ premium: !!a.is_pro, id: a.id, hasta: a.pro_until }));
     return a;
   }
 
