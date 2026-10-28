@@ -350,6 +350,10 @@
     document.body.classList.add('con-nav');
     n.innerHTML = items.map(([k, i, t, u]) => '<a href="' + r + u + '" data-k="' + k + '" class="' + (k === activo ? 'on' : '') + '">' + ICO(i) + t +
       (k === 'chat' || k === 'pedidos' ? '<span class="badge" hidden></span>' : '') + '</a>').join('');
+    // Barra común del núcleo: [principal][principal][ + ][principal][Más]
+    global.CFX_BARRA = a.role === 'client' ? { orden: ['pedidos', 'chat', '+', 'contactos', 'cuenta'], plus: 'tienda' }
+      : a.role === 'equipo' ? { orden: ['hoy', 'pedidos', '+', 'chat'], plus: 'caja' } : { orden: ['hoy', 'pedidos', '+', 'fichas', 'mas'], plus: 'caja' };
+    if (global.CodeFixBarra) { delete n.dataset.cfx; global.CodeFixBarra.montar(); }
     // Atajos arriba: mensajes (negocio) y avisos.
     const h = document.querySelector('header.top');
     if (h && !h.querySelector('.atajos')) {

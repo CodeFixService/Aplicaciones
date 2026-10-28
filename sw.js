@@ -9,7 +9,7 @@ const FILES = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'shared/core.css',
-  'shared/core.js', 'shared/tema.css',
+  'shared/core.js', 'shared/barra.js', 'shared/tema.css',
   'shared/iconos.js',
   'shared/instalar.js',
   'shared/config.js',
