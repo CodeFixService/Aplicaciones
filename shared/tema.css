@@ -64,10 +64,10 @@ input, select, textarea, button { font-family: inherit; }
   nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current="page"] { color: var(--brand, var(--marca, #2563eb)) !important; }
   nav.cfx-barra > .on::before, nav.cfx-barra > .activo::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: currentColor; }
   /* El + grande, con color, un poco más arriba que el resto */
-  nav.cfx-barra > .cfx-mas { overflow: visible; color: var(--cfx-texto) !important; }
+  nav.cfx-barra > .cfx-mas { overflow: visible; color: var(--cfx-texto) !important; font-size: 0 !important; justify-content: center !important; }  /* solo el +, sin texto */
   nav.cfx-barra > .cfx-mas::before { display: none; }
   nav.cfx-barra > .cfx-mas .cfx-ico, nav.cfx-barra > .cfx-mas > svg:first-child, nav.cfx-barra > .cfx-mas > span:first-child {
-    width: 56px !important; height: 56px !important; margin: -26px auto 1px !important; border-radius: 50% !important;
+    width: 56px !important; height: 56px !important; margin: -22px auto 0 !important; border-radius: 50% !important;
     background: var(--brand, var(--marca, #2563eb)) !important; color: var(--brand-ink, #fff) !important;
     box-shadow: 0 6px 16px color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 45%, transparent), 0 0 0 4px var(--cfx-tarjeta) !important;
   }
@@ -104,9 +104,11 @@ input, select, textarea, button { font-family: inherit; }
     color: var(--brand, var(--marca, #2563eb)) !important; background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 12%, transparent) !important;
   }
   nav.cfx-barra > .on::before, nav.cfx-barra > .activo::before, nav.cfx-barra > .cfx-mas::before { display: none !important; }
-  nav.cfx-barra > .cfx-mas { order: -1; margin-bottom: 10px !important; justify-content: center !important; background: var(--brand, var(--marca, #2563eb)) !important; color: var(--brand-ink, #fff) !important; }
+  nav.cfx-barra > .cfx-mas { order: -1; align-self: center !important; width: 52px !important; min-height: 52px !important; height: 52px !important; padding: 0 !important; margin-bottom: 12px !important; border-radius: 50% !important;
+    justify-content: center !important; font-size: 0 !important; background: var(--brand, var(--marca, #2563eb)) !important; color: var(--brand-ink, #fff) !important; }
   nav.cfx-barra > .cfx-mas:hover { filter: brightness(1.08); }
-  nav.cfx-barra > .cfx-mas .cfx-ico, nav.cfx-barra > .cfx-mas > svg:first-child, nav.cfx-barra > .cfx-mas > span:first-child { width: 22px !important; height: 22px !important; background: none !important; color: inherit !important; }
+  nav.cfx-barra > .cfx-mas .cfx-ico, nav.cfx-barra > .cfx-mas > svg:first-child, nav.cfx-barra > .cfx-mas > span:first-child { width: 26px !important; height: 26px !important; background: none !important; color: inherit !important; }
+  nav.cfx-barra > .cfx-mas svg { width: 26px !important; height: 26px !important; }
   nav.cfx-barra .cfx-oculto { display: flex !important; }
   nav.cfx-barra > .cfx-menu { display: none !important; }
   nav.cfx-barra .badge, nav.cfx-barra .punto, nav.cfx-barra .num { position: static !important; margin-left: auto !important; transform: none !important; }

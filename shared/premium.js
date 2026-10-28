@@ -8,7 +8,8 @@
   css.textContent =
     'html.cfx-premium body::before{content:"";position:fixed;top:0;left:0;right:0;height:3px;z-index:2147482000;background:linear-gradient(90deg,#f7d774,#d9a21b,#f7d774);pointer-events:none}' +
     'html.cfx-premium nav.cfx-barra>.on,html.cfx-premium nav.cfx-barra>.activo,html.cfx-premium nav.cfx-barra>[aria-current="page"]{color:#c58b00!important}' +
-    'html.cfx-premium nav.cfx-barra .cfx-mas,html.cfx-premium nav.cfx-barra .nuevo span:first-child{background:linear-gradient(135deg,#f7d774,#d9a21b)!important;color:#3b2a00!important}' +
+    'html.cfx-premium nav.cfx-barra .cfx-mas>:first-child,html.cfx-premium nav.cfx-barra .cfx-mas .cfx-ico,html.cfx-premium nav.cfx-barra .nuevo span:first-child{background:linear-gradient(135deg,#f7d774,#d9a21b)!important;color:#3b2a00!important}' +
+    '@media(min-width:900px){html.cfx-premium nav.cfx-barra>.cfx-mas{background:linear-gradient(135deg,#f7d774,#d9a21b)!important;color:#3b2a00!important}html.cfx-premium nav.cfx-barra>.cfx-mas>:first-child,html.cfx-premium nav.cfx-barra>.cfx-mas .cfx-ico{background:none!important}}' +
     'dialog.cfx-hola{border:0;padding:0;margin:auto auto 0;width:100%;max-width:520px;background:transparent}dialog.cfx-hola::backdrop{background:rgba(15,23,42,.55)}' +
     '@media(min-width:600px){dialog.cfx-hola{margin:auto}}' +
     '.cfx-hola>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);border-radius:20px 20px 0 0;padding:20px 16px calc(18px + env(safe-area-inset-bottom));font-family:var(--cfx-letra,system-ui,sans-serif);text-align:center}' +
