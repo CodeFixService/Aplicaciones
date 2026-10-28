@@ -4675,7 +4675,7 @@ grant execute on function public.marca_publica() to anon, authenticated;
 --  · Funciones comunes cfx_* para el Centro de Mando (respaldo, limpieza e inventario).
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.10'::text $$;
+language sql immutable as $$ select '5.11'::text $$;
 
 alter table public.notification_reads add column if not exists oculto boolean not null default false;
 alter table public.profiles add column if not exists aviso_limpieza_at timestamptz;
@@ -4881,7 +4881,7 @@ create or replace function public.cfx_texto_guardar_app(p_clave text, p_valor te
 language plpgsql security definer set search_path = '' as $$ begin raise exception 'Esta app no tiene textos editables'; end $$;
 create or replace function public.cfx_destinatarios(p_destino text) returns setof uuid
 language sql stable security definer set search_path = '' as $$
-  select id from public.profiles where not suspended and role in ('user', 'client')
+  select id from public.profiles where not suspended and role in ('user', 'client', 'equipo')
     and (p_destino = 'todos' or (p_destino = 'negocios' and role = 'user') or (p_destino = 'clientes' and role = 'client')
       or (p_destino = 'premium' and public.is_pro(id)) or (p_destino = 'gratis' and not public.is_pro(id)))
 $$;

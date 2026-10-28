@@ -17,9 +17,9 @@
     const r = campo.getBoundingClientRect();
     if (!r.width || r.bottom < 0 || r.top > innerHeight) return ocultar();
     // Tamaño según el campo (en campos chicos el botón se achica) y el texto no queda debajo del micrófono.
-    const alto = Math.max(22, Math.min(campo.tagName === 'TEXTAREA' ? 34 : 34, r.height - 10, r.width / 5));
+    const alto = Math.round(Math.max(18, Math.min(campo.tagName === 'TEXTAREA' ? 30 : 28, r.height * 0.62, r.width / 6)));
     if (!campo.dataset.cfxPad) { campo.dataset.cfxPad = campo.style.paddingRight || '-'; campo.style.paddingRight = (alto + 12) + 'px'; }
-    b.style.cssText = 'position:fixed;z-index:130;width:' + alto + 'px;height:' + alto + 'px;left:' + Math.round(r.right - alto - 6) + 'px;top:' + Math.round(campo.tagName === 'TEXTAREA' ? r.bottom - alto - 6 : r.top + (r.height - alto) / 2) + 'px';
+    b.style.cssText = 'position:fixed;z-index:130;width:' + alto + 'px;height:' + alto + 'px;left:' + Math.round(r.right - alto - Math.max(4, (r.height - alto) / 2.4)) + 'px;top:' + Math.round(campo.tagName === 'TEXTAREA' ? r.bottom - alto - 7 : r.top + (r.height - alto) / 2) + 'px';
     b.hidden = false;
   }
   function ocultar() {

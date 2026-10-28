@@ -7,7 +7,7 @@
   await Cuenta.require('../../', { admin: true });
   Cuenta.revisarActualizacion();
   // La dirección de la app (Cloudflare): la usa el aviso automático de versión nueva.
-  Cuenta.rpc('admin_set_setting', { p_key: 'app_url', p_value: Core.rootUrl() }).catch(() => {});
+  if (location.protocol === 'https:') Cuenta.rpc('admin_set_setting', { p_key: 'app_url', p_value: Core.rootUrl() }).catch(() => {});
 
   const fecha = (t) => t ? new Date(t).toLocaleDateString('es') : '';
   const fechaHora = (t) => t ? new Date(t).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '';
@@ -21,10 +21,10 @@
   const pintarLogoArriba = () => $('bInicio').classList.toggle('logo', !!Cuenta.aplicarLogo(Cuenta.account));
   pintarLogoArriba();
   let perfiles = {};
-  const DB_VERSION = '5.10';
+  const DB_VERSION = '5.11';
 
   /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
-  const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, pagos: cargarPagos, ajustes: () => verAjuste(ajuste) };
+  const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, ajustes: () => verAjuste() };
   document.querySelectorAll('nav.tabs button').forEach((b) => { b.onclick = () => show(b.dataset.v); });
   function show(v, sinCargar) {
     document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
@@ -42,9 +42,6 @@
     const r = await Cuenta.rpc('admin_resumen');
     $('cBase').classList.toggle('hidden', r.version === DB_VERSION);
     $('baseTxt').textContent = 'La app es la ' + DB_VERSION + ' y la base de datos la ' + r.version + '. Se actualiza sola en máximo 10 minutos (no borra datos).';
-    $('tabPagos').textContent = r.pagos_por_revisar; $('tabPagos').classList.toggle('hidden', !r.pagos_por_revisar);
-    $('cPagosAlerta').classList.toggle('hidden', !r.pagos_por_revisar);
-    $('cPagosAlerta').innerHTML = '💰 Tienes <b>' + r.pagos_por_revisar + '</b> comprobante(s) de Pro/Premium por revisar ›';
     const item = (t, v) => '<div class="card"><span class="muted">' + t + '</span><b>' + v + '</b></div>';
     $('stats').innerHTML = item('🏪 Negocios', r.negocios) + item('⭐ Negocios Pro', r.negocios_pro) + item('🟢 Activos 7 días', r.activos_7d) +
       item('⏳ Vencen en 7 días', r.por_vencer) + item('👥 Clientes', r.clientes) + item('⭐ Clientes Premium', r.clientes_pro) +
@@ -65,7 +62,6 @@
     try { const x = await Cuenta.rpc('admin_limpiar', { p_que: b.dataset.l }); Core.toast('🧹 Borrados: ' + x.comprobantes + ' comprobantes, ' + x.avisos + ' avisos, ' + x.mensajes + ' mensajes, ' + x.pedidos + ' pedidos'); cargarResumen().catch(fallo); }
     catch (err) { fallo(err); }
   };
-  $('cPagosAlerta').onclick = (e) => { e.preventDefault(); show('pagos'); };
 
   /* ---------- 📡 Actividad de empresas (solo el admin la ve) ---------- */
   const dias = (t) => t ? Math.floor((Date.now() - new Date(t)) / 864e5) : null;
@@ -464,119 +460,19 @@
     accionCuenta(id, a, c ? c.nombre : '', () => cargarClientes().catch(fallo));
   };
 
-  /* ---------- Pagos (comprobantes del Pro / Premium) ---------- */
-  let pFiltro = 'en_revision', pagos = [];
-  seg('pSeg', (b) => { pFiltro = b.dataset.f; cargarPagos().catch(fallo); });
-  async function cargarPagos() {
-    pagos = await Cuenta.rpc('admin_pagos', { p_estado: pFiltro });
-    const E = { en_revision: '🧾 Por revisar', aprobado: '✅ Aprobado', rechazado: '❌ Rechazado' };
-    $('pLista').innerHTML = pagos.length ? pagos.map((x) => '<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap">' +
-      '<div class="grow" style="min-width:180px"><b>' + Core.esc(x.nombre) + '</b> <span class="pill">' + (x.rol === 'client' ? 'Cliente' : 'Negocio') + '</span>' +
-      (x.anual ? ' <span class="pill pro">📅 Anual</span>' : '') +
-      '<div class="muted">' + Core.esc(x.email) + ' · ' + fechaHora(x.fecha) + '</div>' +
-      '<div class="muted">' + (x.monto ? Core.money(x.monto) + ' · ' : '') + (x.pro_until ? 'Pro hasta ' + fecha(x.pro_until) : 'Sin Pro') +
-        (x.dias ? ' · ' + x.dias + ' días' : '') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') + '</div></div>' +
-      '<span class="pill">' + E[x.estado] + '</span></div>' +
-      '<div class="acc" style="margin-top:8px">' + (x.tiene_comprobante ? '<button class="alt" data-ver="' + x.id + '">🧾 Ver comprobante</button>' : '') +
-      (x.estado === 'en_revision' ? '<button class="ok" data-ok="' + x.id + '" data-d="' + (x.anual ? 365 : 0) + '">✅ Aprobar ' + (x.anual ? '1 año' : '1 mes') + '</button>' +
-        '<button class="alt" data-ok="' + x.id + '" data-d="' + (x.anual ? 30 : 365) + '">' + (x.anual ? 'Aprobar solo 30 días' : '📅 Aprobar 1 año') + '</button>' +
-        '<button class="danger" data-no="' + x.id + '">Rechazar</button>' : '') + '</div>' +
-      '<div data-img="' + x.id + '"></div></div>').join('') : '<p class="empty">' + (pFiltro === 'en_revision' ? 'Nada por revisar 🎉' : 'Sin pagos') + '</p>';
+  /* ---------- Ajustes: cuadrícula del núcleo con lo propio de Órbita ----------
+     Precios, links, planes, avisos a todos, pagos y versiones se manejan en el Centro de Mando. */
+  const nodo = (id) => $('aj-' + id);
+  let AJ = null;
+  function verAjuste(k) {
+    AJ = AJ || window.CFX_AJUSTES.montar($('v-ajustes'), [
+      { k: 'reglas', ico: '⚖️', t: 'Reglas', d: 'Días, límites y tiempos', nodo: nodo('reglas'), abrir: () => cargarReglas().catch(fallo) },
+      { k: 'push', ico: '🔔', t: 'Notificaciones', d: 'Servidor, push y correo', nodo: nodo('push'), abrir: () => cargarAjustes().catch(fallo) },
+      { k: 'registro', ico: '📜', t: 'Registro de cambios', d: 'Lo que se hizo en el panel', nodo: nodo('registro'), abrir: () => cargarRegistro().catch(fallo) },
+      { k: 'cuenta', ico: '👤', t: 'Mi cuenta y marca', d: 'Logo, nombre, color y WhatsApp', nodo: nodo('cuenta'), abrir: () => cargarAjustes().catch(fallo) }
+    ], { arriba: '<p class="muted" style="margin:0 0 10px">Precios, planes, avisos a todos, pagos y versiones se manejan en el Centro de Mando.</p>' });
+    if (k) AJ.abrir(k); else AJ.grilla();
   }
-  $('pLista').onclick = async (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    try {
-      if (b.dataset.ver) {
-        const img = await Cuenta.rpc('admin_pago_comprobante', { p_id: b.dataset.ver });
-        const box = $('pLista').querySelector('[data-img="' + b.dataset.ver + '"]');
-        box.innerHTML = img ? '<img class="comp" src="' + img + '" alt="Comprobante"><div class="btns"><button class="small alt" data-dl="' + b.dataset.ver + '">⬇️ Descargar</button></div>' : '<p class="muted">El comprobante ya se borró.</p>';
-        box.querySelector('[data-dl]') && (box.querySelector('[data-dl]').onclick = () => fetch(img).then((r) => r.blob()).then((bl) => Core.download('comprobante.jpg', bl)));
-      }
-      if (b.dataset.ok) {
-        const d = +b.dataset.d || null; // null = lo que pagó (anual: 365; mensual: días del plan en Ajustes → Planes)
-        if (d === 365 && !confirm('¿Aprobar 1 año (365 días)? Revisa que haya pagado el plan anual.')) return;
-        await Cuenta.rpc('admin_revisar_pago', { p_id: b.dataset.ok, p_aprobar: true, p_motivo: null, p_dias: d });
-        sb.functions.invoke('enviar').catch(() => {}); Core.toast('✅ Aprobado: Pro activo' + (d === 365 ? ' por 1 año' : '')); cargarPagos().catch(fallo);
-      }
-      if (b.dataset.no) {
-        const m = await Core.elegir('¿Por qué lo rechazas? (le llega a la persona)', ['📷 La foto no se ve clara', '💸 No vemos el pago en la cuenta',
-          '🔢 El monto no coincide con el precio del plan', '📅 El comprobante es de otra fecha o persona'], 'Escribe el motivo:');
-        if (m === null) return;
-        await Cuenta.rpc('admin_revisar_pago', { p_id: b.dataset.no, p_aprobar: false, p_motivo: m });
-        sb.functions.invoke('enviar').catch(() => {}); Core.toast('Rechazado'); cargarPagos().catch(fallo);
-      }
-    } catch (err) { fallo(err); }
-  };
-
-  /* ---------- Ajustes (sub-pestañas) ---------- */
-  let ajuste = 'links';
-  seg('aSeg', (b) => verAjuste(b.dataset.a));
-  function verAjuste(a) {
-    ajuste = a;
-    document.querySelectorAll('.aj').forEach((x) => x.classList.toggle('hidden', x.id !== 'aj-' + a));
-    const f = { links: cargarLinks, planes: cargarPlanes, reglas: cargarReglas, avisos: cargarAvisos, push: cargarAjustes, version: cargarAjustes, registro: cargarRegistro, cuenta: cargarAjustes }[a];
-    return Promise.resolve(f()).catch(fallo);
-  }
-  async function cargarLinks() {
-    $('linksAdmin').innerHTML = '<div class="card"><p>⭐ Precios, links de pago y datos de transferencia del Premium ahora se configuran una sola vez para las 6 apps en el Centro de Mando → Pagos. Aquí ya no hace falta tocar nada.</p></div>'; return;  // centralizado en el Centro de Mando
-    const l = await Cuenta.rpc('mis_links_pago');
-    $('linksAdmin').innerHTML = [['premium_negocio', '🏪 Pro de negocios (mensual)'], ['premium_cliente', '👤 Premium de clientes (mensual)'],
-      ['anual_negocio', '📅 Pro de negocios: plan anual (ej. 12 meses al precio de 10)'], ['anual_cliente', '📅 Premium de clientes: plan anual']].map(([t, nom]) =>
-      '<h2 style="margin-top:10px">' + nom + '</h2>' + [1, 2].map((n) => {
-        const x = l.find((y) => y.tipo === t && y.slot === n) || {}, k = t + n;
-        return '<div class="slotpago' + (x.activo ? ' on' : '') + '"><b>Espacio ' + n + (x.activo ? ' · ✅ Activo' : '') + '</b>' +
-          '<div class="row" style="flex-wrap:wrap"><div style="min-width:120px"><label for="lp' + k + '">Precio ($)</label><input id="lp' + k + '" inputmode="numeric" value="' + (x.precio == null ? '' : x.precio) + '"></div>' +
-          '<div style="min-width:160px;flex:2"><label for="lt' + k + '">Texto</label><input id="lt' + k + '" maxlength="80" value="' + Core.esc(x.titulo || '') + '" placeholder="' + (/^anual/.test(t) ? 'Pro anual: 12 meses al precio de 10' : 'Pro mensual') + '"></div></div>' +
-          '<label for="lu' + k + '">Link de pago</label><input id="lu' + k + '" type="url" placeholder="https://mpago.la/…" value="' + Core.esc(x.url || '') + '">' +
-          '<label class="chk"><input type="checkbox" id="la' + k + '"' + (x.activo ? ' checked' : '') + '> Activo</label>' +
-          '<div class="btns"><button class="small" data-t="' + t + '" data-n="' + n + '">Guardar</button></div></div>';
-      }).join('')).join('');
-  }
-  $('linksAdmin').onclick = async (e) => {
-    const b = e.target.closest('[data-t]');
-    if (!b) return;
-    const k = b.dataset.t + b.dataset.n, pr = $('lp' + k).value.replace(/\D/g, '');
-    try {
-      await Cuenta.rpc('set_link_pago', { p_tipo: b.dataset.t, p_slot: +b.dataset.n, p_titulo: $('lt' + k).value, p_url: $('lu' + k).value,
-        p_precio: pr === '' ? null : +pr, p_activo: $('la' + k).checked });
-      Core.toast('💳 Guardado'); cargarLinks().catch(fallo);
-    } catch (err) { fallo(err); }
-  };
-  const ETIQ = { productos: 'Productos', clientes: 'Clientes con cuenta', fichas: 'Fichas publicadas', respuestas: 'Respuestas rápidas', equipo: 'Personas de equipo',
-    pedidos_mes: 'Pedidos online al mes', contactos: 'Contactos', favoritos: 'Favoritos', mensajes_seguidos: 'Mensajes seguidos' };
-  const NOMP = { negocio_free: '🏪 Negocio gratis', negocio_pro: '🏪⭐ Negocio Pro', cliente_free: '👤 Cliente gratis', cliente_pro: '👤⭐ Cliente Premium' };
-  async function cargarPlanes() {
-    const P = await Cuenta.rpc('planes_publicos');
-    $('planesBody').innerHTML = Object.keys(NOMP).filter((c) => P[c]).map((c) => {
-      const p = P[c];
-      return '<div class="card" data-plan="' + c + '"><h2>' + NOMP[c] + '</h2>' +
-        '<div class="row" style="flex-wrap:wrap"><div style="min-width:140px"><label>Nombre</label><input data-k="nombre" maxlength="40" value="' + Core.esc(p.nombre) + '"></div>' +
-        '<div style="min-width:120px"><label>Duración del pago (días)</label><input data-k="duracion" inputmode="numeric" value="' + p.duracion_dias + '"></div></div>' +
-        '<label>Descripción</label><input data-k="descripcion" maxlength="300" value="' + Core.esc(p.descripcion) + '">' +
-        '<label>Beneficios (uno por línea)</label><textarea data-k="beneficios" rows="4">' + Core.esc((p.beneficios || []).join('\n')) + '</textarea>' +
-        '<h2 style="margin-top:10px">Límites</h2><div class="row" style="flex-wrap:wrap">' + Object.keys(p.limites).map((k) =>
-          '<div style="min-width:140px"><label>' + Core.esc(ETIQ[k] || k) + '</label><input data-l="' + k + '" inputmode="numeric" value="' + p.limites[k] + '"></div>').join('') + '</div>' +
-        '<div class="btns"><button data-gp="' + c + '">💾 Guardar plan</button></div></div>';
-    }).join('');
-  }
-  $('planesBody').onclick = async (e) => {
-    const b = e.target.closest('[data-gp]');
-    if (!b) return;
-    const card = $('planesBody').querySelector('[data-plan="' + b.dataset.gp + '"]'), v = (k) => card.querySelector('[data-k="' + k + '"]').value;
-    const lim = {};
-    card.querySelectorAll('[data-l]').forEach((i) => { lim[i.dataset.l] = parseInt(i.value, 10) || 0; });
-    try {
-      await Cuenta.rpc('admin_plan_guardar', { p_codigo: b.dataset.gp, p_nombre: v('nombre'), p_descripcion: v('descripcion'),
-        p_beneficios: v('beneficios').split('\n').map((x) => x.trim()).filter(Boolean), p_duracion: parseInt(v('duracion'), 10) || 30, p_limites: lim });
-      Core.toast('⭐ Plan guardado');
-    } catch (err) { fallo(err); }
-  };
-  const REGLAS = [['retencion_min', 'Minutos que el pedido queda apartado esperando el pago'], ['cancel_min', 'Minutos para cancelar con devolución (desde que paga)'],
-    ['comprobantes_dias', 'Días que se guardan los comprobantes'], ['aviso1_dias', 'Primer aviso de vencimiento (días antes)'],
-    ['aviso2_dias', 'Segundo aviso de vencimiento (días antes)'], ['dias_regalo', 'Días de Pro gratis para cada negocio nuevo (0 = sin prueba)'],
-    ['max_rechazos', 'Comprobantes que se pueden rechazar por pedido antes de cerrarlo (el cliente sube otro mientras tanto)'],
-    ['registro_negocios', 'Registro abierto de negocios (1 = cualquiera crea su cuenta Gratis con el link/QR; 0 = solo tú los creas)']];
   async function cargarReglas() {
     const r = await Cuenta.rpc('reglas');
     $('reglasBody').innerHTML = REGLAS.map(([k, t]) => '<label for="rg' + k + '">' + t + '</label><input id="rg' + k + '" inputmode="numeric" value="' + r[k] + '">').join('');
@@ -603,65 +499,6 @@
     try { await Cuenta.rpc('admin_set_setting', { p_key: 'contact_whatsapp', p_value: $('sWsp').value.replace(/\D/g, '') }); Core.toast('Guardado'); } catch (err) { fallo(err); }
   };
   $('bSalir').onclick = async () => { await Cuenta.signOut(); location.replace('../../'); };
-
-  /* ---------- Avisos ---------- */
-  const PARA = { all_users: 'Todos', all_businesses: 'Empresas', pro_users: 'Empresas Pro', free_users: 'Empresas Free',
-    all_clients: 'Clientes', self: 'Prueba', my_subscribers: 'Clientes de la empresa', direct: 'Directo' };
-  const ESTADO = { scheduled: 'Programado', sending: 'Enviando', sent: 'Enviado', failed: 'Falló', cancelled: 'Cancelado' };
-  $('aCuando').onchange = () => $('aFecha').classList.toggle('hidden', $('aCuando').value !== 'luego');
-
-  $('bAviso').onclick = async () => {
-    $('aErr').textContent = '';
-    const canales = [$('aPush').checked && 'push', $('aMail').checked && 'email'].filter(Boolean);
-    const cuando = $('aCuando').value === 'luego' ? new Date($('aFecha').value) : new Date();
-    if (isNaN(cuando)) { $('aErr').textContent = 'Elige fecha y hora'; return; }
-    const para = $('aPara').value;
-    if (para !== 'self' && !confirm('¿Enviar "' + $('aTitulo').value + '" a ' + PARA[para].toLowerCase() + '?')) return;
-    $('bAviso').disabled = true;
-    try {
-      await Cuenta.rpc('schedule_notification', {
-        p_title: $('aTitulo').value, p_body: $('aCuerpo').value, p_url: $('aUrl').value, p_image: null,
-        p_audience: para, p_channels: canales, p_send_at: cuando.toISOString()
-      });
-      $('aTitulo').value = ''; $('aCuerpo').value = ''; $('aUrl').value = '';
-      if ($('aCuando').value === 'ya') {
-        Core.toast('Enviando…');
-        await sb.functions.invoke('enviar').catch(() => {}); // si falla, el envío automático lo hará en 1 minuto
-      } else Core.toast('Programado');
-      cargarAvisos();
-    } catch (err) { $('aErr').textContent = err.message; } finally { $('bAviso').disabled = false; }
-  };
-
-  let avisos = [];
-  async function cargarAvisos() {
-    const [list, users] = await Promise.all([
-      q(sb.from('notifications').select('*').neq('audience', 'direct').order('created_at', { ascending: false }).limit(100)),
-      q(sb.from('profiles').select('id,email,empresa'))
-    ]);
-    avisos = list;
-    perfiles = Object.fromEntries(users.map((u) => [u.id, u]));
-    let vistos = {};
-    try {
-      const v = await Cuenta.rpc('notification_views', { p_ids: list.filter((n) => n.status === 'sent').map((n) => n.id) });
-      vistos = Object.fromEntries(v.map((x) => [x.id, x.vistos]));
-    } catch (e) { /* sin red */ }
-    $('avisos').innerHTML = list.length ? list.map((n) => {
-      const quien = perfiles[n.owner_id];
-      const det = n.status === 'sent' || n.status === 'failed'
-        ? ' · 🔔 ' + n.push_sent + (n.push_failed ? ' (' + n.push_failed + ' fallidos)' : '') + ' · ✉️ ' + n.email_sent +
-          ' · 👁 ' + (vistos[n.id] || 0) + ' vistos' : '';
-      return '<li><div class="grow"><b>' + Core.esc(n.title) + '</b> <span class="pill st-' + n.status + '">' + ESTADO[n.status] + '</span>' +
-        '<div class="muted">' + PARA[n.audience] + (n.audience === 'my_subscribers' && quien ? ' de ' + Core.esc(quien.empresa || quien.email) : '') +
-        ' · ' + n.channels.join('+') + ' · ' + fechaHora(n.sent_at || n.send_at) + det + '</div>' +
-        (n.error ? '<div class="err">' + Core.esc(n.error) + '</div>' : '') + '</div>' +
-        (n.status === 'scheduled' ? '<button class="small alt" data-id="' + n.id + '">Cancelar</button>' : '') + '</li>';
-    }).join('') : '<li class="empty">Sin avisos</li>';
-  }
-  $('avisos').onclick = async (e) => {
-    const id = e.target.dataset.id;
-    if (!id) return;
-    try { await Cuenta.rpc('cancel_notification', { p_id: id }); cargarAvisos(); } catch (err) { fallo(err); }
-  };
 
   /* ---------- 🎨 Mi marca: logo, nombre y color del administrador ---------- */
   function pintarMarca() {
@@ -700,22 +537,7 @@
     $('pushEstado').textContent = s.vapid_public && s.vapid_private ? '✅ Claves push configuradas' : '⚠️ Falta generar las claves push';
     $('bVapid').textContent = s.vapid_public ? 'Regenerar claves push' : 'Generar claves push';
     $('mailEstado').textContent = s.gmail_user && s.gmail_app_password ? '✅ Gmail configurado' : '⚠️ Falta configurar Gmail';
-    // Versión publicada en GitHub vs. versión liberada para todos.
-    let pub = '';
-    try { pub = String((await (await fetch('../../version.json', { cache: 'no-store' })).json()).version); } catch (e) { pub = ''; }
-    verPublicada = pub;
-    $('verEstado').innerHTML = 'Tu celular: <b>v' + Core.version + '</b> · Publicada: <b>v' + (pub || '?') + '</b> · Liberada para todos: <b>' +
-      (v.version_liberada ? 'v' + Core.esc(v.version_liberada) : 'ninguna aún') + '</b>';
-    $('bLiberar').textContent = pub ? 'Liberar v' + pub + ' para todos' : 'Liberar para todos';
-    $('bLiberar').disabled = !pub || v.version_liberada === pub;
   }
-  let verPublicada = '';
-  $('bLiberar').onclick = async () => {
-    if (!verPublicada || !confirm('¿Liberar la v' + verPublicada + '? A todos se les actualiza sola.')) return;
-    try { await Cuenta.rpc('admin_set_setting', { p_key: 'version_liberada', p_value: verPublicada }); Core.toast('✅ v' + verPublicada + ' liberada para todos'); cargarAjustes(); }
-    catch (err) { fallo(err); }
-  };
-
   const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   $('bVapid').onclick = async () => {
     const s = await Cuenta.rpc('admin_secret_status').catch(() => ({}));
@@ -754,7 +576,7 @@
   };
 
 
-  const V = ['resumen', 'negocios', 'clientes', 'pagos', 'ajustes'];
+  const V = ['resumen', 'negocios', 'clientes', 'ajustes'];
   const h = location.hash.slice(1);
   show(V.includes(h) ? h : 'resumen');
   addEventListener('hashchange', () => { const x = location.hash.slice(1); if (V.includes(x) && !$('v-' + x).classList.contains('on')) show(x); });

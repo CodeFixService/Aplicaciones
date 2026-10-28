@@ -1,10 +1,11 @@
-/* CodeFix · Núcleo · Ayuda (mismo archivo en cada repositorio).
-   CFX_AYUDA.iniciar({ rpc, app })  → al entrar con sesión: botón 🛟 abajo a la izquierda con
+/* CodeFix · Núcleo · Cabecera, Ayuda y Ajustes (mismo archivo en cada repositorio).
+   CFX_AYUDA.iniciar({ rpc, app, admin, premium, nombre, foto, cuenta, panel… })  → al entrar con sesión: cabecera común [campana][FREE/PRO][foto]; la foto abre el menú con
        · Guía para partir: lo que le falta configurar al negocio (cfx_guia). No se marca como listo hasta que lo hace de verdad,
          y se le recuerda cada vez que entra (y cada 1 hora con la app abierta) mientras falte algo.
        · Chat con soporte: escribe y le respondes desde el Centro de Mando → Mensajes (cfx_chat_*). El globo muestra lo no leído.
        · Términos y condiciones según el tipo de negocio (ley chilena: 19.496 del consumidor y 19.628 / 21.719 de datos personales).
-   CFX_AYUDA.chat({ rpc }) · CFX_AYUDA.terminos(app) · CFX_AYUDA.guia()  (también se pueden abrir sueltos). */
+   CFX_AYUDA.chat({ rpc }) · CFX_AYUDA.terminos(app) · CFX_AYUDA.guia()  (también se pueden abrir sueltos).
+   CFX_AJUSTES.montar(el, secciones) → Ajustes en cuadrícula de tarjetas (igual en las 6 apps). */
 (function () {
   'use strict';
   if (window.CFX_AYUDA) return;
@@ -15,13 +16,24 @@
   const CADA = 60 * 60 * 1000;
   const css = document.createElement('style');
   css.textContent =
-    '.cfx-boya{position:fixed;left:10px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:2147481000;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;' +
-    'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);box-shadow:0 6px 18px rgba(15,23,42,.25),0 0 0 1px rgba(15,23,42,.06);font-size:20px;display:flex;align-items:center;justify-content:center;opacity:.92}' +
-    '.cfx-boya i{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#dc2626;color:#fff;font:700 11px/18px system-ui,sans-serif;font-style:normal;padding:0 4px;box-sizing:border-box}' +
-    '@media(min-width:900px){.cfx-boya{bottom:24px;left:auto;right:24px}}' +
-    // ⋮ arriba a la derecha (dentro del encabezado de la app): Inicio, Atrás, ayuda y Cerrar sesión.
-    '.cfx-boya.cfx-punto{position:relative;left:auto;right:auto;bottom:auto;top:auto;flex:none;width:40px;height:40px;margin-left:6px;background:transparent;box-shadow:none;opacity:1;color:inherit}' +
-    '.cfx-boya.cfx-punto svg{width:22px;height:22px}.cfx-boya.cfx-fijo{top:calc(8px + env(safe-area-inset-top));right:8px;bottom:auto;left:auto}' +
+    // Cabecera común: [campana][FREE/PRO][foto] a la derecha del encabezado de cada app.
+    '.cfx-oc{display:none!important}.cfx-cab{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none;position:relative;z-index:1}' +
+    '.cfx-cab.cfx-fija{position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:2147481000}' +
+    '.cfx-cab>[data-cfx-campana]{margin:0!important;flex:none}' +
+    '.cfx-plan{height:24px;min-height:0;padding:0 9px;border-radius:99px;border:0;cursor:pointer;font:800 11px/24px var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;' +
+    'background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto-2,#5b6472);box-shadow:inset 0 0 0 1px var(--cfx-borde,#e2e7ec)}' +
+    '.cfx-plan.pro{background:linear-gradient(135deg,#f7d774,#d9a21b);color:#3b2a00;box-shadow:none}' +
+    '.cfx-av{width:36px;height:36px;min-height:0;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;flex:none;display:grid;place-items:center;' +
+    'background:var(--brand,var(--marca,#2563eb));color:#fff;font:800 14px/1 var(--cfx-letra,system-ui,sans-serif);box-shadow:0 0 0 2px var(--cfx-tarjeta,#fff),0 0 0 3px var(--cfx-borde,#e2e7ec)}' +
+    '.cfx-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}html.cfx-premium .cfx-av{box-shadow:0 0 0 2px var(--cfx-tarjeta,#fff),0 0 0 4px #d9a21b}' +
+    '.cfx-av i{position:absolute;top:-5px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:#dc2626;color:#fff;font:700 11px/18px system-ui,sans-serif;font-style:normal;padding:0 4px;box-sizing:border-box}' +
+    '@media(max-width:380px){.cfx-cab{gap:6px}.cfx-plan{padding:0 7px;font-size:10px}.cfx-av{width:34px;height:34px}}' +
+    '.cfx-ayuda .ca-yo{display:flex;align-items:center;gap:12px;padding:2px 0 12px;border-bottom:1px solid var(--cfx-borde,#e2e7ec);margin-bottom:6px}.cfx-ayuda .ca-yo .cfx-av{width:46px;height:46px;font-size:17px;cursor:default}' +
+    '.cfx-ayuda .ca-yo b{display:block;font-size:16px}.cfx-ayuda .ca-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}.cfx-ayuda .ca-yo>div{min-width:0}' +
+    // Ajustes en cuadrícula
+    '.cfx-aj>button{min-height:96px}.cfx-aj>button>span:first-child{font-size:26px;line-height:1}.cfx-aj small{display:block;font-weight:500;font-size:12.5px;line-height:1.3;color:var(--cfx-texto-2,#5b6472)}' +
+    '.cfx-aj-cab{display:flex;align-items:center;gap:10px;margin:0 0 12px}.cfx-aj-cab h2{margin:0;font-size:19px;line-height:1.2}' +
+    '.cfx-aj-volver{flex:none;width:40px;height:40px;min-height:0;padding:0;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:20px;cursor:pointer}' +
     'dialog.cfx-ayuda{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;z-index:2147483100;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;font-family:var(--cfx-letra,system-ui,sans-serif)}' +
     'dialog.cfx-ayuda::backdrop{background:transparent}@media(min-width:600px){dialog.cfx-ayuda{align-items:center}}' +
     '.cfx-ayuda>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;border-radius:20px 20px 0 0;box-sizing:border-box;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}' +
@@ -39,6 +51,7 @@
   document.head.appendChild(css);
 
   let R = null, APP = '', estado = { items: [], sin_leer: 0 }, boya = null, abierta = null;
+  const CFG = {};
   const pend = () => estado.items.filter((x) => !x.ok);
 
   function dialogo(html, alCerrar) {
@@ -53,52 +66,115 @@
   }
   function cerrar() { if (abierta) { try { abierta.close(); } catch (e) { abierta.remove(); } abierta = null; } }
 
-  // ---------- Botón ⋮ (arriba, en el encabezado de cada app) ----------
-  const PUNTOS = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+  // ---------- Cabecera común (arriba a la derecha, igual en las 6 apps): [🔔 campana] [FREE/PRO] [foto] ----------
+  // La campana es la de la app (una sola: las repetidas se esconden). La foto abre el menú: inicio, mi cuenta, panel, ayuda, Premium y cerrar sesión.
+  // Lo que ya está en el menú (casa, chat, persona, ADMIN, cerrar sesión…) se esconde con CFG.quitar (selector de cada app).
+  const SVG_CAMPANA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+  const CAMPANA = '#bCampana, #campana, #btnAvisos, [aria-label="Avisos"], [aria-label="Notificaciones"], a[href$="#avisos"], [data-cfx-campana]';
   function encabezado() {
     return [...document.querySelectorAll('header.top, header.cab, .cab, header, .topbar, .top')].find((h) => {
       const r = h.getBoundingClientRect(); return r.width > 200 && r.height >= 36 && r.height <= 130 && r.top <= 8 && getComputedStyle(h).display !== 'none';
     }) || null;
   }
+  const iniciales = () => {
+    const n = String(CFG.nombre || CFG.email || '').replace(/@.*/, '').trim().split(/[\s._-]+/).filter(Boolean);
+    return esc(((n[0] || '?')[0] + (n[1] ? n[1][0] : '')).toUpperCase());
+  };
+  const esPro = () => !!(CFG.admin || ('pro' in CFG ? CFG.pro : CFG.premium));  // pro: la insignia (p. ej. en prueba Pro); premium: la app dorada
   function pintarBoya() {
     if (!R) return;
     if (!boya) {
-      boya = document.createElement('button'); boya.type = 'button'; boya.className = 'cfx-boya no-ico'; boya.setAttribute('aria-label', 'Menú: inicio, ayuda y cerrar sesión');
-      boya.onclick = menu;
+      boya = document.createElement('div'); boya.className = 'cfx-cab';
+      boya.innerHTML = '<button type="button" class="cfx-plan"></button><button type="button" class="cfx-av" aria-label="Mi cuenta y menú"></button>';
+      boya.querySelector('.cfx-av').onclick = menu;
+      boya.querySelector('.cfx-plan').onclick = () => (CFG.admin || !window.CFX_PAGOS ? menu() : window.CFX_PAGOS.abrir({ rpc: R }));
     }
     const h = encabezado();
-    if (h && boya.parentNode !== h) { h.appendChild(boya); boya.classList.add('cfx-punto'); boya.classList.remove('cfx-fijo'); }
-    else if (!h && !boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-punto', 'cfx-fijo'); boya.style.position = 'fixed'; boya.style.background = 'var(--cfx-tarjeta,#fff)'; }
-    const n = pend().length + (estado.sin_leer || 0);
-    boya.innerHTML = PUNTOS + (n ? '<i>' + n + '</i>' : '');
+    if (h) {
+      if (boya.parentNode !== h) h.appendChild(boya);
+      boya.classList.remove('cfx-fija');
+      if (CFG.quitar) h.querySelectorAll(CFG.quitar).forEach((x) => x.classList.add('cfx-oc'));
+      const campanas = [...h.querySelectorAll(CAMPANA)].map((x) => x.closest('button, a') || x).filter((x, i, l) => l.indexOf(x) === i && !x.classList.contains('cfx-plan'));
+      const una = campanas.find((x) => x.dataset.cfxCampana) || campanas.find((x) => !x.classList.contains('cfx-oc')) || campanas[0];
+      campanas.forEach((x) => { if (x !== una) x.classList.add('cfx-oc'); });
+      if (una && una.parentNode !== boya) { una.dataset.cfxCampana = '1'; boya.insertBefore(una, boya.firstChild); }
+      // Mismo ícono de campana en todas las apps (las que usan el emoji 🔔 pasan al dibujo de línea).
+      if (una) [...una.childNodes].forEach((x) => { if (x.nodeType === 3 && /🔔/.test(x.textContent)) { const t = document.createElement('span'); t.innerHTML = SVG_CAMPANA; x.replaceWith(t.firstChild); } });
+    } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); }
+    const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av');
+    plan.textContent = esPro() ? 'PRO' : 'FREE'; plan.classList.toggle('pro', esPro());
+    plan.setAttribute('aria-label', esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
+    const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
+    av.innerHTML = (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + (n ? '<i>' + n + '</i>' : '');
   }
-  // Inicio: la primera pantalla de la app en esta sesión. Cerrar sesión: el botón de la app, o se borra la sesión guardada.
+  // Inicio: la primera pantalla de la app en esta sesión. Cerrar sesión: la función de la app, su botón, o se borra la sesión guardada.
   function inicio() { cerrar(); let u = ''; try { u = sessionStorage.getItem('cfx-inicio') || ''; } catch (e) { /* nada */ } location.href = u || RAIZ; }
   function salir() {
     cerrar();
-    const b = [...document.querySelectorAll('button, a')].find((x) => /^\s*(🚪\s*)?(cerrar sesión|salir)\s*$/i.test(x.textContent || '') && x !== boya);
+    if (typeof CFG.salir === 'function') return CFG.salir();
+    const b = [...document.querySelectorAll('button, a')].find((x) => /^\s*(🚪\s*)?(cerrar sesión|salir)\s*$/i.test(x.textContent || '') && !boya.contains(x));
     if (b) return b.click();
     try { Object.keys(localStorage).filter((k) => /-auth$|^sb-/.test(k)).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* nada */ }
     location.href = RAIZ;
   }
+  function confirmarSalir() {
+    const caja = dialogo('<h2>¿Cerrar sesión?</h2><p>Para volver a entrar necesitarás tu correo y tu clave.</p>' +
+      '<div class="ca-pie"><button type="button" data-cerrar>Cancelar</button><button type="button" class="ca-si" data-salir>Cerrar sesión</button></div>');
+    caja.querySelector('[data-salir]').onclick = salir;
+  }
+  function irA(dest) { cerrar(); if (typeof dest === 'function') return dest(); ir(dest); }
   function menu() {
-    const p = pend().length, caja = dialogo('<h2>Menú</h2><div class="ca-cuerpo">' +
-      '<button type="button" class="ca-op" data-a="inicio"><span>🏠</span><b>Ir al inicio</b></button>' +
-      (pila().length > 1 ? '<button type="button" class="ca-op" data-a="atras"><span>⬅️</span><b>Volver a lo anterior</b></button>' : '') +
-      (estado.items.length ? '<button type="button" class="ca-op" data-a="guia"><span>🧭</span><b>Guía para partir</b>' + (p ? '<i>' + p + ' pendiente' + (p > 1 ? 's' : '') + '</i>' : '✅') + '</button>' : '') +
-      '<button type="button" class="ca-op" data-a="chat"><span>💬</span><b>Chat con soporte</b>' + (estado.sin_leer ? '<i>' + estado.sin_leer + '</i>' : '') + '</button>' +
-      '<button type="button" class="ca-op" data-a="terminos"><span>📄</span><b>Términos y condiciones</b></button>' +
-      (window.CFX_PAGOS ? '<button type="button" class="ca-op" data-a="premium"><span>⭐</span><b>Premium y pagos</b></button>' : '') +
-      '<button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button>' +
+    const p = pend().length, adm = !!CFG.admin, op = (a, ico, t, extra) => '<button type="button" class="ca-op" data-a="' + a + '"><span>' + ico + '</span><b>' + t + '</b>' + (extra || '') + '</button>';
+    const caja = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || CFG.email || 'Mi cuenta') + '</b>' +
+      (CFG.nombre && CFG.email ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>Plan ' + (esPro() ? 'PRO' : 'FREE') + '</small></div></div><div class="ca-cuerpo">' +
+      op('inicio', '🏠', 'Ir al inicio') +
+      (CFG.cuenta ? op('cuenta', '👤', 'Mi cuenta') : '') +
+      (CFG.panel ? op('panel', '🛡️', 'Panel de administración') : '') +
+      (pila().length > 1 ? op('atras', '⬅️', 'Volver a lo anterior') : '') +
+      (!adm && estado.items.length ? op('guia', '🧭', 'Guía para partir', p ? '<i>' + p + ' pendiente' + (p > 1 ? 's' : '') + '</i>' : '✅') : '') +
+      (!adm ? op('chat', '💬', 'Chat con soporte', estado.sin_leer ? '<i>' + estado.sin_leer + '</i>' : '') : '') +
+      op('terminos', '📄', 'Términos y condiciones') +
+      (!adm && window.CFX_PAGOS ? op('premium', '⭐', esPro() ? 'Mi plan PRO' : 'Pasar a PRO') : '') +
+      op('salir', '🚪', 'Cerrar sesión') +
       '</div><div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>');
     caja.onclick = (ev) => {
       const b = ev.target.closest('[data-a]'); if (!b) return;
       const a = b.dataset.a;
       if (a === 'inicio') return inicio();
+      if (a === 'cuenta' || a === 'panel') return irA(CFG[a]);
       if (a === 'atras') { cerrar(); return history.back(); }
-      if (a === 'salir') return salir();
+      if (a === 'salir') return confirmarSalir();
       if (a === 'guia') guia(); else if (a === 'chat') chat({ rpc: R }); else if (a === 'terminos') terminos(); else { cerrar(); window.CFX_PAGOS.abrir({ rpc: R }); }
     };
+  }
+
+  // ---------- Ajustes en cuadrícula (igual en las 6 apps; cada app entrega SU lista) ----------
+  // CFX_AJUSTES.montar(el, [{ k, ico, t, d, abrir(zona) | nodo }], { arriba, abajo })  → tarjetas; al tocar una se abre su sección con "←" que vuelve a la cuadrícula.
+  //   abrir(zona): la sección se dibuja en zona.  nodo: una sección que ya está en la página (se muestra solo ella; abrir también se llama si viene).
+  // Devuelve { abrir(k), grilla() } para entrar directo a una sección (p. ej. desde un link #ajustes/textos).
+  function ajustes(el, L, o) {
+    o = o || {};
+    L = L.filter(Boolean);
+    let w = el.querySelector(':scope > .cfx-aj-w');
+    if (!w) { w = document.createElement('div'); w.className = 'cfx-aj-w'; el.prepend(w); }
+    const nodos = L.map((s) => s.nodo).filter(Boolean);
+    const grilla = () => {
+      nodos.forEach((n) => n.classList.add('cfx-oc'));
+      w.innerHTML = (o.arriba || '') + '<div class="cfx-grilla cfx-aj">' + L.map((s) => '<button type="button" data-k="' + esc(s.k) + '"><span>' + s.ico + '</span>' + esc(s.t) +
+        (s.d ? '<small>' + esc(s.d) + '</small>' : '') + '</button>').join('') + '</div>' + (o.abajo || '');
+      w.querySelectorAll('.cfx-aj > [data-k]').forEach((b) => { b.onclick = () => abrir(b.dataset.k); });
+    };
+    const abrir = (k) => {
+      const s = L.find((x) => x.k === k); if (!s) return grilla();
+      nodos.forEach((n) => n.classList.toggle('cfx-oc', n !== s.nodo));
+      if (s.nodo) s.nodo.classList.remove('hidden');
+      w.innerHTML = '<div class="cfx-aj-cab"><button type="button" class="cfx-aj-volver" data-sin-atras aria-label="Volver a Ajustes">←</button><h2>' + s.ico + ' ' + esc(s.t) + '</h2></div><div class="cfx-aj-zona"></div>';
+      w.querySelector('.cfx-aj-volver').onclick = () => { grilla(); scrollTo(0, 0); };
+      scrollTo(0, 0);
+      return s.abrir ? s.abrir(w.querySelector('.cfx-aj-zona'), k) : undefined;
+    };
+    grilla();
+    return { abrir, grilla };
   }
 
   // ---------- Guía ----------
@@ -225,11 +301,18 @@
     pintarBoya();
     setTimeout(recordar, 4000);
   }
+  // CFX_AYUDA.iniciar({ rpc, app, admin, premium, id, hasta, beneficios, nombre, email, foto, cuenta, panel, quitar, salir })
+  //   una sola llamada al tener la cuenta (también para el admin): cabecera común, ayuda y sensación Premium (CFX_PREMIUM, nunca al admin).
+  //   cuenta / panel: dirección (#… o url) o función para "Mi cuenta" y "Panel de administración". Se puede volver a llamar (p. ej. al cambiar la foto).
   function iniciar(o) {
     if (!o || !o.rpc) return;
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
+    Object.assign(CFG, o);
     try { if (!sessionStorage.getItem('cfx-inicio')) sessionStorage.setItem('cfx-inicio', location.pathname + location.search); } catch (e) { /* nada */ }
+    if (window.CFX_PREMIUM && 'premium' in o) window.CFX_PREMIUM.marcar({ premium: !CFG.admin && !!CFG.premium, id: CFG.id, hasta: CFG.hasta, beneficios: CFG.beneficios });
+    pintarBoya();
+    if (CFG.admin) return;
     revisar();
     if (primera) {
       setInterval(revisar, 5 * 60 * 1000);
@@ -256,7 +339,11 @@
     if (location.hash.length > 1 && l.length > 1 && !b.hasAttribute('data-sin-atras')) { e.preventDefault(); e.stopImmediatePropagation(); history.back(); }
   }, true);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar };
+  // La cabecera se vuelve a poner si la app redibuja su encabezado.
+  setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } }, 1500);
+
+  window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar, menu };
+  window.CFX_AJUSTES = { montar: ajustes };
   // La app pudo pedirlo antes de que este archivo cargara (CFX_AYUDA_PEND = { rpc, app }).
   if (window.CFX_AYUDA_PEND) iniciar(window.CFX_AYUDA_PEND);
 })();

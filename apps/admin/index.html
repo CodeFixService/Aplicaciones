@@ -59,7 +59,6 @@
   <!-- RESUMEN -->
   <section class="view on" id="v-resumen">
     <div class="card hidden" id="cBase" style="border:2px solid var(--bad)"><b>⏳ La base de datos se está actualizando sola</b><p class="muted" id="baseTxt" style="margin:4px 0 0"></p></div>
-    <a class="card hidden" id="cPagosAlerta" href="#pagos" style="display:block;text-decoration:none;color:inherit;border-color:#f59e0b"></a>
     <div class="stats" id="stats"></div>
     <div class="card" id="cActividad">
       <h2>📡 Actividad de empresas <span class="pill" id="actPill"></span></h2>
@@ -171,59 +170,8 @@
   </section>
 
   <!-- PAGOS -->
-  <section class="view" id="v-pagos">
-    <div class="seg2" id="pSeg"><button class="small on" data-f="en_revision">🧾 Por revisar</button><button class="small alt" data-f="aprobado">✅ Aprobados</button>
-      <button class="small alt" data-f="rechazado">❌ Rechazados</button><button class="small alt" data-f="">Todos</button></div>
-    <div class="lista2" id="pLista"></div>
-  </section>
-
-  <!-- AJUSTES -->
   <section class="view" id="v-ajustes">
-    <div class="seg2" id="aSeg">
-      <button class="small on" data-a="links">💳 Precios y links</button><button class="small alt" data-a="planes">⭐ Planes</button>
-      <button class="small alt" data-a="reglas">⚖️ Reglas</button><button class="small alt" data-a="avisos">📣 Avisos</button>
-      <button class="small alt" data-a="push">🔔 Notificaciones</button><button class="small alt" data-a="version">🔄 Versión</button>
-      <button class="small alt" data-a="registro">📜 Registro</button><button class="small alt" data-a="cuenta">👤 Mi cuenta</button>
-    </div>
-    <div class="aj" id="aj-links"><div class="card"><h2>💳 Precio y link del Pro / Premium</h2>
-      <p class="muted" style="margin-top:0">2 espacios por plan; solo uno activo. El precio que ven es el del espacio activo. Ellos pagan ahí y suben el comprobante: lo apruebas en Pagos.
-        Si activas un plan anual, también les aparece y al subir el comprobante marcan "plan anual" (se aprueba por 365 días).</p>
-      <div id="linksAdmin"></div></div></div>
-    <div class="aj hidden" id="aj-planes"><div id="planesBody"></div></div>
-    <div class="aj hidden" id="aj-reglas"><div class="card"><h2>⚖️ Reglas</h2><div id="reglasBody"></div><div class="btns"><button id="bReglas">Guardar reglas</button></div></div></div>
-    <div class="aj hidden" id="aj-avisos">
-    <div class="card">
-      <h2>Enviar aviso</h2>
-      <label>Para</label>
-      <select id="aPara">
-        <option value="all_users">Todos (empresas y clientes)</option>
-        <option value="all_businesses">Todas las empresas</option>
-        <option value="pro_users">Empresas Pro</option>
-        <option value="free_users">Empresas Free</option>
-        <option value="all_clients">Todos los clientes</option>
-        <option value="self">Prueba: solo a mí</option>
-      </select>
-      <label>Título</label><input id="aTitulo" maxlength="80" placeholder="¡Nueva función disponible!">
-      <label>Mensaje</label><textarea id="aCuerpo" maxlength="400"></textarea>
-      <label>Enlace (opcional)</label><input id="aUrl" type="url" placeholder="https://…">
-      <label>Canales</label>
-      <div class="chk">
-        <label><input type="checkbox" id="aPush" checked> Notificación push</label>
-        <label><input type="checkbox" id="aMail"> Correo</label>
-      </div>
-      <label>Cuándo</label>
-      <div class="row">
-        <select id="aCuando"><option value="ya">Ahora</option><option value="luego">Programar</option></select>
-        <input type="datetime-local" id="aFecha" class="hidden">
-      </div>
-      <p class="err" id="aErr"></p>
-      <div class="btns"><button id="bAviso">📣 Enviar</button></div>
-    </div>
-    <div class="card">
-      <h2>Historial (todos los avisos, incluidos los de negocios)</h2>
-      <ul class="list" id="avisos"></ul>
-    </div>
-    </div>
+    <div class="aj hidden" id="aj-reglas"><div class="card"><div id="reglasBody"></div><div class="btns"><button id="bReglas">Guardar reglas</button></div></div></div>
     <div class="aj hidden" id="aj-push">
       <div class="card"><h2>🛰️ Servidor (función "enviar")</h2><p class="muted">Comprueba que la función que envía notificaciones y crea cuentas esté instalada y al día.</p>
         <div class="btns"><button class="alt" id="bPing">Probar conexión</button></div><p class="muted" id="pingRes"></p></div>
@@ -242,10 +190,7 @@
         Se guarda protegida en el servidor: nadie puede leerla desde la app, ni siquiera tú.</p>
     </div>
     </div>
-    <div class="aj hidden" id="aj-version"><div class="card"><h2>🔄 Versión de la app</h2>
-      <p class="muted">La base de datos se actualiza sola. Cuando hay una versión nueva, en tu panel aparece "Actualizar": actualiza la tuya, pruébala y después toca <b>Liberar para todos</b> (a ellos se les actualiza sola).</p>
-      <p id="verEstado"></p><div class="btns"><button id="bLiberar" class="ok">Liberar para todos</button></div></div></div>
-    <div class="aj hidden" id="aj-registro"><div class="card"><h2>📜 Registro de cambios</h2>
+    <div class="aj hidden" id="aj-registro"><div class="card">
       <p class="muted" style="margin-top:0">Solo tú lo ves y solo tú puedes borrarlo.</p>
       <div class="btns"><button class="alt small" id="bRegViejo" type="button">🧹 Borrar lo de más de 30 días</button><button class="danger small" id="bRegTodo" type="button">Borrar todo</button></div>
       <ul class="list" id="regLista"></ul></div></div>
@@ -269,7 +214,6 @@
   <button data-v="resumen" class="on"><span data-ico="grafico"></span>Resumen</button>
   <button data-v="negocios"><span data-ico="bolsa"></span>Negocios</button>
   <button data-v="clientes"><span data-ico="usuarios"></span>Clientes</button>
-  <button data-v="pagos" style="position:relative"><span data-ico="ticket"></span>Pagos<span class="badge hidden" id="tabPagos" style="position:absolute;top:2px;right:calc(50% - 22px)"></span></button>
   <button data-v="ajustes"><span data-ico="ajustes"></span>Ajustes</button>
 </nav>
 

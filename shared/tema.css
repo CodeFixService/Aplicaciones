@@ -71,7 +71,7 @@ input, select, textarea, button { font-family: inherit; }
     background: var(--brand, var(--marca, #2563eb)) !important; color: var(--brand-ink, #fff) !important;
     box-shadow: 0 6px 16px color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 45%, transparent), 0 0 0 4px var(--cfx-tarjeta) !important;
   }
-  nav.cfx-barra > .cfx-mas span svg { width: 28px !important; height: 28px !important; }
+  nav.cfx-barra > .cfx-mas span svg { width: 28px !important; height: 28px !important; margin: 0 !important; }
   nav.cfx-barra > .cfx-mas > svg:first-child { padding: 14px !important; box-sizing: border-box !important; }
   nav.cfx-barra > .cfx-mas:active > :first-child { transform: scale(.94); }
   nav.cfx-barra .cfx-oculto { display: none !important; }
@@ -144,6 +144,14 @@ input, select, textarea, button { font-family: inherit; }
 /* Núcleo 1.5 · Micrófono para dictar en los campos de texto (nucleo/voz.js) */
 .cfx-voz { display: grid; place-items: center; padding: 0 !important; min-height: 0 !important; border-radius: 50% !important; border: 0 !important;
   background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 14%, var(--cfx-tarjeta)) !important; color: var(--brand, var(--marca, #2563eb)) !important; box-shadow: 0 2px 8px rgba(15, 23, 42, .12) !important; cursor: pointer; }
-.cfx-voz svg { width: 18px; height: 18px; }
+.cfx-voz svg { width: 60%; height: 60%; }
 .cfx-voz.on { background: var(--cfx-mal) !important; color: #fff !important; animation: cfxLatido 1s ease-in-out infinite; }
 @keyframes cfxLatido { 50% { transform: scale(1.1); } }
+/* Núcleo 2.2 · El + siempre al centro exacto de su círculo (celular y computador) */
+nav.cfx-barra > .cfx-mas .cfx-ico { display: grid !important; place-items: center !important; line-height: 0 !important; padding: 0 !important; box-sizing: border-box !important; text-indent: 0 !important; }
+nav.cfx-barra > .cfx-mas .cfx-ico svg { display: block !important; margin: 0 !important; flex: none !important; }
+/* Computador: el contenido de cada pestaña centrado y con ancho máximo (a la derecha del menú lateral, sin espacio vacío) */
+@media (min-width: 900px) {
+  body.cfx-con-barra main, body.cfx-con-barra .cfx-centro { width: auto !important; max-width: 1040px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box; }
+  body.cfx-con-barra .con-nav { padding-left: 0 !important; }
+}

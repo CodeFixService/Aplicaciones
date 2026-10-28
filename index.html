@@ -87,7 +87,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">Órbita</h1><span id="planTag" class="pill hidden"></span><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
+<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">Órbita</h1><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
 <main>
   <div class="instalar hidden" id="cInstalar">
     <div style="font-size:30px">📲</div>
@@ -485,8 +485,8 @@
     if (acc.role === 'user') { cargarLinks(); cargarEquipo(); }
     cargarPagos();
     // Núcleo (pagos.js): tienda nueva que debe su primer pago → pantalla de activación.
-    // Núcleo (ayuda.js): 🛟 guía para partir, chat con soporte y términos.
-    if (!acc.is_admin && acc.role !== 'equipo') { window.CFX_AYUDA_PEND = { rpc: (f, x) => Cuenta.rpc(f, x), app: 'orbita' }; if (window.CFX_AYUDA) CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND); }
+    // Núcleo (ayuda.js): cabecera común, guía para partir, chat con soporte y términos.
+    Cuenta.cabecera(acc, './');
     if (acc.role === 'user') { const ir = () => CFX_PAGOS.revisar({ rpc: (f, a) => Cuenta.rpc(f, a), salir: () => $('bSalir').click() }); if (window.CFX_PAGOS) ir(); else addEventListener('load', ir); }
     Cuenta.ofrecerPush();
     // Empresas de antes de la 4.0: su color pasa a la tienda una sola vez.
@@ -530,10 +530,6 @@
 
   function pintar(acc) {
     const cliente = acc.role === 'client';
-    const tag = $('planTag');
-    tag.classList.remove('hidden', 'pro', 'admin');
-    tag.textContent = acc.is_admin ? 'ADMIN' : acc.is_pro ? (cliente ? 'PREMIUM' : 'PRO') : 'FREE';
-    if (acc.is_admin) tag.classList.add('admin'); else if (acc.is_pro) tag.classList.add('pro');
     $('hola').textContent = 'Hola' + (acc.empresa ? ', ' + acc.empresa : '') + ' 👋';
     const plan = acc.is_admin ? 'Administrador general'
       : acc.is_pro ? (cliente ? 'Cliente Premium' : 'Versión Pro') + (acc.pro_until ? ' hasta el ' + new Date(acc.pro_until).toLocaleDateString('es') : ' permanente')

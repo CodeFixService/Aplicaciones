@@ -98,6 +98,14 @@
     }
   }
 
+  // Núcleo (ayuda.js): cabecera común [campana][FREE/PRO][foto], menú de la cuenta, ayuda y sensación Premium.
+  function cabecera(a, rootPath) {
+    window.CFX_AYUDA_PEND = Object.assign(window.CFX_AYUDA_PEND || {}, { rpc, app: 'orbita', admin: !!a.is_admin, premium: !!a.is_pro, id: a.id, hasta: a.pro_until,
+      nombre: a.empresa || a.nombre || '', email: a.email, foto: esLogo(a.logo) ? a.logo : null, quitar: '#planTag, .pill.admin',
+      cuenta: rootPath + '#ajustes', panel: a.is_admin && !/\/apps\/admin\//.test(location.pathname) ? rootPath + 'apps/admin/' : null,
+      salir: async () => { await signOut(); location.replace(rootPath); } });
+    if (window.CFX_AYUDA) window.CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND);
+  }
   async function require(rootPath, opts) {
     let a = null;
     try { a = await refresh(); } catch (e) { a = account; }
@@ -111,8 +119,7 @@
       return new Promise(() => {});
     }
     setTimeout(ofrecerPush, 1500);
-    // Núcleo (premium.js): con Pro/Premium la app se ve dorada y la primera vez saluda.
-    if (!a.is_admin && a.role !== 'equipo') (window.CFX_PREMIUM ? Promise.resolve() : new Promise((r) => addEventListener('load', r))).then(() => window.CFX_PREMIUM && (window.CFX_AYUDA_PEND = { rpc: rpc, app: 'orbita' }, window.CFX_AYUDA && CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND), true) && CFX_PREMIUM.marcar({ premium: !!a.is_pro, id: a.id, hasta: a.pro_until }));
+    cabecera(a, rootPath);
     return a;
   }
 
@@ -426,7 +433,7 @@
   global.Cuenta = {
     marca: () => marca, marcaLista, esLogo,
     nav, contar, ofrecerPush,
-    configured, sb, refresh, require, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
+    configured, sb, refresh, require, cabecera, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora, aplicarLogo,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
