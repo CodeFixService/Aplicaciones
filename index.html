@@ -290,15 +290,8 @@
         <h2 id="proTitulo">⭐ Versión Pro</h2>
         <div class="precio hidden" id="proPrecio"></div>
         <ul class="feat" id="proFeat"></ul>
-        <div class="anual hidden" id="proAnual"><b>📅 Plan anual</b><div class="precio" id="anualPrecio"></div><div class="muted" id="anualTxt"></div>
-          <div class="btns"><a class="btn small warn" id="bComprarAnual" href="#" target="_blank" rel="noopener">Pagar plan anual</a></div></div>
-        <div class="btns">
-          <a class="btn warn hidden" id="bComprar" href="#" target="_blank" rel="noopener" style="flex:1">Comprar ahora</a>
-          <label class="btn alt" for="fComprobante" style="flex:1">📷 Subir comprobante</label>
-          <input type="file" accept="image/*" id="fComprobante" class="hidden">
-        </div>
-        <label class="terms hidden" id="rowAnual"><input type="checkbox" id="pAnual"> <span>El comprobante es del <b>plan anual</b></span></label>
-        <p class="muted" id="proNota"></p>
+        <div class="btns"><button class="warn" id="bPagarPro" style="flex:1">⭐ Pagar</button></div>
+        <p class="muted" id="proNota">Paga con link o transferencia y sube la foto del comprobante. Se activa apenas lo revisemos.</p>
       </div>
       <ul class="list" id="planPagos"></ul>
       <details class="key hidden"><summary>Tengo una key de activación</summary>
@@ -487,6 +480,8 @@
     if (acc.role !== 'client') cargarHoy(acc);
     if (acc.role === 'user') { cargarLinks(); cargarEquipo(); }
     cargarPagos();
+    // Núcleo (pagos.js): tienda nueva que debe su primer pago → pantalla de activación.
+    if (acc.role === 'user') { const ir = () => CFX_PAGOS.revisar({ rpc: (f, a) => Cuenta.rpc(f, a), salir: () => $('bSalir').click() }); if (window.CFX_PAGOS) ir(); else addEventListener('load', ir); }
     Cuenta.ofrecerPush();
     // Empresas de antes de la 4.0: su color pasa a la tienda una sola vez.
     if (acc.role === 'user' && !acc.color && Core.tema.propio(acc.id)) colorTienda(Core.tema.get(acc.id), true);
@@ -596,11 +591,12 @@
     $('miniTxt').textContent = cliente ? 'Descuentos de tu tienda, prioridad en tus pedidos, tu propia Caja y más.' : 'Recordatorio de carrito, reporte semanal, cupones, sellos, equipo y más.';
     if (acc.is_pro && !vence) return;
     $('proTitulo').textContent = acc.is_pro ? '⏰ Renueva tu plan' : cliente ? '⭐ Hazte Premium' : '⭐ Versión Pro';
-    const pi = premium && premium[cliente ? 'cliente' : 'negocio'];
+    // Precios: los mismos de las 6 apps (núcleo: cfx_pago_estado; se editan en el Centro de Mando → Pagos).
+    const pr = (cx && cx.config && cx.config[cliente ? 'cliente' : 'negocio']) || {};
     const plan = premium && premium.planes && premium.planes[cliente ? 'cliente_pro' : 'negocio_pro'];
-    const precio = pi && pi.precio != null ? pi.precio : (cliente ? ajustes.price_client : ajustes.price_business);
-    $('proPrecio').classList.toggle('hidden', !precio);
-    if (precio) $('proPrecio').innerHTML = '$' + Number(precio).toLocaleString('es-CL') + ' <small>por ' + ((plan && plan.duracion_dias) || 30) + ' días</small>';
+    $('proPrecio').classList.toggle('hidden', !pr.mensual);
+    const $$ = (n) => '$' + Number(n).toLocaleString('es-CL');
+    if (pr.mensual) $('proPrecio').innerHTML = $$(pr.mensual) + ' <small>al mes</small>' + (pr.anual ? ' · ' + $$(pr.anual) + ' <small>al año</small>' : '');
     $('proFeat').innerHTML = (cliente
       ? [
          '⭐ El descuento Premium que da tu tienda en cada pedido', '⭐ Tus pedidos aparecen primero en la fila de la tienda',
@@ -613,24 +609,6 @@
          'Push y correos automáticos, y respaldo diario en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
     if (plan && plan.beneficios && plan.beneficios.length) $('proFeat').innerHTML = plan.beneficios.map((t) => '<li>' + Core.esc(t) + '</li>').join('');
-    const link = pi && /^https:\/\//.test(pi.url || '') ? pi.url : /^https:\/\//.test(ajustes.payment_link || '') ? ajustes.payment_link : '';
-    $('bComprar').classList.toggle('hidden', !link);
-    if (link) $('bComprar').href = link;
-    // Plan anual (si el administrador activó su link): 12 meses con descuento.
-    const an = premium && premium[cliente ? 'cliente_anual' : 'negocio_anual'];
-    const hayAnual = !!(an && /^https:\/\//.test(an.url || ''));
-    $('proAnual').classList.toggle('hidden', !hayAnual); $('rowAnual').classList.toggle('hidden', !hayAnual);
-    if (!hayAnual) $('pAnual').checked = false;
-    if (hayAnual) {
-      $('bComprarAnual').href = an.url;
-      $('anualPrecio').innerHTML = an.precio != null ? '$' + Number(an.precio).toLocaleString('es-CL') + ' <small>por 12 meses</small>' : '<small>12 meses</small>';
-      const ahorro = precio && an.precio != null ? Math.round(Number(precio) * 12 * 30 / ((plan && plan.duracion_dias) || 30)) - Number(an.precio) : 0;
-      $('anualTxt').textContent = (an.titulo ? an.titulo + ' · ' : '') + (ahorro > 0 ? 'Ahorras $' + ahorro.toLocaleString('es-CL') + ' al año.' : 'Pagas una vez y te olvidas por un año.') +
-        ' Al subir el comprobante marca "plan anual".';
-    }
-    $('proNota').textContent = link
-      ? '1) Paga con el botón. 2) Sube la foto del comprobante. Se activa por ' + ((plan && plan.duracion_dias) || 30) + ' días apenas lo aprobemos.'
-      : 'Sube la foto del comprobante de tu pago y lo activamos apenas lo revisemos.';
   }
 
   function pintarColores(uid) {
@@ -795,29 +773,17 @@
     try { await Cuenta.rpc('quitar_equipo', { p_id: id }); Core.toast('Quitado del equipo'); cargarEquipo(); } catch (err) { Core.toast(err.message); }
   };
 
-  /* ---------- Mi plan: pagar y subir comprobante ---------- */
-  let premium = null;
+  /* ---------- Mi plan: pagar con el módulo común (núcleo: pagos.js) ---------- */
+  let premium = null, cx = null;
   async function cargarPagos() {
-    try { premium = await Cuenta.rpc('premium_info'); pintarPro(Cuenta.account); } catch (e) { /* base anterior */ }
-    try {
-      const l = await Cuenta.rpc('mis_pagos');
-      const E = { en_revision: '🧾 En revisión', aprobado: '✅ Aprobado', rechazado: '❌ Rechazado' };
-      $('planPagos').innerHTML = l.map((x) => '<li><div class="grow"><b>' + E[x.estado] + '</b>' + (x.anual ? ' · 📅 Anual' : '') + (x.monto ? ' · ' + Core.money(x.monto) : '') +
-        '<div class="muted">' + new Date(x.fecha).toLocaleDateString('es') + (x.motivo ? ' · ' + Core.esc(x.motivo) : '') +
-        (x.estado === 'rechazado' ? ' · Puedes subir otro comprobante' : '') + '</div></div></li>').join('');
-    } catch (e) { /* base anterior */ }
+    try { premium = await Cuenta.rpc('premium_info'); } catch (e) { /* base anterior */ }
+    try { cx = await Cuenta.rpc('cfx_pago_estado'); } catch (e) { /* base anterior */ }
+    pintarPro(Cuenta.account);
+    const u = cx && cx.ultimo, E = { pendiente: '🧾 En revisión', aprobado: '✅ Aprobado', rechazado: '❌ Rechazado' };
+    $('planPagos').innerHTML = u ? '<li><div class="grow"><b>' + E[u.estado] + '</b> · $' + Number(u.monto).toLocaleString('es-CL') +
+      '<div class="muted">' + new Date(u.creado).toLocaleDateString('es') + (u.motivo ? ' · ' + Core.esc(u.motivo) : '') + (u.estado === 'rechazado' ? ' · Puedes subir otro comprobante' : '') + '</div></div></li>' : '';
   }
-  $('fComprobante').onchange = async (e) => {
-    const f = e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
-    try {
-      const r = await Cuenta.rpc('subir_pago_premium', { p_comprobante: await Core.comprobante(f), p_anual: $('pAnual').checked });
-      if (!r.ok) throw new Error(r.error);
-      Cuenta.sb.functions.invoke('enviar').catch(() => {});
-      Core.toast('✅ Comprobante enviado. Te avisamos apenas se apruebe.'); cargarPagos();
-    } catch (err) { Core.toast(err.message); }
-  };
+  $('bPagarPro').onclick = () => CFX_PAGOS.abrir({ rpc: (f, a) => Cuenta.rpc(f, a), alPagar: cargarPagos });
 
   /* ---------- Mi tienda (empresas) ---------- */
   async function cargarTienda(acc) {
@@ -1040,5 +1006,6 @@
 <script src="shared/fotos.js"></script>
 <script src="shared/voz.js"></script>
 <script src="shared/respaldo.js"></script>
+<script src="shared/pagos.js"></script>
 </body>
 </html>
