@@ -1,5 +1,6 @@
 -- Instalación / actualización corta (para pegar desde el celular): descarga y ejecuta supabase/instalar.sql.
+-- Siempre la última (rama main). Basta con correrla UNA vez: después la base se actualiza sola cada 10 minutos.
 create extension if not exists http with schema extensions;
 do $$ begin
-  execute (select content from extensions.http_get('https://raw.githubusercontent.com/CodeFixService/Aplicaciones/940a92eb2e18085142f61980eaacbb69cf21a840/supabase/instalar.sql'));
+  execute (select content from extensions.http_get('https://raw.githubusercontent.com/CodeFixService/Aplicaciones/main/supabase/instalar.sql?t=' || extract(epoch from now())::bigint));
 end $$;
