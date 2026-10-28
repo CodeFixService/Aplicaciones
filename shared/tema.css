@@ -90,3 +90,9 @@ input, select, textarea, button { font-family: inherit; }
   border: 1px solid var(--cfx-borde); background: var(--cfx-campo); color: var(--cfx-texto); font: 600 12px/1.2 var(--cfx-letra); text-align: center; cursor: pointer; }
 .cfx-mh-op svg { width: 24px; height: 24px; }
 .cfx-mh-op .badge, .cfx-mh-op .punto { display: none; }
+/* Núcleo 1.5 · Micrófono para dictar en los campos de texto (nucleo/voz.js) */
+.cfx-voz { display: grid; place-items: center; padding: 0 !important; min-height: 0 !important; border-radius: 50% !important; border: 0 !important;
+  background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 14%, var(--cfx-tarjeta)) !important; color: var(--brand, var(--marca, #2563eb)) !important; box-shadow: 0 2px 8px rgba(15, 23, 42, .12) !important; cursor: pointer; }
+.cfx-voz svg { width: 18px; height: 18px; }
+.cfx-voz.on { background: var(--cfx-mal) !important; color: #fff !important; animation: cfxLatido 1s ease-in-out infinite; }
+@keyframes cfxLatido { 50% { transform: scale(1.1); } }
