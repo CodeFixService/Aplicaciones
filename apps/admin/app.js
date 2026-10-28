@@ -519,6 +519,7 @@
     return Promise.resolve(f()).catch(fallo);
   }
   async function cargarLinks() {
+    $('linksAdmin').innerHTML = '<div class="card"><p>⭐ Precios, links de pago y datos de transferencia del Premium ahora se configuran una sola vez para las 6 apps en el Centro de Mando → Pagos. Aquí ya no hace falta tocar nada.</p></div>'; return;  // centralizado en el Centro de Mando
     const l = await Cuenta.rpc('mis_links_pago');
     $('linksAdmin').innerHTML = [['premium_negocio', '🏪 Pro de negocios (mensual)'], ['premium_cliente', '👤 Premium de clientes (mensual)'],
       ['anual_negocio', '📅 Pro de negocios: plan anual (ej. 12 meses al precio de 10)'], ['anual_cliente', '📅 Premium de clientes: plan anual']].map(([t, nom]) =>

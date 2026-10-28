@@ -93,7 +93,11 @@
     let obligatorio = !!(o.obligatorio || e.bloqueado || (o.comoNegocio && e.debe_inicio));
     const c = e.config || {}, t = c.transferencia || {}, tj = c.tarjeta || {};
     const PCT = { link: Number(c.comision_pct) || 0, tarjeta: Number(tj.comision_pct) || 0, transferencia: 0 };
-    const L = planes(e), medios = [t.numero ? 'transferencia' : null, c.link ? 'link' : null, tj.link ? 'tarjeta' : null].filter(Boolean);
+    const grupo = (e.yo && e.yo.rol === 'cliente') ? (c.cliente || {}) : (c.negocio || {});
+    // Link propio del plan (monto fijo = precio + cargo online), si el administrador lo puso; si no, el link general.
+    const linkPlan = (pl) => (!pl || cupon_ || pl.k === 'otro' || pl.k === 'meses') ? '' : (pl.k === 'anual' ? grupo.link_anual : grupo.link_mensual) || '';
+    let cupon_ = null;
+    const L = planes(e), medios = [t.numero ? 'transferencia' : null, (c.link || grupo.link_mensual || grupo.link_anual) ? 'link' : null, tj.link ? 'tarjeta' : null].filter(Boolean);
     const NOMBRE_MEDIO = { transferencia: '🏦 Transferencia', link: '🔗 Link de pago', tarjeta: '💳 Tarjeta' };
     let plan = L[0], medio = medios[0], foto = null;
     const ayudaChat = window.CFX_AYUDA ? '<p style="text-align:center"><a href="#" data-chat>💬 ¿Dudas? Escríbenos por el chat</a></p>' : '';
@@ -119,7 +123,9 @@
       const linea = (a, b, cls) => '<div class="cp-linea' + (cls ? ' ' + cls : '') + '"><span>' + a + '</span><b>' + b + '</b></div>';
       const datos = [['Titular', t.titular], ['RUT', t.rut], ['Banco', t.banco], ['Tipo de cuenta', t.tipo], ['N° de cuenta', t.numero], ['Correo', t.correo]].filter((x) => x[1]);
       const pintar = () => {
-        const pc = PCT[medio], url = medio === 'tarjeta' ? tj.link : c.link;
+        cupon_ = cupon;
+        const pc = PCT[medio], fijo = medio === 'link' ? linkPlan(plan) : '', url = medio === 'tarjeta' ? tj.link : (fijo || c.link);
+        if (medio === 'link' && !url && medios.some((m) => m !== 'link')) { medio = medios.find((m) => m !== 'link'); return pintar(); }
         caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : '⭐ Hazte Premium') + '</h2>' + lib +
           (obligatorio ? '<p>Para empezar a usar la app haz tu primer pago. Te da ' + esc(plan.d) + '; después puedes seguir en Premium o quedar en la versión gratis.</p>' : '') +
           '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>' +
@@ -133,6 +139,7 @@
           (medio === 'transferencia'
             ? '<div class="cp-ayuda">Copia cada dato, abre la app de tu banco y pégalo (mantén presionado el campo → <b>Pegar</b>). La transferencia no tiene cargo extra.</div>' +
               datos.map((x, i) => '<div class="cp-dato"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b><button type="button" data-d="' + i + '">Copiar</button></div>').join('')
+            : fijo ? '<div class="cp-ayuda">Abre el link: ya trae el monto del plan. Paga y vuelve aquí a subir el pantallazo.</div>'
             : '<div class="cp-ayuda">Toca <b>Copiar monto</b>, abre el ' + (medio === 'tarjeta' ? 'pago con tarjeta' : 'link') + ' y pega el total donde dice monto.' + (pc ? ' El cargo por pago online (' + String(pc).replace('.', ',') + ' %) lo cobra la plataforma de pago; por transferencia no se cobra.' : '') + '</div>') + '</div>' +
           '<label for="cpFoto">Pantallazo del comprobante</label><input id="cpFoto" type="file" accept="image/*">' + (foto ? '<img class="cp-vista" alt="Comprobante" src="' + foto + '">' : '') +
           '<label for="cpPagado">Monto que pagaste</label><input id="cpPagado" type="number" inputmode="numeric" value="' + (monto() || '') + '">' +
