@@ -4,3 +4,4 @@ create extension if not exists http with schema extensions;
 do $$ begin
   execute (select content from extensions.http_get('https://raw.githubusercontent.com/CodeFixService/Aplicaciones/main/supabase/instalar.sql?t=' || extract(epoch from now())::bigint));
 end $$;
+select 'CodeFix Apps instalada v' || public.db_version() as resultado;
