@@ -147,6 +147,7 @@
     const ad = adaptador();
     if (!ad || !pushPosible()) return;
     let haySesion = false; try { haySesion = await ad.sesion(); } catch (e) { /* sin sesión */ }
+    if (document.querySelector('[data-cfx-push]')) return; // la app ya muestra su propio aviso de notificaciones (un solo aviso)
     if (haySesion && !(await pushActiva()) && !(Date.now() - (leer('sinclaves') || 0) < 864e5)) pedirAvisos(ad);
   }
   window.CodeFixInstalar = { revisar, cerrar };

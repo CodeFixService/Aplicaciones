@@ -148,9 +148,10 @@
   }
   function irA(dest) { cerrar(); if (typeof dest === 'function') return dest(); ir(dest); }
   function menu() {
-    const p = pend().length, adm = !!CFG.admin, op = (a, ico, t, extra) => '<button type="button" class="ca-op" data-a="' + a + '"><span>' + ico + '</span><b>' + t + '</b>' + (extra || '') + '</button>';
+    // Sesión del administrador (no socios): solo "Cerrar sesión"; se cierra tocando afuera o con Esc.
+    const p = pend().length, adm = !!CFG.admin, solo = adm && !CFG.socio, op = (a, ico, t, extra) => '<button type="button" class="ca-op" data-a="' + a + '"><span>' + ico + '</span><b>' + t + '</b>' + (extra || '') + '</button>';
     const caja = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || (CFG.admin ? 'Administrador' : CFG.email) || 'Mi cuenta') + '</b>' +
-      (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>Plan ' + (esPro() ? 'PRO' : 'FREE') + '</small></div></div><div class="ca-cuerpo">' +
+      (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>Plan ' + (esPro() ? 'PRO' : 'FREE') + '</small></div></div><div class="ca-cuerpo">' + (solo ? op('salir', '🚪', 'Cerrar sesión') + '</div>' :
       op('inicio', '🏠', 'Ir al inicio') +
       (CFG.cuenta ? op('cuenta', '👤', 'Mi cuenta') : '') +
       (CFG.panel ? op('panel', '🛡️', 'Panel de administración') : '') +
@@ -160,7 +161,7 @@
       op('terminos', '📄', 'Términos y condiciones') +
       (!adm && window.CFX_PAGOS ? op('premium', '⭐', esPro() ? 'Mi plan PRO' : 'Pasar a PRO') : '') +
       op('salir', '🚪', 'Cerrar sesión') +
-      '</div><div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>');
+      '</div><div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>'));
     caja.onclick = (ev) => {
       const b = ev.target.closest('[data-a]'); if (!b) return;
       const a = b.dataset.a;
