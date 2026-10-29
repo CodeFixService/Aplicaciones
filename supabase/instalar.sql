@@ -5570,6 +5570,19 @@ grant execute on function public.cfx_registro_lista(int), public.cfx_planes(), p
   public.cfx_verif_estado(), public.cfx_verif_enviar(text, text, text, text, text), public.cfx_verif_lista(text), public.cfx_verif_fotos(uuid), public.cfx_verif_resolver(uuid, boolean, text) to authenticated;
 revoke all on function public.cfx_planes_app(), public.cfx_plan_guardar_app(text, text, jsonb, jsonb), public.cfx_textos_app(), public.cfx_texto_guardar_app(text, text),
   public.cfx_destinatarios(text), public.cfx_marcar_verificado(uuid, boolean) from public, anon, authenticated;
+
+-- ---------- Series para el Resumen del Centro de Mando: por mes, cuentas nuevas y pagos/ingresos aprobados (últimos N meses) ----------
+create or replace function public.cfx_series(p_meses int default 6) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n int := greatest(1, least(coalesce(p_meses, 6), 24));
+begin
+  perform public.cfx_es_admin();
+  return (select jsonb_agg(jsonb_build_object('mes', to_char(m, 'YYYY-MM'),
+      'cuentas', (select count(*) from auth.users u where u.created_at >= m and u.created_at < m + interval '1 month'),
+      'pagos', (select count(*) from public.cfx_pagos p where p.estado = 'aprobado' and p.creado >= m and p.creado < m + interval '1 month'),
+      'ingresos', (select coalesce(sum(p.monto), 0) from public.cfx_pagos p where p.estado = 'aprobado' and p.creado >= m and p.creado < m + interval '1 month')) order by m)
+    from generate_series(date_trunc('month', now()) - make_interval(months => n - 1), date_trunc('month', now()), interval '1 month') m);
+end $$;
 -- ---------------------------------------------------------------------
 -- CodeFix · Ayuda (igual en las 6 apps; lo reparte nucleo/sincronizar.py).
 --   1) Puente al Centro de Mando: los avisos importantes (pagos por revisar, mensajes de soporte) le llegan al tiro

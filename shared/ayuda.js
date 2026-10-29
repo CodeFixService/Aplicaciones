@@ -38,6 +38,7 @@
     '.cfx-plan{height:24px;min-height:0;padding:0 9px;border-radius:99px;border:0;cursor:pointer;font:800 11px/24px var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;' +
     'background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto-2,#5b6472);box-shadow:inset 0 0 0 1px var(--cfx-borde,#e2e7ec)}' +
     '.cfx-plan.pro{background:linear-gradient(135deg,#f7d774,#d9a21b);color:#3b2a00;box-shadow:none}' +
+    '.cfx-plan.rol{background:linear-gradient(135deg,#334155,#0f172a);color:#fff;box-shadow:none}' +
     '.cfx-av{width:36px;height:36px;min-height:0;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;flex:none;display:grid;place-items:center;' +
     'background:var(--brand,var(--marca,#2563eb));color:#fff;font:800 14px/1 var(--cfx-letra,system-ui,sans-serif);box-shadow:0 0 0 2px var(--cfx-tarjeta,#fff),0 0 0 3px var(--cfx-borde,#e2e7ec)}' +
     '.cfx-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}html.cfx-premium .cfx-av{box-shadow:0 0 0 2px var(--cfx-tarjeta,#fff),0 0 0 4px #d9a21b}' +
@@ -126,8 +127,10 @@
     const atajo = 'atajo' in CFG ? CFG.atajo : CFG.admin && !CFG.socio && CFG.app !== 'mando' ? { ir: panelCM(), t: 'Panel' } : null;
     at.classList.toggle('cfx-oc', !atajo);
     if (atajo) { at.href = atajo.ir; at.setAttribute('aria-label', 'Ir a ' + atajo.t); at.innerHTML = SVG_CAMBIO + '<span>' + esc(atajo.t) + '</span>'; }
-    plan.textContent = esPro() ? 'PRO' : 'FREE'; plan.classList.toggle('pro', esPro());
-    plan.setAttribute('aria-label', esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
+    // Administrador y socios: en vez del plan se ve su rol (ADMIN / SOCIO), así se nota que es una cuenta para administrar.
+    const rol = CFG.admin ? (CFG.socio ? 'SOCIO' : 'ADMIN') : '';
+    plan.textContent = rol || (esPro() ? 'PRO' : 'FREE'); plan.classList.toggle('pro', !rol && esPro()); plan.classList.toggle('rol', !!rol);
+    plan.setAttribute('aria-label', rol ? (rol === 'ADMIN' ? 'Administrador' : 'Socio') : esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
     const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
     av.innerHTML = (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + (n ? '<i>' + n + '</i>' : '');
   }
@@ -151,7 +154,7 @@
     // Sesión del administrador (no socios): solo "Cerrar sesión"; se cierra tocando afuera o con Esc.
     const p = pend().length, adm = !!CFG.admin, solo = adm && !CFG.socio, op = (a, ico, t, extra) => '<button type="button" class="ca-op" data-a="' + a + '"><span>' + ico + '</span><b>' + t + '</b>' + (extra || '') + '</button>';
     const caja = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || (CFG.admin ? 'Administrador' : CFG.email) || 'Mi cuenta') + '</b>' +
-      (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>Plan ' + (esPro() ? 'PRO' : 'FREE') + '</small></div></div><div class="ca-cuerpo">' + (solo ? op('salir', '🚪', 'Cerrar sesión') + '</div>' :
+      (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>' + (CFG.admin ? (CFG.socio ? 'Socio' : 'Administrador') : 'Plan ' + (esPro() ? 'PRO' : 'FREE')) + '</small></div></div><div class="ca-cuerpo">' + (solo ? op('salir', '🚪', 'Cerrar sesión') + '</div>' :
       op('inicio', '🏠', 'Ir al inicio') +
       (CFG.cuenta ? op('cuenta', '👤', 'Mi cuenta') : '') +
       (CFG.panel ? op('panel', '🛡️', 'Panel de administración') : '') +
@@ -396,6 +399,36 @@
   new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => { if (n.nodeType === 1) flechas(n.parentNode || n); }); })
     .observe(document.documentElement, { childList: true, subtree: true });
   if (document.readyState !== 'loading') flechas(document); else document.addEventListener('DOMContentLoaded', () => flechas(document));
+
+  // ---------- Otras apps CodeFix (debajo del ingreso de cada app) ----------
+  // Bajo el formulario de ingreso se muestran las otras apps: al tocar una se abre su registro. El CM y Cerebro (personales) no se muestran
+  // ni la llevan; un formulario con data-sin-apps tampoco. La app donde estás no sale.
+  const OTRAS = [['emprendedor', 'billetera', 'Billetera', 'Cobros y deudas', '#0f8a5f', '#crear'], ['aplicaciones', 'apps', 'Órbita', 'Tienda y pedidos', '#2563eb', ''],
+    ['barberia', 'barberia', 'Barbería', 'Reservas de hora', '#b8860b', 'registro/'], ['taller', 'bicitaller', 'BiciTaller', 'Taller de bicis', '#16a34a', 'n/'],
+    ['estacionamiento', 'estaciona', 'Estaciona', 'Arrienda o publica', '#1d4ed8', '']];
+  const h0 = location.hostname.split('.')[0];
+  const PROPIA = /^(saas|mando|contenido|cerebro)$/.test(h0) || /\/admin\//.test(location.pathname);
+  function otrasApps() {
+    if (PROPIA) return;
+    document.querySelectorAll('input[type="password"][autocomplete="current-password"]').forEach((c) => {
+      const f = c.closest('form'); if (!f || f.dataset.cfxApps || f.hasAttribute('data-sin-apps') || f.closest('dialog.cfx-ayuda')) return;
+      f.dataset.cfxApps = '1';
+      const L = OTRAS.filter((a) => a[0] !== h0 && a[1] !== h0);
+      const d = document.createElement('div'); d.className = 'cfx-otras';
+      d.innerHTML = '<p>¿Conoces las otras apps de CodeFix? Crea tu cuenta gratis</p><div>' + L.map((a) => '<a href="' + web(a[0], a[1]) + a[5] + '" target="_blank" rel="noopener" style="--c:' + a[4] + '">' +
+        '<i aria-hidden="true">' + a[2][0] + '</i><b>' + a[2] + '</b><small>' + a[3] + '</small></a>').join('') + '</div>';
+      f.after(d);
+    });
+  }
+  const cssO = document.createElement('style');
+  cssO.textContent = '.cfx-otras{margin:18px 0 4px}.cfx-otras>p{margin:0 0 8px;font-size:13px;opacity:.75;text-align:center}' +
+    '.cfx-otras>div{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none}.cfx-otras>div::-webkit-scrollbar{display:none}' +
+    '.cfx-otras a{flex:1 0 96px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:14px;border:1px solid rgba(127,127,127,.22);background:rgba(127,127,127,.06);color:inherit;text-decoration:none;text-align:center}' +
+    '.cfx-otras i{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-style:normal;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 60%,#000));box-shadow:0 4px 12px color-mix(in srgb,var(--c) 35%,transparent);margin-bottom:2px}' +
+    '.cfx-otras b{font-size:13px}.cfx-otras small{font-size:11px;opacity:.7;line-height:1.2}';
+  document.head.appendChild(cssO);
+  new MutationObserver(() => { clearTimeout(otrasApps.t); otrasApps.t = setTimeout(otrasApps, 120); }).observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState !== 'loading') otrasApps(); else document.addEventListener('DOMContentLoaded', otrasApps);
 
   // ---------- "Volver" vuelve a la pantalla anterior (no al inicio) ----------
   // Se guarda el recorrido de la sesión; los botones "Volver"/"‹" de cualquier app hacen history.back() si hay una pantalla anterior.

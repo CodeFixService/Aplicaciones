@@ -315,3 +315,5 @@ header.top h1::before { display: inline-block; vertical-align: middle; margin-ri
   header.top a[aria-label^="Volver"]:not(.hidden) ~ h1::before { display: none; }
   header.top { gap: 8px; }
 }
+/* Celular: con "‹" a la vista el logo cuadrado se oculta para que el nombre de la tienda no quede en "T…". */
+@media (max-width: 420px) { header.top > a:not(.hidden) + h1::before { display: none; } }

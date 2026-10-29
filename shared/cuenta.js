@@ -415,10 +415,12 @@
       try { inicio = !sessionStorage.getItem('cfx:pushSesion'); sessionStorage.setItem('cfx:pushSesion', '1'); } catch (e) { inicio = false; }
       if (!inicio && Date.now() - t < PUSH_CADA) return;
       if (document.getElementById('cfxPush')) return;
+      // Un solo aviso: si están bloqueadas no se insiste con la hoja (lo explica Cuenta), ni si la pantalla ya muestra su propio aviso.
+      const negado = Notification.permission === 'denied';
+      if (negado || [...document.querySelectorAll('[data-cfx-push]')].some((x) => x.offsetParent)) return;
       localStorage.setItem(k, String(Date.now()));
       const d = document.createElement('div');
-      d.className = 'hoja'; d.id = 'cfxPush';
-      const negado = Notification.permission === 'denied';
+      d.className = 'hoja'; d.id = 'cfxPush'; d.dataset.cfxPush = '';
       d.innerHTML = '<div><span style="font-size:28px">🔔</span><div class="grow"><b>Activa las notificaciones</b><br>' +
         (negado ? 'Están bloqueadas: actívalas en los ajustes del navegador (candado junto a la dirección).' : 'Es muy importante: así te enteras al tiro de pedidos, pagos y mensajes.') +
         '</div>' + (negado ? '' : '<button class="small" type="button">Activar</button>') + '<button class="small alt" type="button" aria-label="Ahora no">✕</button></div>';
