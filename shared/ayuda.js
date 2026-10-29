@@ -14,6 +14,18 @@
   const RAIZ = yo ? yo.replace(/(shared|js)\/ayuda\.js.*$/, '') : location.origin + '/';
   const color = () => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || getComputedStyle(document.documentElement).getPropertyValue('--marca').trim() || (document.querySelector('meta[name="theme-color"]') || {}).content || '#2563eb';
   const CADA = 60 * 60 * 1000;
+  // Dirección de cada app y del Centro de Mando según dónde se abre (un solo lugar para las 7):
+  //  · Cloudflare Workers (<worker>.<cuenta>.workers.dev) → <worker>.<cuenta>.workers.dev
+  //  · dominio propio (mando.codefix.app)                → <sub>.codefix.app
+  //  · pruebas, GitHub Pages o Pages.dev                 → los Workers de la cuenta
+  const CUENTA_WORKERS = 'juanjosuecastilloloyola.workers.dev';
+  function web(worker, sub) {
+    const h = location.hostname, p = h.split('.');
+    if (/\.workers\.dev$/.test(h) && p.length >= 4) return 'https://' + worker + '.' + p.slice(1).join('.') + '/';
+    if (/^(localhost|127\.|\d+\.\d+\.\d+\.\d+$)|github\.io$|pages\.dev$/.test(h) || p.length < 2) return 'https://' + worker + '.' + CUENTA_WORKERS + '/';
+    return 'https://' + sub + '.' + (p.length >= 3 ? p.slice(1).join('.') : h) + '/';
+  }
+  const panelCM = () => web('saas', 'mando') + 'admin/';
   const css = document.createElement('style');
   css.textContent =
     // Cabecera común: [campana][FREE/PRO][foto] a la derecha del encabezado de cada app.
@@ -32,7 +44,7 @@
     '.cfx-av i{position:absolute;top:-5px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:#dc2626;color:#fff;font:700 11px/18px system-ui,sans-serif;font-style:normal;padding:0 4px;box-sizing:border-box}' +
     '@media(max-width:380px){.cfx-cab{gap:6px}.cfx-plan{padding:0 7px;font-size:10px}.cfx-av{width:34px;height:34px}}' +
     '.cfx-ayuda .ca-yo{display:flex;align-items:center;gap:12px;padding:2px 0 12px;border-bottom:1px solid var(--cfx-borde,#e2e7ec);margin-bottom:6px}.cfx-ayuda .ca-yo .cfx-av{width:46px;height:46px;font-size:17px;cursor:default}' +
-    '.cfx-ayuda .ca-yo b{display:block;font-size:16px}.cfx-ayuda .ca-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}.cfx-ayuda .ca-yo>div{min-width:0}' +
+    '.cfx-ayuda .ca-yo b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-ayuda .ca-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}.cfx-ayuda .ca-yo>div{min-width:0}' +
     // Ajustes en cuadrícula
     '.cfx-aj>button{min-height:96px}.cfx-aj>button>span:first-child{font-size:26px;line-height:1}.cfx-aj small{display:block;font-weight:500;font-size:12.5px;line-height:1.3;color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-reg-b{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.cfx-reg-b button{flex:1 1 180px;min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font:700 14px var(--cfx-letra,system-ui,sans-serif);cursor:pointer}' +
@@ -110,9 +122,10 @@
       if (una) [...una.childNodes].forEach((x) => { if (x.nodeType === 3 && /🔔/.test(x.textContent)) { const t = document.createElement('span'); t.innerHTML = SVG_CAMPANA; x.replaceWith(t.firstChild); } });
     } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); }
     const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av'), at = boya.querySelector('.cfx-atajo');
-    // Atajo fijo (p. ej. Centro de Mando: Panel ⇄ App): { ir, t }.
-    at.classList.toggle('cfx-oc', !CFG.atajo);
-    if (CFG.atajo) { at.href = CFG.atajo.ir; at.setAttribute('aria-label', 'Ir a ' + CFG.atajo.t); at.innerHTML = SVG_CAMBIO + '<span>' + esc(CFG.atajo.t) + '</span>'; }
+    // Atajo fijo { ir, t }: el Centro de Mando pasa el suyo (Panel ⇄ App); en las otras apps el administrador va al panel del Centro de Mando.
+    const atajo = 'atajo' in CFG ? CFG.atajo : CFG.admin && CFG.app !== 'mando' ? { ir: panelCM(), t: 'Panel' } : null;
+    at.classList.toggle('cfx-oc', !atajo);
+    if (atajo) { at.href = atajo.ir; at.setAttribute('aria-label', 'Ir a ' + atajo.t); at.innerHTML = SVG_CAMBIO + '<span>' + esc(atajo.t) + '</span>'; }
     plan.textContent = esPro() ? 'PRO' : 'FREE'; plan.classList.toggle('pro', esPro());
     plan.setAttribute('aria-label', esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
     const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
@@ -136,8 +149,8 @@
   function irA(dest) { cerrar(); if (typeof dest === 'function') return dest(); ir(dest); }
   function menu() {
     const p = pend().length, adm = !!CFG.admin, op = (a, ico, t, extra) => '<button type="button" class="ca-op" data-a="' + a + '"><span>' + ico + '</span><b>' + t + '</b>' + (extra || '') + '</button>';
-    const caja = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || CFG.email || 'Mi cuenta') + '</b>' +
-      (CFG.nombre && CFG.email ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>Plan ' + (esPro() ? 'PRO' : 'FREE') + '</small></div></div><div class="ca-cuerpo">' +
+    const caja = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || (CFG.admin ? 'Administrador' : CFG.email) || 'Mi cuenta') + '</b>' +
+      (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>Plan ' + (esPro() ? 'PRO' : 'FREE') + '</small></div></div><div class="ca-cuerpo">' +
       op('inicio', '🏠', 'Ir al inicio') +
       (CFG.cuenta ? op('cuenta', '👤', 'Mi cuenta') : '') +
       (CFG.panel ? op('panel', '🛡️', 'Panel de administración') : '') +
@@ -406,7 +419,7 @@
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } }, 1500);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar, menu };
+  window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar, menu, web, panelCM };
   window.CFX_AJUSTES = { montar: ajustes, registro };
   // La app pudo pedirlo antes de que este archivo cargara (CFX_AYUDA_PEND = { rpc, app }).
   if (window.CFX_AYUDA_PEND) iniciar(window.CFX_AYUDA_PEND);

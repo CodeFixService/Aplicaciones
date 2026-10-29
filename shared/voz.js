@@ -13,7 +13,7 @@
   let campo = null, rec = null;
   const sirve = (e) => e && e.matches && e.matches(SIRVE) && !e.readOnly && !e.disabled && !e.closest('[data-sin-voz]') && !/correo|email|clave|pass|rut|codigo|código/i.test((e.name || '') + (e.id || '') + (e.autocomplete || ''));
   function ubicar() {
-    if (!campo || !campo.isConnected) return ocultar();
+    if (!campo || !campo.isConnected || (!rec && document.activeElement !== campo)) return ocultar();
     const r = campo.getBoundingClientRect();
     if (!r.width || r.bottom < 0 || r.top > innerHeight) return ocultar();
     // Tamaño según el campo (en campos chicos el botón se achica) y el texto no queda debajo del micrófono.
@@ -32,6 +32,7 @@
   document.addEventListener('focusout', () => setTimeout(() => { if (!rec && !(document.activeElement && sirve(document.activeElement))) ocultar(); }, 150));
   addEventListener('scroll', () => { if (!b.hidden) ubicar(); }, true);
   addEventListener('resize', () => { if (!b.hidden) ubicar(); });
+  setInterval(() => { if (!b.hidden) ubicar(); }, 600); // si la pantalla cambia sin mover nada (otra vista, ventana cerrada), el micrófono no queda suelto
   b.addEventListener('mousedown', (e) => e.preventDefault()); // que el campo no pierda el foco
   b.addEventListener('click', () => {
     if (rec) { rec.stop(); return; }

@@ -77,7 +77,7 @@
 
   // En Android las notificaciones solo funcionan a través del service worker.
   async function notify(title, opts) {
-    opts = Object.assign({ icon: rootUrl() + 'icons/icon-192.png', badge: rootUrl() + 'icons/icon-192.png' }, opts || {});
+    opts = Object.assign({ icon: rootUrl() + 'icons/icon-192.png', badge: rootUrl() + 'icons/badge.png' }, opts || {});
     if (!('Notification' in global) || Notification.permission !== 'granted') {
       toast(title + (opts.body ? ' — ' + opts.body : ''));
       return;
@@ -323,7 +323,7 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.19';
+  const APP_VERSION = '5.20';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};

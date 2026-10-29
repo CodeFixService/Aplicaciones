@@ -110,7 +110,7 @@
   // Núcleo (ayuda.js): cabecera común [campana][FREE/PRO][foto], menú de la cuenta, ayuda y sensación Premium.
   function cabecera(a, rootPath) {
     window.CFX_AYUDA_PEND = Object.assign(window.CFX_AYUDA_PEND || {}, { rpc, app: 'orbita', admin: !!a.is_admin, premium: !!a.is_pro, id: a.id, hasta: a.pro_until,
-      nombre: a.empresa || a.nombre || '', email: a.email, foto: esLogo(a.logo) ? a.logo : null, quitar: '.pill.admin',
+      nombre: a.empresa || a.nombre || '', email: a.email, foto: esLogo(a.logo) ? a.logo : null, quitar: '.pill.admin, #licTag',
       cuenta: rootPath + '#ajustes', panel: a.is_admin && !/\/apps\/admin\//.test(location.pathname) ? rootPath + 'apps/admin/' : null,
       salir: async () => { await signOut(); location.replace(rootPath); } });
     if (window.CFX_AYUDA) window.CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND);

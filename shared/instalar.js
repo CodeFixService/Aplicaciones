@@ -126,7 +126,11 @@
     mostrar('Activa las notificaciones', 'Te avisamos al tiro de tus pedidos, pagos y mensajes, aunque tengas la app cerrada.', '',
       'Activar', async () => {
         try { await ad.activar(); cerrar(); guardar('avisos', Date.now()); }
-        catch (e) { const p = hoja && hoja.querySelector('p'); if (p) p.textContent = (e && e.message) || 'No se pudo activar. Intenta de nuevo.'; }
+        catch (e) {
+          // La app aún no tiene sus claves push (se crean en CM → Control → 🔔 Notificaciones): no se muestra el error y se vuelve a ofrecer en 1 día.
+          if (/administrador a[uú]n no activ/i.test((e && e.message) || '')) { guardar('sinclaves', Date.now()); return cerrar(); }
+          const p = hoja && hoja.querySelector('p'); if (p) p.textContent = (e && e.message) || 'No se pudo activar. Intenta de nuevo.';
+        }
       });
   }
 
@@ -143,7 +147,7 @@
     const ad = adaptador();
     if (!ad || !pushPosible()) return;
     let haySesion = false; try { haySesion = await ad.sesion(); } catch (e) { /* sin sesión */ }
-    if (haySesion && !(await pushActiva())) pedirAvisos(ad);
+    if (haySesion && !(await pushActiva()) && !(Date.now() - (leer('sinclaves') || 0) < 864e5)) pedirAvisos(ad);
   }
   window.CodeFixInstalar = { revisar, cerrar };
   const iniciar = () => { setTimeout(revisar, ESPERA); setInterval(revisar, 60 * 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(revisar, 1200); }); };
