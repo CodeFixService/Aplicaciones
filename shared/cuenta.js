@@ -98,10 +98,19 @@
     }
   }
 
+  // Textos editables (Centro de Mando → Control → Textos): reemplaza los elementos con data-texto="clave".
+  function textos() {
+    if (!sb || !document.querySelector('[data-texto]')) return;
+    sb.from('textos').select('clave, valor').then(({ data }) => (data || []).forEach((t) => {
+      (global.CFX_TEXTOS = global.CFX_TEXTOS || {})[t.clave] = t.valor;
+      if (t.valor) document.querySelectorAll('[data-texto="' + t.clave + '"]').forEach((e) => { e.textContent = t.valor; });
+    }));
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', textos); else textos();
   // Núcleo (ayuda.js): cabecera común [campana][FREE/PRO][foto], menú de la cuenta, ayuda y sensación Premium.
   function cabecera(a, rootPath) {
     window.CFX_AYUDA_PEND = Object.assign(window.CFX_AYUDA_PEND || {}, { rpc, app: 'orbita', admin: !!a.is_admin, premium: !!a.is_pro, id: a.id, hasta: a.pro_until,
-      nombre: a.empresa || a.nombre || '', email: a.email, foto: esLogo(a.logo) ? a.logo : null, quitar: '#planTag, .pill.admin',
+      nombre: a.empresa || a.nombre || '', email: a.email, foto: esLogo(a.logo) ? a.logo : null, quitar: '.pill.admin',
       cuenta: rootPath + '#ajustes', panel: a.is_admin && !/\/apps\/admin\//.test(location.pathname) ? rootPath + 'apps/admin/' : null,
       salir: async () => { await signOut(); location.replace(rootPath); } });
     if (window.CFX_AYUDA) window.CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND);
@@ -360,17 +369,16 @@
     if (!n) { n = document.createElement('nav'); n.className = 'tabs abajo'; document.body.appendChild(n); }
     document.body.classList.add('con-nav');
     n.innerHTML = items.map(([k, i, t, u]) => '<a href="' + r + u + '" data-k="' + k + '" class="' + (k === activo ? 'on' : '') + '">' + ICO(i) + t +
-      (k === 'chat' || k === 'pedidos' ? '<span class="badge" hidden></span>' : '') + '</a>').join('');
+      (k === 'chat' || k === 'pedidos' || k === 'mas' ? '<span class="badge" hidden></span>' : '') + '</a>').join('');
     // Barra común del núcleo: [principal][principal][ + ][principal][Más]
     global.CFX_BARRA = a.role === 'client' ? { orden: ['pedidos', 'chat', '+', 'contactos', 'cuenta'], plus: 'tienda' }
       : a.role === 'equipo' ? { orden: ['hoy', 'pedidos', '+', 'chat'], plus: 'caja' } : { orden: ['hoy', 'pedidos', '+', 'fichas', 'mas'], plus: 'caja' };
     if (global.CodeFixBarra) { delete n.dataset.cfx; global.CodeFixBarra.montar(); }
-    // Atajos arriba: mensajes (negocio) y avisos.
+    // Arriba solo la campana (la cabecera común del núcleo la ordena); los mensajes van en la barra o en "Más" (con su número).
     const h = document.querySelector('header.top');
     if (h && !h.querySelector('.atajos')) {
       const d = document.createElement('div'); d.className = 'atajos';
-      d.innerHTML = (a.role === 'client' ? '' : '<a href="' + r + 'apps/mensajes/" aria-label="Mensajes">' + ICO('chat') + '<span class="badge" hidden id="atMsg"></span></a>') +
-        '<a href="' + r + (a.role === 'client' ? '#cuenta' : '') + '#avisos" aria-label="Avisos">' + ICO('campana') + '</a>';
+      d.innerHTML = '<a href="' + r + (a.role === 'client' ? '#cuenta' : '') + '#avisos" aria-label="Avisos">' + ICO('campana') + '</a>';
       h.appendChild(d);
     }
     contar();
@@ -380,7 +388,7 @@
     try {
       const { data } = await sb.rpc('chat_list');
       const m = (data || []).reduce((s, c) => s + (c.no_leidos || 0), 0);
-      document.querySelectorAll('nav.tabs.abajo [data-k=chat] .badge, #atMsg').forEach((b) => { b.textContent = m; b.hidden = !m; });
+      document.querySelectorAll('nav.tabs.abajo [data-k=chat] .badge, nav.tabs.abajo [data-k=mas] .badge').forEach((b) => { b.textContent = m; b.hidden = !m; });
     } catch (e) { /* sin red */ }
     if (account.role !== 'client') {
       try {

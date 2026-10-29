@@ -155,3 +155,54 @@ nav.cfx-barra > .cfx-mas .cfx-ico svg { display: block !important; margin: 0 !im
   body.cfx-con-barra main, body.cfx-con-barra .cfx-centro { width: auto !important; max-width: 1040px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box; }
   body.cfx-con-barra .con-nav { padding-left: 0 !important; }
 }
+/* ===== Núcleo 2.3 · Barra lista, espacio vacío, centrado y diseño moderno ===== */
+/* La barra de abajo no "salta" al cargar: se muestra cuando el núcleo ya la ordenó. */
+@media (max-width: 899px) {
+  html:not(.cfx-barra-lista) nav.nav:not(.cfx-barra), html:not(.cfx-barra-lista) nav.tabs:not(.sub):not(.cfx-barra), html:not(.cfx-barra-lista) nav#nav:not(.cfx-barra) { visibility: hidden; }
+  nav.cfx-barra > .cfx-vacio { display: block; min-height: 50px; }
+}
+@media (min-width: 900px) { nav.cfx-barra > .cfx-vacio { display: none !important; } }
+/* El + exactamente al centro de su círculo */
+nav.cfx-barra > .cfx-mas .cfx-ico, nav.cfx-barra > .cfx-mas .cfx-ico svg { transform: none; }
+nav.cfx-barra > .cfx-mas .cfx-ico svg { width: 28px !important; height: 28px !important; }
+/* Botones de ícono y flechas de volver: el símbolo siempre al centro del cuadro */
+.icono, .icon-btn, .btn-icono, .cfx-aj-volver, .icono-top {
+  display: inline-grid; place-items: center; line-height: 1 !important; text-align: center; }
+.icono[hidden], .icon-btn[hidden], .btn-icono[hidden], .icono-top[hidden] { display: none !important; }
+.icono > svg, .icon-btn > svg, .btn-icono > svg, .cfx-aj-volver > svg { display: block; margin: 0 !important; }
+/* Los textos siempre caben en su cuadro (palabras largas, correos y links se cortan bien) */
+.card, .tarjeta, .item, .cfx-grilla > *, .kpi, .stats > *, dialog, .modal-caja, .sheet, .hoja { overflow-wrap: anywhere; min-width: 0; }
+h1, h2, h3 { overflow-wrap: anywhere; }
+.cfx-grilla > button, .cfx-grilla > a { text-wrap: balance; }
+/* Tarjetas de menú (Ajustes / Más): el ícono en su cuadro con brillo de la marca */
+.cfx-aj > button > span:first-child { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; font-size: 22px !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 22%, transparent), color-mix(in srgb, #8b5cf6 16%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 30%, transparent); }
+/* Toque moderno: tarjetas que se elevan y brillan suave al tocarlas */
+.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button, .cfx-mh-op, .kpi { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+@media (hover: hover) {
+  .cfx-grilla > a:hover, .cfx-grilla > button:hover, .cfx-mh-op:hover { transform: translateY(-2px);
+    box-shadow: 0 10px 28px -12px color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 55%, transparent) !important; }
+}
+.cfx-grilla > a:active, .cfx-grilla > button:active, .cfx-mh-op:active { transform: scale(.97); }
+/* Fondo "galáctico" suave (sin tapar el color de cada app) */
+body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 9%, transparent), transparent 70%),
+  radial-gradient(800px 420px at 105% 0%, color-mix(in srgb, #8b5cf6 7%, transparent), transparent 70%); background-attachment: fixed; background-repeat: no-repeat; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not(.claro):not(.light) body { background-image:
+  radial-gradient(900px 520px at 0% -10%, color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 18%, transparent), transparent 70%),
+  radial-gradient(800px 480px at 105% 0%, color-mix(in srgb, #8b5cf6 14%, transparent), transparent 70%); } }
+:root[data-theme="dark"] body, html.dark body, html.oscuro body { background-image: radial-gradient(900px 520px at 0% -10%, color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 18%, transparent), transparent 70%),
+  radial-gradient(800px 480px at 105% 0%, color-mix(in srgb, #8b5cf6 14%, transparent), transparent 70%); }
+/* Al bajar, cada tarjeta entra suave (solo en navegadores que lo permiten; si no, se ve normal) */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button { animation: cfxEntra linear both; animation-timeline: view(); animation-range: entry 0% entry 40%; }
+  }
+}
+@keyframes cfxEntra { from { opacity: .25; translate: 0 14px; scale: .985; } to { opacity: 1; translate: none; scale: none; } }
+/* Listas que se apilan al bajar (núcleo: barra.js marca .cfx-apilar): cada tarjeta queda pegada arriba y la siguiente se pone encima */
+@media (max-width: 899px) {
+  .cfx-apilar > .cfx-pila { position: sticky; top: calc(var(--cfx-top, 64px) + 8px + var(--cfx-i, 0) * 6px); z-index: 1;
+    box-shadow: 0 -6px 18px -10px rgba(15, 23, 42, .35), var(--cfx-sombra, none) !important; }
+  .cfx-apilar > .cfx-pila { scale: var(--cfx-esc, 1); filter: brightness(var(--cfx-luz, 1)); transform-origin: 50% 0; transition: scale .08s linear; animation: none !important; }
+}

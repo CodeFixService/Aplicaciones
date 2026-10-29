@@ -20,6 +20,9 @@
     '.cfx-oc{display:none!important}.cfx-cab{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none;position:relative;z-index:1}' +
     '.cfx-cab.cfx-fija{position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:2147481000}' +
     '.cfx-cab>[data-cfx-campana]{margin:0!important;flex:none}' +
+    '.cfx-atajo{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 11px;border-radius:99px;text-decoration:none;flex:none;font:800 12.5px/1 var(--cfx-letra,system-ui,sans-serif);' +
+    'color:var(--brand,var(--marca,#2563eb));background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 35%,transparent)}' +
+    '.cfx-atajo svg{flex:none}@media(max-width:380px){.cfx-atajo span{display:none}.cfx-atajo{width:32px;padding:0;justify-content:center}}' +
     '.cfx-plan{height:24px;min-height:0;padding:0 9px;border-radius:99px;border:0;cursor:pointer;font:800 11px/24px var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;' +
     'background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto-2,#5b6472);box-shadow:inset 0 0 0 1px var(--cfx-borde,#e2e7ec)}' +
     '.cfx-plan.pro{background:linear-gradient(135deg,#f7d774,#d9a21b);color:#3b2a00;box-shadow:none}' +
@@ -32,8 +35,12 @@
     '.cfx-ayuda .ca-yo b{display:block;font-size:16px}.cfx-ayuda .ca-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}.cfx-ayuda .ca-yo>div{min-width:0}' +
     // Ajustes en cuadrícula
     '.cfx-aj>button{min-height:96px}.cfx-aj>button>span:first-child{font-size:26px;line-height:1}.cfx-aj small{display:block;font-weight:500;font-size:12.5px;line-height:1.3;color:var(--cfx-texto-2,#5b6472)}' +
-    '.cfx-aj-cab{display:flex;align-items:center;gap:10px;margin:0 0 12px}.cfx-aj-cab h2{margin:0;font-size:19px;line-height:1.2}' +
-    '.cfx-aj-volver{flex:none;width:40px;height:40px;min-height:0;padding:0;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:20px;cursor:pointer}' +
+    '.cfx-reg-b{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.cfx-reg-b button{flex:1 1 180px;min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font:700 14px var(--cfx-letra,system-ui,sans-serif);cursor:pointer}' +
+    '.cfx-reg-b .cfx-reg-todo{color:#dc2626}.cfx-reg-f{padding:10px 12px;border-radius:12px;background:var(--cfx-tarjeta,#fff);border:1px solid var(--cfx-borde,#e2e7ec);margin:0 0 8px;overflow-wrap:anywhere}' +
+    '.cfx-reg-f b{display:block}.cfx-reg-f span{display:block;font-size:13.5px;color:var(--cfx-texto-2,#5b6472)}.cfx-reg-f small{font-size:12px;color:var(--cfx-texto-2,#5b6472)}' +
+    '.cfx-toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;transition:.25s;z-index:2147483200;background:#111827;color:#fff;padding:10px 16px;border-radius:12px;font:600 14px var(--cfx-letra,system-ui,sans-serif);max-width:90vw}.cfx-toast.on{opacity:1;transform:translate(-50%,0)}' +
+    '.cfx-flecha{display:inline-grid!important;place-items:center;line-height:1!important}.cfx-aj-cab{display:flex;align-items:center;gap:10px;margin:0 0 12px}.cfx-aj-cab h2{margin:0;font-size:19px;line-height:1.2}' +
+    '.cfx-aj-volver{flex:none;width:40px;height:40px;min-height:0;padding:0;display:grid;place-items:center;line-height:1;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:20px;cursor:pointer}' +
     'dialog.cfx-ayuda{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;z-index:2147483100;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;font-family:var(--cfx-letra,system-ui,sans-serif)}' +
     'dialog.cfx-ayuda::backdrop{background:transparent}@media(min-width:600px){dialog.cfx-ayuda{align-items:center}}' +
     '.cfx-ayuda>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;border-radius:20px 20px 0 0;box-sizing:border-box;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}' +
@@ -70,6 +77,7 @@
   // La campana es la de la app (una sola: las repetidas se esconden). La foto abre el menú: inicio, mi cuenta, panel, ayuda, Premium y cerrar sesión.
   // Lo que ya está en el menú (casa, chat, persona, ADMIN, cerrar sesión…) se esconde con CFG.quitar (selector de cada app).
   const SVG_CAMPANA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+  const SVG_CAMBIO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>';
   const CAMPANA = '#bCampana, #campana, #btnAvisos, [aria-label="Avisos"], [aria-label="Notificaciones"], a[href$="#avisos"], [data-cfx-campana]';
   function encabezado() {
     return [...document.querySelectorAll('header.top, header.cab, .cab, header, .topbar, .top')].find((h) => {
@@ -85,7 +93,7 @@
     if (!R) return;
     if (!boya) {
       boya = document.createElement('div'); boya.className = 'cfx-cab';
-      boya.innerHTML = '<button type="button" class="cfx-plan"></button><button type="button" class="cfx-av" aria-label="Mi cuenta y menú"></button>';
+      boya.innerHTML = '<a class="cfx-atajo cfx-oc"></a><button type="button" class="cfx-plan"></button><button type="button" class="cfx-av" aria-label="Mi cuenta y menú"></button>';
       boya.querySelector('.cfx-av').onclick = menu;
       boya.querySelector('.cfx-plan').onclick = () => (CFG.admin || !window.CFX_PAGOS ? menu() : window.CFX_PAGOS.abrir({ rpc: R }));
     }
@@ -97,11 +105,14 @@
       const campanas = [...h.querySelectorAll(CAMPANA)].map((x) => x.closest('button, a') || x).filter((x, i, l) => l.indexOf(x) === i && !x.classList.contains('cfx-plan'));
       const una = campanas.find((x) => x.dataset.cfxCampana) || campanas.find((x) => !x.classList.contains('cfx-oc')) || campanas[0];
       campanas.forEach((x) => { if (x !== una) x.classList.add('cfx-oc'); });
-      if (una && una.parentNode !== boya) { una.dataset.cfxCampana = '1'; boya.insertBefore(una, boya.firstChild); }
+      if (una && una.parentNode !== boya) { una.dataset.cfxCampana = '1'; boya.insertBefore(una, boya.querySelector('.cfx-plan')); }
       // Mismo ícono de campana en todas las apps (las que usan el emoji 🔔 pasan al dibujo de línea).
       if (una) [...una.childNodes].forEach((x) => { if (x.nodeType === 3 && /🔔/.test(x.textContent)) { const t = document.createElement('span'); t.innerHTML = SVG_CAMPANA; x.replaceWith(t.firstChild); } });
     } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); }
-    const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av');
+    const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av'), at = boya.querySelector('.cfx-atajo');
+    // Atajo fijo (p. ej. Centro de Mando: Panel ⇄ App): { ir, t }.
+    at.classList.toggle('cfx-oc', !CFG.atajo);
+    if (CFG.atajo) { at.href = CFG.atajo.ir; at.setAttribute('aria-label', 'Ir a ' + CFG.atajo.t); at.innerHTML = SVG_CAMBIO + '<span>' + esc(CFG.atajo.t) + '</span>'; }
     plan.textContent = esPro() ? 'PRO' : 'FREE'; plan.classList.toggle('pro', esPro());
     plan.setAttribute('aria-label', esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
     const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
@@ -168,13 +179,48 @@
       const s = L.find((x) => x.k === k); if (!s) return grilla();
       nodos.forEach((n) => n.classList.toggle('cfx-oc', n !== s.nodo));
       if (s.nodo) s.nodo.classList.remove('hidden');
-      w.innerHTML = '<div class="cfx-aj-cab"><button type="button" class="cfx-aj-volver" data-sin-atras aria-label="Volver a Ajustes">←</button><h2>' + s.ico + ' ' + esc(s.t) + '</h2></div><div class="cfx-aj-zona"></div>';
+      w.innerHTML = '<div class="cfx-aj-cab"><button type="button" class="cfx-aj-volver" data-sin-atras aria-label="Volver a Ajustes"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button><h2>' + s.ico + ' ' + esc(s.t) + '</h2></div><div class="cfx-aj-zona"></div>';
       w.querySelector('.cfx-aj-volver').onclick = () => { grilla(); scrollTo(0, 0); };
       scrollTo(0, 0);
       return s.abrir ? s.abrir(w.querySelector('.cfx-aj-zona'), k) : undefined;
     };
     grilla();
     return { abrir, grilla };
+  }
+
+  // ---------- Registro de cambios: botones para borrarlo (igual en las 6 apps) ----------
+  // CFX_AJUSTES.registro(el, rpc, { lista: true, recargar }) → arriba de el pone "Borrar lo de más de 30 días" y "Borrar todo" (pide confirmar).
+  //   lista: además muestra el registro común (cfx_registro_lista) para las apps que no tienen uno propio.
+  async function registro(el, rpc, o) {
+    o = o || {};
+    const caja = document.createElement('div'); caja.className = 'cfx-reg';
+    caja.innerHTML = '<div class="cfx-reg-b"><button type="button" data-d="30">🧹 Borrar lo de más de 30 días</button><button type="button" data-d="0" class="cfx-reg-todo">🗑️ Borrar todo</button></div><div class="cfx-reg-l"></div>';
+    el.prepend(caja);
+    const pintar = async () => {
+      if (!o.lista) return;
+      const l = caja.querySelector('.cfx-reg-l');
+      try {
+        const L = await rpc('cfx_registro_lista', { p_limite: 300 });
+        l.innerHTML = L.length ? L.map((x) => '<div class="cfx-reg-f"><b>' + esc(x.accion) + '</b><span>' + esc(x.detalle || '') + '</span><small>' + esc(x.quien || '') + ' · ' + new Date(x.creado).toLocaleString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</small></div>').join('')
+          : '<p style="margin:8px 0;color:var(--cfx-texto-2,#5b6472)">Sin cambios registrados.</p>';
+      } catch (x) { l.innerHTML = '<p>' + esc(x.message || x) + '</p>'; }
+    };
+    caja.querySelector('.cfx-reg-b').onclick = (ev) => {
+      const b = ev.target.closest('[data-d]'); if (!b) return;
+      const d = +b.dataset.d;
+      const c = dialogo('<h2>' + (d ? '🧹 Borrar lo antiguo' : '🗑️ Borrar todo el registro') + '</h2><p>' + (d ? 'Se borran los cambios de hace más de 30 días.' : 'Se borra todo el registro de cambios. No se puede deshacer.') + '</p>' +
+        '<div class="ca-pie"><button type="button" data-cerrar>Cancelar</button><button type="button" class="ca-si" data-si>Borrar</button></div>');
+      c.querySelector('[data-si]').onclick = async (e) => {
+        e.target.disabled = true;
+        try { const n = await rpc('cfx_registro_borrar', { p_dias: d }); cerrar(); aviso('🧹 Registro borrado (' + n + ')'); pintar(); if (o.recargar) o.recargar(); }
+        catch (x) { e.target.disabled = false; aviso(x.message || String(x)); }
+      };
+    };
+    pintar();
+  }
+  function aviso(t) {
+    const d = document.createElement('div'); d.className = 'cfx-toast'; d.textContent = t; document.body.appendChild(d);
+    setTimeout(() => d.classList.add('on'), 10); setTimeout(() => { d.classList.remove('on'); setTimeout(() => d.remove(), 300); }, 2600);
   }
 
   // ---------- Guía ----------
@@ -319,6 +365,24 @@
       document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
     }
   }
+
+  // ---------- Flechas siempre al centro de su cuadro ----------
+  // Los botones que solo tienen una flecha de texto (‹ › ← →) pasan a un dibujo: así queda centrada en todas las letras y celulares.
+  const FLECHA = { '‹': 'M15 18l-6-6 6-6', '›': 'M9 18l6-6-6-6', '←': 'M19 12H5M12 19l-7-7 7-7', '→': 'M5 12h14M12 5l7 7-7 7' };
+  function flechas(raiz) {
+    (raiz.querySelectorAll ? raiz.querySelectorAll('button, a') : []).forEach((b) => {
+      if (b.children.length || b.dataset.cfxFlecha) return;
+      const t = (b.textContent || '').trim(); if (!FLECHA[t]) return;
+      b.dataset.cfxFlecha = '1';
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block;margin:auto"><path d="' + FLECHA[t] + '"/></svg>';
+      if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', t === '←' ? 'Volver' : t === '‹' ? 'Anterior' : 'Siguiente');
+      b.style.display = b.style.display || ''; b.classList.add('cfx-flecha');
+    });
+  }
+  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => { if (n.nodeType === 1) flechas(n.parentNode || n); }); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState !== 'loading') flechas(document); else document.addEventListener('DOMContentLoaded', () => flechas(document));
+
   // ---------- "Volver" vuelve a la pantalla anterior (no al inicio) ----------
   // Se guarda el recorrido de la sesión; los botones "Volver"/"‹" de cualquier app hacen history.back() si hay una pantalla anterior.
   function pila() { try { return JSON.parse(sessionStorage.getItem('cfx-pila') || '[]'); } catch (e) { return []; } }
@@ -343,7 +407,7 @@
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } }, 1500);
 
   window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar, menu };
-  window.CFX_AJUSTES = { montar: ajustes };
+  window.CFX_AJUSTES = { montar: ajustes, registro };
   // La app pudo pedirlo antes de que este archivo cargara (CFX_AYUDA_PEND = { rpc, app }).
   if (window.CFX_AYUDA_PEND) iniciar(window.CFX_AYUDA_PEND);
 })();

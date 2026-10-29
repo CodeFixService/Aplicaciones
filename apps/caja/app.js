@@ -21,8 +21,6 @@
   const alLimite = () => Core.toast(pro ? 'Llegaste al máximo de ' + PRO_PRODUCTOS + ' productos'
     : '⭐ Llegaste a ' + FREE_PRODUCTOS + ' productos. Pásate a Pro para tener hasta ' + PRO_PRODUCTOS + ' (o agrupa colores y tallas como opciones).');
   const soloPro = (que) => Core.toast('⭐ ' + que + ' es de la versión Pro');
-  $('planTag').textContent = pro ? 'PRO' : 'FREE';
-  $('planTag').classList.toggle('pro', pro);
 
   // Montos en pesos: sin decimales cuando son enteros.
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL', { maximumFractionDigits: 2 });

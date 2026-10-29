@@ -104,8 +104,8 @@
   <section id="v-login" class="hidden">
     <div class="card login">
       <div class="marcaLogo" id="loginLogo">C</div>
-      <h2 id="loginTitulo">Ingresa a tu cuenta</h2>
-      <p class="sub" id="loginSub">Publicidad, clientes, ventas y notificaciones en un solo lugar.</p>
+      <h2 id="loginTitulo" data-texto="login_titulo">Ingresa a tu cuenta</h2>
+      <p class="sub" id="loginSub" data-texto="login_bajada">Publicidad, clientes, ventas y notificaciones en un solo lugar.</p>
       <div class="tabs2 hidden">
         <button id="tIn" class="on small" type="button">Ingresar</button>
         <button id="tUp" class="small" type="button">Crear cuenta</button>
@@ -121,8 +121,8 @@
         <div class="btns"><button id="lBtn" type="submit" style="flex:1">Ingresar</button></div>
       </form>
       <p class="muted" style="text-align:center"><a href="#" id="lOlvide">¿Olvidaste tu contraseña?</a></p>
-      <a class="btn alt" href="n/" style="display:flex;justify-content:center;margin-top:6px">🏪 ¿Tienes un negocio? Crea tu tienda gratis</a>
-      <p class="muted" style="text-align:center;font-size:13px">¿Eres cliente de una tienda? Pide tu cuenta a la tienda.</p>
+      <a class="btn alt" href="n/" data-texto="login_negocio" style="display:flex;justify-content:center;margin-top:6px">🏪 ¿Tienes un negocio? Crea tu tienda gratis</a>
+      <p class="muted" data-texto="login_cliente" style="text-align:center;font-size:13px">¿Eres cliente de una tienda? Pide tu cuenta a la tienda.</p>
     </div>
   </section>
 
@@ -398,7 +398,7 @@
     $('lPass').required = m !== 'olvide';
     $('lPass').autocomplete = m === 'up' ? 'new-password' : 'current-password';
     $('lblEmpresa').textContent = clienteDe ? 'Tu nombre' : 'Nombre de tu empresa';
-    $('loginTitulo').textContent = { in: 'Ingresa a tu cuenta', up: clienteDe ? 'Crea tu cuenta de cliente' : 'Crea tu cuenta gratis', olvide: 'Recuperar contraseña' }[m];
+    $('loginTitulo').textContent = { in: (window.CFX_TEXTOS || {}).login_titulo || 'Ingresa a tu cuenta', up: clienteDe ? 'Crea tu cuenta de cliente' : 'Crea tu cuenta gratis', olvide: 'Recuperar contraseña' }[m];
     $('lBtn').textContent = { in: 'Ingresar', up: 'Crear cuenta', olvide: 'Enviar enlace' }[m];
     $('lErr').textContent = '';
   }

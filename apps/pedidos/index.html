@@ -40,7 +40,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Pedidos</h1><span id="planTag" class="pill">FREE</span></header>
+<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Pedidos</h1></header>
 <nav class="tabs sub" id="subtabs">
   <button data-v="pedidos" class="on"><span data-ico="paquete"></span>Pedidos</button>
   <button data-v="cupones" class="dueno"><span data-ico="ticket"></span>Promociones</button>
@@ -114,8 +114,6 @@
   Cuenta.nav('pedidos');
   const dueno = yo.role !== 'equipo';
   const pro = !!yo.is_pro;
-  $('planTag').textContent = yo.role === 'equipo' ? 'EQUIPO' : pro ? 'PRO' : 'FREE';
-  $('planTag').classList.toggle('pro', pro);
   document.querySelectorAll('.dueno').forEach((b) => b.classList.toggle('hidden', !dueno));
   const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
   const params = new URLSearchParams(location.search);

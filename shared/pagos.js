@@ -47,9 +47,15 @@
         const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
         let cal = q.calidad, d = c.toDataURL('image/jpeg', cal);
         while (d.length > 380000 && cal > 0.3) { cal -= 0.1; d = c.toDataURL('image/jpeg', cal); }
+        // Si aún pesa mucho (fotos gigantes), se achica el tamaño hasta que quepa: el servidor acepta hasta ~290 KB.
+        while (d.length > 380000 && c.width > 400) {
+          const c2 = document.createElement('canvas'); c2.width = Math.round(c.width * 0.8); c2.height = Math.round(c.height * 0.8);
+          const g2 = c2.getContext('2d'); g2.fillStyle = '#fff'; g2.fillRect(0, 0, c2.width, c2.height); g2.drawImage(c, 0, 0, c2.width, c2.height);
+          c.width = c2.width; c.height = c2.height; g.drawImage(c2, 0, 0); d = c.toDataURL('image/jpeg', 0.5);
+        }
         ok(d);
       };
-      img.onerror = () => { URL.revokeObjectURL(u); mal(new Error('No se pudo leer la foto')); };
+      img.onerror = () => { URL.revokeObjectURL(u); mal(new Error('No se pudo leer la foto. Sube un pantallazo (JPG o PNG) del comprobante.')); };
       img.src = u;
     });
   }

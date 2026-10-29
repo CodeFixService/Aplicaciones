@@ -24,7 +24,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Contactos</h1><span id="planTag" class="pill">FREE</span></header>
+<header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Contactos</h1></header>
 <main>
   <div class="card">
     <h2>🔑 Tu código</h2>
@@ -69,8 +69,6 @@
   Cuenta.nav('contactos');
   if (yo.role !== 'client') { location.replace('../../'); return; }
   const premium = !!yo.is_pro, limite = premium ? 20 : 3;
-  $('planTag').textContent = premium ? 'PREMIUM' : 'FREE';
-  $('planTag').classList.toggle('pro', premium);
   $('planTxt').innerHTML = premium
     ? '⭐ Premium: hasta <b>20 contactos</b> y hasta <b>5 mensajes seguidos</b> en el chat.'
     : 'Free: hasta <b>3 contactos</b> y <b>1 mensaje a la vez</b> en el chat. <a href="../../#plan">⭐ Hazte Premium</a> para 20 contactos y 5 mensajes seguidos.';

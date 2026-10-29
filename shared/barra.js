@@ -85,28 +85,119 @@
     }
     const usados = new Set();
     const porClave = (k) => k === '+' ? mas : botones.find((b) => clave(b) === k && !usados.has(b));
-    const fila = orden.map(porClave).filter(Boolean);
-    fila.forEach((b) => usados.add(b));
-    const sobran = botones.filter((b) => !usados.has(b));
-    fila.forEach((b) => nav.appendChild(b));
-    sobran.forEach((b) => { b.classList.add('cfx-oculto'); nav.appendChild(b); });
-    // Si sobran botones, el último lugar pasa a ser "Más": abre una hoja con los que sobran (y el "Más" propio de la app).
-    if (sobran.length) {
-      const bMas = fila.find((b) => clave(b) === kMas && b !== mas);
-      const lista = bMas ? sobran.concat(bMas) : sobran;
-      if (bMas) bMas.classList.add('cfx-oculto');
-      const m = document.createElement('button');
+    const fila0 = orden.map(porClave).filter(Boolean);
+    fila0.forEach((b) => usados.add(b));
+    let L = fila0.filter((b) => b !== mas);                 // principales, en orden
+    let extra = botones.filter((b) => !usados.has(b));      // los que no caben
+    const bMas = L.find((b) => clave(b) === kMas);
+    // Con + al centro siempre quedan 2 a cada lado: si sobran botones, el último lugar es "Más" (con los que sobran y el "Más" propio de la app).
+    let menu = false;
+    if (mas && (L.length > 4 || (extra.length && L.length >= 4))) {
+      const quedan = L.filter((b) => b !== bMas).slice(0, 3);
+      extra = L.filter((b) => !quedan.includes(b) && b !== bMas).concat(extra);
+      if (bMas) extra.push(bMas);
+      L = quedan; menu = true;
+    } else if (extra.length) {
+      menu = true;
+      if (bMas) { L = L.filter((b) => b !== bMas); extra.push(bMas); }
+    }
+    let m = null;
+    if (menu) {
+      m = document.createElement('button');
       m.type = 'button'; m.className = 'cfx-menu'; m.innerHTML = '<span class="cfx-ico">' + svg('menu') + '</span>Más';
+      const lista = extra;
       m.addEventListener('click', (e) => { e.stopImmediatePropagation(); e.preventDefault(); hoja(lista); });
-      if (bMas) nav.insertBefore(m, bMas); else nav.appendChild(m);
       // El "Más" se ve activo cuando estás en una de sus secciones.
       const marcar = () => { const on = lista.some((b) => b.classList.contains('on') || b.classList.contains('activo')); if (m.classList.contains('on') !== on) m.classList.toggle('on', on); };
-      new MutationObserver(marcar).observe(nav, { attributes: true, subtree: true, attributeFilter: ['class'] }); marcar();
+      new MutationObserver(marcar).observe(nav, { attributes: true, subtree: true, attributeFilter: ['class'] }); setTimeout(marcar, 0);
+      L.push(m);
     }
+    // Fila final: [L0][L1][+][L2][L3]. Con 3 botones queda un espacio vacío para que el + siga al medio.
+    let fila = L;
+    if (mas) {
+      const izq = L.slice(0, Math.min(2, Math.ceil(L.length / 2))), der = L.slice(izq.length);
+      if (izq.length === 2 && der.length === 1) { const v = document.createElement('span'); v.className = 'cfx-vacio'; v.setAttribute('aria-hidden', 'true'); der.unshift(v); }
+      fila = izq.concat([mas], der);
+    }
+    fila.forEach((b) => { b.classList.remove('cfx-oculto'); nav.appendChild(b); });
+    extra.forEach((b) => { b.classList.add('cfx-oculto'); nav.appendChild(b); });
     nav.style.setProperty('--cfx-n', String(nav.querySelectorAll(':scope > :not(.cfx-oculto)').length));
+    document.documentElement.classList.add('cfx-barra-lista');
   }
+
+  // ---------- Tiras de opciones que se deslizan de lado (pestañas, filtros, chips) ----------
+  // Al volver a dibujarse (al tocar una opción) quedan donde estaban: no saltan al inicio ni se centran.
+  // Solo se mueven lo justo si la opción elegida quedó fuera de la vista.
+  const TIRA = '.seg, .seg2, .tabs:not(nav), .chips, .subtabs, .cfx-tira, .filtros, [class*="tira"]';
+  const pos = new Map();
+  const firma = (t) => t.className.replace(/\b(on|activo|cfx-\w+)\b/g, '') + '|' + [...t.children].slice(0, 5).map((x) => (x.textContent || '').replace(/[\d\s()]+/g, '')).join('|');
+  const activo = (t) => t.querySelector(':scope > .on, :scope > .activo, :scope > [aria-selected="true"], :scope > [aria-current]');
+  function mostrarActivo(t) {
+    const a = activo(t); if (!a) return;
+    const ra = a.getBoundingClientRect(), rt = t.getBoundingClientRect();
+    if (ra.left < rt.left) t.scrollLeft -= rt.left - ra.left + 12;
+    else if (ra.right > rt.right) t.scrollLeft += ra.right - rt.right + 12;
+  }
+  function tira(t) {
+    if (t.dataset.cfxTira) return;
+    t.dataset.cfxTira = '1';
+    const k = firma(t);
+    if (pos.has(k)) t.scrollLeft = pos.get(k);
+    mostrarActivo(t);
+    pos.set(k, t.scrollLeft);
+    t.addEventListener('scroll', () => pos.set(k, t.scrollLeft), { passive: true });
+    t.addEventListener('click', () => { pos.set(k, t.scrollLeft); }, true);
+  }
+  const revisarTiras = (raiz) => { (raiz && raiz.querySelectorAll ? [raiz, ...raiz.querySelectorAll(TIRA)] : document.querySelectorAll(TIRA)).forEach((t) => { if (t.matches && t.matches(TIRA) && t.children.length > 1) tira(t); }); };
+  // Las apps que antes centraban la opción elegida usan esto (no mueve la tira si ya se ve).
+  window.CodeFixTiras = { ajustar: (raiz) => (raiz || document).querySelectorAll(TIRA).forEach(mostrarActivo) };
+  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => { if (n.nodeType === 1) revisarTiras(n); }); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState !== 'loading') revisarTiras(); else document.addEventListener('DOMContentLoaded', () => revisarTiras());
+
+  // ---------- Listas que se apilan al bajar (celular y tablet) ----------
+  // Una lista con 4 o más tarjetas cortas iguales (pedidos, reservas, pagos, días…) se apila: cada tarjeta queda pegada arriba
+  // y la siguiente se pone encima, así no hay que bajar tanto. Las tarjetas con formularios o muy altas no se apilan.
+  const TARJ = ':scope > .card, :scope > .tarjeta';
+  function cabeceraAlto() {
+    const h = [...document.querySelectorAll('header')].find((x) => { const st = getComputedStyle(x); return (st.position === 'fixed' || st.position === 'sticky') && x.getBoundingClientRect().top <= 1; });
+    document.documentElement.style.setProperty('--cfx-top', (h ? Math.round(h.getBoundingClientRect().bottom) : 0) + 'px');
+  }
+  function apilar() {
+    if (innerWidth >= 900) return;
+    cabeceraAlto();
+    const padres = new Set([...document.querySelectorAll('.card, .tarjeta')].map((c) => c.parentElement).filter(Boolean));
+    padres.forEach((p) => {
+      if (p.classList.contains('cfx-apilar') || p.closest('dialog, .modal, .sheet, .hoja, .cfx-mv, .cfx-apilar, [data-sin-pila]')) return;
+      const L = [...p.querySelectorAll(TARJ)];
+      if (L.length < 4 || getComputedStyle(p).display === 'grid') return;
+      const alto = innerHeight * 0.42;
+      if (L.some((c) => c.offsetHeight > alto || c.offsetHeight < 40 || c.querySelector('input, textarea, select'))) return;
+      if (L.some((c, i) => i && c.offsetTop <= L[i - 1].offsetTop)) return;  // no están una debajo de otra
+      p.classList.add('cfx-apilar');
+      L.forEach((c, i) => { c.classList.add('cfx-pila'); c.style.setProperty('--cfx-i', String(Math.min(i, 4))); });
+    });
+  }
+  // La tarjeta que queda abajo se achica y oscurece un poco a medida que la siguiente la tapa.
+  function tapar() {
+    document.querySelectorAll('.cfx-apilar').forEach((p) => {
+      const L = p.querySelectorAll(':scope > .cfx-pila');
+      L.forEach((c, i) => {
+        const sig = L[i + 1]; if (!sig) { c.style.removeProperty('--cfx-esc'); c.style.removeProperty('--cfx-luz'); return; }
+        const r = c.getBoundingClientRect(), rs = sig.getBoundingClientRect();
+        const t = Math.max(0, Math.min(1, (r.bottom - rs.top) / Math.max(1, r.height)));
+        c.style.setProperty('--cfx-esc', String(1 - t * 0.06)); c.style.setProperty('--cfx-luz', String(1 - t * 0.18));
+      });
+    });
+  }
+  let tPila = 0, rafPila = 0;
+  const pedirPila = () => { clearTimeout(tPila); tPila = setTimeout(apilar, 350); };
+  new MutationObserver(pedirPila).observe(document.documentElement, { childList: true, subtree: true });
+  addEventListener('scroll', () => { if (!rafPila) rafPila = requestAnimationFrame(() => { rafPila = 0; tapar(); }); }, { passive: true, capture: true });
+  addEventListener('resize', pedirPila);
+
   window.CodeFixBarra = { montar };
-  const iniciar = () => setTimeout(() => montar(), 0);
+  const iniciar = () => setTimeout(() => { montar(); setTimeout(() => document.documentElement.classList.add('cfx-barra-lista'), 1200); }, 0);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
   // Barras que la app dibuja después (al iniciar sesión).
   const obs = new MutationObserver(() => { const n = buscarNav(); if (n && n.dataset.cfx !== '1') montar(); });

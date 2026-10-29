@@ -4675,7 +4675,7 @@ grant execute on function public.marca_publica() to anon, authenticated;
 --  · Funciones comunes cfx_* para el Centro de Mando (respaldo, limpieza e inventario).
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.11'::text $$;
+language sql immutable as $$ select '5.12'::text $$;
 
 alter table public.notification_reads add column if not exists oculto boolean not null default false;
 alter table public.profiles add column if not exists aviso_limpieza_at timestamptz;
@@ -4875,10 +4875,31 @@ begin
   update public.planes set limites = limites || jsonb_build_object(p_clave, p_free) where codigo = fc;
   update public.planes set limites = limites || jsonb_build_object(p_clave, p_premium) where codigo = pc;
 end $$;
+-- Textos editables (desde el Centro de Mando → Control → Textos). La app los pone donde dice data-texto="clave".
+create table if not exists public.textos (clave text primary key, valor text not null default '', nombre text not null default '');
+alter table public.textos enable row level security;
+drop policy if exists textos_leer on public.textos;
+create policy textos_leer on public.textos for select using (true);
+revoke insert, update, delete, truncate on public.textos from anon, authenticated;
+grant select on public.textos to anon, authenticated;
+insert into public.textos (clave, valor, nombre) values
+  ('login_titulo', 'Ingresa a tu cuenta', 'Ingreso: título'),
+  ('login_bajada', 'Publicidad, clientes, ventas y notificaciones en un solo lugar.', 'Ingreso: texto bajo el título'),
+  ('login_negocio', '🏪 ¿Tienes un negocio? Crea tu tienda gratis', 'Ingreso: botón para crear tienda'),
+  ('login_cliente', '¿Eres cliente de una tienda? Pide tu cuenta a la tienda.', 'Ingreso: nota para clientes'),
+  ('registro_titulo', 'Crea la tienda online de tu negocio, gratis', 'Registro de negocios: título'),
+  ('registro_bajada', 'Para emprendimientos, pymes y negocios de cualquier rubro: productos o servicios, con o sin local.', 'Registro de negocios: texto bajo el título')
+on conflict (clave) do nothing;
 create or replace function public.cfx_textos_app() returns jsonb
-language sql stable security definer set search_path = '' as $$ select '[]'::jsonb $$;
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('clave', clave, 'valor', valor, 'nombre', nombre) order by clave), '[]') from public.textos
+$$;
 create or replace function public.cfx_texto_guardar_app(p_clave text, p_valor text) returns void
-language plpgsql security definer set search_path = '' as $$ begin raise exception 'Esta app no tiene textos editables'; end $$;
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.textos set valor = left(coalesce(p_valor, ''), 600) where clave = p_clave;
+  if not found then raise exception 'Texto no encontrado'; end if;
+end $$;
 create or replace function public.cfx_destinatarios(p_destino text) returns setof uuid
 language sql stable security definer set search_path = '' as $$
   select id from public.profiles where not suspended and role in ('user', 'client', 'equipo')
@@ -5305,6 +5326,25 @@ begin
 end $$;
 
 -- ---------- Planes: [{grupo, clave, free, premium}] (números o sí/no) ----------
+-- Borrar el registro de cambios (el común y el propio de la app, si tiene): lo de más de N días, o todo con 0. Solo el administrador.
+create or replace function public.cfx_registro_borrar(p_dias int default 30) returns int
+language plpgsql security definer set search_path = '' as $$
+declare n int := 0; k int; col text; desde timestamptz := case when coalesce(p_dias, 0) <= 0 then 'infinity'::timestamptz else now() - make_interval(days => p_dias) end;
+begin
+  perform public.cfx_es_admin();
+  delete from public.cfx_registro where creado < desde; get diagnostics n = row_count;
+  if to_regclass('public.auditoria') is not null then
+    select c.column_name into col from information_schema.columns c where c.table_schema = 'public' and c.table_name = 'auditoria'
+      and c.column_name in ('created_at', 'at', 'creado', 'fecha') and c.data_type like 'timestamp%' order by c.ordinal_position limit 1;
+    if col is not null then execute format('delete from public.auditoria where %I < $1', col) using desde; get diagnostics k = row_count; n := n + k; end if;
+  end if;
+  insert into public.cfx_registro (quien, accion, detalle) values (coalesce((select email from auth.users where id = auth.uid()), 'sistema'), 'registro borrado',
+    case when coalesce(p_dias, 0) <= 0 then 'todo' else 'más de ' || p_dias || ' días' end || ' (' || n || ' filas)');
+  return n;
+end $$;
+revoke all on function public.cfx_registro_borrar(int) from public, anon;
+grant execute on function public.cfx_registro_borrar(int) to authenticated;
+
 create or replace function public.cfx_planes() returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
@@ -5664,6 +5704,23 @@ begin
   return i;
 end $$;
 
+-- El administrador escribe primero a una cuenta (consejos o recomendaciones): queda en su chat de soporte (🛟) y en CM → Mensajes.
+create or replace function public.cfx_chat_iniciar(p_cuenta uuid, p_texto text, p_email text default '', p_nombre text default '', p_rol text default 'negocio') returns bigint
+language plpgsql security definer set search_path = '' as $$
+declare t text := trim(coalesce(p_texto, '')); i bigint; o public.cfx_chat;
+begin
+  perform public.cfx_es_admin();
+  if t = '' or length(t) > 1000 then raise exception 'Escribe el mensaje (máx. 1000 letras)'; end if;
+  select * into o from public.cfx_chat where cuenta = p_cuenta order by id desc limit 1;
+  insert into public.cfx_chat (cuenta, email, nombre, rol, de, texto, leido)
+  values (p_cuenta, coalesce(o.email, left(coalesce(p_email, ''), 200)), coalesce(o.nombre, left(coalesce(p_nombre, ''), 120)), coalesce(o.rol, left(coalesce(p_rol, 'negocio'), 20)), 'soporte', t, false)
+  returning id into i;
+  perform public.cfx_avisar(p_cuenta, '💬 Soporte te escribió', left(t, 200));
+  return i;
+end $$;
+revoke all on function public.cfx_chat_iniciar(uuid, text, text, text, text) from public, anon;
+grant execute on function public.cfx_chat_iniciar(uuid, text, text, text, text) to authenticated;
+
 -- ---------- 3) Guía para partir ----------
 -- Pendientes de configuración del negocio (los arma cada app) + verificar identidad. Solo para negocios.
 create or replace function public.cfx_guia() returns jsonb
@@ -5692,7 +5749,7 @@ revoke all on function public.cfx_guia_app() from public, anon, authenticated;
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_pagos', 'public.cfx_registro', 'public.cfx_verificaciones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.user_invites'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_pagos', 'public.cfx_registro', 'public.cfx_verificaciones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
