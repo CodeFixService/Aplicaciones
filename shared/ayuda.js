@@ -122,8 +122,8 @@
       if (una) [...una.childNodes].forEach((x) => { if (x.nodeType === 3 && /🔔/.test(x.textContent)) { const t = document.createElement('span'); t.innerHTML = SVG_CAMPANA; x.replaceWith(t.firstChild); } });
     } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); }
     const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av'), at = boya.querySelector('.cfx-atajo');
-    // Atajo fijo { ir, t }: el Centro de Mando pasa el suyo (Panel ⇄ App); en las otras apps el administrador va al panel del Centro de Mando.
-    const atajo = 'atajo' in CFG ? CFG.atajo : CFG.admin && CFG.app !== 'mando' ? { ir: panelCM(), t: 'Panel' } : null;
+    // Atajo fijo { ir, t }: el Centro de Mando pasa el suyo (Panel ⇄ App); en las otras apps solo el administrador (no socios, negocios ni clientes) va al panel del Centro de Mando.
+    const atajo = 'atajo' in CFG ? CFG.atajo : CFG.admin && !CFG.socio && CFG.app !== 'mando' ? { ir: panelCM(), t: 'Panel' } : null;
     at.classList.toggle('cfx-oc', !atajo);
     if (atajo) { at.href = atajo.ir; at.setAttribute('aria-label', 'Ir a ' + atajo.t); at.innerHTML = SVG_CAMBIO + '<span>' + esc(atajo.t) + '</span>'; }
     plan.textContent = esPro() ? 'PRO' : 'FREE'; plan.classList.toggle('pro', esPro());
