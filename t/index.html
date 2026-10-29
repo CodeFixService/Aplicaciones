@@ -18,7 +18,8 @@
     background: var(--brand) center / cover no-repeat; }
   header.top h1::before { display: none; }
   .seg { display: flex; gap: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; padding: 4px; margin-bottom: 14px; }
-  .seg button { flex: 1; border-radius: 99px; background: transparent; color: var(--muted); box-shadow: none; }
+  .seg { flex-wrap: nowrap; overflow: hidden; } /* los 3 botones siempre dentro del recuadro */
+  .seg button { flex: 1 1 0; min-width: 0; padding: 10px 4px; gap: 5px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 99px; background: transparent; color: var(--muted); box-shadow: none; }
   .seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   .item { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
