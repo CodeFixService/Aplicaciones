@@ -117,16 +117,18 @@ input, select, textarea, button { font-family: inherit; }
 }
 @media (max-width: 360px) { nav.cfx-barra > a, nav.cfx-barra > button { font-size: 10px !important; } nav.cfx-barra > .cfx-mas .cfx-ico { width: 50px !important; height: 50px !important; } }
 /* Menú en cuadrícula (igual en todas las apps): Más / Ajustes = tarjetas; dentro de cada sección, pestañas en tira. */
-.cfx-grilla { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 10px !important; padding: 0 !important; margin: 0 0 12px !important;
+.cfx-grilla { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 10px !important; grid-auto-rows: 1fr !important; padding: 0 !important; margin: 0 0 12px !important;
   list-style: none !important; background: none !important; border: 0 !important; box-shadow: none !important; }
 .cfx-grilla > li { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
 .cfx-grilla > a, .cfx-grilla > button, .cfx-grilla > li > a {
   display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: flex-start !important; gap: 6px !important;
-  width: 100% !important; min-height: 92px; margin: 0 !important; padding: 14px !important; box-sizing: border-box; position: relative;
+  width: 100% !important; height: 100% !important; min-height: 112px !important; margin: 0 !important; padding: 14px !important; box-sizing: border-box; position: relative;
   border-radius: 18px !important; background: var(--cfx-tarjeta) !important; border: 1px solid var(--cfx-borde) !important; box-shadow: var(--cfx-sombra, none);
   color: var(--cfx-texto) !important; font: 700 14px/1.25 var(--cfx-letra) !important; text-align: left !important; text-decoration: none !important; white-space: normal !important; cursor: pointer; }
 .cfx-grilla > a:hover, .cfx-grilla > button:hover, .cfx-grilla > li > a:hover { border-color: var(--brand, var(--marca, #2563eb)) !important; }
 .cfx-grilla .ic-caja, .cfx-grilla > button > span:first-child { font-size: 24px; }
+/* Todas las tarjetas del mismo alto (dos líneas de texto) y el cuadrado del ícono del mismo tamaño en todas. */
+.cfx-grilla .ic-caja { width: 40px !important; height: 40px !important; min-width: 40px !important; flex: none !important; }
 .cfx-grilla .chev, .cfx-grilla .flecha, .cfx-grilla a > .muted:last-child { display: none !important; }
 .cfx-grilla .badge, .cfx-grilla .num, .cfx-grilla .punto, .cfx-grilla .tag { position: absolute !important; top: 10px !important; right: 10px !important; }
 @media (max-width: 360px) { .cfx-grilla { grid-template-columns: 1fr 1fr !important; } }

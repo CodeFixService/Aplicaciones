@@ -56,9 +56,9 @@
     '.cfx-aj-volver{flex:none;width:40px;height:40px;min-height:0;padding:0;display:grid;place-items:center;line-height:1;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:20px;cursor:pointer}' +
     'dialog.cfx-ayuda{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;z-index:2147483100;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;font-family:var(--cfx-letra,system-ui,sans-serif)}' +
     'dialog.cfx-ayuda::backdrop{background:transparent}@media(min-width:600px){dialog.cfx-ayuda{align-items:center}}' +
-    '.cfx-ayuda>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);width:100%;max-width:520px;max-height:92vh;display:flex;flex-direction:column;border-radius:20px 20px 0 0;box-sizing:border-box;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}' +
+    '.cfx-ayuda>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);width:100%;max-width:520px;max-height:92%;display:flex;flex-direction:column;border-radius:20px 20px 0 0;box-sizing:border-box;padding:16px 16px calc(14px + env(safe-area-inset-bottom))}' +
     '@media(min-width:600px){.cfx-ayuda>div{border-radius:20px}}.cfx-ayuda h2{margin:0 0 6px;font-size:19px}.cfx-ayuda h3{font-size:15px;margin:14px 0 4px}.cfx-ayuda p,.cfx-ayuda li{font-size:14px;line-height:1.45;color:var(--cfx-texto-2,#5b6472)}' +
-    '.cfx-ayuda .ca-cuerpo{overflow:auto;flex:1;min-height:0}.cfx-ayuda button{min-height:44px;border-radius:12px;border:0;font:inherit;font-weight:700;cursor:pointer;padding:0 12px;background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto,#111827)}' +
+    '.cfx-ayuda .ca-cuerpo{overflow:auto;flex:1;min-height:0;padding:2px 4px;margin:0 -4px}.cfx-ayuda>div:focus{outline:none}.cfx-ayuda button{min-height:44px;border-radius:12px;border:0;font:inherit;font-weight:700;cursor:pointer;padding:0 12px;background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto,#111827)}' +
     '.cfx-ayuda button.ca-si{background:var(--ca-color);color:#fff}.cfx-ayuda .ca-op{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin:6px 0;background:var(--cfx-campo,#f3f5f8)}.cfx-ayuda .ca-op b{flex:1}' +
     '.cfx-ayuda .ca-op i{font-style:normal;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:12px}' +
     '.cfx-ayuda .ca-it{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--cfx-borde,#e2e7ec)}.cfx-ayuda .ca-it:first-child{border-top:0}.cfx-ayuda .ca-it span{font-size:20px;line-height:1}' +
@@ -80,8 +80,12 @@
     d.innerHTML = '<div>' + html + '</div>';
     document.body.appendChild(d); abierta = d;
     try { d.showModal(); } catch (e) { d.setAttribute('open', ''); }
+    d.firstChild.tabIndex = -1; try { d.firstChild.focus({ preventScroll: true }); } catch (e) { /* nada */ }
     d.addEventListener('click', (ev) => { if (ev.target === d || ev.target.closest('[data-cerrar]')) cerrar(); });
-    d.addEventListener('close', () => { if (alCerrar) alCerrar(); d.remove(); if (abierta === d) abierta = null; });
+    // iPhone: el teclado no achica la página; la ventana se ajusta a lo visible para que el chat quede sobre el teclado.
+    const vv = window.visualViewport, ajustar = () => { d.style.height = vv.height + 'px'; d.style.top = vv.offsetTop + 'px'; d.style.bottom = 'auto'; };
+    if (vv) { vv.addEventListener('resize', ajustar); vv.addEventListener('scroll', ajustar); ajustar(); }
+    d.addEventListener('close', () => { if (vv) { vv.removeEventListener('resize', ajustar); vv.removeEventListener('scroll', ajustar); } if (alCerrar) alCerrar(); d.remove(); if (abierta === d) abierta = null; });
     return d.firstChild;
   }
   function cerrar() { if (abierta) { try { abierta.close(); } catch (e) { abierta.remove(); } abierta = null; } }

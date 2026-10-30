@@ -1,6 +1,6 @@
 /* CodeFix · Núcleo · Pagar Premium (mismo archivo en cada repositorio). Precios, link, tarjeta y transferencia vienen de la base
    (cfx_pago_estado), y se editan una sola vez para las 6 apps en el Centro de Mando → Pagos.
-   CFX_PAGOS.abrir({ rpc })            → elegir plan (mensual, varios meses, anual u otro monto), pagar y subir el comprobante, paso a paso:
+   CFX_PAGOS.abrir({ rpc })            → elegir plan (1 mes, 3 meses o 1 año), pagar y subir el comprobante, paso a paso:
                                           1) paga el total  2) saca pantallazo  3) súbelo  4) espera 5–10 min (te avisamos).
                                           Transferencia = precio exacto. Link o tarjeta = precio + "cargo por pago online (X %)" en una línea aparte.
    CFX_PAGOS.revisar({ rpc, salir })   → si es un negocio nuevo que debe su primer pago, muestra la pantalla de activación (no se cierra).
@@ -17,7 +17,7 @@
     '.cfx-pago h2{margin:0 0 4px;font-size:20px}.cfx-pago p{margin:6px 0;color:var(--cfx-texto-2,#5b6472);font-size:14px;line-height:1.4}' +
     '.cfx-pago .cp-planes{display:grid;gap:8px;margin:12px 0}.cfx-pago .cp-plan{display:flex;align-items:center;gap:10px;border:2px solid var(--cfx-borde,#e2e7ec);border-radius:14px;padding:10px 12px;cursor:pointer;background:var(--cfx-campo,#f7f9fb)}' +
     '.cfx-pago .cp-plan.on{border-color:var(--cp-color)}.cfx-pago .cp-plan b{flex:1}.cfx-pago .cp-plan small{display:block;font-weight:400;color:var(--cfx-texto-2,#5b6472)}.cfx-pago .cp-precio{font-weight:800;font-size:17px}' +
-    '.cfx-pago .cp-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:6px;margin:12px 0 8px}.cfx-pago .cp-tabs button{min-width:0;padding:0 6px;font-size:13.5px;line-height:1.15}.cfx-pago button{min-height:44px;border-radius:12px;border:0;font:inherit;font-weight:700;cursor:pointer;padding:0 12px;background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto,#111827)}' +
+    '.cfx-pago .cp-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px;margin:12px 0 8px}.cfx-pago .cp-tabs button{min-width:0;min-height:56px;padding:4px 2px;font-size:13px;line-height:1.15;white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}.cfx-pago button{min-height:44px;border-radius:12px;border:0;font:inherit;font-weight:700;cursor:pointer;padding:0 12px;background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto,#111827)}' +
     '.cfx-pago button.cp-si,.cfx-pago .cp-tabs button.on{background:var(--cp-color);color:#fff}.cfx-pago button:disabled{opacity:.6}' +
     '.cfx-pago .cp-caja{border:1px solid var(--cfx-borde,#e2e7ec);border-radius:14px;padding:12px;margin:8px 0}.cfx-pago .cp-monto{font-size:28px;font-weight:800;margin:2px 0}' +
     '.cfx-pago .cp-fila{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.cfx-pago .cp-fila>*{flex:1 1 140px}.cfx-pago a.cp-btn{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;background:var(--cp-color);color:#fff;font-weight:700;text-decoration:none}' +
@@ -63,13 +63,13 @@
   function planes(e) {
     const c = e.config || {}, n = c.negocio || {}, cl = c.cliente || {}, rol = e.yo && e.yo.rol;
     const ahorro = (m, a) => (m && a && a < m * 12) ? ' · ahorras ' + Math.round(100 - a * 100 / (m * 12)) + '%' : '';
-    if (rol === 'negocio' && e.debe_inicio) return [{ k: 'inicio', t: 'Activar mi cuenta', d: (n.inicio_dias || 30) + ' días de Premium', p: n.inicio }];
+    // Solo 3 planes (igual que los links de pago): 1 mes, 3 meses y 1 año. El primer pago es el de 1 mes y da 30 días.
     const base = rol === 'cliente' ? cl : n;
     const l = [];
-    if (base.mensual) l.push({ k: 'mensual', t: 'Mensual', d: '30 días de Premium', p: base.mensual });
-    if (base.mensual) l.push({ k: 'meses', t: 'Varios meses', d: 'De 2 a 11 meses (30 días cada uno)', p: base.mensual, m: 3 });
-    if (base.anual) l.push({ k: 'anual', t: 'Anual', d: '365 días de Premium' + ahorro(base.mensual, base.anual), p: base.anual });
-    l.push({ k: 'otro', t: 'Otro monto', d: 'Un pago distinto (lo que acordaste)', p: 0 });
+    if (rol === 'negocio' && e.debe_inicio) l.push({ k: 'inicio', t: '1 mes', d: (n.inicio_dias || 30) + ' días de Premium', p: n.inicio || n.mensual });
+    else if (base.mensual) l.push({ k: 'mensual', t: '1 mes', d: '30 días de Premium', p: base.mensual });
+    if (base.mensual) l.push({ k: 'meses', t: '3 meses', d: '90 días de Premium', p: base.mensual, m: 3 });
+    if (base.anual) l.push({ k: 'anual', t: '1 año', d: '365 días de Premium' + ahorro(base.mensual, base.anual), p: base.anual });
     return l;
   }
 
@@ -101,9 +101,9 @@
     const PCT = { link: Number(c.comision_pct) || 0, tarjeta: Number(tj.comision_pct) || 0, transferencia: 0 };
     const grupo = (e.yo && e.yo.rol === 'cliente') ? (c.cliente || {}) : (c.negocio || {});
     // Link propio del plan (monto fijo = precio + cargo online), si el administrador lo puso; si no, el link general.
-    const linkPlan = (pl) => (!pl || cupon_ || pl.k === 'otro' || pl.k === 'meses') ? '' : (pl.k === 'anual' ? grupo.link_anual : grupo.link_mensual) || '';
+    const linkPlan = (pl) => (!pl || cupon_ || pl.k === 'otro') ? '' : (pl.k === 'anual' ? grupo.link_anual : pl.k === 'meses' ? grupo.link_3meses : grupo.link_mensual) || '';
     let cupon_ = null;
-    const L = planes(e), medios = [t.numero ? 'transferencia' : null, (c.link || grupo.link_mensual || grupo.link_anual) ? 'link' : null, tj.link ? 'tarjeta' : null].filter(Boolean);
+    const L = planes(e), medios = [t.numero ? 'transferencia' : null, (c.link || grupo.link_mensual || grupo.link_3meses || grupo.link_anual) ? 'link' : null, tj.link ? 'tarjeta' : null].filter(Boolean);
     const NOMBRE_MEDIO = { transferencia: '🏦 Transferencia', link: '🔗 Link de pago', tarjeta: '💳 Tarjeta' };
     let plan = L[0], medio = medios[0], foto = null;
     const ayudaChat = window.CFX_AYUDA ? '<p style="text-align:center"><a href="#" data-chat>💬 ¿Dudas? Escríbenos por el chat</a></p>' : '';
@@ -137,14 +137,13 @@
           '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>' +
           (u && u.estado === 'rechazado' ? '<div class="cp-err">Tu último comprobante fue rechazado: ' + esc(u.motivo || '') + '</div>' : '') +
           '<div class="cp-planes">' + L.map((x, i) => '<div class="cp-plan' + (x === plan ? ' on' : '') + '" data-p="' + i + '"><b>' + esc(x.t) + '<small>' + esc(x.d) + '</small></b><span class="cp-precio">' + (x.p ? pesos(x.k === 'meses' ? x.p * x.m : x.p) : '') + '</span></div>').join('') + '</div>' +
-          (plan.k === 'meses' ? '<label for="cpMeses">¿Cuántos meses?</label><select id="cpMeses">' + [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => '<option value="' + n + '"' + (n === plan.m ? ' selected' : '') + '>' + n + ' meses · ' + (n * 30) + ' días</option>').join('') + '</select>' : '') +
           (plan.k === 'otro' ? '<label for="cpOtro">Monto a pagar</label><input id="cpOtro" type="number" inputmode="numeric" min="1" placeholder="Ej: 10000">' : '') +
           (medios.length > 1 ? '<div class="cp-tabs">' + medios.map((m) => '<button type="button" data-m="' + m + '" class="' + (m === medio ? 'on' : '') + '">' + NOMBRE_MEDIO[m] + '</button>').join('') + '</div>' : '') +
           '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div><div class="cp-fila"><button type="button" data-copiar>📋 Copiar monto</button>' +
             (medio !== 'transferencia' ? '<a class="cp-btn" href="' + esc(url) + '" target="_blank" rel="noopener">Abrir ' + (medio === 'tarjeta' ? 'pago con tarjeta' : 'link de pago') + '</a>' : '') + '</div>' +
           (medio === 'transferencia'
             ? '<div class="cp-ayuda">Copia cada dato, abre la app de tu banco y pégalo (mantén presionado el campo → <b>Pegar</b>). La transferencia no tiene cargo extra.</div>' +
-              datos.map((x, i) => '<div class="cp-dato"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b><button type="button" data-d="' + i + '">Copiar</button></div>').join('')
+              datos.map((x, i) => '<div class="cp-dato"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b>' + (/^(Banco|Tipo de cuenta)$/.test(x[0]) ? '' : '<button type="button" data-d="' + i + '">Copiar</button>') + '</div>').join('')
             : fijo ? '<div class="cp-ayuda">Abre el link: ya trae el monto del plan. Paga y vuelve aquí a subir el pantallazo.</div>'
             : '<div class="cp-ayuda">Toca <b>Copiar monto</b>, abre el ' + (medio === 'tarjeta' ? 'pago con tarjeta' : 'link') + ' y pega el total donde dice monto.' + (pc ? ' El cargo por pago online (' + String(pc).replace('.', ',') + ' %) lo cobra la plataforma de pago; por transferencia no se cobra.' : '') + '</div>') + '</div>' +
           '<label for="cpFoto">Pantallazo del comprobante</label><input id="cpFoto" type="file" accept="image/*">' + (foto ? '<img class="cp-vista" alt="Comprobante" src="' + foto + '">' : '') +
@@ -154,7 +153,6 @@
             (cupon ? '<p>Cupón ' + esc(cupon.codigo) + ': ' + cupon.pct + '% de descuento.</p>' : '') + '</details>' +
           keyHtml + pie;
         if (plan.k === 'otro') { const i = caja.querySelector('#cpOtro'); i.value = o._otro || ''; i.oninput = () => { o._otro = i.value; refrescar(); }; }
-        if (plan.k === 'meses') caja.querySelector('#cpMeses').onchange = (ev) => { plan.m = +ev.target.value; o._pagado = ''; pintar(); };
         if (o._pagado) caja.querySelector('#cpPagado').value = o._pagado;
         caja.querySelector('#cpPagado').oninput = (ev) => { o._pagado = ev.target.value; };
       };
