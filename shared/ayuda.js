@@ -34,8 +34,11 @@
     '.cfx-cab>[data-cfx-campana]{margin:0!important;flex:none}' +
     '.cfx-atajo{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 11px;border-radius:99px;text-decoration:none;flex:none;font:800 12.5px/1 var(--cfx-letra,system-ui,sans-serif);' +
     'color:var(--brand,var(--marca,#2563eb));background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 35%,transparent)}' +
-    '.cfx-atajo svg{flex:none}@media(max-width:600px){.cfx-atajo span{display:none}.cfx-cab>.cfx-atajo{width:36px!important;height:36px!important;padding:0!important;gap:0;justify-content:center;border-radius:50%!important}.cfx-atajo svg{width:18px;height:18px}}' +
-    '.cfx-cab>.cfx-atajo{border:0!important;border-radius:99px;background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 13%,transparent)!important;color:var(--brand,var(--marca,#2563eb))!important}' +
+    '.cfx-atajo svg{flex:none}' +
+    '.cfx-cab>.cfx-atajo{display:inline-flex!important;flex-direction:row!important;align-items:center!important;justify-content:center;gap:5px!important;width:auto!important;height:32px!important;min-width:0!important;min-height:0!important;padding:0 11px!important;margin:0!important;' +
+    'font:800 12.5px/1 var(--cfx-letra,system-ui,sans-serif)!important;border:0!important;border-radius:99px!important;background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 13%,transparent)!important;color:var(--brand,var(--marca,#2563eb))!important;box-shadow:none!important}' +
+    '.cfx-cab>.cfx-atajo svg{width:16px!important;height:16px!important;margin:0!important}.cfx-cab>.cfx-atajo span{font-size:12.5px!important;line-height:1!important}' +
+    '@media(max-width:600px){.cfx-atajo span{display:none}.cfx-cab>.cfx-atajo{width:36px!important;height:36px!important;padding:0!important;gap:0;justify-content:center;border-radius:50%!important}.cfx-cab>.cfx-atajo svg{width:18px!important;height:18px!important}}' +
     // Campana del mismo tamaño que la foto: redonda, con borde suave y el dibujo al centro.
     '.cfx-cab>[data-cfx-campana]{width:36px!important;height:36px!important;min-width:0!important;min-height:0!important;padding:0!important;border-radius:50%!important;display:grid!important;place-items:center!important;position:relative;' +
     'background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:0 1px 3px rgba(15,23,42,.08)!important;color:var(--cfx-texto,#111827)!important}' +
