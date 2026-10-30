@@ -40,6 +40,14 @@
     '.cfx-cab>[data-cfx-campana]{width:36px!important;height:36px!important;min-width:0!important;min-height:0!important;padding:0!important;border-radius:50%!important;display:grid!important;place-items:center!important;position:relative;' +
     'background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:0 1px 3px rgba(15,23,42,.08)!important;color:var(--cfx-texto,#111827)!important}' +
     '.cfx-cab>[data-cfx-campana]>svg{width:20px!important;height:20px!important;margin:0!important;display:block}' +
+    '.cfx-sel-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f3f5f8);color:var(--cfx-texto,#111827);font:700 14px/1 var(--cfx-letra,system-ui,sans-serif);cursor:pointer;white-space:nowrap}' +
+    '.cfx-sel-btn svg{flex:none;opacity:.7}.cfx-ayuda .ca-op.ca-mal b{color:var(--cfx-mal,#dc2626)}' +
+    '.cfx-x-oculta{display:none!important}.cfx-aviso-desl{touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;will-change:transform}.cfx-aviso-desl *{-webkit-user-drag:none}' +
+    '@keyframes cfxPista{0%,100%{transform:none}35%{transform:translateX(-42px)}60%{transform:translateX(-42px)}}.cfx-pista{animation:cfxPista 1.1s cubic-bezier(.2,.8,.2,1)}' +
+    '.cfx-emerg{position:fixed;inset:auto;width:auto;height:fit-content;box-sizing:border-box;top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;margin:0 auto;max-width:460px;z-index:2147483600;display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:18px;border:1px solid var(--cfx-borde,#e2e7ec);' +
+    'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);box-shadow:0 18px 44px -12px rgba(15,23,42,.45);font-family:var(--cfx-letra,system-ui,sans-serif);cursor:pointer;touch-action:none;animation:cfxBaja .26s cubic-bezier(.2,.8,.2,1)}' +
+    '@keyframes cfxBaja{from{transform:translateY(-120%);opacity:0}}.cfx-emerg b{display:block;font-size:15px;line-height:1.25}.cfx-emerg small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:13px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.cfx-emerg>div{min-width:0}' +
+    '.cfx-emerg-ico{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--brand,var(--marca,#2563eb))}.cfx-emerg-ico svg{width:20px;height:20px}' +
     '.cfx-cab>a,.cfx-cab>button{transition:transform .12s ease}.cfx-cab>a:active,.cfx-cab>button:active{transform:scale(.92)}' +
     // Título de la cabecera: más chico en celular y hasta 2 líneas antes de cortar con "…".
     ':is(button,a):has(> .cfx-titulo){justify-content:flex-start!important}.cfx-titulo{text-align:left;white-space:normal!important;display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden!important;text-overflow:ellipsis;line-height:1.12!important;min-width:0}' +
@@ -527,8 +535,98 @@
       x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x);
     });
   }
+  // ---------- Avisos: se borran deslizando hacia el lado (sin ✕) y se juntan los de abajo ----------
+  // Cada app deja su botón "Borrar aviso" (aria-label) con su propia lógica: aquí se esconde y el deslizar lo toca.
+  // Así cada persona sigue viendo y borrando solo SUS avisos, igual que antes.
+  const XAV = '[aria-label="Borrar aviso"]';
+  const filaAviso = (b) => b.closest('.notif, .item, li, .aviso') || b.parentElement;
+  function irse(f, dir) {
+    return new Promise((ok) => {
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return ok();
+      f.style.transition = 'transform .18s ease-in, opacity .18s ease-in'; f.style.transform = 'translateX(' + (dir * 110) + '%)'; f.style.opacity = '0';
+      setTimeout(() => { const h = f.offsetHeight; f.style.overflow = 'hidden'; f.style.height = h + 'px'; void f.offsetHeight;
+        f.style.transition = 'height .18s ease, margin .18s ease, padding .18s ease'; f.style.height = '0px'; f.style.marginTop = f.style.marginBottom = '0px'; f.style.paddingTop = f.style.paddingBottom = '0px';
+        setTimeout(ok, 190); }, 170);
+    });
+  }
+  function deslizable(b) {
+    if (b.dataset.cfxDesl) return; b.dataset.cfxDesl = '1';
+    const f = filaAviso(b); if (!f || f === document.body) return;
+    b.classList.add('cfx-x-oculta'); f.classList.add('cfx-aviso-desl');
+    f.setAttribute('draggable', 'false'); f.addEventListener('dragstart', (e) => e.preventDefault());
+    let x0 = 0, y0 = 0, dx = 0, mov = false, id = null;
+    f.addEventListener('pointerdown', (e) => { if (e.button) return; x0 = e.clientX; y0 = e.clientY; dx = 0; mov = false; id = e.pointerId; f.style.transition = 'none'; });
+    f.addEventListener('pointermove', (e) => {
+      if (id !== e.pointerId) return;
+      const ddx = e.clientX - x0, ddy = e.clientY - y0;
+      if (!mov && (Math.abs(ddy) > 12 && Math.abs(ddy) > Math.abs(ddx))) { id = null; return; }
+      if (!mov && Math.abs(ddx) > 10) { mov = true; try { f.setPointerCapture(e.pointerId); } catch (er) { /* nada */ } }
+      if (mov) { dx = ddx; f.style.transform = 'translateX(' + dx + 'px)'; f.style.opacity = String(Math.max(.25, 1 - Math.abs(dx) / f.offsetWidth)); }
+    });
+    const soltar = async (e) => {
+      if (id !== e.pointerId) return; id = null;
+      if (!mov) return;
+      if (Math.abs(dx) > f.offsetWidth * .3) { await irse(f, dx > 0 ? 1 : -1); f.classList.add('cfx-oc'); mov = false; b.click(); }
+      else { f.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1), opacity .2s'; f.style.transform = ''; f.style.opacity = ''; }
+    };
+    f.addEventListener('pointerup', soltar); f.addEventListener('pointercancel', soltar);
+    // Si se deslizó, no cuenta como toque (no abre el aviso).
+    f.addEventListener('click', (e) => { if (mov) { e.preventDefault(); e.stopPropagation(); mov = false; } }, true);
+    // Pista una sola vez: el primer aviso se asoma hacia el lado.
+    try { if (!localStorage.getItem('cfx-desl-pista')) { localStorage.setItem('cfx-desl-pista', '1'); setTimeout(() => f.classList.add('cfx-pista'), 500); } } catch (e) { /* nada */ }
+  }
+  function avisosDeslizar() { document.querySelectorAll(XAV + ':not([data-cfx-desl])').forEach(deslizable); }
+  // "Borrar todos": los avisos salen hacia el lado en cascada (la app lo llama después de confirmar).
+  async function salirTodos() {
+    const fs = [...document.querySelectorAll('.cfx-aviso-desl:not(.cfx-oc)')].filter((f) => f.offsetParent);
+    await Promise.all(fs.map((f, i) => new Promise((ok) => setTimeout(() => irse(f, 1).then(ok), Math.min(i, 8) * 45))));
+  }
+  // ---------- Aviso emergente: llega un aviso con la app abierta → baja arriba, encima de todo ----------
+  let emerg = null;
+  function emergente(o) {
+    o = o || {};
+    if (emerg) emerg.remove();
+    const d = document.createElement('div'); d.className = 'cfx-emerg'; d.setAttribute('role', 'status');
+    d.innerHTML = '<span class="cfx-emerg-ico">' + SVG_CAMPANA + '</span><div><b></b><small></small></div>';
+    d.querySelector('b').textContent = String(o.titulo || 'Nuevo aviso').replace(/^🔔\s*/, ''); d.querySelector('small').textContent = o.cuerpo || '';
+    document.body.appendChild(d); emerg = d;
+    try { d.setAttribute('popover', 'manual'); d.showPopover(); } catch (e) { /* sin popover: igual queda arriba */ }
+    const fuera = (dir) => { if (!d.isConnected) return; d.style.transition = 'transform .2s ease-in, opacity .2s'; d.style.transform = dir ? 'translateX(' + dir * 110 + '%)' : 'translateY(-130%)'; d.style.opacity = '0'; setTimeout(() => { d.remove(); if (emerg === d) emerg = null; }, 210); };
+    const t = setTimeout(() => fuera(0), 5000);
+    let x0 = null, y0 = 0, dx = 0, dy = 0;
+    d.addEventListener('pointerdown', (e) => { x0 = e.clientX; y0 = e.clientY; dx = dy = 0; d.style.transition = 'none'; });
+    d.addEventListener('pointermove', (e) => { if (x0 == null) return; dx = e.clientX - x0; dy = Math.min(0, e.clientY - y0); d.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; });
+    d.addEventListener('pointerup', () => {
+      if (x0 == null) return; x0 = null;
+      if (Math.abs(dx) > 70 || dy < -30) { clearTimeout(t); return fuera(Math.abs(dx) > 70 ? Math.sign(dx) : 0); }
+      d.style.transition = 'transform .2s'; d.style.transform = '';
+      if (Math.abs(dx) < 6 && dy > -6) { clearTimeout(t); fuera(0); if (typeof o.abrir === 'function') o.abrir(); else { const c = document.querySelector('.cfx-cab [data-cfx-campana]'); if (c) c.click(); } }
+    });
+  }
+  // ---------- Selectores de acción ("⭐ Premium…", "Acción…"): botón con flecha al centro que abre una hoja ----------
+  // Elegir una opción cambia el <select> escondido y avisa "change": la app hace lo mismo que antes.
+  const CHEV = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  function selAccion() {
+    document.querySelectorAll('select:not([data-cfx-sel])').forEach((sel) => {
+      const o0 = sel.options[0];
+      if (!o0 || sel.id || sel.name || o0.value !== '' || !/…\s*$/.test(o0.text) || sel.options.length < 2) return;  // solo selectores de acción, no campos de formulario
+      sel.dataset.cfxSel = '1'; sel.classList.add('cfx-oc');
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'cfx-sel-btn';
+      const t = o0.text.replace(/…\s*$/, '').trim();
+      b.innerHTML = '<span></span>' + CHEV; b.querySelector('span').textContent = t; b.setAttribute('aria-label', t);
+      sel.after(b);
+      b.onclick = () => {
+        const caja = dialogo('<h2></h2><div class="ca-cuerpo">' + [...sel.options].slice(1).map((o, i) => '<button type="button" class="ca-op' + (/quitar|eliminar|borrar|suspend/i.test(o.text) ? ' ca-mal' : '') + '" data-i="' + (i + 1) + '"><b></b></button>').join('') +
+          '</div><div class="ca-pie"><button type="button" data-cerrar>Cancelar</button></div>');
+        caja.querySelector('h2').textContent = t;
+        caja.querySelectorAll('[data-i]').forEach((x) => { x.querySelector('b').textContent = sel.options[+x.dataset.i].text; x.onclick = () => { cerrar(); sel.value = sel.options[+x.dataset.i].value; sel.dispatchEvent(new Event('change', { bubbles: true })); }; });
+      };
+    });
+  }
+  window.CFX_ANIM = { emergente, salirTodos, deslizar: avisosDeslizar };
+
   let tTiras = 0;
-  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(tiras, 250); };
+  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { tiras(); avisosDeslizar(); selAccion(); }, 120); };
   new MutationObserver(pedirTiras).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('resize', pedirTiras); addEventListener('hashchange', pedirTiras); pedirTiras();
 

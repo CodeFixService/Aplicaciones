@@ -890,6 +890,7 @@
   const limpiosDesde = () => { const a = Cuenta.account; return a && a.avisos_limpios_at ? new Date(a.avisos_limpios_at) : null; };
   $('bLimpiarAvisos').onclick = async () => {
     if (!confirm('¿Limpiar tus avisos? Solo verás los que lleguen desde ahora.')) return;
+    if (window.CFX_ANIM) await window.CFX_ANIM.salirTodos();
     try {
       const t = await Cuenta.rpc('limpiar_mis_avisos');
       Object.assign(Cuenta.account, { avisos_limpios_at: t || new Date().toISOString() });
@@ -897,11 +898,15 @@
       Core.toast('🧹 Avisos limpios'); cargarInbox();
     } catch (err) { Core.toast(err.message); }
   };
+  let ultimoAviso = null;
   async function cargarInbox() {
     try {
       const desde = limpiosDesde();
       const inbox = (await Cuenta.rpc('my_inbox')).filter((n) => !desde || new Date(n.sent_at) > desde);
       $('bLimpiarAvisos').classList.toggle('hidden', !inbox.length);
+      // Llegó uno nuevo con la app abierta → aviso emergente arriba (solo los de esta cuenta).
+      if (window.CFX_ANIM && ultimoAviso != null && inbox[0] && inbox[0].id !== ultimoAviso && !inbox[0].leido) window.CFX_ANIM.emergente({ titulo: inbox[0].title, cuerpo: inbox[0].body });
+      ultimoAviso = inbox[0] ? inbox[0].id : 0;
       $('inbox').innerHTML = inbox.length ? inbox.map((n) =>
         '<li class="' + (n.leido ? '' : 'nuevo') + '" data-id="' + n.id + '"><div class="grow"><b>' + Core.esc(n.title) + '</b>' +
         '<div class="muted">' + Core.esc(n.de || '') + ' · ' + new Date(n.sent_at).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + '</div>' +
@@ -1001,7 +1006,7 @@
   };
 
   Cuenta.refresh().then(entrar).catch(() => entrar(Cuenta.account));
-  setInterval(() => { if (!document.hidden && Cuenta.account) contarMensajes(); }, 30000);
+  setInterval(() => { if (!document.hidden && Cuenta.account) { contarMensajes(); if (ultimoAviso != null) cargarInbox(); } }, 30000);
 })();
 </script>
 <script src="shared/iconos.js"></script>
