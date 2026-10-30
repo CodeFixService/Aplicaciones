@@ -168,14 +168,15 @@
     cabeceraAlto();
     const padres = new Set([...document.querySelectorAll('.card, .tarjeta')].map((c) => c.parentElement).filter(Boolean));
     padres.forEach((p) => {
-      if (p.classList.contains('cfx-apilar') || p.closest('dialog, .modal, .sheet, .hoja, .cfx-mv, .cfx-apilar, [data-sin-pila]')) return;
-      const L = [...p.querySelectorAll(TARJ)];
-      if (L.length < 4 || getComputedStyle(p).display === 'grid') return;
-      const alto = innerHeight * 0.42;
-      if (L.some((c) => c.offsetHeight > alto || c.offsetHeight < 40 || c.querySelector('input, textarea, select'))) return;
-      if (L.some((c, i) => i && c.offsetTop <= L[i - 1].offsetTop)) return;  // no están una debajo de otra
-      p.classList.add('cfx-apilar');
-      L.forEach((c, i) => { c.classList.add('cfx-pila'); c.style.setProperty('--cfx-i', String(Math.min(i, 4))); });
+      // Se revisa cada vez: si la lista se volvió a dibujar, las tarjetas nuevas también se apilan (y si ya no sirve, se deshace).
+      if (p.closest('dialog, .modal, .sheet, .hoja, .cfx-mv, [data-sin-pila]') || (p.parentElement && p.parentElement.closest('.cfx-apilar'))) return;
+      if (!p.offsetParent && getComputedStyle(p).position !== 'fixed') return;  // escondida: se revisa cuando se muestre
+      const L = [...p.querySelectorAll(TARJ)], alto = innerHeight * 0.42;
+      const sirve = L.length >= 4 && getComputedStyle(p).display !== 'grid' &&
+        !L.some((c) => c.offsetHeight > alto || c.offsetHeight < 40 || c.querySelector('input, textarea, select')) &&
+        !L.some((c, i) => i && c.offsetTop <= L[i - 1].offsetTop);  // una debajo de otra
+      if (sirve) { p.classList.add('cfx-apilar'); L.forEach((c, i) => { if (!c.classList.contains('cfx-pila')) { c.classList.add('cfx-pila'); c.style.setProperty('--cfx-i', String(Math.min(i, 4))); } }); }
+      else if (p.classList.contains('cfx-apilar')) { p.classList.remove('cfx-apilar'); p.querySelectorAll(':scope > .cfx-pila').forEach((c) => c.classList.remove('cfx-pila')); }
     });
   }
   // La tarjeta que queda abajo se achica y oscurece un poco a medida que la siguiente la tapa.
@@ -195,6 +196,9 @@
   new MutationObserver(pedirPila).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('scroll', () => { if (!rafPila) rafPila = requestAnimationFrame(() => { rafPila = 0; tapar(); }); }, { passive: true, capture: true });
   addEventListener('resize', pedirPila);
+  // Las secciones que solo se esconden y se muestran (paneles con pestañas) no agregan nodos: se revisa al cambiar de pantalla.
+  addEventListener('hashchange', pedirPila); addEventListener('popstate', pedirPila);
+  addEventListener('click', (e) => { if (e.target.closest && e.target.closest('nav, .tabs, .seg, .chips, [data-v], [data-s], [data-tab], [data-r]')) { clearTimeout(tPila); tPila = setTimeout(apilar, 120); } }, { passive: true, capture: true });
 
   window.CodeFixBarra = { montar };
   const iniciar = () => setTimeout(() => { montar(); setTimeout(() => document.documentElement.classList.add('cfx-barra-lista'), 1200); }, 0);

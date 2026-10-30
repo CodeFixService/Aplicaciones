@@ -209,3 +209,40 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
 
 /* El + del centro: siempre de color neutro oscuro (no blanco), así no se pierde si el color de la app es claro o blanco. */
 :root { --cfx-mas-ink: #111827; }
+
+/* ---------- Animaciones (igual en las 7 apps, celular y escritorio). Solo transform/opacity: fluidas y sin saltos.
+   Si el teléfono pide "reducir movimiento", no hay animaciones. ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  :root { --cfx-ease: cubic-bezier(.2, .8, .2, 1); }
+  /* Cambio de pantalla o pestaña: la sección entra suave */
+  .view.on, .vista.on, section.on, [data-cfx-vista] { animation: cfxVista .32s var(--cfx-ease) both; }
+  /* Tarjetas: entran escalonadas al aparecer (en navegadores sin animación por scroll; con ella ya entran al bajar) */
+  @supports not (animation-timeline: view()) {
+    .card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button { animation: cfxEntra .38s var(--cfx-ease) both; }
+    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(2) { animation-delay: .03s; }
+    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(3) { animation-delay: .06s; }
+    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(4) { animation-delay: .09s; }
+    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(5) { animation-delay: .12s; }
+    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(n+6) { animation-delay: .15s; }
+  }
+  /* Ventanas y hojas: suben desde abajo en celular, aparecen con zoom suave en escritorio */
+  dialog[open] > *, .modal:not([hidden]) .modal-caja, .sheet, .hoja { animation: cfxSube .3s var(--cfx-ease) both; }
+  dialog[open]::backdrop { animation: cfxFundido .25s ease both; }
+  .modal:not([hidden]) { animation: cfxFundido .2s ease both; }
+  @media (min-width: 700px) { dialog[open] > *, .modal:not([hidden]) .modal-caja { animation-name: cfxZoom; } }
+  /* Botones: se hunden un poco al tocarlos */
+  button, .btn, a.btn, .chip, .cfx-grilla > a, .cfx-grilla > button { transition: transform .14s var(--cfx-ease), background-color .2s, color .2s, border-color .2s, box-shadow .2s; }
+  button:active:not(:disabled), .btn:active, .chip:active, .cfx-grilla > a:active, .cfx-grilla > button:active { transform: scale(.96); }
+  /* Barra de abajo: el ícono elegido "salta" un poco */
+  nav.cfx-barra > a, nav.cfx-barra > button { transition: color .2s, background-color .25s; }
+  nav.cfx-barra > .on:not(.cfx-mas) svg, nav.cfx-barra > .activo:not(.cfx-mas) svg { animation: cfxPop .35s var(--cfx-ease); }
+  nav.cfx-barra > .cfx-mas > :first-child { transition: transform .18s var(--cfx-ease), box-shadow .2s; }
+  @media (hover: hover) { nav.cfx-barra > .cfx-mas:hover > :first-child { transform: translateY(-2px); } .card:hover, .cfx-grilla > a:hover, .cfx-grilla > button:hover { transition: transform .2s var(--cfx-ease), box-shadow .2s; } .cfx-grilla > a:hover, .cfx-grilla > button:hover { transform: translateY(-2px); } }
+  /* Insignias que cambian: pulso corto */
+  .badge.on, .num:not(:empty), .punto:not(.oculto) { animation: cfxPop .4s var(--cfx-ease); }
+}
+@keyframes cfxVista { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes cfxSube { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes cfxZoom { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes cfxFundido { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cfxPop { 0% { transform: scale(.85); } 60% { transform: scale(1.08); } 100% { transform: none; } }
