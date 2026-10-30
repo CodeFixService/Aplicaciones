@@ -68,7 +68,7 @@ input, select, textarea, button { font-family: inherit; }
   nav.cfx-barra > .cfx-mas::before { display: none; }
   nav.cfx-barra > .cfx-mas .cfx-ico, nav.cfx-barra > .cfx-mas > svg:first-child, nav.cfx-barra > .cfx-mas > span:first-child {
     width: 56px !important; height: 56px !important; margin: -22px auto 0 !important; border-radius: 50% !important;
-    background: var(--brand, var(--marca, #2563eb)) !important; color: var(--brand-ink, #fff) !important;
+    background: var(--brand, var(--marca, #2563eb)) !important; color: var(--cfx-mas-ink, #111827) !important;
     box-shadow: 0 6px 16px color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 45%, transparent), 0 0 0 4px var(--cfx-tarjeta) !important;
   }
   nav.cfx-barra > .cfx-mas span svg { width: 28px !important; height: 28px !important; margin: 0 !important; }
@@ -105,7 +105,7 @@ input, select, textarea, button { font-family: inherit; }
   }
   nav.cfx-barra > .on::before, nav.cfx-barra > .activo::before, nav.cfx-barra > .cfx-mas::before { display: none !important; }
   nav.cfx-barra > .cfx-mas { order: -1; align-self: center !important; width: 52px !important; min-height: 52px !important; height: 52px !important; padding: 0 !important; margin-bottom: 12px !important; border-radius: 50% !important;
-    justify-content: center !important; font-size: 0 !important; background: var(--brand, var(--marca, #2563eb)) !important; color: var(--brand-ink, #fff) !important; }
+    justify-content: center !important; font-size: 0 !important; background: var(--brand, var(--marca, #2563eb)) !important; color: var(--cfx-mas-ink, #111827) !important; }
   nav.cfx-barra > .cfx-mas:hover { filter: brightness(1.08); }
   nav.cfx-barra > .cfx-mas .cfx-ico, nav.cfx-barra > .cfx-mas > svg:first-child, nav.cfx-barra > .cfx-mas > span:first-child { width: 26px !important; height: 26px !important; background: none !important; color: inherit !important; }
   nav.cfx-barra > .cfx-mas svg { width: 26px !important; height: 26px !important; }
@@ -206,3 +206,6 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
     box-shadow: 0 -6px 18px -10px rgba(15, 23, 42, .35), var(--cfx-sombra, none) !important; }
   .cfx-apilar > .cfx-pila { scale: var(--cfx-esc, 1); filter: brightness(var(--cfx-luz, 1)); transform-origin: 50% 0; transition: scale .08s linear; animation: none !important; }
 }
+
+/* El + del centro: siempre de color neutro oscuro (no blanco), así no se pierde si el color de la app es claro o blanco. */
+:root { --cfx-mas-ink: #111827; }

@@ -21,7 +21,7 @@
   const pintarLogoArriba = () => $('bInicio').classList.toggle('logo', !!Cuenta.aplicarLogo(Cuenta.account));
   pintarLogoArriba();
   let perfiles = {};
-  const DB_VERSION = '5.12';
+  const DB_VERSION = '5.13';
 
   /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
   const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, ajustes: () => verAjuste() };

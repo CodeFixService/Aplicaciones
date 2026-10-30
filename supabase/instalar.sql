@@ -93,14 +93,18 @@ from auth.users u
 on conflict (id) do nothing;
 
 create or replace function public.is_admin() returns boolean
-language sql stable security definer set search_path = '' as $$
-  select exists (
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  -- Administrador (dueño) o socio (núcleo: cfx_socios; los agrega el administrador desde el Centro de Mando).
+  -- Sin sesión (p. ej. al instalar) no se llega a cfx_es_socio, que se crea más abajo.
+  if auth.uid() is null then return false; end if;
+  return exists (
     select 1 from public.profiles p join auth.users u on u.id = p.id
     where p.id = auth.uid() and p.role = 'admin' and not p.suspended
       and u.email_confirmed_at is not null
       and lower(u.email) = public.admin_email()
-  )
-$$;
+  ) or public.cfx_es_socio();
+end $$;
 
 create or replace function public.is_pro(uid uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -4675,7 +4679,7 @@ grant execute on function public.marca_publica() to anon, authenticated;
 --  · Funciones comunes cfx_* para el Centro de Mando (respaldo, limpieza e inventario).
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.12'::text $$;
+language sql immutable as $$ select '5.13'::text $$;
 
 alter table public.notification_reads add column if not exists oculto boolean not null default false;
 alter table public.profiles add column if not exists aviso_limpieza_at timestamptz;
@@ -5757,12 +5761,155 @@ grant execute on function public.cfx_cm_vincular(text, text, text, text), public
   public.cfx_chat_bandeja(), public.cfx_chat_hilo(uuid), public.cfx_chat_responder(uuid, text), public.cfx_guia() to authenticated;
 revoke all on function public.cfx_guia_app() from public, anon, authenticated;
 -- ---------------------------------------------------------------------
+-- CodeFix · Referidos (igual en las 7 apps; lo reparte nucleo/sincronizar.py). Se administra desde CM → Control → Referidos.
+--   Cada usuario (negocio o cliente, nunca el admin) tiene su código. Quien se registra con él queda asociado a esa cuenta.
+--   El admin ve quién invitó a quién, da días de Premium o manda un sticker de ánimo. Premio automático (opcional):
+--   cuando el invitado paga su primer Premium, quien lo invitó recibe N días (cfx_config 'referidos' → dias_auto; 0 = apagado).
+--   Usa lo que cada app define para los pagos: cfx_yo(), cfx_dar_premium(uuid, text, int) y cfx_avisar(uuid, text, text).
+-- ---------------------------------------------------------------------
+create table if not exists public.cfx_ref_codigos (cuenta uuid primary key, codigo text not null unique check (codigo ~ '^[A-Z0-9]{4,12}$'), creado timestamptz not null default now());
+create table if not exists public.cfx_referidos (
+  invitado uuid primary key, invito uuid not null, codigo text not null, email text not null default '', nombre text not null default '',
+  creado timestamptz not null default now(), premiado boolean not null default false, dias_dados int not null default 0, stickers int not null default 0);
+create index if not exists cfx_referidos_invito_idx on public.cfx_referidos (invito);
+alter table public.cfx_ref_codigos enable row level security;
+alter table public.cfx_referidos enable row level security;
+revoke all on public.cfx_ref_codigos, public.cfx_referidos from anon, authenticated;
+insert into public.cfx_config (clave, valor) values ('referidos', '{"dias_auto": 0}') on conflict (clave) do nothing;
+
+-- Mi código para invitar (y cuántos se registraron con él). El admin no tiene.
+create or replace function public.cfx_ref_mio() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare y jsonb := public.cfx_yo(); c text; i int := 0;
+begin
+  if y is null or y ->> 'rol' = 'admin' then return null; end if;
+  select codigo into c from public.cfx_ref_codigos where cuenta = (y ->> 'id')::uuid;
+  while c is null and i < 20 loop
+    c := upper(left(regexp_replace(translate(coalesce(nullif(y ->> 'nombre', ''), split_part(y ->> 'email', '@', 1)), 'áéíóúñÁÉÍÓÚÑ', 'aeiounAEIOUN'), '[^A-Za-z]', '', 'g'), 6));
+    c := (case when length(c) < 2 then 'CF' else c end) || lpad((floor(random() * 10000))::int::text, 4, '0'); i := i + 1;
+    begin insert into public.cfx_ref_codigos (cuenta, codigo) values ((y ->> 'id')::uuid, c); exception when unique_violation then c := null; end;
+  end loop;
+  return jsonb_build_object('codigo', c, 'invitados', (select count(*) from public.cfx_referidos where invito = (y ->> 'id')::uuid),
+    'pagaron', (select count(*) from public.cfx_referidos r where r.invito = (y ->> 'id')::uuid and r.premiado));
+end $$;
+-- La cuenta nueva que llegó con un código queda asociada (una sola vez, solo en sus primeros 3 días, nunca consigo misma).
+create or replace function public.cfx_ref_registrar(p_codigo text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare y jsonb := public.cfx_yo(); o uuid; quien text;
+begin
+  if y is null or y ->> 'rol' = 'admin' then return false; end if;
+  if (select created_at from auth.users where id = (y ->> 'id')::uuid) < now() - interval '3 days' then return false; end if;
+  select cuenta into o from public.cfx_ref_codigos where codigo = upper(trim(p_codigo));
+  if o is null or o = (y ->> 'id')::uuid then return false; end if;
+  insert into public.cfx_referidos (invitado, invito, codigo, email, nombre) values ((y ->> 'id')::uuid, o, upper(trim(p_codigo)), coalesce(y ->> 'email', ''), coalesce(y ->> 'nombre', ''))
+    on conflict (invitado) do nothing;
+  if not found then return false; end if;
+  quien := coalesce(nullif(y ->> 'nombre', ''), split_part(y ->> 'email', '@', 1));
+  perform public.cfx_avisar(o, '🎉 ' || quien || ' se registró con tu código', 'Gracias por recomendarnos. ¡Sigue invitando!');
+  return true;
+end $$;
+-- Panel: quién invitó a quién (con correo de ambos), si el invitado ya pagó y lo que se le ha dado a quien invitó.
+create or replace function public.cfx_ref_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return jsonb_build_object('config', (select valor from public.cfx_config where clave = 'referidos'), 'filas', coalesce((select jsonb_agg(x order by x.creado desc) from (
+    select r.invitado, r.email, r.nombre, r.creado, r.codigo, r.invito, u.email invito_email, r.premiado, r.dias_dados, r.stickers,
+      exists (select 1 from public.cfx_pagos g where g.cuenta = r.invitado and g.estado = 'aprobado') pago
+    from public.cfx_referidos r left join auth.users u on u.id = r.invito limit 1000) x), '[]'));
+end $$;
+-- Dar días de Premium y/o mandar un sticker (mensaje de ánimo) a quien invita.
+create or replace function public.cfx_ref_premiar(p_cuenta uuid, p_dias int default 0, p_mensaje text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare hasta timestamptz; d int := greatest(0, least(coalesce(p_dias, 0), 365)); n int;
+begin
+  perform public.cfx_es_admin();
+  select count(*) into n from public.cfx_referidos where invito = p_cuenta;
+  if n = 0 then raise exception 'Esa cuenta no ha invitado a nadie'; end if;
+  if d > 0 then
+    hasta := public.cfx_dar_premium(p_cuenta, 'otro', d);
+    update public.cfx_referidos set dias_dados = dias_dados + d where invitado = (select invitado from public.cfx_referidos where invito = p_cuenta order by creado desc limit 1);
+  end if;
+  if coalesce(trim(p_mensaje), '') <> '' or d > 0 then
+    perform public.cfx_avisar(p_cuenta, left(coalesce(nullif(trim(p_mensaje), ''), '🏆 ¡Gracias por invitar!'), 90),
+      case when d > 0 then '🎁 Te regalamos ' || d || ' días de Premium por recomendarnos (' || n || ' invitado' || case when n > 1 then 's' else '' end || ').' else 'Vas en ' || n || ' invitado' || case when n > 1 then 's' else '' end || '. ¡Sigue así!' end);
+    update public.cfx_referidos set stickers = stickers + 1 where invitado = (select invitado from public.cfx_referidos where invito = p_cuenta order by creado desc limit 1);
+  end if;
+  perform public.cfx_anotar('referido', 'premio a ' || coalesce((select email from auth.users where id = p_cuenta), p_cuenta::text) || ': ' || d || ' días');
+  return jsonb_build_object('dias', d, 'hasta', hasta);
+end $$;
+create or replace function public.cfx_ref_config_guardar(p_dias_auto int) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  insert into public.cfx_config (clave, valor) values ('referidos', jsonb_build_object('dias_auto', greatest(0, least(coalesce(p_dias_auto, 0), 365))))
+    on conflict (clave) do update set valor = excluded.valor;
+  return (select valor from public.cfx_config where clave = 'referidos');
+end $$;
+-- Premio automático: al aprobarse el primer pago del invitado, quien lo invitó recibe dias_auto días (una sola vez por invitado).
+create or replace function public.cfx_ref_al_pagar() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare r public.cfx_referidos; d int := coalesce(((select valor from public.cfx_config where clave = 'referidos') ->> 'dias_auto')::int, 0);
+begin
+  if new.estado <> 'aprobado' or old.estado = 'aprobado' then return new; end if;
+  select * into r from public.cfx_referidos where invitado = new.cuenta and not premiado for update;
+  if r.invitado is null then return new; end if;
+  update public.cfx_referidos set premiado = true, dias_dados = dias_dados + case when d > 0 then d else 0 end where invitado = r.invitado;
+  if d > 0 then
+    perform public.cfx_dar_premium(r.invito, 'otro', d);
+    perform public.cfx_avisar(r.invito, '🎁 ¡Ganaste ' || d || ' días de Premium!', coalesce(nullif(r.nombre, ''), split_part(r.email, '@', 1)) || ' pagó su Premium gracias a tu invitación.');
+  end if;
+  return new;
+end $$;
+drop trigger if exists cfx_ref_al_pagar on public.cfx_pagos;
+create trigger cfx_ref_al_pagar after update of estado on public.cfx_pagos for each row execute function public.cfx_ref_al_pagar();
+revoke all on function public.cfx_ref_al_pagar() from public, anon, authenticated;
+revoke all on function public.cfx_ref_mio(), public.cfx_ref_registrar(text), public.cfx_ref_lista(), public.cfx_ref_premiar(uuid, int, text), public.cfx_ref_config_guardar(int) from public, anon;
+grant execute on function public.cfx_ref_mio(), public.cfx_ref_registrar(text), public.cfx_ref_lista(), public.cfx_ref_premiar(uuid, int, text), public.cfx_ref_config_guardar(int) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- CodeFix · Socios comunes (lo reparte nucleo/sincronizar.py). Los usan Billetera, Órbita y Estaciona (las otras apps tienen
+-- sus propios socios). El socio entra con su correo y administra igual que el admin (cada app lo reconoce en su función de
+-- administrador), pero solo el administrador dueño agrega o quita socios (CM → Control → 🤝 Socios). Lo que hace queda en el registro.
+-- ---------------------------------------------------------------------
+create table if not exists public.cfx_socios (email text primary key check (email = lower(email) and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  nombre text not null default '' check (length(nombre) <= 60), creado timestamptz not null default now());
+alter table public.cfx_socios enable row level security;
+revoke all on public.cfx_socios from anon, authenticated;
+create or replace function public.cfx_es_socio() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select auth.uid() is not null and exists (select 1 from public.cfx_socios s join auth.users u on lower(u.email) = s.email where u.id = auth.uid())
+$$;
+create or replace function public.cfx_socios_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return coalesce((select jsonb_agg(jsonb_build_object('email', s.email, 'nombre', s.nombre, 'creado', s.creado, 'tiene_cuenta', exists (select 1 from auth.users u where lower(u.email) = s.email)) order by s.creado) from public.cfx_socios s), '[]');
+end $$;
+create or replace function public.cfx_socio_guardar(p_email text, p_nombre text default '', p_si boolean default true) returns void
+language plpgsql security definer set search_path = '' as $$
+declare e text := lower(trim(p_email));
+begin
+  perform public.cfx_es_admin();
+  if public.cfx_es_socio() then raise exception 'Solo el administrador agrega o quita socios'; end if;
+  if coalesce(p_si, true) then
+    insert into public.cfx_socios (email, nombre) values (e, left(coalesce(trim(p_nombre), ''), 60)) on conflict (email) do update set nombre = excluded.nombre;
+    perform public.cfx_anotar('socio', 'agregó a ' || e);
+  else
+    delete from public.cfx_socios where email = e;
+    perform public.cfx_anotar('socio', 'quitó a ' || e);
+  end if;
+end $$;
+revoke all on function public.cfx_es_socio(), public.cfx_socios_lista(), public.cfx_socio_guardar(text, text, boolean) from public, anon;
+grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), public.cfx_socio_guardar(text, text, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------
 -- CodeFix · Inventario (igual en las 6 apps; lo usa el Centro de Mando → Apps → Respaldo y limpieza).
 --   Muestra las tablas que esta versión ya NO usa (restos de versiones antiguas) con cuántas filas tienen.
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_pagos', 'public.cfx_registro', 'public.cfx_verificaciones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_pagos', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;

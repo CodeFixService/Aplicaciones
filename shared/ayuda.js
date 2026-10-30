@@ -163,6 +163,7 @@
       (!adm ? op('chat', '💬', 'Chat con soporte', estado.sin_leer ? '<i>' + estado.sin_leer + '</i>' : '') : '') +
       op('terminos', '📄', 'Términos y condiciones') +
       (!adm && window.CFX_PAGOS ? op('premium', '⭐', esPro() ? 'Mi plan PRO' : 'Pasar a PRO') : '') +
+      (!adm && !PERSONALES.includes(APP) ? op('invitar', '🎁', 'Invita y gana') : '') +
       op('salir', '🚪', 'Cerrar sesión') +
       '</div><div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>'));
     caja.onclick = (ev) => {
@@ -172,6 +173,7 @@
       if (a === 'cuenta' || a === 'panel') return irA(CFG[a]);
       if (a === 'atras') { cerrar(); return history.back(); }
       if (a === 'salir') return confirmarSalir();
+      if (a === 'invitar') return invitar();
       if (a === 'guia') guia(); else if (a === 'chat') chat({ rpc: R }); else if (a === 'terminos') terminos(); else { cerrar(); window.CFX_PAGOS.abrir({ rpc: R }); }
     };
   }
@@ -367,6 +369,31 @@
   // CFX_AYUDA.iniciar({ rpc, app, admin, premium, id, hasta, beneficios, nombre, email, foto, cuenta, panel, quitar, salir })
   //   una sola llamada al tener la cuenta (también para el admin): cabecera común, ayuda y sensación Premium (CFX_PREMIUM, nunca al admin).
   //   cuenta / panel: dirección (#… o url) o función para "Mi cuenta" y "Panel de administración". Se puede volver a llamar (p. ej. al cambiar la foto).
+  // ---------- Referidos: ?ref=CODIGO en el link queda guardado y se asocia al crear/entrar a la cuenta nueva ----------
+  const PERSONALES = ['mando', 'contenido'], SOCIOS_NUCLEO = ['billetera', 'orbita', 'estaciona'];
+  try { const rf = new URLSearchParams(location.search).get('ref'); if (rf && /^[A-Za-z0-9]{4,12}$/.test(rf)) localStorage.setItem('cfx-ref', rf.toUpperCase()); } catch (e) { /* nada */ }
+  async function refRegistrar() {
+    let c = null; try { c = localStorage.getItem('cfx-ref'); } catch (e) { return; }
+    if (!c || PERSONALES.includes(APP)) return;
+    try { await R('cfx_ref_registrar', { p_codigo: c }); localStorage.removeItem('cfx-ref'); } catch (e) { /* base sin referidos todavía: se intenta otra vez */ }
+  }
+  async function invitar() {
+    const caja = dialogo('<h2>🎁 Invita y gana</h2><p>Comparte tu link: quien se registre con él queda asociado a tu cuenta y te ganas días de Premium.</p><div class="ca-cuerpo" id="caRef"><p>Cargando…</p></div>' +
+      '<div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>');
+    try {
+      const r = await R('cfx_ref_mio'); if (!r || !r.codigo) throw new Error('Tu cuenta no tiene código.');
+      const link = RAIZ + '?ref=' + r.codigo, z = caja.querySelector('#caRef');
+      z.innerHTML = '<p style="text-align:center;margin:6px 0"><b style="font-size:24px;letter-spacing:.06em">' + esc(r.codigo) + '</b></p><p style="word-break:break-all;font-size:13px;opacity:.8">' + esc(link) + '</p>' +
+        '<p>Invitaste a <b>' + r.invitados + '</b> persona' + (r.invitados === 1 ? '' : 's') + (r.pagaron ? ' · ' + r.pagaron + ' ya pagaron' : '') + (r.invitados >= 3 ? ' 🏆' : '') + '</p>' +
+        '<button type="button" class="ca-op" data-a="share"><span>📤</span><b>Compartir mi link</b></button><button type="button" class="ca-op" data-a="copiar"><span>📋</span><b>Copiar link</b></button>';
+      z.onclick = async (ev) => {
+        const b = ev.target.closest('[data-a]'); if (!b) return;
+        const txt = 'Te recomiendo esta app 👉 ' + link;
+        if (b.dataset.a === 'share' && navigator.share) { try { await navigator.share({ text: txt, url: link }); } catch (e) { /* cancelado */ } }
+        else { try { await navigator.clipboard.writeText(link); b.querySelector('b').textContent = '¡Copiado!'; } catch (e) { /* sin permiso */ } }
+      };
+    } catch (e) { caja.querySelector('#caRef').innerHTML = '<p>' + esc(e.message) + '</p>'; }
+  }
   function iniciar(o) {
     if (!o || !o.rpc) return;
     const primera = !R;
@@ -375,7 +402,10 @@
     try { if (!sessionStorage.getItem('cfx-inicio')) sessionStorage.setItem('cfx-inicio', location.pathname + location.search); } catch (e) { /* nada */ }
     if (window.CFX_PREMIUM && 'premium' in o) window.CFX_PREMIUM.marcar({ premium: !CFG.admin && !!CFG.premium, id: CFG.id, hasta: CFG.hasta, beneficios: CFG.beneficios });
     pintarBoya();
+    // Socios comunes (Billetera, Órbita y Estaciona): la app no lo sabe; se pregunta una vez para mostrar SOCIO y no el atajo del CM.
+    if (CFG.admin && CFG.socio === undefined && SOCIOS_NUCLEO.includes(APP)) R('cfx_es_socio').then((v) => { CFG.socio = !!v; pintarBoya(); }).catch(() => { CFG.socio = false; });
     if (CFG.admin) return;
+    refRegistrar();
     revisar();
     if (primera) {
       setInterval(revisar, 5 * 60 * 1000);
@@ -386,8 +416,21 @@
   // ---------- Flechas siempre al centro de su cuadro ----------
   // Los botones que solo tienen una flecha de texto (‹ › ← →) pasan a un dibujo: así queda centrada en todas las letras y celulares.
   const FLECHA = { '‹': 'M15 18l-6-6 6-6', '›': 'M9 18l6-6-6-6', '←': 'M19 12H5M12 19l-7-7 7-7', '→': 'M5 12h14M12 5l7 7-7 7' };
+  // El signo + queda solo en el botón principal (el + del centro): "+ Cuenta" → "Cuenta". No toca botones que son solo "+" ni "+ 2 libres".
+  const MAS_TXT = /^(\s*)[+＋]\s*(?=\p{L})/u;
+  function sinMas(b) {
+    if (b.matches('.cfx-mas, .nuevo, .nav-mas, .mas-grande, [data-cfx-nuevo]') || b.closest('nav, .no-ico, [data-emoji]')) return;
+    const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT, null); let t;
+    while ((t = w.nextNode()) && !t.data.trim()) { /* primer texto */ }
+    if (t && MAS_TXT.test(t.data)) t.data = t.data.replace(MAS_TXT, '$1');
+    // Ícono "+" (SVG) delante de un texto: se quita; un botón que es solo el + se deja.
+    const sv = b.querySelector('svg'); if (!sv || !(b.textContent || '').trim()) return;
+    const d = [...sv.querySelectorAll('path')].map((x) => x.getAttribute('d')).join(' ').replace(/\s+/g, '');
+    if (/^M12[ ,]?5v14M5[ ,]?12h14$/.test(d) || d === 'M12 5v14M5 12h14'.replace(/\s+/g, '')) { const c = sv.parentElement !== b && !sv.parentElement.textContent.trim() ? sv.parentElement : sv; c.remove(); }
+  }
   function flechas(raiz) {
     (raiz.querySelectorAll ? raiz.querySelectorAll('button, a') : []).forEach((b) => {
+      sinMas(b);
       if (b.children.length || b.dataset.cfxFlecha) return;
       const t = (b.textContent || '').trim(); if (!FLECHA[t]) return;
       b.dataset.cfxFlecha = '1';
@@ -396,7 +439,7 @@
       b.style.display = b.style.display || ''; b.classList.add('cfx-flecha');
     });
   }
-  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => { if (n.nodeType === 1) flechas(n.parentNode || n); }); })
+  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => { const e = n.nodeType === 1 ? n : n.parentElement; if (e) flechas(e.parentNode || e); }); })
     .observe(document.documentElement, { childList: true, subtree: true });
   if (document.readyState !== 'loading') flechas(document); else document.addEventListener('DOMContentLoaded', () => flechas(document));
 
