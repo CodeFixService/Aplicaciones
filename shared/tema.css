@@ -5,7 +5,7 @@
    Las variables tienen los nombres de todas las apps (brand/bg/card/text… y marca/fondo/tarjeta/texto…). */
 :root {
   --cfx-fondo: #f3f5f7; --cfx-tarjeta: #ffffff; --cfx-campo: #f7f9fb; --cfx-texto: #111827; --cfx-texto-2: #5b6472;
-  --cfx-borde: #e2e7ec; --cfx-sombra: 0 1px 2px rgba(15, 23, 42, .06), 0 4px 14px rgba(15, 23, 42, .05);
+  --cfx-borde: #dce3ea; --cfx-sombra: 0 1px 2px rgba(15, 23, 42, .07), 0 6px 18px -6px rgba(15, 23, 42, .14);
   --cfx-radio: 14px; --cfx-radio-chico: 12px;
   --cfx-letra: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --cfx-ok: #16a34a; --cfx-mal: #dc2626; --cfx-aviso: #ea580c;
@@ -24,12 +24,12 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not(.claro):not(.light) {
     --cfx-fondo: #0e1318; --cfx-tarjeta: #161d25; --cfx-campo: #1b232d; --cfx-texto: #e8edf2; --cfx-texto-2: #9aa6b2;
-    --cfx-borde: #263240; --cfx-sombra: none;
+    --cfx-borde: #2d3a49; --cfx-sombra: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 8px 22px -10px rgba(0, 0, 0, .75);
   }
 }
 :root[data-theme="dark"], html.dark, html.oscuro, body.dark, body.oscuro {
   --cfx-fondo: #0e1318; --cfx-tarjeta: #161d25; --cfx-campo: #1b232d; --cfx-texto: #e8edf2; --cfx-texto-2: #9aa6b2;
-  --cfx-borde: #263240; --cfx-sombra: none;
+  --cfx-borde: #2d3a49; --cfx-sombra: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 8px 22px -10px rgba(0, 0, 0, .75);
   --bg: var(--cfx-fondo); --card: var(--cfx-tarjeta); --card2: var(--cfx-campo); --field: var(--cfx-campo);
   --text: var(--cfx-texto); --ink: var(--cfx-texto); --muted: var(--cfx-texto-2); --line: var(--cfx-borde); --shadow: var(--cfx-sombra);
   --fondo: var(--cfx-fondo); --tarjeta: var(--cfx-tarjeta); --texto: var(--cfx-texto); --texto-2: var(--cfx-texto-2);
@@ -181,7 +181,7 @@ h1, h2, h3 { overflow-wrap: anywhere; }
   background: linear-gradient(135deg, color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 22%, transparent), color-mix(in srgb, #8b5cf6 16%, transparent));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 30%, transparent); }
 /* Toque moderno: tarjetas que se elevan y brillan suave al tocarlas */
-.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button, .cfx-mh-op, .kpi { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button, .cfx-mh-op, .kpi { transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
 @media (hover: hover) {
   .cfx-grilla > a:hover, .cfx-grilla > button:hover, .cfx-mh-op:hover { transform: translateY(-2px);
     box-shadow: 0 10px 28px -12px color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 55%, transparent) !important; }
@@ -217,10 +217,10 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
 @media (prefers-reduced-motion: no-preference) {
   :root { --cfx-ease: cubic-bezier(.2, .8, .2, 1); }
   /* Cambio de pantalla o pestaña: la sección entra suave */
-  .view.on, .vista.on, section.on, [data-cfx-vista] { animation: cfxVista .32s var(--cfx-ease) both; }
+  .view.on, .vista.on, section.on, [data-cfx-vista] { animation: cfxVista .2s var(--cfx-ease) both; }
   /* Tarjetas: entran escalonadas al aparecer (en navegadores sin animación por scroll; con ella ya entran al bajar) */
   @supports not (animation-timeline: view()) {
-    .card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button { animation: cfxEntra .38s var(--cfx-ease) both; }
+    .card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button { animation: cfxEntra .24s var(--cfx-ease) both; }
     :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(2) { animation-delay: .03s; }
     :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(3) { animation-delay: .06s; }
     :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(4) { animation-delay: .09s; }
@@ -228,8 +228,8 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
     :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(n+6) { animation-delay: .15s; }
   }
   /* Ventanas y hojas: suben desde abajo en celular, aparecen con zoom suave en escritorio */
-  dialog[open] > *, .modal:not([hidden]) .modal-caja, .sheet, .hoja { animation: cfxSube .3s var(--cfx-ease) both; }
-  dialog[open]::backdrop { animation: cfxFundido .25s ease both; }
+  dialog[open] > *, .modal:not([hidden]) .modal-caja, .sheet, .hoja { animation: cfxSube .2s var(--cfx-ease) both; }
+  dialog[open]::backdrop { animation: cfxFundido .18s ease both; }
   .modal:not([hidden]) { animation: cfxFundido .2s ease both; }
   @media (min-width: 700px) { dialog[open] > *, .modal:not([hidden]) .modal-caja { animation-name: cfxZoom; } }
   /* Botones: se hunden un poco al tocarlos */
@@ -252,3 +252,17 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
 /* El + del centro nunca muestra texto (tampoco mientras la barra se arma): solo el signo; el nombre queda para lectores de pantalla. */
 nav :is(.cfx-mas, .nuevo, .nav-mas, .mas-grande, [data-cfx-nuevo]) { font-size: 0 !important; }
 nav :is(.cfx-mas, .nuevo, .nav-mas, .mas-grande, [data-cfx-nuevo]) :is(small, .t, .txt, .label) { display: none !important; }
+
+/* ---------- Nítido (núcleo 2.12): bordes que se notan, sombras suaves, textos que no se cortan ---------- */
+.card, .tarjeta, .kpi { border-color: var(--cfx-borde); box-shadow: var(--cfx-sombra, none); }
+input::placeholder, textarea::placeholder { text-overflow: ellipsis; opacity: .75; }
+/* Tiras de filtros que no caben: se deslizan de lado y se desvanecen en la orilla (así se nota que hay más). */
+.cfx-desliza { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none; scroll-snap-type: x proximity; }
+.cfx-desliza::-webkit-scrollbar { display: none; }
+.cfx-desliza > * { flex: none !important; scroll-snap-align: start; }
+.cfx-desliza.cfx-d-der { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+.cfx-desliza.cfx-d-izq { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px); mask-image: linear-gradient(90deg, transparent, #000 36px); }
+.cfx-desliza.cfx-d-izq.cfx-d-der { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+/* Botones: el texto en una línea y el ícono al centro con el texto. */
+button, .btn, a.btn, .chip { align-items: center; }
+.chip, .seg > button, .tabs > button, .cp-tabs > button { white-space: nowrap; }

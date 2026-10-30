@@ -34,7 +34,16 @@
     '.cfx-cab>[data-cfx-campana]{margin:0!important;flex:none}' +
     '.cfx-atajo{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 11px;border-radius:99px;text-decoration:none;flex:none;font:800 12.5px/1 var(--cfx-letra,system-ui,sans-serif);' +
     'color:var(--brand,var(--marca,#2563eb));background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 35%,transparent)}' +
-    '.cfx-atajo svg{flex:none}@media(max-width:380px){.cfx-atajo span{display:none}.cfx-atajo{width:32px;padding:0;justify-content:center}}' +
+    '.cfx-atajo svg{flex:none}@media(max-width:600px){.cfx-atajo span{display:none}.cfx-cab>.cfx-atajo{width:36px!important;height:36px!important;padding:0!important;gap:0;justify-content:center;border-radius:50%!important}.cfx-atajo svg{width:18px;height:18px}}' +
+    '.cfx-cab>.cfx-atajo{border:0!important;border-radius:99px;background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 13%,transparent)!important;color:var(--brand,var(--marca,#2563eb))!important}' +
+    // Campana del mismo tamaño que la foto: redonda, con borde suave y el dibujo al centro.
+    '.cfx-cab>[data-cfx-campana]{width:36px!important;height:36px!important;min-width:0!important;min-height:0!important;padding:0!important;border-radius:50%!important;display:grid!important;place-items:center!important;position:relative;' +
+    'background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:0 1px 3px rgba(15,23,42,.08)!important;color:var(--cfx-texto,#111827)!important}' +
+    '.cfx-cab>[data-cfx-campana]>svg{width:20px!important;height:20px!important;margin:0!important;display:block}' +
+    '.cfx-cab>a,.cfx-cab>button{transition:transform .12s ease}.cfx-cab>a:active,.cfx-cab>button:active{transform:scale(.92)}' +
+    // Título de la cabecera: más chico en celular y hasta 2 líneas antes de cortar con "…".
+    ':is(button,a):has(> .cfx-titulo){justify-content:flex-start!important}.cfx-titulo{text-align:left;white-space:normal!important;display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden!important;text-overflow:ellipsis;line-height:1.12!important;min-width:0}' +
+    '@media(max-width:600px){.cfx-titulo{font-size:clamp(14px,4vw,18px)!important}}' +
     '.cfx-plan{height:24px;min-height:0;padding:0 9px;border-radius:99px;border:0;cursor:pointer;font:800 11px/24px var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;' +
     'background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto-2,#5b6472);box-shadow:inset 0 0 0 1px var(--cfx-borde,#e2e7ec)}' +
     '.cfx-plan.pro{background:linear-gradient(135deg,#f7d774,#d9a21b);color:#3b2a00;box-shadow:none}' +
@@ -43,7 +52,7 @@
     'background:var(--brand,var(--marca,#2563eb));color:#fff;font:800 14px/1 var(--cfx-letra,system-ui,sans-serif);box-shadow:0 0 0 2px var(--cfx-tarjeta,#fff),0 0 0 3px var(--cfx-borde,#e2e7ec)}' +
     '.cfx-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}html.cfx-premium .cfx-av{box-shadow:0 0 0 2px var(--cfx-tarjeta,#fff),0 0 0 4px #d9a21b}' +
     '.cfx-av i{position:absolute;top:-5px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:#dc2626;color:#fff;font:700 11px/18px system-ui,sans-serif;font-style:normal;padding:0 4px;box-sizing:border-box}' +
-    '@media(max-width:380px){.cfx-cab{gap:6px}.cfx-plan{padding:0 7px;font-size:10px}.cfx-av{width:34px;height:34px}}' +
+    '@media(max-width:420px){.cfx-cab{gap:6px}.cfx-plan{padding:0 7px;font-size:10px;letter-spacing:.04em}}' +
     '.cfx-ayuda .ca-yo{display:flex;align-items:center;gap:12px;padding:2px 0 12px;border-bottom:1px solid var(--cfx-borde,#e2e7ec);margin-bottom:6px}.cfx-ayuda .ca-yo .cfx-av{width:46px;height:46px;font-size:17px;cursor:default}' +
     '.cfx-ayuda .ca-yo b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-ayuda .ca-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}.cfx-ayuda .ca-yo>div{min-width:0}' +
     // Ajustes en cuadrícula
@@ -119,6 +128,8 @@
       if (boya.parentNode !== h) h.appendChild(boya);
       boya.classList.remove('cfx-fija');
       if (CFG.quitar) h.querySelectorAll(CFG.quitar).forEach((x) => x.classList.add('cfx-oc'));
+      // El nombre de la cabecera que se cortaba con "…" pasa a 2 líneas (y letra más chica en celular).
+      h.querySelectorAll('h1, h2, b, strong, span, div').forEach((x) => { if (!boya.contains(x) && !x.classList.contains('cfx-titulo') && x.childElementCount === 0 && (x.textContent || '').trim() && getComputedStyle(x).textOverflow === 'ellipsis') x.classList.add('cfx-titulo'); });
       const campanas = [...h.querySelectorAll(CAMPANA)].map((x) => x.closest('button, a') || x).filter((x, i, l) => l.indexOf(x) === i && !x.classList.contains('cfx-plan'));
       const una = campanas.find((x) => x.dataset.cfxCampana) || campanas.find((x) => !x.classList.contains('cfx-oc')) || campanas[0];
       campanas.forEach((x) => { if (x !== una) x.classList.add('cfx-oc'); });
@@ -501,6 +512,26 @@
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } }, 1500);
 
   window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar, menu, web, panelCM };
+  // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
+  function marcarTira(x) {
+    x.classList.toggle('cfx-d-izq', x.scrollLeft > 4);
+    x.classList.toggle('cfx-d-der', x.scrollLeft + x.clientWidth < x.scrollWidth - 4);
+  }
+  function tiras() {
+    const padres = new Set(); document.querySelectorAll('button, a, .chip').forEach((b) => { if (b.parentElement) padres.add(b.parentElement); });
+    padres.forEach((x) => {
+      if (x.classList.contains('cfx-desliza')) return marcarTira(x);
+      if (x.childElementCount < 2 || x.scrollWidth <= x.clientWidth + 4 || !x.clientWidth || x.closest('.cfx-barra, .cfx-cab, header, dialog')) return;
+      const hijos = [...x.children], botones = hijos.filter((h) => /^(BUTTON|A)$/.test(h.tagName) || h.classList.contains('chip'));
+      if (botones.length < hijos.length * 0.7 || getComputedStyle(x).display.indexOf('flex') < 0) return;
+      x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x);
+    });
+  }
+  let tTiras = 0;
+  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(tiras, 250); };
+  new MutationObserver(pedirTiras).observe(document.documentElement, { childList: true, subtree: true });
+  addEventListener('resize', pedirTiras); addEventListener('hashchange', pedirTiras); pedirTiras();
+
   window.CFX_AJUSTES = { montar: ajustes, registro };
   // La app pudo pedirlo antes de que este archivo cargara (CFX_AYUDA_PEND = { rpc, app }).
   if (window.CFX_AYUDA_PEND) iniciar(window.CFX_AYUDA_PEND);
