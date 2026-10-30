@@ -42,6 +42,18 @@
     '.cfx-cab>[data-cfx-campana]>svg{width:20px!important;height:20px!important;margin:0!important;display:block}' +
     '.cfx-sel-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f3f5f8);color:var(--cfx-texto,#111827);font:700 14px/1 var(--cfx-letra,system-ui,sans-serif);cursor:pointer;white-space:nowrap}' +
     '.cfx-sel-btn svg{flex:none;opacity:.7}.cfx-ayuda .ca-op.ca-mal b{color:var(--cfx-mal,#dc2626)}' +
+    '.cfx-cuenta-g{margin:16px 0 8px}.cfx-cg-t{font:800 12px/1 var(--cfx-letra,system-ui,sans-serif);letter-spacing:.08em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472);margin:0 2px 10px}' +
+    '.cfx-srv{margin:0 0 14px}.cfx-srv-pista{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:2px 2px 6px}.cfx-srv-pista::-webkit-scrollbar{display:none}' +
+    '.cfx-srv-c{flex:0 0 calc(100% - 28px);scroll-snap-align:start;box-sizing:border-box;border-radius:18px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);box-shadow:var(--cfx-sombra,none);padding:12px 14px;transition:transform .2s cubic-bezier(.2,.8,.2,1)}' +
+    '@media(min-width:700px){.cfx-srv-c{flex-basis:calc(50% - 10px)}}' +
+    '.cfx-srv-cab{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:0;border:0;background:none;color:inherit;font:700 15px/1.2 var(--cfx-letra,system-ui,sans-serif);cursor:pointer;text-align:left}.cfx-srv-cab b{flex:1;min-width:0}' +
+    '.cfx-srv-cab svg{flex:none;transition:transform .22s cubic-bezier(.2,.8,.2,1);opacity:.6}.cfx-srv.abierto .cfx-srv-cab svg{transform:rotate(180deg)}' +
+    '.cfx-srv-pt{width:10px;height:10px;border-radius:50%;flex:none;background:#94a3b8}.cfx-srv-c.ok .cfx-srv-pt{background:var(--cfx-ok,#16a34a);box-shadow:0 0 0 4px color-mix(in srgb,var(--cfx-ok,#16a34a) 20%,transparent)}.cfx-srv-c.warn .cfx-srv-pt{background:var(--cfx-aviso,#ea580c)}' +
+    '.cfx-srv-pc{font-size:13px;color:var(--cfx-texto-2,#5b6472)}.cfx-srv-barra{height:6px;border-radius:3px;background:var(--cfx-campo,#eef2f6);overflow:hidden;margin:8px 0 0}.cfx-srv-barra i{display:block;height:100%;width:0;border-radius:3px;background:var(--brand,var(--marca,#2563eb));transition:width .5s cubic-bezier(.2,.8,.2,1)}' +
+    '.cfx-srv-det{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s cubic-bezier(.2,.8,.2,1)}.cfx-srv-det>div{overflow:hidden;min-height:0}.cfx-srv.abierto .cfx-srv-det{grid-template-rows:1fr}' +
+    '.cfx-srv-det h4{margin:12px 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472)}.cfx-srv-res{margin:10px 0 0;font-size:13px;color:var(--cfx-texto-2,#5b6472)}' +
+    '.cfx-srv-f{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:4px 0;border-top:1px dashed var(--cfx-borde,#e2e7ec)}.cfx-srv-f span{min-width:0;overflow-wrap:anywhere}.cfx-srv-f small{color:var(--cfx-texto-2,#5b6472);flex:none}.cfx-srv-err{display:block;color:var(--cfx-aviso,#ea580c);font-size:12px;margin:2px 0 4px}' +
+    '.cfx-srv-puntos{display:flex;justify-content:center;gap:6px}.cfx-srv-puntos i{width:7px;height:7px;border-radius:4px;background:var(--cfx-borde,#d4dae1);cursor:pointer;transition:width .2s,background .2s}.cfx-srv-puntos i.on{width:18px;background:var(--brand,var(--marca,#2563eb))}' +
     '.cfx-x-oculta{display:none!important}.cfx-aviso-desl{touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;will-change:transform}.cfx-aviso-desl *{-webkit-user-drag:none}' +
     '@keyframes cfxPista{0%,100%{transform:none}35%{transform:translateX(-42px)}60%{transform:translateX(-42px)}}.cfx-pista{animation:cfxPista 1.1s cubic-bezier(.2,.8,.2,1)}' +
     '.cfx-emerg{position:fixed;inset:auto;width:auto;height:fit-content;box-sizing:border-box;top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;margin:0 auto;max-width:460px;z-index:2147483600;display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:18px;border:1px solid var(--cfx-borde,#e2e7ec);' +
@@ -173,32 +185,44 @@
     caja.querySelector('[data-salir]').onclick = salir;
   }
   function irA(dest) { cerrar(); if (typeof dest === 'function') return dest(); ir(dest); }
+  // La foto de arriba solo cierra sesión (en todas las apps). Lo demás (cuenta, guía, soporte, términos, plan, invitar)
+  // va en "Cuenta y ayuda", que el núcleo agrega al final de Más / Ajustes / Cuenta de cada app.
   function menu() {
-    // Sesión del administrador (no socios): solo "Cerrar sesión"; se cierra tocando afuera o con Esc.
-    const p = pend().length, adm = !!CFG.admin, solo = adm && !CFG.socio, op = (a, ico, t, extra) => '<button type="button" class="ca-op" data-a="' + a + '"><span>' + ico + '</span><b>' + t + '</b>' + (extra || '') + '</button>';
-    const caja = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || (CFG.admin ? 'Administrador' : CFG.email) || 'Mi cuenta') + '</b>' +
-      (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>' + (CFG.admin ? (CFG.socio ? 'Socio' : 'Administrador') : 'Plan ' + (esPro() ? 'PRO' : 'FREE')) + '</small></div></div><div class="ca-cuerpo">' + (solo ? op('salir', '🚪', 'Cerrar sesión') + '</div>' :
-      op('inicio', '🏠', 'Ir al inicio') +
-      (CFG.cuenta ? op('cuenta', '👤', 'Mi cuenta') : '') +
-      (CFG.panel ? op('panel', '🛡️', 'Panel de administración') : '') +
-      (pila().length > 1 ? op('atras', '⬅️', 'Volver a lo anterior') : '') +
-      (!adm && estado.items.length ? op('guia', '🧭', 'Guía para partir', p ? '<i>' + p + ' pendiente' + (p > 1 ? 's' : '') + '</i>' : '✅') : '') +
-      (!adm ? op('chat', '💬', 'Chat con soporte', estado.sin_leer ? '<i>' + estado.sin_leer + '</i>' : '') : '') +
-      op('terminos', '📄', 'Términos y condiciones') +
-      (!adm && window.CFX_PAGOS ? op('premium', '⭐', esPro() ? 'Mi plan PRO' : 'Pasar a PRO') : '') +
-      (!adm && !PERSONALES.includes(APP) ? op('invitar', '🎁', 'Invita y gana') : '') +
-      op('salir', '🚪', 'Cerrar sesión') +
-      '</div><div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>'));
-    caja.onclick = (ev) => {
-      const b = ev.target.closest('[data-a]'); if (!b) return;
-      const a = b.dataset.a;
-      if (a === 'inicio') return inicio();
-      if (a === 'cuenta' || a === 'panel') return irA(CFG[a]);
-      if (a === 'atras') { cerrar(); return history.back(); }
-      if (a === 'salir') return confirmarSalir();
-      if (a === 'invitar') return invitar();
-      if (a === 'guia') guia(); else if (a === 'chat') chat({ rpc: R }); else if (a === 'terminos') terminos(); else { cerrar(); window.CFX_PAGOS.abrir({ rpc: R }); }
-    };
+    dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || (CFG.admin ? 'Administrador' : CFG.email) || 'Mi cuenta') + '</b>' +
+      (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>' + (CFG.admin ? (CFG.socio ? 'Socio' : 'Administrador') : 'Plan ' + (esPro() ? 'PRO' : 'FREE')) + '</small></div></div>' +
+      '<div class="ca-cuerpo"><button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button></div>').onclick = (ev) => { if (ev.target.closest('[data-a=salir]')) confirmarSalir(); };
+  }
+  function accion(a) {
+    if (a === 'cuenta' || a === 'panel') return irA(CFG[a]);
+    if (a === 'invitar') return invitar();
+    if (a === 'guia') return guia();
+    if (a === 'chat') return chat({ rpc: R });
+    if (a === 'terminos') return terminos();
+    if (a === 'premium' && window.CFX_PAGOS) return window.CFX_PAGOS.abrir({ rpc: R });
+  }
+  function cuentaEnMas() {
+    if (!R || (CFG.admin && !CFG.socio)) return;
+    const on = document.querySelector('nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current]');
+    const MAS = /^(más|mas|ajustes|cuenta|perfil)$/i;
+    if (!(on && MAS.test((on.getAttribute('aria-label') || on.textContent || '').replace(/[0-9+]/g, '').trim())) && !MAS.test(location.hash.replace(/^#\/?/, '').split(/[/?]/)[0])) return;
+    const vis = (x) => x.offsetParent && !x.closest('.cfx-cuenta-g, dialog, .cfx-oc, [hidden]');
+    const gs = [...document.querySelectorAll('.cfx-grilla')].filter(vis);
+    const ancla = gs[gs.length - 1] || [...document.querySelectorAll('.view.on, .vista.on, section.on, main')].find(vis);
+    if (!ancla) return;
+    const caja = gs.length ? ancla.parentElement : ancla;
+    if ([...caja.querySelectorAll(':scope > .cfx-cuenta-g')].length) return;
+    const p = pend().length, adm = !!CFG.admin;
+    const t = (a, ico, tx, extra) => '<button type="button" data-cfx-a="' + a + '"><span class="ic-caja">' + ico + '</span>' + tx + (extra || '') + '</button>';
+    const d = document.createElement('div'); d.className = 'cfx-cuenta-g';
+    d.innerHTML = '<div class="cfx-cg-t">Cuenta y ayuda</div><div class="cfx-grilla">' +
+      (CFG.cuenta ? t('cuenta', '👤', 'Mi cuenta') : '') + (CFG.panel ? t('panel', '🛡️', 'Panel de administración') : '') +
+      (!adm && estado.items.length ? t('guia', '🧭', 'Guía para partir', p ? '<i class="badge on">' + p + '</i>' : '') : '') +
+      (!adm ? t('chat', '💬', 'Chat con soporte', estado.sin_leer ? '<i class="badge on">' + estado.sin_leer + '</i>' : '') : '') +
+      t('terminos', '📄', 'Términos y condiciones') +
+      (!adm && window.CFX_PAGOS ? t('premium', '⭐', esPro() ? 'Mi plan PRO' : 'Pasar a PRO') : '') +
+      (!adm && !PERSONALES.includes(APP) ? t('invitar', '🎁', 'Invita y gana') : '') + '</div>';
+    d.onclick = (ev) => { const b = ev.target.closest('[data-cfx-a]'); if (b) accion(b.dataset.cfxA); };
+    if (gs.length) ancla.after(d); else ancla.appendChild(d);
   }
 
   // ---------- Ajustes en cuadrícula (igual en las 6 apps; cada app entrega SU lista) ----------
@@ -623,10 +647,47 @@
       };
     });
   }
+  // ---------- Servidores en carrusel (Centro de Mando): una tarjeta por app, de lado, con el detalle que se despliega ----------
+  // CFX_SERVIDORES.montar(el, [{ nombre, cargar: () => Promise<cfx_servidor()> }]). Abierto/cerrado vale para todas:
+  // si deslizas con el detalle abierto, la siguiente ya viene abierta; si lo cierras, siguen chicas.
+  function servidores(el, L) {
+    const MB = (b) => (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
+    const hace = (f) => { if (!f) return 'nunca'; const m = Math.round((Date.now() - new Date(f)) / 60000); return m < 1 ? 'recién' : m < 60 ? 'hace ' + m + ' min' : m < 1440 ? 'hace ' + Math.round(m / 60) + ' h' : 'hace ' + Math.round(m / 1440) + ' d'; };
+    let abierto = false;
+    try { abierto = localStorage.getItem('cfx-srv-abierto') === '1'; } catch (e) { /* nada */ }
+    el.innerHTML = '<div class="cfx-srv' + (abierto ? ' abierto' : '') + '"><div class="cfx-srv-pista">' + L.map((x, i) => '<div class="cfx-srv-c" data-i="' + i + '"><button type="button" class="cfx-srv-cab"><span class="cfx-srv-pt"></span><b></b><span class="cfx-srv-pc">…</span>' + CHEV + '</button>' +
+      '<div class="cfx-srv-barra"><i></i></div><div class="cfx-srv-det"><div><p class="cfx-srv-res">Revisando…</p></div></div></div>').join('') + '</div><div class="cfx-srv-puntos">' + L.map((x, i) => '<i data-i="' + i + '"></i>').join('') + '</div></div>';
+    const raiz = el.firstChild, pista = raiz.firstChild, puntos = [...raiz.querySelectorAll('.cfx-srv-puntos i')];
+    L.forEach((x, i) => {
+      const c = pista.children[i]; c.querySelector('b').textContent = x.nombre;
+      Promise.resolve().then(x.cargar).then((u) => {
+        const pc = Math.min(100, Math.round(u.db_bytes / u.limite_bytes * 100)), push = (u.tareas || []).filter((t) => /push|enviar/i.test(t.nombre));
+        const mal = push.some((t) => !t.activa || t.ok === false) || (u.tareas && u.tareas.length && !push.length);
+        c.classList.add(pc > 80 || mal ? 'warn' : 'ok');
+        c.querySelector('.cfx-srv-pc').textContent = pc + '%';
+        c.querySelector('.cfx-srv-barra i').style.width = Math.max(2, pc) + '%';
+        c.querySelector('.cfx-srv-det > div').innerHTML = '<p class="cfx-srv-res">' + MB(u.db_bytes) + ' de ' + MB(u.limite_bytes) + ' · ' + u.cuentas + ' cuentas</p>' +
+          '<h4>Tareas automáticas</h4>' + ((u.tareas || []).length ? u.tareas.map((t) => '<div class="cfx-srv-f"><span>' + (t.activa && t.ok !== false ? '✅' : '⚠️') + ' ' + esc(t.nombre) + '</span><small>' + esc(t.activa ? hace(t.ultima) : 'pausada') + '</small></div>' +
+            (t.ok === false && t.error ? '<small class="cfx-srv-err">' + esc(t.error) + '</small>' : '')).join('') : '<p class="cfx-srv-res">Sin tareas automáticas.</p>') +
+          (u.tareas && !push.length ? '<small class="cfx-srv-err">No hay tarea de envío push: las notificaciones no salen al teléfono.</small>' : '') +
+          '<h4>Lo que más pesa</h4>' + (u.tablas || []).map((t) => '<div class="cfx-srv-f"><span>' + esc(t.tabla) + '</span><small>' + MB(t.bytes) + ' · ' + t.filas + ' filas</small></div>').join('');
+      }).catch((e) => {
+        c.classList.add('warn'); c.querySelector('.cfx-srv-pc').textContent = '—';
+        c.querySelector('.cfx-srv-det > div').innerHTML = '<p class="cfx-srv-res">' + esc(/cfx_servidor|PGRST202|does not exist|Could not find/i.test((e && e.message) || '') ? 'Su base se está actualizando (máx. 10 min).' : (e && e.message) || 'Sin conexión') + '</p>';
+      });
+    });
+    raiz.addEventListener('click', (ev) => {
+      if (ev.target.closest('.cfx-srv-cab')) { abierto = !abierto; raiz.classList.toggle('abierto', abierto); try { localStorage.setItem('cfx-srv-abierto', abierto ? '1' : '0'); } catch (e) { /* nada */ } return; }
+      const d = ev.target.closest('.cfx-srv-puntos i'); if (d) pista.children[+d.dataset.i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    });
+    const marcar = () => { const i = Math.round(pista.scrollLeft / Math.max(1, pista.children[0].offsetWidth + 10)); puntos.forEach((p, j) => p.classList.toggle('on', j === i)); };
+    pista.addEventListener('scroll', () => requestAnimationFrame(marcar), { passive: true }); marcar();
+  }
+  window.CFX_SERVIDORES = { montar: servidores };
   window.CFX_ANIM = { emergente, salirTodos, deslizar: avisosDeslizar };
 
   let tTiras = 0;
-  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { tiras(); avisosDeslizar(); selAccion(); }, 120); };
+  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); }, 120); };
   new MutationObserver(pedirTiras).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('resize', pedirTiras); addEventListener('hashchange', pedirTiras); pedirTiras();
 

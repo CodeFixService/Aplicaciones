@@ -4679,7 +4679,7 @@ grant execute on function public.marca_publica() to anon, authenticated;
 --  · Funciones comunes cfx_* para el Centro de Mando (respaldo, limpieza e inventario).
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.13'::text $$;
+language sql immutable as $$ select '5.14'::text $$;
 
 alter table public.notification_reads add column if not exists oculto boolean not null default false;
 alter table public.profiles add column if not exists aviso_limpieza_at timestamptz;
@@ -5586,6 +5586,27 @@ begin
       'pagos', (select count(*) from public.cfx_pagos p where p.estado = 'aprobado' and p.creado >= m and p.creado < m + interval '1 month'),
       'ingresos', (select coalesce(sum(p.monto), 0) from public.cfx_pagos p where p.estado = 'aprobado' and p.creado >= m and p.creado < m + interval '1 month')) order by m)
     from generate_series(date_trunc('month', now()) - make_interval(months => n - 1), date_trunc('month', now()), interval '1 month') m);
+end $$;
+
+-- ---------- Servidor (igual en las 7 apps): uso de la base, cuentas, tablas más pesadas y tareas automáticas ----------
+-- El Centro de Mando lo muestra en el carrusel de servidores. "tareas" sirve para ver si el envío de push está corriendo.
+create or replace function public.cfx_servidor() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare t jsonb := '[]'; tb jsonb;
+begin
+  perform public.cfx_es_admin();
+  select coalesce(jsonb_agg(x), '[]') into tb from (
+    select jsonb_build_object('tabla', c.relname, 'bytes', pg_total_relation_size(c.oid), 'filas', greatest(c.reltuples, 0)::bigint) x
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' order by pg_total_relation_size(c.oid) desc limit 6) q;
+  begin
+    execute $q$ select coalesce(jsonb_agg(jsonb_build_object('nombre', j.jobname, 'activa', j.active, 'cada', j.schedule,
+        'ultima', r.end_time, 'ok', r.status = 'succeeded', 'error', left(r.return_message, 160)) order by j.jobname), '[]')
+      from cron.job j left join lateral (select end_time, status, return_message from cron.job_run_details d where d.jobid = j.jobid order by d.runid desc limit 1) r on true $q$ into t;
+  exception when others then t := '[]';
+  end;
+  return jsonb_build_object('db_bytes', pg_database_size(current_database()), 'limite_bytes', 500 * 1024 * 1024,
+    'cuentas', (select count(*) from auth.users), 'tablas', tb, 'tareas', t, 'hora', now());
 end $$;
 -- ---------------------------------------------------------------------
 -- CodeFix · Ayuda (igual en las 6 apps; lo reparte nucleo/sincronizar.py).
