@@ -19,9 +19,13 @@
     let t = 0;
     try { t = Number(sessionStorage.getItem(K + version)) || 0; } catch (e) { /* sin storage */ }
     if (Date.now() - t < 10 * 60 * 1000) return; // ya se intentó hace poco
+    // Sin bucle: como máximo 2 intentos por versión cada 30 minutos (si el hosting aún no la termina de publicar, se espera).
+    let I = [];
+    try { I = JSON.parse(localStorage.getItem(K + 'n:' + version) || '[]').filter((x) => Date.now() - x < 30 * 60 * 1000); } catch (e) { I = []; }
+    if (I.length >= 2) return;
     const correr = () => {
       if (ocupado()) { setTimeout(correr, 4000); return; }
-      try { sessionStorage.setItem(K + version, String(Date.now())); sessionStorage.setItem(LISTA, version); } catch (e) { /* sin storage */ }
+      try { sessionStorage.setItem(K + version, String(Date.now())); sessionStorage.setItem(LISTA, version); I.push(Date.now()); localStorage.setItem(K + 'n:' + version, JSON.stringify(I)); } catch (e) { /* sin storage */ }
       aviso('Actualizando a la v' + version + '…');
       try { actualizar(); } catch (e) { /* se reintenta después */ }
     };
