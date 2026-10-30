@@ -246,3 +246,7 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
 @keyframes cfxZoom { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes cfxFundido { from { opacity: 0; } to { opacity: 1; } }
 @keyframes cfxPop { 0% { transform: scale(.85); } 60% { transform: scale(1.08); } 100% { transform: none; } }
+
+/* El + del centro nunca muestra texto (tampoco mientras la barra se arma): solo el signo; el nombre queda para lectores de pantalla. */
+nav :is(.cfx-mas, .nuevo, .nav-mas, .mas-grande, [data-cfx-nuevo]) { font-size: 0 !important; }
+nav :is(.cfx-mas, .nuevo, .nav-mas, .mas-grande, [data-cfx-nuevo]) :is(small, .t, .txt, .label) { display: none !important; }

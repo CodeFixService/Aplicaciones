@@ -75,6 +75,8 @@
       if (i) { i.innerHTML = svg('mas'); i.classList.add('cfx-ico'); }
       else { const sv = mas.querySelector(':scope > svg'); if (sv) sv.remove(); mas.insertAdjacentHTML('afterbegin', '<span class="cfx-ico">' + svg('mas') + '</span>'); }
       if (!mas.getAttribute('aria-label')) mas.setAttribute('aria-label', (mas.textContent || 'Nuevo').trim());
+      // Solo el signo +: se quita el texto suelto y las etiquetas (el nombre queda en aria-label).
+      [...mas.childNodes].forEach((n) => { if (n.nodeType === 3 && n.data.trim()) n.remove(); else if (n.nodeType === 1 && n.matches('small, .t, .txt, .label')) n.remove(); });
     }
     // Orden: el indicado, o el de la app con el + al centro y "Más" al final.
     const kMas = cfg.mas || (botones.find((b) => /^(mas|ajustes|perfil|cuenta)$/.test(clave(b)) && b !== mas) ? clave(botones.find((b) => /^(mas|ajustes|perfil|cuenta)$/.test(clave(b)) && b !== mas)) : '');
