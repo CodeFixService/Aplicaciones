@@ -194,13 +194,14 @@
         <button class="alt small hidden" id="bLimpiarAvisos" style="flex:none">🧹 Limpiar</button></div>
       <ul class="list inbox" id="inbox"></ul>
     </div>
+    <!-- Cliente: su pestaña Cuenta lleva el menú común (perfil, plan, ofertas y Cuenta y ayuda) -->
+    <div id="miPerfilCli"></div>
   </section>
 
   <!-- Con sesión: ajustes (todo lo de configuración en un solo lugar) -->
   <section id="v-ajustes" class="hidden">
     <!-- Perfil común del núcleo (ayuda.js → CFX_PERFIL), siempre arriba: foto y nombre, color y modo, avanzado y "Mi tienda" -->
     <div class="card" id="miPerfil"></div>
-    <div class="hidden" id="cMas"><div id="masL"></div></div>
 
     <div class="card hidden" id="cTienda">
       <h2>🏪 Mi tienda</h2>
@@ -292,12 +293,12 @@
       <div class="btns"><button class="alt" id="bRespaldo">⬇️ Descargar respaldo (Excel)</button></div>
     </div>
 
-    <div class="card">
+    <div class="card cfx-oc" id="cLegal">
       <h2>📄 Legal</h2>
       <p class="muted"><a href="apps/legal/">Términos de uso y política de privacidad</a></p>
     </div>
 
-    <div class="card danger-zone">
+    <div class="card danger-zone cfx-oc" id="cPeligro">
       <h2>⚠️ Zona peligrosa</h2>
       <div class="btns"><button class="alt" id="bSalir">Cerrar sesión</button></div>
       <details style="margin-top:14px">
@@ -330,11 +331,14 @@
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
   const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho)$/.test(location.hash);
+  let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo y #despacho abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
-    showView(enAjustes() ? 'v-ajustes' : 'v-home');
-    const ancla = /^#(plan|premium)$/.test(location.hash) ? 'cPlan' : /^#(avisos|links|equipo|despacho)$/.test(location.hash) ? location.hash.slice(1) : null;
-    if (ancla) setTimeout(() => $(ancla).scrollIntoView({ behavior: 'smooth' }), 250);
+    const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
+    showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho)$/.test(location.hash) ? location.hash.slice(1) : null;
+    if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
+    else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
   }
   addEventListener('hashchange', irAVista);
@@ -530,21 +534,34 @@
     $('hoy').classList.toggle('hidden', cliente);
     $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Órbita') : (acc.empresa || 'Órbita'));
     const dueno = acc.role === 'user';
-    ['cTienda', 'cLinks', 'cDespacho', 'cEquipo', 'cMas', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
+    ['cTienda', 'cLinks', 'cDespacho', 'cEquipo', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
     if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x)); }
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
     $('cMiCaja').classList.toggle('hidden', !cliente);
     if (cliente && !acc.is_pro) $('cMiCaja').href = '#plan';
-    if (dueno) pintarMas();
 
 
     $('inboxTitulo').textContent = '🔔 Avisos';
-    // Perfil común (núcleo; cómo guarda Órbita: shared/cuenta.js) + la sección Mi tienda.
-    if (window.CFX_PERFIL && !$('miPerfil').dataset.pf) {
-      $('miPerfil').dataset.pf = '1';
-      window.CFX_PERFIL.montar($('miPerfil'), { alGuardar: () => pintar(Cuenta.account), mejorar: () => { Core.toast('⭐ Elegir colores e ícono es de Premium'); $('cPro').scrollIntoView({ behavior: 'smooth' }); },
-        secciones: dueno ? [{ k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario y pagos', nodo: $('cTienda') }] : [] });
+    // Menú Más común del núcleo (CFX_MENU; cómo guarda el perfil: shared/cuenta.js). Cada tarjeta de abajo se abre en su hoja.
+    const caja = cliente ? $('miPerfilCli') : $('miPerfil');
+    if (window.CFX_MENU && !caja.dataset.pf) {
+      caja.dataset.pf = '1'; caja.classList.remove('card');
+      const ir = (u) => ({ ir: u }), equipo = acc.role === 'equipo';
+      const L = [
+        ...(dueno ? [['apps/caja/#productos', 'bolsa', 'Productos, fotos y stock'], ['apps/fichas/#clientes', 'usuarios', 'Clientes'], ['apps/pedidos/?v=cupones', 'ticket', 'Promociones: cupones y sellos'],
+          ['apps/pedidos/?v=stats', 'grafico', 'Estadísticas'], ['apps/catalogo/?v=ofertas', 'ojo', 'Ver mi tienda como cliente'], ['apps/mensajes/', 'chat', 'Mensajes']]
+          .map(([u, i, t]) => Object.assign({ k: 'n-' + i, ico: Core.ico(i), t, grupo: 'Tu negocio' }, ir(u))) : []),
+        dueno && { k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario y pagos', grupo: 'Tu tienda', nodo: $('cTienda') },
+        dueno && { k: 'links', ico: '💳', t: 'Links de pago', grupo: 'Tu tienda', nodo: $('cLinks') },
+        dueno && { k: 'despacho', ico: '🚚', t: 'Despacho', grupo: 'Tu tienda', nodo: $('cDespacho') },
+        dueno && { k: 'equipo', ico: '🧑‍🍳', t: 'Mi equipo', dato: acc.is_pro ? '' : 'PRO', grupo: 'Tu tienda', nodo: $('cEquipo') },
+        !equipo && { k: 'premium', ico: '⭐', t: 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
+        cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
+        dueno && { k: 'respaldo', ico: '💾', t: 'Respaldo de mi tienda', d: 'Excel con todo', grupo: 'Configuración', nodo: $('cRespaldo') }
+      ];
+      MENU_O = window.CFX_MENU.montar(caja, L, { perfil: { alGuardar: () => pintar(Cuenta.account), mejorar: () => { Core.toast('⭐ Elegir colores e ícono es de Premium'); MENU_O.abrir('premium'); } } });
+      if (enAjustes()) irAVista();
     }
     $('cTienda').classList.toggle('hidden', cliente);
     $('eTel').value = acc.telefono || '';
@@ -588,16 +605,6 @@
     if (plan && plan.beneficios && plan.beneficios.length) $('proFeat').innerHTML = plan.beneficios.map((t) => '<li>' + Core.esc(t) + '</li>').join('');
   }
 
-  /* ---------- Más (negocio): todo agrupado ---------- */
-  function pintarMas() {
-    const G = [['Tu negocio', [['apps/caja/#productos', 'bolsa', 'Productos, fotos y stock'], ['apps/fichas/#clientes', 'usuarios', 'Clientes'],
-      ['apps/pedidos/?v=cupones', 'ticket', 'Promociones: cupones y sellos'], ['apps/pedidos/?v=stats', 'grafico', 'Estadísticas'],
-      ['apps/catalogo/?v=ofertas', 'ojo', 'Ver mi tienda como cliente'], ['apps/mensajes/', 'chat', 'Mensajes']]],
-      ['Cobros y equipo', [['#links', 'tarjeta', 'Links de pago'], ['#equipo', 'contactos', 'Mi equipo'], ['#plan', 'estrella', 'Mi plan']]]];
-    $('masL').innerHTML = G.map(([t, L]) => '<div class="sec">' + t + '</div><div class="lista"><ul class="list cfx-grilla">' + L.map(([u, i, x]) =>
-      '<li><a class="mini" href="' + u + '" style="width:100%"><span class="ic-caja">' + Core.ico(i) + '</span><span class="grow">' + x + '</span><span class="muted">›</span></a></li>').join('') + '</ul></div>').join('') +
-      '<div class="sec">Configuración</div>';
-  }
 
   /* ---------- Hoy (negocio y equipo) ---------- */
   let hoyLink = '';

@@ -135,6 +135,15 @@
       if (account.role !== 'client') try { await rpc('set_mi_color', { p_color: c }); } catch (err) { throw new Error('🎨 Tu app queda con este color. ' + err.message); }
     },
     clave: (n) => setPassword(n),
+    eliminarTexto: 'Se borran tu cuenta, tus mensajes y tus datos del servidor. No se puede deshacer.',
+    eliminar: async () => {
+      const v = prompt('Para borrar tu cuenta para siempre escribe ELIMINAR');
+      if (String(v || '').trim().toUpperCase() !== 'ELIMINAR') return;
+      const uid = account && account.id;
+      await rpc('delete_my_account'); await signOut();
+      try { Object.keys(localStorage).filter((k) => uid && k.includes(uid)).forEach((k) => localStorage.removeItem(k)); } catch (e) { /* nada */ }
+      location.replace(rootUrl());
+    },
     bloqueo: (que) => (que !== 'foto' && account && account.role === 'client' && !account.is_pro ? 'Elegir colores e ícono' : '')
   };
 

@@ -195,12 +195,7 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
   radial-gradient(800px 480px at 105% 0%, color-mix(in srgb, #8b5cf6 14%, transparent), transparent 70%); } }
 :root[data-theme="dark"] body, html.dark body, html.oscuro body { background-image: radial-gradient(900px 520px at 0% -10%, color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 18%, transparent), transparent 70%),
   radial-gradient(800px 480px at 105% 0%, color-mix(in srgb, #8b5cf6 14%, transparent), transparent 70%); }
-/* Al bajar, cada tarjeta entra suave (solo en navegadores que lo permiten; si no, se ve normal) */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button { animation: cfxEntra linear both; animation-timeline: view(); animation-range: entry 0% entry 40%; }
-  }
-}
+/* Las tarjetas ya NO se animan al bajar ni al volver a una pantalla: la página queda quieta (antes parecía que se recargaba). */
 @keyframes cfxEntra { from { opacity: .25; translate: 0 14px; scale: .985; } to { opacity: 1; translate: none; scale: none; } }
 /* Listas que se apilan al bajar (núcleo: barra.js marca .cfx-apilar): cada tarjeta queda pegada arriba y la siguiente se pone encima */
 @media (max-width: 899px) {
@@ -218,15 +213,6 @@ body { background-image: radial-gradient(900px 480px at 0% -8%, color-mix(in srg
   :root { --cfx-ease: cubic-bezier(.2, .8, .2, 1); }
   /* Cambio de pantalla o pestaña: la sección entra suave */
   .view.on, .vista.on, section.on, [data-cfx-vista] { animation: cfxVista .2s var(--cfx-ease) both; }
-  /* Tarjetas: entran escalonadas al aparecer (en navegadores sin animación por scroll; con ella ya entran al bajar) */
-  @supports not (animation-timeline: view()) {
-    .card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button { animation: cfxEntra .24s var(--cfx-ease) both; }
-    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(2) { animation-delay: .03s; }
-    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(3) { animation-delay: .06s; }
-    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(4) { animation-delay: .09s; }
-    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(5) { animation-delay: .12s; }
-    :is(.card, .tarjeta, .cfx-grilla > a, .cfx-grilla > button):nth-child(n+6) { animation-delay: .15s; }
-  }
   /* Ventanas y hojas: suben desde abajo en celular, aparecen con zoom suave en escritorio */
   dialog[open] > *, .modal:not([hidden]) .modal-caja, .sheet, .hoja { animation: cfxSube .2s var(--cfx-ease) both; }
   dialog[open]::backdrop { animation: cfxFundido .18s ease both; }
