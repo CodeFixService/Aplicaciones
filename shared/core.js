@@ -36,8 +36,16 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
+  // Pesos chilenos: sin decimales y con punto de miles ($10.000).
   function money(n) {
-    return '$' + Number(n || 0).toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '$' + Math.round(Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
+  }
+
+  // "10.000", "$ 10.000", "10000" o "9,99" → número entero en pesos; NaN si no es un precio.
+  function precioNum(v) {
+    const t = String(v == null ? '' : v).trim();
+    if (!/^\$?\s*\d[\d.\s]*(,\d{1,2})?$/.test(t)) return NaN;
+    return Math.round(+t.replace(/,\d{1,2}$/, '').replace(/\D/g, ''));
   }
 
   function esc(s) {
@@ -323,7 +331,7 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.41';
+  const APP_VERSION = '5.42';
   const DB_VERSION = '5.15'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
@@ -347,7 +355,7 @@
 
   global.Core = {
     RUBROS,
-    store, uid, money, esc, toast, registerSW, askNotify, notify, download,
+    store, uid, money, precioNum, esc, toast, registerSW, askNotify, notify, download,
     backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };
 })(window);

@@ -23,7 +23,7 @@
 
   const DEFAULT = {
     plantilla: 'oferta', titulo: 'GRAN OFERTA', subtitulo: 'Solo por esta semana',
-    precio: '19.99', antes: '29.99', cta: '¡Pide ya por WhatsApp!',
+    precio: '10000', antes: '15000', cta: '¡Pide ya por WhatsApp!',
     color1: Core.tema.get(cuenta.id), color2: '#f59e0b', foto: null, lista: '', qr: false
   };
 
@@ -126,7 +126,7 @@
   }
 
   const font = (w, s) => w + ' ' + s + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  const fmtPrice = (p) => (p === '' || p == null) ? '' : (isNaN(+p) ? String(p) : Core.money(p));
+  const fmtPrice = (p) => (p === '' || p == null) ? '' : (isNaN(Core.precioNum(p)) ? String(p) : Core.money(Core.precioNum(p)));
 
   function priceBadge(f, cx, cy, r) {
     if (!f.precio) return;
@@ -485,7 +485,7 @@
   async function publicarFicha(f) {
     if (!f) return;
     const tipo = TEMPLATES[f.plantilla] && (licensed() || FREE_TEMPLATES.includes(f.plantilla)) ? f.plantilla : 'oferta';
-    const pn = parseFloat(String(f.precio || '').replace(/[^\d.,]/g, '').replace(',', '.'));
+    const pn = Core.precioNum(f.precio);
     await Cuenta.rpc('publicar_ficha', {
       p_key: f.id, p_titulo: f.titulo || 'Ficha', p_detalle: f.subtitulo || '',
       p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 432), // ~35 KB: rápida y liviana

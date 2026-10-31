@@ -10,6 +10,7 @@
 <link rel="icon" href="../../icons/icon-192.png">
 <link rel="stylesheet" href="../../shared/core.css">
 <link rel="stylesheet" href="../../shared/tema.css">
+<script src="../../shared/carga.js"></script>
 <script src="../../shared/humano.js"></script>
 <script src="../../shared/core.js"></script>
 <style>
@@ -110,8 +111,8 @@
       <label>Título</label><input id="f-titulo" maxlength="60">
       <label>Subtítulo</label><input id="f-subtitulo" maxlength="90">
       <div class="row">
-        <div><label>Precio</label><input id="f-precio" inputmode="decimal" placeholder="19.99"></div>
-        <div><label>Precio antes</label><input id="f-antes" inputmode="decimal" placeholder="29.99"></div>
+        <div><label>Precio</label><input id="f-precio" inputmode="numeric" placeholder="10.000"></div>
+        <div><label>Precio antes</label><input id="f-antes" inputmode="numeric" placeholder="15.000"></div>
       </div>
       <div id="rowLista" class="hidden">
         <label>Productos y precios (uno por línea: <i>Producto = precio</i>)</label>

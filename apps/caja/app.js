@@ -23,7 +23,7 @@
   const soloPro = (que) => Core.toast('⭐ ' + que + ' es de la versión Pro');
 
   // Montos en pesos: sin decimales cuando son enteros.
-  const money = (n) => '$' + Number(n || 0).toLocaleString('es-CL', { maximumFractionDigits: 2 });
+  const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
   // "1.500" = mil quinientos (punto de miles); "2,5" o "2.5" = dos coma cinco.
   const num = (v) => {
     let t = String(v == null ? '' : v).trim().replace(/[$\s]/g, '');
