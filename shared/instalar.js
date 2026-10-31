@@ -163,7 +163,9 @@
     obligar = true;
     pedirAvisos(ad);
   }
-  window.CodeFixInstalar = { revisar, cerrar };
+  // Para el perfil común (ayuda.js): estado y activar las notificaciones con el adaptador de cada app.
+  const activarPush = async () => { const ad = adaptador(); if (!ad || !pushPosible()) throw new Error('Este navegador no permite notificaciones'); await ad.activar(); };
+  window.CodeFixInstalar = { revisar, cerrar, pushActiva, activarPush };
   const iniciar = () => { setTimeout(revisar, ESPERA); setInterval(revisar, 60 * 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(revisar, 1200); }); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();

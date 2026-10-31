@@ -99,7 +99,20 @@
     '.cfx-ayuda .ca-msjs{display:flex;flex-direction:column;gap:6px;padding:6px 0}.cfx-ayuda .ca-m{max-width:82%;padding:8px 11px;border-radius:14px;font-size:14px;line-height:1.35;white-space:pre-wrap;word-break:break-word}' +
     '.cfx-ayuda .ca-m.yo{align-self:flex-end;background:var(--ca-color);color:#fff;border-bottom-right-radius:4px}.cfx-ayuda .ca-m.el{align-self:flex-start;background:var(--cfx-campo,#eef2f6);border-bottom-left-radius:4px}' +
     '.cfx-ayuda .ca-m small{display:block;opacity:.7;font-size:11px;margin-top:2px}.cfx-ayuda .ca-escribir{display:flex;gap:8px;padding-top:8px}.cfx-ayuda textarea{flex:1;min-height:44px;max-height:120px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;padding:10px 12px;resize:none;box-sizing:border-box}' +
-    '.cfx-ayuda .ca-pie{display:flex;gap:8px;margin-top:10px}.cfx-ayuda .ca-pie button{flex:1}';
+    '.cfx-ayuda .ca-pie{display:flex;gap:8px;margin-top:10px}.cfx-ayuda .ca-pie button{flex:1}' +
+    // Perfil común (CFX_PERFIL)
+    '.cfx-pf{display:flex;flex-direction:column;gap:10px}.cfx-pf label{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:14px;margin:0}.cfx-pf input:not([type=color]),.cfx-pf textarea{width:100%;box-sizing:border-box;margin:0}' +
+    '.cfx-pf-fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.cfx-pf-fila>span:first-child{flex:1;min-width:0}.cfx-pf-btns{display:flex;gap:8px;flex-wrap:wrap}.cfx-pf-btns button{min-height:40px}' +
+    '.cfx-pf-av{width:64px;height:64px;font-size:22px;font-weight:800;border-radius:50%;flex:none;display:grid;place-items:center;overflow:hidden;background:var(--brand,var(--marca,#2563eb));color:var(--brand-ink,#fff)}' +
+    '.cfx-pf-av img{width:100%;height:100%;object-fit:cover;display:block}.cfx-pf-yo .cfx-pf-av{width:52px;height:52px;font-size:18px}.cfx-pf-av b{font-size:1.3em;line-height:1}' +
+    '.cfx-pf-icos,.cfx-pf-cols,.cfx-pf-modos{display:flex;flex-wrap:wrap;gap:8px}.cfx-pf-icos button{width:44px;height:44px;min-height:0;padding:0;font-size:22px;border-radius:12px}.cfx-pf-icos button.on{outline:3px solid var(--brand,#2563eb);outline-offset:1px}' +
+    '.cfx-pf-cols button{width:38px;height:38px;min-height:0;padding:0;border-radius:50%;border:2px solid var(--cfx-tarjeta,#fff);box-shadow:0 0 0 1px var(--cfx-borde,#e2e7ec)}.cfx-pf-cols button.on{box-shadow:0 0 0 3px var(--cfx-texto,#111827)}.cfx-pf-cols button.cfx-pf-lock{opacity:.45}' +
+    '.cfx-pf-libre{flex-direction:row!important;align-items:center}.cfx-pf-libre input{width:52px;height:40px;padding:0;border:0;background:none;flex:none}.cfx-pf-libre i{font-style:normal}' +
+    '.cfx-pf-modos button{flex:1;min-width:96px}.cfx-pf-modos button.on,.cfx-pf-si{background:var(--brand,#2563eb)!important;color:var(--brand-ink,#fff)!important;border-color:transparent!important}' +
+    '.cfx-pf-caja{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--cfx-borde,#e2e7ec);border-radius:14px}.cfx-pf-caja small{color:var(--cfx-texto-2,#5b6472)}.cfx-pf-peligro button{color:var(--cfx-mal,#dc2626)}' +
+    '.cfx-pf-yo{display:flex;align-items:center;gap:12px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--cfx-borde,#e2e7ec)}.cfx-pf-yo>div{min-width:0;flex:1}' +
+    '.cfx-pf-yo b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-pf-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}' +
+    '.cfx-ayuda .cfx-pf-d{min-height:200px}';
   document.head.appendChild(css);
 
   let R = null, APP = '', estado = { items: [], sin_leer: 0 }, boya = null, abierta = null;
@@ -193,7 +206,8 @@
   function menu() {
     dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || (CFG.admin ? 'Administrador' : CFG.email) || 'Mi cuenta') + '</b>' +
       (CFG.email && (CFG.nombre || CFG.admin) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small>' + (CFG.admin ? (CFG.socio ? 'Socio' : 'Administrador') : 'Plan ' + (esPro() ? 'PRO' : 'FREE')) + '</small></div></div>' +
-      '<div class="ca-cuerpo"><button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button></div>').onclick = (ev) => { if (ev.target.closest('[data-a=salir]')) confirmarSalir(); };
+      '<div class="ca-cuerpo">' + (R ? '<button type="button" class="ca-op" data-a="perfil"><span>👤</span><b>Mi perfil</b></button>' : '') +
+      '<button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button></div>').onclick = (ev) => { if (ev.target.closest('[data-a=salir]')) confirmarSalir(); if (ev.target.closest('[data-a=perfil]')) abrirPerfil(); };
   }
   function accion(a) {
     if (a === 'cuenta' || a === 'panel') return irA(CFG[a]);
@@ -449,6 +463,7 @@
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
     Object.assign(CFG, o);
+    if (!CFG.foto && !(window.CFX_PERFIL_APP || {}).foto) CFG.foto = lsL(fotoKey()) || null;  // foto guardada por BASE (este celular)
     try { if (!sessionStorage.getItem('cfx-inicio')) sessionStorage.setItem('cfx-inicio', location.pathname + location.search); } catch (e) { /* nada */ }
     if (window.CFX_PREMIUM && 'premium' in o) window.CFX_PREMIUM.marcar({ premium: !CFG.admin && !!CFG.premium, id: CFG.id, hasta: CFG.hasta, beneficios: CFG.beneficios });
     pintarBoya();
@@ -664,7 +679,7 @@
     L.forEach((x, i) => {
       const c = pista.children[i]; c.querySelector('b').textContent = x.nombre;
       Promise.resolve().then(x.cargar).then((u) => {
-        const pc = Math.min(100, Math.round(u.db_bytes / u.limite_bytes * 100)), push = (u.tareas || []).filter((t) => /push|enviar/i.test(t.nombre));
+        const pc = Math.min(100, Math.round(u.db_bytes / u.limite_bytes * 100)), push = (u.tareas || []).filter((t) => /push|enviar|cola/i.test(t.nombre));
         const mal = push.some((t) => !t.activa || t.ok === false) || (u.tareas && u.tareas.length && !push.length);
         c.classList.add(pc > 80 || mal ? 'warn' : 'ok');
         c.querySelector('.cfx-srv-pc').textContent = pc + '%';
@@ -693,6 +708,158 @@
   const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); }, 120); };
   new MutationObserver(pedirTiras).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('resize', pedirTiras); addEventListener('hashchange', pedirTiras); pedirTiras();
+
+  // ---------- Perfil común (igual en las 7 apps): foto y nombre · color y modo · avanzado (+ secciones propias) ----------
+  // La app solo entrega cómo guarda (adaptador), igual que CFX_AJUSTES: window.CFX_PERFIL_APP = { guardar, clave, eliminar, … }.
+  // Lo que la app no entrega lo pone BASE (este celular): foto local, color, modo, notificaciones (instalar.js).
+  // Adaptador (todo opcional):
+  //   nombre(), tituloNombre(), nombreFijo (texto: no se edita aquí), correo(), sub() · foto() (url o promesa) · guardarFoto(File | '' = quitar) · iconos [] · icono() · campos [{ k, t, v, tipo, ph, max }]
+  //   guardar({ nombre, icono, ...campos }) (sin guardar: el nombre no se edita) · colores [hex | [nombre, hex]] · color() · guardarColor(c) · probarColor(c) · libre (color a gusto)
+  //   modo() 'auto'|'claro'|'oscuro' · guardarModo(m) · pushActiva() · activarPush() · desactivarPush() · clave(nueva) · eliminar() (pide su propia confirmación) · puedeEliminar()
+  //   bloqueo(que, valor) → texto si es Premium ('foto', 'icono', 'color', 'libre') · mejorar(texto) · arriba (html) · secciones [{ k, ico, t, d, abrir(zona) }]
+  //   alGuardar() → después de cada cambio (p. ej. refrescar la cuenta)
+  const PF = 'cfx-pf:';
+  const lsL = (k) => { try { return localStorage.getItem(PF + k) || ''; } catch (e) { return ''; } };
+  const lsG = (k, v) => { try { if (v) localStorage.setItem(PF + k, v); else localStorage.removeItem(PF + k); } catch (e) { /* lleno */ } };
+  const HEX = /^#[0-9a-f]{6}$/i;
+  function pintarModo(m) { const r = document.documentElement; if (m === 'claro' || m === 'oscuro') r.dataset.theme = m === 'claro' ? 'light' : 'dark'; else delete r.dataset.theme; }
+  function pintarColor(c) {
+    if (!HEX.test(c || '')) return;
+    const n = parseInt(c.slice(1), 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255, r = document.documentElement.style;
+    r.setProperty('--brand', c); r.setProperty('--marca', c); r.setProperty('--brand-ink', l > 0.62 ? '#0f172a' : '#ffffff');
+    const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = c;
+  }
+  // Lo guardado por BASE se aplica apenas carga (solo existe en las apps que usan BASE).
+  if (lsL('modo')) pintarModo(lsL('modo'));
+  if (lsL('color')) pintarColor(lsL('color'));
+  const fotoKey = () => 'foto:' + (CFG.id || CFG.email || '');
+  function achicar(f, lado) {
+    return new Promise((ok, mal) => {
+      const img = new Image(); img.onerror = () => mal(new Error('No se pudo leer la imagen'));
+      img.onload = () => { const s = Math.min(1, lado / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(img.src); ok(c.toDataURL('image/jpeg', 0.8)); };
+      img.src = URL.createObjectURL(f);
+    });
+  }
+  const INST = () => window.CodeFixInstalar || {};
+  const BASE = {
+    nombre: () => CFG.nombre || '', correo: () => CFG.email || '', sub: () => (CFG.admin ? (CFG.socio ? 'Socio' : 'Administrador') : 'Plan ' + (esPro() ? 'PRO' : 'FREE')),
+    foto: () => lsL(fotoKey()) || CFG.foto || '',
+    guardarFoto: async (f) => { lsG(fotoKey(), f ? await achicar(f, (window.CFX_FOTO && window.CFX_FOTO.perfil.lado) || 400) : ''); },
+    colores: ['#2563eb', '#4f46e5', '#7c3aed', '#db2777', '#dc2626', '#ea580c', '#d97706', '#16a34a', '#059669', '#0891b2', '#334155', '#111827'],
+    color: () => lsL('color') || getComputedStyle(document.documentElement).getPropertyValue('--brand').trim(),
+    guardarColor: (c) => { lsG('color', c); pintarColor(c); }, probarColor: pintarColor, libre: true,
+    modo: () => lsL('modo') || 'auto', guardarModo: (m) => { lsG('modo', m === 'auto' ? '' : m); pintarModo(m); },
+    pushActiva: () => (INST().pushActiva ? INST().pushActiva() : Promise.resolve(false)),
+    activarPush: () => { if (!INST().activarPush) throw new Error('Este navegador no permite notificaciones'); return INST().activarPush(); },
+    bloqueo: () => '', mejorar: (t) => { aviso('⭐ ' + t + ' es Premium'); if (window.CFX_PAGOS && R) window.CFX_PAGOS.abrir({ rpc: R }); }
+  };
+  // Herencia: lo que la app define (también lo heredado de su adaptador base: { __proto__: base, … }) reemplaza a BASE; lo demás queda de BASE.
+  // Página sin adaptador (p. ej. un panel): solo foto, notificaciones y lo de este celular; el nombre no se edita.
+  const SOLO_BASE = { guardar: null, guardarColor: null, guardarModo: null };
+  const perfilApp = () => { const A = window.CFX_PERFIL_APP || SOLO_BASE, P = Object.assign({}, BASE); for (const k in A) P[k] = A[k]; return P; };
+  const valor = (x) => (typeof x === 'function' ? x() : x);
+  const errTxt = (e) => (e && (e.message || e.error_description)) || String(e || 'Error');
+  const MODOS = [['auto', '📱 Automático'], ['claro', '☀️ Claro'], ['oscuro', '🌙 Oscuro']];
+
+  function perfil(el, extraAd) {
+    const P = Object.assign(perfilApp(), extraAd || {});
+    let foto = '';
+    const listo = async (fn, ok, btn) => {
+      if (btn) btn.disabled = true;
+      try { await fn(); if (ok) aviso(ok); if (P.alGuardar) await P.alGuardar(); return true; } catch (e) { aviso('⚠️ ' + errTxt(e)); return false; } finally { if (btn) btn.disabled = false; }
+    };
+    const av = (f, ico) => '<span class="cfx-pf-av">' + (f ? '<img src="' + esc(f) + '" alt="">' : ico ? '<b>' + esc(ico) + '</b>' : iniciales()) + '</span>';
+    const cabeza = () => '<div class="ca-yo cfx-pf-yo">' + av(foto, valor(P.icono)) + '<div><b>' + esc(valor(P.nombre) || 'Mi cuenta') + '</b>' + (valor(P.correo) ? '<small>' + esc(valor(P.correo)) + '</small>' : '') + '<small>' + esc(valor(P.sub) || '') + '</small></div></div>';
+    const pide = (que, v) => { const t = P.bloqueo(que, v); if (t) { P.mejorar(t); return true; } return false; };
+    const refrescarFoto = async () => { foto = (await valor(P.foto)) || ''; CFG.foto = foto || null; if (boya) pintarBoya(); };
+
+    function verYo(z) {
+      let nueva, ico = valor(P.icono);
+      const iconos = valor(P.iconos) || [], campos = valor(P.campos) || [];
+      z.innerHTML = '<div class="cfx-pf">' + '<div class="cfx-pf-fila"><span data-pf-av>' + av(foto, ico) + '</span><div class="cfx-pf-btns">' +
+        (P.guardarFoto ? '<button type="button" data-pf="foto">📷 ' + (foto ? 'Cambiar foto' : 'Poner foto') + '</button>' + (foto ? '<button type="button" data-pf="sinfoto">Quitar foto</button>' : '') + '<input type="file" accept="image/*" hidden>' : '') + '</div></div>' +
+        (iconos.length ? '<label>Tu ícono</label><div class="cfx-pf-icos">' + iconos.map((i) => '<button type="button" data-ico="' + esc(i) + '" class="' + (i === ico ? 'on' : '') + '">' + (esc(i) || iniciales()) + '</button>').join('') + '</div>' : '') +
+        '<label>' + esc(valor(P.tituloNombre) || 'Nombre') + '<input data-k="nombre" maxlength="80" value="' + esc(valor(P.nombre) || '') + '"' + (valor(P.nombreFijo) || !P.guardar ? ' readonly' : '') + '>' + (valor(P.nombreFijo) ? '<small>' + esc(valor(P.nombreFijo)) + '</small>' : '') + '</label>' +
+        campos.map((c) => '<label>' + esc(c.t) + (c.tipo === 'area' ? '<textarea data-k="' + esc(c.k) + '" maxlength="' + (c.max || 300) + '" placeholder="' + esc(c.ph || '') + '">' + esc(c.v || '') + '</textarea>'
+          : '<input data-k="' + esc(c.k) + '" type="' + (c.tipo || 'text') + '" maxlength="' + (c.max || 120) + '" placeholder="' + esc(c.ph || '') + '" value="' + esc(c.v || '') + '"' + (c.tipo === 'tel' ? ' inputmode="tel"' : '') + '>') + '</label>').join('') +
+        '<button type="button" class="cfx-pf-si" data-pf="guardar">Guardar</button></div>';
+      const q = (s) => z.querySelector(s), previa = () => { q('[data-pf-av]').innerHTML = av(nueva === undefined ? foto : nueva ? URL.createObjectURL(nueva) : '', ico); };
+      const inp = q('input[type=file]');
+      if (inp) inp.onchange = () => { if (inp.files[0]) { nueva = inp.files[0]; previa(); } };
+      z.onclick = async (ev) => {
+        const b = ev.target.closest('[data-pf], [data-ico]'); if (!b) return;
+        if (b.dataset.ico !== undefined) { if (pide('icono', b.dataset.ico)) return; ico = b.dataset.ico; z.querySelectorAll('[data-ico]').forEach((x) => x.classList.toggle('on', x === b)); if (P.guardarFoto && nueva === undefined && foto && P.iconoQuitaFoto) nueva = ''; return previa(); }
+        const a = b.dataset.pf;
+        if (a === 'foto') { if (!pide('foto')) inp.click(); return; }
+        if (a === 'sinfoto') { nueva = ''; return previa(); }
+        if (a === 'guardar') {
+          const d = { icono: ico }; z.querySelectorAll('[data-k]').forEach((i) => { d[i.dataset.k] = i.value.trim(); });
+          if (await listo(async () => { if (nueva !== undefined) await P.guardarFoto(nueva); if (P.guardar) await P.guardar(d); }, '✅ Perfil guardado', b)) { if (d.nombre) CFG.nombre = d.nombre; await refrescarFoto(); verYo(z); pintarCabeza(); }
+        }
+      };
+    }
+    function verEstilo(z) {
+      const cols = (valor(P.colores) || []).map((c) => (Array.isArray(c) ? c : [c, c])), act = String(valor(P.color) || '').toLowerCase(), m = valor(P.modo) || 'auto';
+      const libre = valor(P.libre) && P.guardarColor;
+      z.innerHTML = '<div class="cfx-pf">' + (P.guardarColor ? '<label>Color de la app</label><div class="cfx-pf-cols">' + cols.map(([n, c]) => '<button type="button" data-c="' + esc(c) + '" title="' + esc(n) + '" aria-label="' + esc(n) + '" style="background:' + esc(c) + '" class="' +
+        (c.toLowerCase() === act ? 'on' : '') + (P.bloqueo('color', c) ? ' cfx-pf-lock' : '') + '"></button>').join('') + '</div>' +
+        (libre ? '<label class="cfx-pf-libre"><input type="color" value="' + esc(HEX.test(act) ? act : '#2563eb') + '"><span>🎨 Color a tu gusto' + (P.bloqueo('libre') ? ' <i>⭐</i>' : '') + '</span></label>' : '') : '') +
+        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, t]) => '<button type="button" data-m="' + k + '" class="' + (k === m ? 'on' : '') + '">' + t + '</button>').join('') + '</div>' : '') + '</div>';
+      z.onclick = (ev) => {
+        const b = ev.target.closest('[data-c], [data-m]'); if (!b) return;
+        if (b.dataset.m) return listo(() => P.guardarModo(b.dataset.m)).then(() => verEstilo(z));
+        if (pide('color', b.dataset.c)) return;
+        listo(() => P.guardarColor(b.dataset.c), '🎨 Color guardado').then(() => verEstilo(z));
+      };
+      const lib = z.querySelector('input[type=color]');
+      if (lib) {
+        lib.onclick = (ev) => { if (pide('libre')) ev.preventDefault(); };
+        lib.oninput = () => P.probarColor && P.probarColor(lib.value);
+        lib.onchange = () => listo(() => P.guardarColor(lib.value), '🎨 Color guardado').then(() => verEstilo(z));
+      }
+    }
+    function verAvanzado(z) {
+      z.innerHTML = '<div class="cfx-pf">' +
+        '<div class="cfx-pf-caja"><b>🔔 Notificaciones en este celular</b><div class="cfx-pf-fila"><span data-push>Revisando…</span><button type="button" data-pf="push">Activar</button></div></div>' +
+        (P.clave ? '<div class="cfx-pf-caja"><b>🔑 Cambiar contraseña</b><input data-c1 type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 6)"><input data-c2 type="password" autocomplete="new-password" placeholder="Repítela">' +
+          '<button type="button" data-pf="clave">Cambiar contraseña</button></div>' : '') +
+        (P.eliminar && valor(P.puedeEliminar) !== false ? '<div class="cfx-pf-caja cfx-pf-peligro"><b>🗑️ Eliminar mi cuenta</b><small>' + esc(valor(P.eliminarTexto) || 'Se borran tu cuenta y tus datos. No se puede deshacer.') + '</small><button type="button" data-pf="eliminar">Eliminar mi cuenta</button></div>' : '') + '</div>';
+      const q = (s) => z.querySelector(s);
+      let on = false;
+      const estado = async () => { on = await Promise.resolve(P.pushActiva()).catch(() => false); q('[data-push]').textContent = on ? '✅ Activas' : 'Apagadas'; q('[data-pf=push]').textContent = on ? (P.desactivarPush ? 'Desactivar' : 'Reactivar') : 'Activar'; };
+      estado();
+      z.onclick = async (ev) => {
+        const b = ev.target.closest('[data-pf]'); if (!b) return; const a = b.dataset.pf;
+        if (a === 'push') await (on && P.desactivarPush ? listo(() => P.desactivarPush(), 'Notificaciones desactivadas', b) : listo(() => P.activarPush(), '🔔 Notificaciones activadas', b)).then(estado);
+        if (a === 'clave') {
+          const c1 = q('[data-c1]').value, c2 = q('[data-c2]').value;
+          if (c1.length < 6) return aviso('La contraseña debe tener al menos 6 caracteres');
+          if (c1 !== c2) return aviso('Las contraseñas no coinciden');
+          if (await listo(() => P.clave(c1), '🔑 Contraseña cambiada', b)) q('[data-c1]').value = q('[data-c2]').value = '';
+        }
+        if (a === 'eliminar') { cerrar(); try { await P.eliminar(); } catch (e) { aviso('⚠️ ' + errTxt(e)); } }
+      };
+    }
+    let pintarCabeza = () => {};
+    const L = [{ k: 'yo', ico: '👤', t: 'Foto y nombre', d: 'Cómo te ven', abrir: verYo }, { k: 'estilo', ico: '🎨', t: 'Color y modo', d: 'Claro, oscuro o automático', abrir: verEstilo },
+      { k: 'avanzado', ico: '⚙️', t: 'Avanzado', d: 'Contraseña, avisos y cuenta', abrir: verAvanzado }].concat(valor(P.secciones) || []);
+    el.classList.add('cfx-pf-w');
+    const h = ajustes(el, L, { arriba: '<div data-pf-cab></div>' + (valor(P.arriba) || '') });
+    const g = h.grilla;
+    pintarCabeza = () => { const c = el.querySelector('[data-pf-cab]'); if (c) c.innerHTML = cabeza(); };
+    h.grilla = () => { g(); pintarCabeza(); };
+    el.querySelector('.cfx-aj-w').addEventListener('click', (ev) => { if (ev.target.closest('.cfx-aj-volver')) pintarCabeza(); });
+    Promise.resolve(valor(P.foto)).then((f) => { foto = f || ''; pintarCabeza(); });
+    return h;
+  }
+  function abrirPerfil(k) {
+    const caja = dialogo('<div class="ca-cuerpo cfx-pf-d"></div><div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>');
+    const h = perfil(caja.querySelector('.cfx-pf-d'));
+    if (k) h.abrir(k);
+    return h;
+  }
+  window.CFX_PERFIL = { montar: perfil, abrir: abrirPerfil, BASE, pintarModo, pintarColor };
 
   window.CFX_AJUSTES = { montar: ajustes, registro };
   // La app pudo pedirlo antes de que este archivo cargara (CFX_AYUDA_PEND = { rpc, app }).

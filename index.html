@@ -199,31 +199,13 @@
   <!-- Con sesión: ajustes (todo lo de configuración en un solo lugar) -->
   <section id="v-ajustes" class="hidden">
     <div class="hidden" id="cMas"><div id="masL"></div></div>
-    <div class="card">
-      <h2>👤 Mi perfil</h2>
-      <label for="eNombre" id="lblNombre">Nombre</label><input id="eNombre" maxlength="80">
-      <div class="btns"><button class="small" id="eBtn">Guardar</button><button class="small alt hidden" id="bVerif">🪪 Verificar identidad</button></div>
-      <div id="rowIcono" class="hidden">
-        <label>Tu ícono <span class="pill pro" id="icoPill">PREMIUM</span></label>
-        <div class="iconos" id="iconos"></div>
-      </div>
-      <div id="rowColor">
-        <label id="lblColor">Color de tu marca</label>
-        <div class="swatches" id="swatches"></div>
-        <div class="row" style="margin-top:10px;align-items:center">
-          <span class="muted" style="flex:2">O elige cualquier color:</span>
-          <input type="color" id="eColor" aria-label="Color personalizado">
-        </div>
-      </div>
-      <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">🔑 Cambiar mi contraseña</summary>
-        <label for="nPass">Contraseña nueva (mínimo 6 caracteres)</label><input id="nPass" type="password" autocomplete="new-password" minlength="6">
-        <div class="btns"><button class="small" id="bPass">Cambiar contraseña</button></div>
-      </details>
-    </div>
+    <!-- Perfil común del núcleo (ayuda.js → CFX_PERFIL): foto y nombre, color y modo, avanzado y "Mi tienda" -->
+    <div class="card" id="miPerfil"></div>
 
     <div class="card hidden" id="cTienda">
       <h2>🏪 Mi tienda</h2>
       <p class="muted">Lo que ven tus clientes al comprarte.</p>
+      <div class="btns" style="margin-top:0"><button class="small alt" id="bVerif">🪪 Verificar identidad</button></div>
       <div id="rowTel">
         <label for="eTel">WhatsApp de la tienda (para recibir pedidos)</label>
         <input id="eTel" inputmode="tel" placeholder="56912345678">
@@ -280,11 +262,9 @@
       <p class="muted hidden" id="eqCred" style="white-space:pre-line"></p>
     </div>
 
-    <div class="card">
-      <h2>🔔 Notificaciones</h2>
-      <p class="muted" id="pushEstado"></p>
-      <div class="btns"><button class="small alt" id="bPush2">Activar en este celular</button></div>
-      <label class="terms hidden" id="rowMute"><input type="checkbox" id="eMute"> <span>Silenciar ofertas de la tienda (los mensajes y pedidos siguen llegando)</span></label>
+    <div class="card hidden" id="cMute">
+      <h2>🔔 Ofertas</h2>
+      <label class="terms" id="rowMute"><input type="checkbox" id="eMute"> <span>Silenciar ofertas de la tienda (los mensajes y pedidos siguen llegando)</span></label>
     </div>
 
     <div class="card upsell" id="cPlan"><span id="plan"></span>
@@ -535,7 +515,7 @@
       : acc.is_pro ? (cliente ? 'Cliente Premium' : 'Versión Pro') + (acc.pro_until ? ' hasta el ' + new Date(acc.pro_until).toLocaleDateString('es') : ' permanente')
       : cliente ? 'Cliente' : 'Versión Free';
     $('estadoPlan').textContent = acc.email + ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : '');
-    $('avatar').textContent = icono(acc) || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
+    $('avatar').textContent = Cuenta.icono() || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
     Cuenta.aplicarLogo(acc);
     // Cliente: logo y nombre de su tienda en la bienvenida.
     $('tiendaChip').classList.toggle('hidden', !cliente || !acc.negocio);
@@ -550,7 +530,6 @@
     $('hoy').classList.toggle('hidden', cliente);
     $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Órbita') : (acc.empresa || 'Órbita'));
     const dueno = acc.role === 'user';
-    $('bVerif').classList.toggle('hidden', !dueno);
     ['cTienda', 'cLinks', 'cDespacho', 'cEquipo', 'cMas', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
     if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x)); }
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
@@ -561,25 +540,19 @@
 
 
     $('inboxTitulo').textContent = '🔔 Avisos';
-    $('lblNombre').textContent = cliente ? 'Tu nombre' : 'Nombre de la empresa';
-    $('eNombre').value = acc.empresa || '';
-    // Clientes: color e ícono son beneficios Premium. Empresas: siempre.
-    const puedeEstilo = !cliente || acc.is_pro;
-    $('rowColor').classList.toggle('bloqueado', !puedeEstilo);
-    $('lblColor').innerHTML = cliente ? 'Color de tu app <span class="pill pro">PREMIUM</span>'
-      : 'Color de tu marca <span class="muted" style="font-weight:400">(tus clientes también lo ven' + (acc.is_pro ? '' : '; color personalizado: <span class="pill pro">PRO</span>') + ')</span>';
-    $('rowIcono').classList.remove('hidden');
-    $('rowIcono').classList.toggle('bloqueado', !puedeEstilo);
-    $('icoPill').classList.toggle('hidden', !cliente);
-    pintarIconos(acc);
+    // Perfil común (núcleo; cómo guarda Órbita: shared/cuenta.js) + la sección Mi tienda.
+    if (window.CFX_PERFIL && !$('miPerfil').dataset.pf) {
+      $('miPerfil').dataset.pf = '1';
+      window.CFX_PERFIL.montar($('miPerfil'), { alGuardar: () => pintar(Cuenta.account), mejorar: () => { Core.toast('⭐ Elegir colores e ícono es de Premium'); $('cPro').scrollIntoView({ behavior: 'smooth' }); },
+        secciones: dueno ? [{ k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario y pagos', nodo: $('cTienda') }] : [] });
+    }
     $('cTienda').classList.toggle('hidden', cliente);
     $('eTel').value = acc.telefono || '';
     $('rowSellos').classList.toggle('bloqueado', !acc.is_pro);
     $('planActual').textContent = acc.is_admin ? 'Administrador general: tienes todo activado.'
       : acc.is_pro ? '⭐ ' + plan + '. ¡Gracias por tu apoyo!' : 'Tu plan actual: ' + plan + '.';
-    $('rowMute').classList.toggle('hidden', !cliente);
+    $('cMute').classList.toggle('hidden', !cliente);
     $('eMute').checked = !!acc.mute_offers;
-    pintarColores(acc.id);
 
     pintarPro(acc);
   }
@@ -615,36 +588,6 @@
     if (plan && plan.beneficios && plan.beneficios.length) $('proFeat').innerHTML = plan.beneficios.map((t) => '<li>' + Core.esc(t) + '</li>').join('');
   }
 
-  function pintarColores(uid) {
-    const actual = Core.tema.get(uid).toLowerCase();
-    $('swatches').innerHTML = Core.tema.colores.map(([n, c]) =>
-      '<button class="' + (c === actual ? 'on' : '') + '" data-c="' + c + '" title="' + n + '" aria-label="' + n +
-      '" style="background:' + c + '"></button>').join('');
-    $('eColor').value = actual;
-  }
-  // Personalizar la app: para clientes es un beneficio Premium.
-  function estiloBloqueado() {
-    const a = Cuenta.account;
-    if (a && a.role === 'client' && !a.is_pro) {
-      Core.toast('⭐ Elegir colores e ícono es de Premium');
-      $('cPro').scrollIntoView({ behavior: 'smooth' });
-      return true;
-    }
-    return false;
-  }
-  const ICONOS = ['😀', '😎', '🦊', '🐱', '🐶', '🦁', '🚴', '⚽', '🎮', '🎧', '🌸', '🌵', '🍕', '☕', '⭐', '🔥', '💎', '🚀'];
-  function icono(acc) { try { return localStorage.getItem('cfx:icono:' + acc.id) || ''; } catch (e) { return ''; } }
-  function pintarIconos(acc) {
-    const act = icono(acc);
-    $('iconos').innerHTML = [''].concat(ICONOS).map((i) => '<button type="button" class="' + (i === act ? 'on' : '') + '" data-i="' + i + '" aria-label="' +
-      (i || 'Inicial') + '">' + (i || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase()) + '</button>').join('');
-  }
-  $('iconos').onclick = (e) => {
-    const b = e.target.closest('button');
-    if (!b || estiloBloqueado()) return;
-    try { localStorage.setItem('cfx:icono:' + Cuenta.uid(), b.dataset.i); } catch (err) { /* sin espacio */ }
-    pintar(Cuenta.account);
-  };
   /* ---------- Más (negocio): todo agrupado ---------- */
   function pintarMas() {
     const G = [['Tu negocio', [['apps/caja/#productos', 'bolsa', 'Productos, fotos y stock'], ['apps/fichas/#clientes', 'usuarios', 'Clientes'],
@@ -875,15 +818,6 @@
     try { await Cuenta.rpc('set_mi_color', { p_color: c }); }
     catch (err) { if (!callado) Core.toast('🎨 Tu app queda con este color. ' + err.message); }
   }
-  $('swatches').onclick = (e) => {
-    const c = e.target.dataset.c;
-    if (!c || estiloBloqueado()) return;
-    Core.tema.set(Cuenta.uid(), c);
-    pintarColores(Cuenta.uid());
-    colorTienda(c);
-  };
-  $('eColor').oninput = (e) => { if (!estiloBloqueado()) Core.tema.set(Cuenta.uid(), e.target.value); else e.target.value = Core.tema.get(Cuenta.uid()); };
-  $('eColor').onchange = (e) => { const c = e.target.value; pintarColores(Cuenta.uid()); if (!estiloBloqueado()) colorTienda(c); };
 
   /* ---------- Avisos (con "visto") ---------- */
   // 🧹 Limpiar: quedan ocultos los avisos anteriores; solo se ven los que lleguen después.
@@ -963,28 +897,16 @@
       activo = !!(reg && reg.pushManager && await reg.pushManager.getSubscription()) && Notification.permission === 'granted';
     } catch (e) { /* sin soporte */ }
     $('cPush').classList.toggle('hidden', activo);
-    $('pushEstado').textContent = activo ? '✅ Activas en este celular.' : 'Desactivadas en este celular: actívalas para recibir avisos, pedidos y mensajes.';
-    $('bPush2').classList.toggle('hidden', activo);
     if (activo) Cuenta.syncPush(); // el celular queda a nombre de esta cuenta
   }
-  $('bPush').onclick = $('bPush2').onclick = async () => {
+  $('bPush').onclick = async () => {
     try { await Cuenta.enablePush(); Core.toast('✅ Notificaciones activadas en este celular'); revisarPush(); }
     catch (err) { Core.toast(err.message); }
   };
 
   /* ---------- Cuenta ---------- */
-  $('eBtn').onclick = async () => {
-    try { pintar(await Cuenta.rpc('update_my_company', { p_empresa: $('eNombre').value })); Core.toast('Guardado'); }
-    catch (err) { Core.toast(err.message); }
-  };
   $('eMute').onchange = async (e) => {
     try { pintar(await Cuenta.rpc('set_mute_offers', { p_mute: e.target.checked })); Core.toast(e.target.checked ? 'Ofertas silenciadas' : 'Ofertas activadas'); cargarInbox(); }
-    catch (err) { Core.toast(err.message); }
-  };
-  $('bPass').onclick = async () => {
-    const v = $('nPass').value;
-    if (v.length < 6) return Core.toast('Mínimo 6 caracteres');
-    try { await Cuenta.setPassword(v); $('nPass').value = ''; Core.toast('✅ Contraseña cambiada'); }
     catch (err) { Core.toast(err.message); }
   };
   $('bSalir').onclick = async () => { await Cuenta.signOut(); location.replace('./'); };

@@ -323,7 +323,7 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.33';
+  const APP_VERSION = '5.34';
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};

@@ -115,6 +115,29 @@
       salir: async () => { await signOut(); location.replace(rootPath); } });
     if (window.CFX_AYUDA) window.CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND);
   }
+  // Perfil común del núcleo (ayuda.js → CFX_PERFIL), en todas las páginas: aquí solo cómo guarda Órbita.
+  // Personalizar la app (color e ícono): para clientes es un beneficio Premium. Empresas: el color también queda en el servidor (sus clientes ven la tienda con su marca).
+  const ICONOS = ['😀', '😎', '🦊', '🐱', '🐶', '🦁', '🚴', '⚽', '🎮', '🎧', '🌸', '🌵', '🍕', '☕', '⭐', '🔥', '💎', '🚀'];
+  const icono = () => { try { return (account && localStorage.getItem('cfx:icono:' + account.id)) || ''; } catch (e) { return ''; } };
+  const T = () => global.Core.tema;
+  global.CFX_PERFIL_APP = {
+    nombre: () => (account || {}).empresa || '', correo: () => (account || {}).email,
+    tituloNombre: () => ((account || {}).role === 'client' ? 'Tu nombre' : 'Nombre de la empresa'),
+    iconos: [''].concat(ICONOS), icono,
+    guardar: async (d) => {
+      try { localStorage.setItem('cfx:icono:' + account.id, d.icono || ''); } catch (err) { /* sin espacio */ }
+      const a = await rpc('update_my_company', { p_empresa: d.nombre });
+      if (a && a.id) writeCache(a); else await refresh();
+    },
+    colores: () => T().colores, libre: true, color: () => T().get(account.id), probarColor: (c) => T().aplicar(c),
+    guardarColor: async (c) => {
+      T().set(account.id, c);
+      if (account.role !== 'client') try { await rpc('set_mi_color', { p_color: c }); } catch (err) { throw new Error('🎨 Tu app queda con este color. ' + err.message); }
+    },
+    clave: (n) => setPassword(n),
+    bloqueo: (que) => (que !== 'foto' && account && account.role === 'client' && !account.is_pro ? 'Elegir colores e ícono' : '')
+  };
+
   async function require(rootPath, opts) {
     let a = null;
     try { a = await refresh(); } catch (e) { a = account; }
@@ -445,6 +468,7 @@
     nav, contar, ofrecerPush,
     configured, sb, refresh, require, cabecera, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora, aplicarLogo,
+    icono,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
     isAdmin: () => !!(account && account.is_admin),
