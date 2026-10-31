@@ -1,5 +1,5 @@
 /* CodeFix · Núcleo · Pagar Premium (mismo archivo en cada repositorio). Precios, link, tarjeta y transferencia vienen de la base
-   (cfx_pago_estado), y se editan una sola vez para las 6 apps en el Centro de Mando → Pagos.
+   (cfx_pago_estado), y se editan una sola vez para las 7 apps en el Centro de Mando → Pagos.
    CFX_PAGOS.abrir({ rpc })            → elegir plan (1 mes, 3 meses o 1 año), pagar y subir el comprobante, paso a paso:
                                           1) paga el total  2) saca pantallazo  3) súbelo  4) espera 5–10 min (te avisamos).
                                           Transferencia = precio exacto. Link o tarjeta = precio + "cargo por pago online (X %)" en una línea aparte.

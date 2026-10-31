@@ -5,7 +5,7 @@
        · Chat con soporte: escribe y le respondes desde el Centro de Mando → Mensajes (cfx_chat_*). El globo muestra lo no leído.
        · Términos y condiciones según el tipo de negocio (ley chilena: 19.496 del consumidor y 19.628 / 21.719 de datos personales).
    CFX_AYUDA.chat({ rpc }) · CFX_AYUDA.terminos(app) · CFX_AYUDA.guia()  (también se pueden abrir sueltos).
-   CFX_AJUSTES.montar(el, secciones) → Ajustes en cuadrícula de tarjetas (igual en las 6 apps). */
+   CFX_AJUSTES.montar(el, secciones) → Ajustes en cuadrícula de tarjetas (igual en las 7 apps). */
 (function () {
   'use strict';
   if (window.CFX_AYUDA) return;
@@ -100,6 +100,8 @@
     '.cfx-ayuda .ca-m.yo{align-self:flex-end;background:var(--ca-color);color:#fff;border-bottom-right-radius:4px}.cfx-ayuda .ca-m.el{align-self:flex-start;background:var(--cfx-campo,#eef2f6);border-bottom-left-radius:4px}' +
     '.cfx-ayuda .ca-m small{display:block;opacity:.7;font-size:11px;margin-top:2px}.cfx-ayuda .ca-escribir{display:flex;gap:8px;padding-top:8px}.cfx-ayuda textarea{flex:1;min-height:44px;max-height:120px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;padding:10px 12px;resize:none;box-sizing:border-box}' +
     '.cfx-ayuda .ca-pie{display:flex;gap:8px;margin-top:10px}.cfx-ayuda .ca-pie button{flex:1}' +
+    '.cfx-btns-auto{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0}.cfx-btns-auto>*{margin:0!important}' +
+    '.cfx-pf-w{margin-bottom:16px}.cfx-pf .cfx-pf-modos{margin-bottom:4px}' +
     // Perfil común (CFX_PERFIL): diseño propio, igual en las 7 apps (no hereda botones ni campos de la app). --pf = color de la app.
     '.cfx-pf-w{--pf:var(--brand,var(--marca,#2563eb));--pf2:color-mix(in srgb,var(--pf) 62%,#7c3aed);--pf-borde:color-mix(in srgb,var(--pf) 22%,var(--cfx-borde,#e2e7ec))}' +
     '.cfx-pf{display:flex;flex-direction:column;gap:14px}.cfx-pf label{display:flex;flex-direction:column;gap:6px;font:700 12.5px/1.2 inherit;letter-spacing:.04em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472);margin:0}' +
@@ -162,7 +164,7 @@
   }
   function cerrar() { if (abierta) { try { abierta.close(); } catch (e) { abierta.remove(); } abierta = null; } }
 
-  // ---------- Cabecera común (arriba a la derecha, igual en las 6 apps): [🔔 campana] [FREE/PRO] [foto] ----------
+  // ---------- Cabecera común (arriba a la derecha, igual en las 7 apps): [🔔 campana] [FREE/PRO] [foto] ----------
   // La campana es la de la app (una sola: las repetidas se esconden). La foto abre el menú: inicio, mi cuenta, panel, ayuda, Premium y cerrar sesión.
   // Lo que ya está en el menú (casa, chat, persona, ADMIN, cerrar sesión…) se esconde con CFG.quitar (selector de cada app).
   const SVG_CAMPANA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
@@ -269,7 +271,7 @@
     if (gs.length) ancla.after(d); else ancla.appendChild(d);
   }
 
-  // ---------- Ajustes en cuadrícula (igual en las 6 apps; cada app entrega SU lista) ----------
+  // ---------- Ajustes en cuadrícula (igual en las 7 apps; cada app entrega SU lista) ----------
   // CFX_AJUSTES.montar(el, [{ k, ico, t, d, abrir(zona) | nodo }], { arriba, abajo })  → tarjetas; al tocar una se abre su sección con "←" que vuelve a la cuadrícula.
   //   abrir(zona): la sección se dibuja en zona.  nodo: una sección que ya está en la página (se muestra solo ella; abrir también se llama si viene).
   // Devuelve { abrir(k), grilla() } para entrar directo a una sección (p. ej. desde un link #ajustes/textos).
@@ -317,7 +319,7 @@
     return { abrir, grilla };
   }
 
-  // ---------- Registro de cambios: botones para borrarlo (igual en las 6 apps) ----------
+  // ---------- Registro de cambios: botones para borrarlo (igual en las 7 apps) ----------
   // CFX_AJUSTES.registro(el, rpc, { lista: true, recargar }) → arriba de el pone "Borrar lo de más de 30 días" y "Borrar todo" (pide confirmar).
   //   lista: además muestra el registro común (cfx_registro_lista) para las apps que no tienen uno propio.
   async function registro(el, rpc, o) {
@@ -613,6 +615,22 @@
     x.classList.toggle('cfx-d-izq', x.scrollLeft > 4);
     x.classList.toggle('cfx-d-der', x.scrollLeft + x.clientWidth < x.scrollWidth - 4);
   }
+  // Botones seguidos dentro de una tarjeta (p. ej. "Descargar mis datos" + "Limpiar antiguos"): se agrupan con espacio parejo
+  // entre ellos y, si no caben, bajan a la línea siguiente con el mismo espacio (antes quedaban pegados).
+  const ES_BOTON = (n) => n && n.nodeType === 1 && (n.tagName === 'BUTTON' || (n.tagName === 'A' && /\b(btn|button)\b/.test(n.className))) && !n.hidden;
+  function separarBotones() {
+    document.querySelectorAll('.card, .tarjeta').forEach((c) => {
+      if (c.closest('.cfx-barra, .cfx-cab, header') || /flex|grid/.test(getComputedStyle(c).display)) return;
+      let n = c.firstChild;
+      while (n) {
+        if (!ES_BOTON(n)) { n = n.nextSibling; continue; }
+        const grupo = [n]; let m = n.nextSibling;
+        while (m && (ES_BOTON(m) || (m.nodeType === 3 && !m.textContent.trim()))) { if (m.nodeType === 1) grupo.push(m); m = m.nextSibling; }
+        if (grupo.length >= 2) { const g = document.createElement('div'); g.className = 'cfx-btns-auto'; c.insertBefore(g, n); grupo.forEach((b) => g.appendChild(b)); }
+        n = m;
+      }
+    });
+  }
   function tiras() {
     const padres = new Set(); document.querySelectorAll('button, a, .chip').forEach((b) => { if (b.parentElement) padres.add(b.parentElement); });
     padres.forEach((x) => {
@@ -751,7 +769,7 @@
   window.CFX_ANIM = { emergente, salirTodos, deslizar: avisosDeslizar };
 
   let tTiras = 0;
-  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); }, 120); };
+  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { separarBotones(); tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); }, 120); };
   new MutationObserver(pedirTiras).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('resize', pedirTiras); addEventListener('hashchange', pedirTiras); pedirTiras();
 

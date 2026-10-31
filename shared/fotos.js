@@ -1,5 +1,5 @@
 /* CodeFix · Núcleo · Calidad de las fotos según para qué son (mismo archivo en cada repositorio).
-   Se cambia aquí y aplica en las 6 apps. Las fotos se achican en el celular antes de subirlas.
+   Se cambia aquí y aplica en las 7 apps. Las fotos se achican en el celular antes de subirlas.
    · comprobante: voucher o captura de pago. Basta con que se lea: liviano.
    · documento:   carnet o documentos para verificar identidad. Que se lean bien los números.
    · vitrina:     productos, servicios, ofertas, fotos de trabajo y de estacionamientos: calidad mínima para que no se pixele en un teléfono.
