@@ -100,25 +100,45 @@
     '.cfx-ayuda .ca-m.yo{align-self:flex-end;background:var(--ca-color);color:#fff;border-bottom-right-radius:4px}.cfx-ayuda .ca-m.el{align-self:flex-start;background:var(--cfx-campo,#eef2f6);border-bottom-left-radius:4px}' +
     '.cfx-ayuda .ca-m small{display:block;opacity:.7;font-size:11px;margin-top:2px}.cfx-ayuda .ca-escribir{display:flex;gap:8px;padding-top:8px}.cfx-ayuda textarea{flex:1;min-height:44px;max-height:120px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;padding:10px 12px;resize:none;box-sizing:border-box}' +
     '.cfx-ayuda .ca-pie{display:flex;gap:8px;margin-top:10px}.cfx-ayuda .ca-pie button{flex:1}' +
-    // Perfil común (CFX_PERFIL)
-    '.cfx-pf{display:flex;flex-direction:column;gap:10px}.cfx-pf label{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:14px;margin:0}.cfx-pf input:not([type=color]),.cfx-pf textarea{width:100%;box-sizing:border-box;margin:0}' +
-    '.cfx-pf-fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.cfx-pf-fila>span:first-child{flex:1;min-width:0}.cfx-pf-btns{display:flex;gap:8px;flex-wrap:wrap}.cfx-pf-btns button{min-height:40px}' +
-    '.cfx-pf-av{width:64px;height:64px;font-size:22px;font-weight:800;border-radius:50%;flex:none;display:grid;place-items:center;overflow:hidden;background:var(--brand,var(--marca,#2563eb));color:var(--brand-ink,#fff)}' +
-    '.cfx-pf-av img{width:100%;height:100%;object-fit:cover;display:block}.cfx-pf-yo .cfx-pf-av{width:52px;height:52px;font-size:18px}.cfx-pf-av b{font-size:1.3em;line-height:1}' +
-    '.cfx-pf-icos,.cfx-pf-cols,.cfx-pf-modos{display:flex;flex-wrap:wrap;gap:8px}.cfx-pf-icos button{width:44px;height:44px;min-height:0;padding:0;font-size:22px;border-radius:12px}.cfx-pf-icos button.on{outline:3px solid var(--brand,#2563eb);outline-offset:1px}' +
-    '.cfx-pf-cols button{width:38px;height:38px;min-height:0;padding:0;border-radius:50%;border:2px solid var(--cfx-tarjeta,#fff);box-shadow:0 0 0 1px var(--cfx-borde,#e2e7ec)}.cfx-pf-cols button.on{box-shadow:0 0 0 3px var(--cfx-texto,#111827)}.cfx-pf-cols button.cfx-pf-lock{opacity:.45}' +
-    '.cfx-pf-libre{flex-direction:row!important;align-items:center}.cfx-pf-libre input{width:52px;height:40px;padding:0;border:0;background:none;flex:none}.cfx-pf-libre i{font-style:normal}' +
-    // Botones del perfil con estilo propio (igual en las 7 apps, sin heredar el botón de cada app).
-    '.cfx-pf .cfx-pf-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}' +
-    '.cfx-pf .cfx-pf-modos button,.cfx-pf .cfx-pf-icos button{background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:none!important;transform:none}' +
-    '.cfx-pf .cfx-pf-modos button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:68px!important;width:100%;min-width:0;margin:0!important;padding:8px 4px!important;border-radius:14px!important;font:600 13.5px/1.2 inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.cfx-pf .cfx-pf-modos button>span{font-size:20px;line-height:1;display:grid;place-items:center}.cfx-pf .cfx-pf-modos button svg{width:22px;height:22px}' +
-    '.cfx-pf .cfx-pf-modos button.on,.cfx-pf .cfx-pf-si{background:var(--brand,var(--marca,#2563eb))!important;color:var(--brand-ink,#fff)!important;border-color:transparent!important}' +
-    '.cfx-pf .cfx-pf-cols button{width:38px!important;height:38px!important;flex:none;margin:0!important;padding:0!important;min-height:0!important;border-radius:50%!important}' +
-    '.cfx-pf .cfx-pf-icos button{width:44px!important;height:44px!important;flex:none;margin:0!important;padding:0!important;min-height:0!important;display:grid;place-items:center;border-radius:12px!important}' +
-    '.cfx-pf-caja{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--cfx-borde,#e2e7ec);border-radius:14px}.cfx-pf-caja small{color:var(--cfx-texto-2,#5b6472)}.cfx-pf-peligro button{color:var(--cfx-mal,#dc2626)}' +
-    '.cfx-pf-yo{display:flex;align-items:center;gap:12px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--cfx-borde,#e2e7ec)}.cfx-pf-yo>div{min-width:0;flex:1}' +
-    '.cfx-pf-yo b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-pf-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}' +
+    // Perfil común (CFX_PERFIL): diseño propio, igual en las 7 apps (no hereda botones ni campos de la app). --pf = color de la app.
+    '.cfx-pf-w{--pf:var(--brand,var(--marca,#2563eb));--pf2:color-mix(in srgb,var(--pf) 62%,#7c3aed);--pf-borde:color-mix(in srgb,var(--pf) 22%,var(--cfx-borde,#e2e7ec))}' +
+    '.cfx-pf{display:flex;flex-direction:column;gap:14px}.cfx-pf label{display:flex;flex-direction:column;gap:6px;font:700 12.5px/1.2 inherit;letter-spacing:.04em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472);margin:0}' +
+    '.cfx-pf label small{text-transform:none;letter-spacing:0;font-weight:500}' +
+    '.cfx-pf input:not([type=color]),.cfx-pf textarea{width:100%!important;box-sizing:border-box;margin:0!important;min-height:48px;padding:12px 14px!important;border-radius:14px!important;border:1.5px solid var(--pf-borde)!important;' +
+    'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;font:500 16px/1.3 inherit!important;text-transform:none;letter-spacing:0;box-shadow:none!important;outline:0;transition:border-color .15s,box-shadow .15s}' +
+    '.cfx-pf textarea{min-height:90px;resize:vertical}.cfx-pf input:focus,.cfx-pf textarea:focus{border-color:var(--pf)!important;box-shadow:0 0 0 4px color-mix(in srgb,var(--pf) 18%,transparent)!important}.cfx-pf input[readonly]{opacity:.7}' +
+    // Botones: mismo alto, borde y radio; el principal con degradado y brillo.
+    '.cfx-pf button:not([data-c]):not([data-ico]):not([data-m]){min-height:48px!important;padding:0 18px!important;margin:0!important;border-radius:14px!important;border:1.5px solid var(--pf-borde)!important;' +
+    'background:var(--cfx-tarjeta,#fff)!important;color:var(--cfx-texto,#111827)!important;font:700 15px/1.2 inherit!important;box-shadow:0 1px 2px rgba(15,23,42,.06)!important;cursor:pointer;width:auto;transition:transform .12s,box-shadow .15s}' +
+    '.cfx-pf button:active{transform:scale(.97)}.cfx-pf button:disabled{opacity:.55}' +
+    '.cfx-pf .cfx-pf-si{width:100%!important;border:0!important;color:#fff!important;background:linear-gradient(135deg,var(--pf),var(--pf2))!important;box-shadow:0 8px 22px color-mix(in srgb,var(--pf) 38%,transparent),inset 0 1px 0 rgba(255,255,255,.25)!important}' +
+    '.cfx-pf-fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.cfx-pf-fila>span:first-child{flex:1;min-width:0}.cfx-pf-btns{display:flex;gap:8px;flex-wrap:wrap;flex:1;min-width:0}' +
+    // Foto: anillo con el color de la app.
+    '.cfx-pf-av{width:72px;height:72px;font-size:24px;font-weight:800;border-radius:50%;flex:none;display:grid;place-items:center;overflow:hidden;color:#fff;' +
+    'background:linear-gradient(135deg,var(--pf,#2563eb),var(--pf2,#7c3aed));box-shadow:0 0 0 3px var(--cfx-tarjeta,#fff),0 0 0 5px var(--pf,#2563eb),0 8px 24px color-mix(in srgb,var(--pf,#2563eb) 35%,transparent)}' +
+    '.cfx-pf-av img{width:100%;height:100%;object-fit:cover;display:block}.cfx-pf-av b{font-size:1.3em;line-height:1}' +
+    '.cfx-pf-yo{display:flex;align-items:center;gap:14px;padding:6px 4px 16px;margin-bottom:12px;border-bottom:1px solid var(--cfx-borde,#e2e7ec)}.cfx-pf-yo>div{min-width:0;flex:1}.cfx-pf-yo .cfx-pf-av{width:58px;height:58px;font-size:20px}' +
+    '.cfx-pf-yo b{display:block;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-pf-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:13px;overflow-wrap:anywhere}' +
+    // Íconos, colores y modos.
+    '.cfx-pf-icos,.cfx-pf-cols{display:flex;flex-wrap:wrap;gap:10px}' +
+    '.cfx-pf .cfx-pf-icos button{width:46px!important;height:46px!important;flex:none;margin:0!important;padding:0!important;min-height:0!important;display:grid;place-items:center;border-radius:14px!important;font-size:22px;' +
+    'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1.5px solid var(--pf-borde)!important;box-shadow:none!important}' +
+    '.cfx-pf .cfx-pf-icos button.on{border-color:var(--pf)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--pf) 30%,transparent)!important}' +
+    '.cfx-pf .cfx-pf-cols button{width:40px!important;height:40px!important;flex:none;margin:0!important;padding:0!important;min-height:0!important;border-radius:50%!important;border:3px solid var(--cfx-tarjeta,#fff)!important;box-shadow:0 0 0 1.5px var(--cfx-borde,#e2e7ec)!important}' +
+    '.cfx-pf .cfx-pf-cols button.on{box-shadow:0 0 0 3px var(--cfx-texto,#111827),0 6px 16px rgba(0,0,0,.25)!important;transform:scale(1.08)}.cfx-pf .cfx-pf-cols button.cfx-pf-lock{opacity:.4}' +
+    '.cfx-pf-libre{flex-direction:row!important;align-items:center;gap:10px!important;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--cfx-texto,#111827)!important}' +
+    '.cfx-pf-libre input{width:48px;height:40px;padding:0;border:0;background:none;flex:none;cursor:pointer}.cfx-pf-libre i{font-style:normal}' +
+    '.cfx-pf .cfx-pf-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}' +
+    '.cfx-pf .cfx-pf-modos button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:74px!important;width:100%;min-width:0;margin:0!important;padding:10px 4px!important;border-radius:16px!important;' +
+    'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1.5px solid var(--pf-borde)!important;box-shadow:none!important;font:700 13.5px/1.2 inherit!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cfx-pf .cfx-pf-modos button>span{font-size:22px;line-height:1;display:grid;place-items:center}.cfx-pf .cfx-pf-modos button svg{width:24px;height:24px}' +
+    '.cfx-pf .cfx-pf-modos button.on{border-color:transparent!important;color:#fff!important;background:linear-gradient(135deg,var(--pf),var(--pf2))!important;box-shadow:0 8px 22px color-mix(in srgb,var(--pf) 38%,transparent)!important}' +
+    // Cajas de Avanzado.
+    '.cfx-pf-caja{display:flex;flex-direction:column;gap:10px;padding:16px;border:1.5px solid var(--pf-borde);border-radius:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--pf) 6%,var(--cfx-tarjeta,#fff)),var(--cfx-tarjeta,#fff))}' +
+    '.cfx-pf-caja>b{font-size:15.5px}.cfx-pf-caja small{color:var(--cfx-texto-2,#5b6472);font-size:13px}.cfx-pf-caja .cfx-pf-fila>span{font-weight:600}' +
+    '.cfx-pf .cfx-pf-peligro{border-color:color-mix(in srgb,var(--cfx-mal,#dc2626) 35%,transparent);background:color-mix(in srgb,var(--cfx-mal,#dc2626) 5%,var(--cfx-tarjeta,#fff))}' +
+    '.cfx-pf .cfx-pf-peligro button{color:var(--cfx-mal,#dc2626)!important;border-color:color-mix(in srgb,var(--cfx-mal,#dc2626) 45%,transparent)!important}' +
+    '@media (max-width:360px){.cfx-pf .cfx-pf-modos button{font-size:12.5px!important}.cfx-pf-av{width:64px;height:64px}}' +
     '.cfx-ayuda .cfx-pf-d{min-height:200px}';
   document.head.appendChild(css);
 
@@ -273,7 +293,11 @@
     let w = el.querySelector(':scope > .cfx-aj-w');
     if (!w) { w = document.createElement('div'); w.className = 'cfx-aj-w'; el.prepend(w); }
     const nodos = L.map((s) => s.nodo).filter(Boolean);
+    // Cuadrícula dentro de la sección de otra (p. ej. Mi perfil dentro de Ajustes): una sola flecha a la vez.
+    // Al abrir una sección de adentro se esconde la flecha de afuera; la de adentro vuelve un paso y la de afuera reaparece.
+    const cabPadre = () => { const z = el.closest('.cfx-aj-zona'); return z && z.parentElement.querySelector(':scope > .cfx-aj-cab'); };
     const grilla = () => {
+      const cp = cabPadre(); if (cp) cp.classList.remove('cfx-oc');
       nodos.forEach((n) => n.classList.add('cfx-oc'));
       w.innerHTML = (o.arriba || '') + '<div class="cfx-grilla cfx-aj">' + L.map((s) => '<button type="button" data-k="' + esc(s.k) + '"><span>' + s.ico + '</span>' + esc(s.t) +
         (s.d ? '<small>' + esc(s.d) + '</small>' : '') + '</button>').join('') + '</div>' + (o.abajo || '');
@@ -281,6 +305,7 @@
     };
     const abrir = (k) => {
       const s = L.find((x) => x.k === k); if (!s) return grilla();
+      const cp = cabPadre(); if (cp) cp.classList.add('cfx-oc');
       nodos.forEach((n) => n.classList.toggle('cfx-oc', n !== s.nodo));
       if (s.nodo) s.nodo.classList.remove('hidden');
       w.innerHTML = '<div class="cfx-aj-cab"><button type="button" class="cfx-aj-volver" data-sin-atras aria-label="Volver a Ajustes"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button><h2>' + s.ico + ' ' + esc(s.t) + '</h2></div><div class="cfx-aj-zona"></div>';
