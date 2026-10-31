@@ -108,7 +108,14 @@
     '.cfx-pf-icos,.cfx-pf-cols,.cfx-pf-modos{display:flex;flex-wrap:wrap;gap:8px}.cfx-pf-icos button{width:44px;height:44px;min-height:0;padding:0;font-size:22px;border-radius:12px}.cfx-pf-icos button.on{outline:3px solid var(--brand,#2563eb);outline-offset:1px}' +
     '.cfx-pf-cols button{width:38px;height:38px;min-height:0;padding:0;border-radius:50%;border:2px solid var(--cfx-tarjeta,#fff);box-shadow:0 0 0 1px var(--cfx-borde,#e2e7ec)}.cfx-pf-cols button.on{box-shadow:0 0 0 3px var(--cfx-texto,#111827)}.cfx-pf-cols button.cfx-pf-lock{opacity:.45}' +
     '.cfx-pf-libre{flex-direction:row!important;align-items:center}.cfx-pf-libre input{width:52px;height:40px;padding:0;border:0;background:none;flex:none}.cfx-pf-libre i{font-style:normal}' +
-    '.cfx-pf-modos button{flex:1;min-width:96px}.cfx-pf-modos button.on,.cfx-pf-si{background:var(--brand,#2563eb)!important;color:var(--brand-ink,#fff)!important;border-color:transparent!important}' +
+    // Botones del perfil con estilo propio (igual en las 7 apps, sin heredar el botón de cada app).
+    '.cfx-pf .cfx-pf-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}' +
+    '.cfx-pf .cfx-pf-modos button,.cfx-pf .cfx-pf-icos button{background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:none!important;transform:none}' +
+    '.cfx-pf .cfx-pf-modos button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:68px!important;width:100%;min-width:0;margin:0!important;padding:8px 4px!important;border-radius:14px!important;font:600 13.5px/1.2 inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.cfx-pf .cfx-pf-modos button>span{font-size:20px;line-height:1;display:grid;place-items:center}.cfx-pf .cfx-pf-modos button svg{width:22px;height:22px}' +
+    '.cfx-pf .cfx-pf-modos button.on,.cfx-pf .cfx-pf-si{background:var(--brand,var(--marca,#2563eb))!important;color:var(--brand-ink,#fff)!important;border-color:transparent!important}' +
+    '.cfx-pf .cfx-pf-cols button{width:38px!important;height:38px!important;flex:none;margin:0!important;padding:0!important;min-height:0!important;border-radius:50%!important}' +
+    '.cfx-pf .cfx-pf-icos button{width:44px!important;height:44px!important;flex:none;margin:0!important;padding:0!important;min-height:0!important;display:grid;place-items:center;border-radius:12px!important}' +
     '.cfx-pf-caja{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--cfx-borde,#e2e7ec);border-radius:14px}.cfx-pf-caja small{color:var(--cfx-texto-2,#5b6472)}.cfx-pf-peligro button{color:var(--cfx-mal,#dc2626)}' +
     '.cfx-pf-yo{display:flex;align-items:center;gap:12px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--cfx-borde,#e2e7ec)}.cfx-pf-yo>div{min-width:0;flex:1}' +
     '.cfx-pf-yo b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-pf-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}' +
@@ -246,6 +253,20 @@
   // CFX_AJUSTES.montar(el, [{ k, ico, t, d, abrir(zona) | nodo }], { arriba, abajo })  → tarjetas; al tocar una se abre su sección con "←" que vuelve a la cuadrícula.
   //   abrir(zona): la sección se dibuja en zona.  nodo: una sección que ya está en la página (se muestra solo ella; abrir también se llama si viene).
   // Devuelve { abrir(k), grilla() } para entrar directo a una sección (p. ej. desde un link #ajustes/textos).
+  // Al abrir o volver de una sección la pantalla no salta arriba: solo se mueve si el comienzo quedó fuera de la vista.
+  function aLaVista(w) {
+    const r = w.getBoundingClientRect(), cab = w.closest('dialog') ? 0 : Math.min(120, (document.querySelector('header') || { offsetHeight: 0 }).offsetHeight);
+    if (r.top >= cab && r.top < innerHeight * 0.6) return;
+    w.style.scrollMarginTop = (cab + 8) + 'px'; w.scrollIntoView({ block: 'start' });
+  }
+  // Tocar una opción no mueve la pantalla aunque la app vuelva a dibujar lo de abajo o arriba (guarda y repone la posición).
+  async function quieto(el, fn) {
+    const caja = el.closest('dialog > div') || el.closest('dialog'), y = scrollY, yc = caja ? caja.scrollTop : 0;
+    try { return await fn(); } finally {
+      const reponer = () => { if (Math.abs(scrollY - y) > 1) scrollTo(0, y); if (caja && Math.abs(caja.scrollTop - yc) > 1) caja.scrollTop = yc; };
+      reponer(); requestAnimationFrame(reponer); setTimeout(reponer, 350);
+    }
+  }
   function ajustes(el, L, o) {
     o = o || {};
     L = L.filter(Boolean);
@@ -263,8 +284,8 @@
       nodos.forEach((n) => n.classList.toggle('cfx-oc', n !== s.nodo));
       if (s.nodo) s.nodo.classList.remove('hidden');
       w.innerHTML = '<div class="cfx-aj-cab"><button type="button" class="cfx-aj-volver" data-sin-atras aria-label="Volver a Ajustes"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button><h2>' + s.ico + ' ' + esc(s.t) + '</h2></div><div class="cfx-aj-zona"></div>';
-      w.querySelector('.cfx-aj-volver').onclick = () => { grilla(); scrollTo(0, 0); };
-      scrollTo(0, 0);
+      w.querySelector('.cfx-aj-volver').onclick = () => { grilla(); aLaVista(w); };
+      aLaVista(w);
       return s.abrir ? s.abrir(w.querySelector('.cfx-aj-zona'), k) : undefined;
     };
     grilla();
@@ -760,15 +781,15 @@
   const perfilApp = () => { const A = window.CFX_PERFIL_APP || SOLO_BASE, P = Object.assign({}, BASE); for (const k in A) P[k] = A[k]; return P; };
   const valor = (x) => (typeof x === 'function' ? x() : x);
   const errTxt = (e) => (e && (e.message || e.error_description)) || String(e || 'Error');
-  const MODOS = [['auto', '📱 Automático'], ['claro', '☀️ Claro'], ['oscuro', '🌙 Oscuro']];
+  const MODOS = [['auto', '📱', 'Automático'], ['claro', '☀️', 'Claro'], ['oscuro', '🌙', 'Oscuro']];
 
   function perfil(el, extraAd) {
     const P = Object.assign(perfilApp(), extraAd || {});
     let foto = '';
-    const listo = async (fn, ok, btn) => {
+    const listo = (fn, ok, btn) => quieto(el, async () => {
       if (btn) btn.disabled = true;
       try { await fn(); if (ok) aviso(ok); if (P.alGuardar) await P.alGuardar(); return true; } catch (e) { aviso('⚠️ ' + errTxt(e)); return false; } finally { if (btn) btn.disabled = false; }
-    };
+    });
     const av = (f, ico) => '<span class="cfx-pf-av">' + (f ? '<img src="' + esc(f) + '" alt="">' : ico ? '<b>' + esc(ico) + '</b>' : iniciales()) + '</span>';
     const cabeza = () => '<div class="ca-yo cfx-pf-yo">' + av(foto, valor(P.icono)) + '<div><b>' + esc(valor(P.nombre) || 'Mi cuenta') + '</b>' + (valor(P.correo) ? '<small>' + esc(valor(P.correo)) + '</small>' : '') + '<small>' + esc(valor(P.sub) || '') + '</small></div></div>';
     const pide = (que, v) => { const t = P.bloqueo(que, v); if (t) { P.mejorar(t); return true; } return false; };
@@ -805,18 +826,22 @@
       z.innerHTML = '<div class="cfx-pf">' + (P.guardarColor ? '<label>Color de la app</label><div class="cfx-pf-cols">' + cols.map(([n, c]) => '<button type="button" data-c="' + esc(c) + '" title="' + esc(n) + '" aria-label="' + esc(n) + '" style="background:' + esc(c) + '" class="' +
         (c.toLowerCase() === act ? 'on' : '') + (P.bloqueo('color', c) ? ' cfx-pf-lock' : '') + '"></button>').join('') + '</div>' +
         (libre ? '<label class="cfx-pf-libre"><input type="color" value="' + esc(HEX.test(act) ? act : '#2563eb') + '"><span>🎨 Color a tu gusto' + (P.bloqueo('libre') ? ' <i>⭐</i>' : '') + '</span></label>' : '') : '') +
-        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, t]) => '<button type="button" data-m="' + k + '" class="' + (k === m ? 'on' : '') + '">' + t + '</button>').join('') + '</div>' : '') + '</div>';
+        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + '</div>';
+      // Se marca la opción en su lugar (sin volver a dibujar la sección).
+      const marcar = (sel, b) => z.querySelectorAll(sel).forEach((x) => x.classList.toggle('on', x === b));
       z.onclick = (ev) => {
         const b = ev.target.closest('[data-c], [data-m]'); if (!b) return;
-        if (b.dataset.m) return listo(() => P.guardarModo(b.dataset.m)).then(() => verEstilo(z));
+        ev.preventDefault();
+        if (b.dataset.m) { marcar('[data-m]', b); return listo(() => P.guardarModo(b.dataset.m)).then((ok) => { if (!ok) marcar('[data-m]', z.querySelector('[data-m="' + (valor(P.modo) || 'auto') + '"]')); }); }
         if (pide('color', b.dataset.c)) return;
-        listo(() => P.guardarColor(b.dataset.c), '🎨 Color guardado').then(() => verEstilo(z));
+        marcar('[data-c]', b);
+        listo(() => P.guardarColor(b.dataset.c), '🎨 Color guardado');
       };
       const lib = z.querySelector('input[type=color]');
       if (lib) {
         lib.onclick = (ev) => { if (pide('libre')) ev.preventDefault(); };
         lib.oninput = () => P.probarColor && P.probarColor(lib.value);
-        lib.onchange = () => listo(() => P.guardarColor(lib.value), '🎨 Color guardado').then(() => verEstilo(z));
+        lib.onchange = () => { z.querySelectorAll('[data-c]').forEach((x) => x.classList.remove('on')); listo(() => P.guardarColor(lib.value), '🎨 Color guardado'); };
       }
     }
     function verAvanzado(z) {
