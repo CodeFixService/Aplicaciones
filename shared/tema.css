@@ -154,7 +154,7 @@ nav.cfx-barra > .cfx-mas .cfx-ico { display: grid !important; place-items: cente
 nav.cfx-barra > .cfx-mas .cfx-ico svg { display: block !important; margin: 0 !important; flex: none !important; }
 /* Computador: el contenido de cada pestaña centrado y con ancho máximo (a la derecha del menú lateral, sin espacio vacío) */
 @media (min-width: 900px) {
-  body.cfx-con-barra main, body.cfx-con-barra .cfx-centro { width: auto !important; max-width: 1040px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box; }
+  body.cfx-con-barra main, body.cfx-con-barra .cfx-centro { width: auto !important; max-width: 960px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box; }
   body.cfx-con-barra .con-nav { padding-left: 0 !important; }
 }
 /* ===== Núcleo 2.3 · Barra lista, espacio vacío, centrado y diseño moderno ===== */
@@ -261,6 +261,7 @@ button, .btn, a.btn, .chip { align-items: center; }
 button.chip, a.chip, [role="button"].chip { min-height: 40px; }
 /* Computador: el contenido centrado, sin estirarse a todo el ancho; tarjetas de números en grilla pareja */
 @media (min-width: 900px) {
-  body.cfx-con-barra main > .cfx-centrado, body.cfx-con-barra .cfx-centrado { max-width: 960px; margin-left: auto; margin-right: auto; }
-  .cfx-kpis { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important; gap: 12px !important; }
+  body.cfx-con-barra .con-nav > main, body.cfx-con-barra .cfx-centrado { max-width: 960px !important; margin-left: auto !important; margin-right: auto !important; }
+  /* Tarjetas de números: llenan la fila pareja (auto-fit), sin hueco a la derecha */
+  .stats, .kpis, .cfx-kpis { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important; gap: 12px !important; }
 }

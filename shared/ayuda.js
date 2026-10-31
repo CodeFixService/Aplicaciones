@@ -47,7 +47,7 @@
     '.cfx-sel-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f3f5f8);color:var(--cfx-texto,#111827);font:700 14px/1 var(--cfx-letra,system-ui,sans-serif);cursor:pointer;white-space:nowrap}' +
     '.cfx-sel-btn svg{flex:none;opacity:.7}.cfx-ayuda .ca-op.ca-mal b{color:var(--cfx-mal,#dc2626)}' +
     '.cfx-cuenta-g{margin:16px 0 8px}.cfx-cg-t{font:800 12px/1 var(--cfx-letra,system-ui,sans-serif);letter-spacing:.08em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472);margin:0 2px 10px}' +
-    '.cfx-srv{margin:0 0 14px}.cfx-srv-pista{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:2px 2px 6px}.cfx-srv-pista::-webkit-scrollbar{display:none}' +
+    '.cfx-srv{margin:0 0 14px}.cfx-srv-pista{display:flex;align-items:flex-start;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:2px 2px 6px}.cfx-srv-pista::-webkit-scrollbar{display:none}' +
     '.cfx-srv-c{flex:0 0 calc(100% - 28px);scroll-snap-align:start;box-sizing:border-box;border-radius:18px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);box-shadow:var(--cfx-sombra,none);padding:12px 14px;transition:transform .2s cubic-bezier(.2,.8,.2,1)}' +
     '@media(min-width:700px){.cfx-srv-c{flex-basis:calc(50% - 10px)}}' +
     '.cfx-srv-cab{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:0;border:0;background:none;color:inherit;font:700 15px/1.2 var(--cfx-letra,system-ui,sans-serif);cursor:pointer;text-align:left}.cfx-srv-cab b{flex:1;min-width:0}' +
@@ -66,7 +66,7 @@
     '.cfx-emerg-ico{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--brand,var(--marca,#2563eb))}.cfx-emerg-ico svg{width:20px;height:20px}' +
     '.cfx-cab>a,.cfx-cab>button{transition:transform .12s ease}.cfx-cab>a:active,.cfx-cab>button:active{transform:scale(.92)}' +
     // Título de la cabecera: más chico en celular y hasta 2 líneas antes de cortar con "…".
-    ':is(button,a):has(> .cfx-titulo){justify-content:flex-start!important}.cfx-titulo{text-align:left;white-space:normal!important;display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden!important;text-overflow:ellipsis;line-height:1.12!important;min-width:0}' +
+    ':is(button,a):has(> .cfx-titulo){justify-content:flex-start!important}.cfx-titulo{text-align:left;white-space:nowrap!important;display:block!important;overflow:hidden!important;text-overflow:ellipsis;line-height:1.2!important;min-width:0}' +
     '@media(max-width:600px){.cfx-titulo{font-size:clamp(14px,4vw,18px)!important}}' +
     '.cfx-plan{height:24px;min-height:0;padding:0 9px;border-radius:99px;border:0;cursor:pointer;font:800 11px/24px var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;' +
     'background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto-2,#5b6472);box-shadow:inset 0 0 0 1px var(--cfx-borde,#e2e7ec)}' +
@@ -879,7 +879,12 @@
           '<h4>Lo que más pesa</h4>' + (u.tablas || []).map((t) => '<div class="cfx-srv-f"><span>' + esc(t.tabla) + '</span><small>' + MB(t.bytes) + ' · ' + t.filas + ' filas</small></div>').join('');
       }).catch((e) => {
         c.classList.add('warn'); c.querySelector('.cfx-srv-pc').textContent = '—';
-        c.querySelector('.cfx-srv-det > div').innerHTML = '<p class="cfx-srv-res">' + esc(/cfx_servidor|PGRST202|does not exist|Could not find/i.test((e && e.message) || '') ? 'Su base se está actualizando (máx. 10 min).' : (e && e.message) || 'Sin conexión') + '</p>';
+        // Se muestra la causa real (antes todo error que nombraba cfx_servidor decía "se está actualizando" y escondía el problema).
+        const m = (e && e.message) || '';
+        const txt = /JWT|expired|permission denied|not authorized|sesi[oó]n|Solo el/i.test(m) ? 'Sin permiso: vuelve a conectar esta app en Apps (con tu cuenta de administrador).'
+          : /PGRST202|Could not find the function|function public\.cfx_servidor.*does not exist/i.test(m) ? 'Su base aún no tiene esta función: se actualiza sola (máx. 10 min).'
+          : m ? 'No respondió.' : 'Sin conexión.';
+        c.querySelector('.cfx-srv-det > div').innerHTML = '<p class="cfx-srv-res">' + esc(txt) + '</p>' + (m ? '<small class="cfx-srv-err">' + esc(m.slice(0, 200)) + '</small>' : '');
       });
     });
     raiz.addEventListener('click', (ev) => {
