@@ -37,7 +37,6 @@
     $(id).querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.classList.toggle('alt', x !== b); }); cb(b); }; };
 
   /* ---------- Resumen ---------- */
-  const MB = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB';
   async function cargarResumen() {
     const r = await Cuenta.rpc('admin_resumen');
     // Aviso solo si la base está MÁS VIEJA que la que espera la app (si es más nueva, la app es la que se pone al día).
@@ -48,14 +47,7 @@
     $('stats').innerHTML = item('🏪 Negocios', r.negocios) + item('⭐ Negocios Pro', r.negocios_pro) + item('🟢 Activos 7 días', r.activos_7d) +
       item('⏳ Vencen en 7 días', r.por_vencer) + item('👥 Clientes', r.clientes) + item('⭐ Clientes Premium', r.clientes_pro) +
       item('🧑‍🍳 Equipo', r.equipo) + item('🛒 Pedidos del mes', r.pedidos_mes) + item('🛒 Pedidos hoy', r.pedidos_hoy) + item('💰 Ingresos del mes', Core.money(r.ingresos_mes));
-    const u = r.uso, pct = Math.min(100, Math.round(u.db_bytes * 100 / u.db_limite));
-    $('usoPill').textContent = pct >= 90 ? '🔴 ' + pct + '%' : pct >= 70 ? '🟡 ' + pct + '%' : '🟢 ' + pct + '%';
-    $('usoBarras').innerHTML = '<div class="uso"><div class="row" style="justify-content:space-between"><span>Base de datos</span><b>' + MB(u.db_bytes) + ' de ' + MB(u.db_limite) +
-      '</b></div><div class="barra"><div style="width:' + Math.max(pct, 2) + '%;background:' + (pct >= 90 ? 'var(--bad)' : pct >= 70 ? '#f59e0b' : 'var(--ok)') + '"></div></div></div>';
-    $('usoTablas').innerHTML = Object.entries(u.tablas || {}).sort((a, b) => b[1] - a[1]).slice(0, 10)
-      .map(([k, v]) => '<tr><td>' + Core.esc(k) + '</td><td class="r">' + MB(v) + '</td></tr>').join('');
-    $('usoTxt').textContent = 'Comprobantes guardados: ' + u.comprobantes + ' (' + MB(u.comprobantes_bytes) + '). ' +
-      (pct >= 90 ? 'Casi lleno: limpia o pasa a Supabase Pro.' : pct >= 70 ? 'Va subiendo: programa una limpieza.' : 'Todo bien.');
+    // El uso del servidor se ve en el Centro de Mando → Resumen (carrusel de servidores); aquí solo la limpieza.
     await Promise.all([cargarPerfiles().then(cargarReportes), cargarIngresos(), cargarActividad()]);
   }
   $('cServidor').onclick = async (e) => {

@@ -37,6 +37,7 @@
     '.cfx-atajo svg{flex:none}' +
     '.cfx-cab>.cfx-atajo{display:inline-flex!important;flex-direction:row!important;align-items:center!important;justify-content:center;gap:5px!important;width:auto!important;height:32px!important;min-width:0!important;min-height:0!important;padding:0 11px!important;margin:0!important;' +
     'font:800 12.5px/1 var(--cfx-letra,system-ui,sans-serif)!important;border:0!important;border-radius:99px!important;background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 13%,transparent)!important;color:var(--brand,var(--marca,#2563eb))!important;box-shadow:none!important}' +
+    '.cfx-cab>.cfx-atajo.cfx-oc,.cfx-cab>.cfx-atajo[hidden]{display:none!important}' +
     '.cfx-cab>.cfx-atajo svg{width:16px!important;height:16px!important;margin:0!important}.cfx-cab>.cfx-atajo span{font-size:12.5px!important;line-height:1!important}' +
     '@media(max-width:600px){.cfx-atajo span{display:none}.cfx-cab>.cfx-atajo{width:36px!important;height:36px!important;padding:0!important;gap:0;justify-content:center;border-radius:50%!important}.cfx-cab>.cfx-atajo svg{width:18px!important;height:18px!important}}' +
     // Campana del mismo tamaño que la foto: redonda, con borde suave y el dibujo al centro.
@@ -78,6 +79,15 @@
     '@media(max-width:420px){.cfx-cab{gap:6px}.cfx-plan{padding:0 7px;font-size:10px;letter-spacing:.04em}}' +
     '.cfx-ayuda .ca-yo{display:flex;align-items:center;gap:12px;padding:2px 0 12px;border-bottom:1px solid var(--cfx-borde,#e2e7ec);margin-bottom:6px}.cfx-ayuda .ca-yo .cfx-av{width:46px!important;height:46px!important;max-height:46px;min-width:46px!important;font-size:17px;cursor:default}' +
     '.cfx-ayuda .ca-yo b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-ayuda .ca-yo small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px;overflow-wrap:anywhere}.cfx-ayuda .ca-yo>div{min-width:0}' +
+    // Núcleo 2.20: ✕ y hoja sin anillo doble al abrir, título repetido escondido, botón propio para subir archivos, ícono del título de la hoja.
+    '.cfx-hm-x:focus:not(:focus-visible),.cfx-hm-c:focus{outline:none!important;box-shadow:none!important}.cfx-hm-x:focus-visible{outline:2px solid var(--pf)!important;outline-offset:2px;box-shadow:none!important}' +
+    '.cfx-tit-rep{display:none!important}.cfx-hm-cab h2{display:flex;align-items:center;gap:8px}.cfx-hm-ic{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:color-mix(in srgb,var(--pf) 14%,transparent);color:var(--pf)}.cfx-hm-ic svg{width:18px;height:18px}' +
+    '.cfx-hm-cab h2 .cfx-hm-tx{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.cfx-arch-in{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;margin:0!important;padding:0!important;border:0!important}' +
+    '.cfx-arch{display:flex;align-items:center;gap:12px;margin:6px 0 10px;min-width:0}.cfx-arch-b{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;min-height:44px!important;padding:0 16px!important;margin:0!important;border-radius:12px!important;flex:none;' +
+    'border:1.5px dashed color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 55%,var(--cfx-borde,#e2e7ec))!important;background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 8%,var(--cfx-tarjeta,#fff))!important;color:var(--brand,var(--marca,#2563eb))!important;font:700 14px/1 var(--cfx-letra,system-ui,sans-serif)!important;cursor:pointer;width:auto!important}' +
+    '.cfx-arch-b svg{width:18px;height:18px;flex:none}.cfx-arch-n{min-width:0;flex:1;font:500 13px/1.3 var(--cfx-letra,system-ui,sans-serif);color:var(--cfx-texto-2,#5b6472);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.cfx-arch-v{flex:none;width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:center;border:1px solid var(--cfx-borde,#e2e7ec);display:block}' +
     // Menú en lista (CFX_AJUSTES / CFX_MENU): filas con ícono, nombre, detalle, dato y ›; igual en las 7 apps.
     '.cfx-aj-w{--pf:var(--brand,var(--marca,#2563eb))}.cfx-aj-g{margin:20px 6px 8px;font:800 12px/1.2 var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-aj-w>.cfx-aj-g:first-child{margin-top:4px}' +
@@ -310,12 +320,44 @@
   }
   const CHEV_D = '<svg class="cfx-fila-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
   const SVG_X = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
-  const fila = (s) => '<button type="button" class="cfx-fila' + (s.rojo ? ' cfx-fila-rojo' : '') + '" data-k="' + esc(s.k) + '" data-tipo="' + (s.ir ? 'ir' : s.accion ? 'accion' : 'hoja') + '"><span class="cfx-fila-ic">' + (s.ico || '•') + '</span>' +
+  // Íconos comunes: lo mismo se ve igual en las 7 apps. La app puede pasar una clave (ico: 'perfil') o un emoji; el núcleo reconoce
+  // además las opciones conocidas por su nombre ("Mi perfil", "Cerrar sesión"…). Sin clave conocida → ícono genérico, nunca vacío.
+  const ICO_CLAVE = { perfil: 'usuario', cuenta: 'carnet', estilo: 'paleta', avanzado: 'ajustes', ajustes: 'ajustes', guia: 'brujula', chat: 'chat', plan: 'estrella', premium: 'estrella',
+    invitar: 'regalo', terminos: 'documento', salir: 'puerta', respaldo: 'bajar', equipo: 'usuarios', qr: 'qr', link: 'enlace', pagos: 'tarjeta', avisos: 'campana', empresa: 'tienda',
+    agregar: 'mas', tienda: 'tienda', reglas: 'balanza', socios: 'conexion', registro: 'portapapeles', calificaciones: 'corazon', panel: 'escudo', horario: 'reloj', limpieza: 'escoba',
+    instalar: 'celular', reparar: 'herramienta', animo: 'cara', datos: 'bajar', textos: 'lapiz', versiones: 'cohete', servidor: 'servidor' };
+  const ICO_TITULO = [[/^mi perfil|^foto y nombre/, 'perfil'], [/^mi cuenta$|^cuenta$|^datos de (la )?cuenta/, 'cuenta'], [/^color y modo|^apariencia|^estilo/, 'estilo'], [/^avanzado/, 'avanzado'],
+    [/^gu[ií]a/, 'guia'], [/^chat con soporte|^soporte/, 'chat'], [/^mi plan|^pasar a pro|^premium\b|^plan\b/, 'plan'], [/^invita/, 'invitar'], [/^t[ée]rminos/, 'terminos'],
+    [/^cerrar sesi[oó]n/, 'salir'], [/^respaldo/, 'respaldo'], [/^(mi )?equipo\b|^trabajadores/, 'equipo'], [/^enlace y qr|^qr\b|^c[oó]digo qr|^mi qr/, 'qr'], [/^links? de pago/, 'pagos'],
+    [/^notificaciones|^avisos/, 'avisos'], [/^otra empresa|^agregar|^nueva empresa/, 'agregar'], [/^(mi )?empresa/, 'empresa'], [/^(mi )?tienda/, 'tienda'], [/^reglas/, 'reglas'],
+    [/^socios/, 'socios'], [/^registro\b/, 'registro'], [/calificaciones|^rese[ñn]as/, 'calificaciones'], [/^panel de administraci/, 'panel'], [/^horario/, 'horario'], [/^limpieza/, 'limpieza'],
+    [/^instalar/, 'instalar'], [/^reparar/, 'reparar'], [/^registros de [áa]nimo/, 'animo'], [/^mis datos/, 'datos']];
+  function icono(s) {
+    const I = window.CodeFixIconos, ico = s.ico == null ? '' : String(s.ico).trim();
+    if (!I || !I.svg) return ico || '•';
+    if (/^</.test(ico)) return ico;  // la app ya trae su propio dibujo (svg)
+    const t = String(s.t || '').toLowerCase().trim(), porT = ICO_TITULO.find((x) => x[0].test(t));
+    const clave = ICO_CLAVE[ico] ? ico : porT ? porT[1] : ICO_CLAVE[s.k] ? s.k : '';
+    const nombre = clave ? ICO_CLAVE[clave] : I.deEmoji(ico) || (I.iconos.includes(ico) ? ico : 'apps');
+    return I.svg(nombre) || ico || '•';
+  }
+  const fila = (s) => '<button type="button" class="cfx-fila' + (s.rojo ? ' cfx-fila-rojo' : '') + '" data-k="' + esc(s.k) + '" data-tipo="' + (s.ir ? 'ir' : s.accion ? 'accion' : 'hoja') + '"><span class="cfx-fila-ic no-ico">' + icono(s) + '</span>' +
     '<span class="cfx-fila-t"><b>' + esc(s.t) + '</b>' + (s.d ? '<small>' + esc(s.d) + '</small>' : '') + '</span>' +
     (s.dato !== undefined && s.dato !== null && s.dato !== '' ? '<span class="cfx-fila-dato">' + esc(s.dato) + '</span>' : '') + (s.rojo ? '' : CHEV_D) + '</button>';
   // Hoja desde abajo: se apilan (una encima de otra), cada una se cierra con ✕, deslizando hacia abajo, tocando afuera o con "atrás" del celular.
   // Es una capa normal (z-index 45: sobre la página y la barra de abajo, bajo las ventanas y avisos de cada app), no una ventana del sistema:
   // así las confirmaciones y avisos propios de la app siguen apareciendo encima.
+  // Si lo primero de la hoja es un título igual al de la hoja ("Mi tienda" dentro de "Mi tienda"), se esconde (también si la app lo dibuja después).
+  const normal = (x) => String(x || '').replace(/[\p{Extended_Pictographic}️‍]/gu, '').replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  function sinTituloRepetido(z, titulo) {
+    const T = normal(titulo); if (!T || !z) return;
+    const rev = () => {
+      const h = z.querySelector('h1:not(.cfx-tit-rep), h2:not(.cfx-tit-rep), h3:not(.cfx-tit-rep)'); if (!h || normal(h.textContent) !== T) return;
+      const r = document.createRange(); r.setStart(z, 0); r.setEndBefore(h);
+      if (!r.toString().trim()) h.classList.add('cfx-tit-rep');
+    };
+    rev(); const mo = new MutationObserver(rev); mo.observe(z, { childList: true, subtree: true, characterData: true }); setTimeout(() => mo.disconnect(), 5000);
+  }
   const hojas = []; let popPropio = 0;
   function hoja(titulo, alCerrar) {
     const d = document.createElement('div'); d.className = 'cfx-hoja-m cfx-pf-w'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
@@ -323,7 +365,10 @@
     d.querySelector('h2').innerHTML = titulo;
     document.body.appendChild(d); document.documentElement.classList.add('cfx-hoja-on');
     hojas.push(d); d._t = performance.now();
-    setTimeout(() => { try { d.querySelector('.cfx-hm-x').focus({ preventScroll: true }); } catch (e) { /* nada */ } }, 30);
+    // El foco va a la hoja (no a la ✕: en algunas apps se veía con un anillo doble apenas se abría).
+    d.firstChild.tabIndex = -1;
+    setTimeout(() => { try { d.firstChild.focus({ preventScroll: true }); } catch (e) { /* nada */ } }, 30);
+    sinTituloRepetido(d.querySelector('.cfx-hm-zona'), d.querySelector('h2').textContent);
     try { history.pushState(Object.assign({}, history.state, { cfxHoja: hojas.length }), ''); } catch (e) { /* nada */ }
     let ido = false;
     const fuera = (porAtras) => {
@@ -371,7 +416,7 @@
       if (s.ir) { if (/^#/.test(s.ir)) location.hash = s.ir; else location.href = s.ir; return undefined; }
       if (s.accion) return s.accion();
       let lugar = null;
-      const h = hoja(s.ico + ' ' + esc(s.t), () => {
+      const h = hoja('<span class="cfx-hm-ic no-ico">' + icono(s) + '</span><span class="cfx-hm-tx">' + esc(s.t) + '</span>', () => {
         if (s.nodo && lugar) { s.nodo.classList.add('cfx-oc'); lugar.replaceWith(s.nodo); }
         if (s.alCerrar) s.alCerrar();
       });
@@ -847,8 +892,48 @@
   window.CFX_SERVIDORES = { montar: servidores };
   window.CFX_ANIM = { emergente, salirTodos, deslizar: avisosDeslizar };
 
+  // ---------- Subir archivo: botón propio en español ("Subir foto") con vista previa cuadrada, en vez de "Choose File / No file chosen" ----------
+  // El campo original sigue ahí (escondido): la app lo lee igual. data-nativo lo deja como estaba.
+  const SVG_SUBIR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>';
+  const SVG_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+  function archivos() {
+    document.querySelectorAll('input[type=file]:not([data-cfx-arch]):not([data-nativo])').forEach((i) => {
+      if (!i.offsetParent && getComputedStyle(i).position !== 'fixed') {
+        // escondido por la app (tiene su propio botón) → no se toca; escondido porque su sección aún no se ve → se revisa después
+        const cs = getComputedStyle(i); if (i.hidden || cs.display === 'none') i.dataset.cfxArch = '0';
+        return;
+      }
+      const cs = getComputedStyle(i);
+      if (+cs.opacity < 0.1 || cs.visibility === 'hidden' || i.offsetWidth < 20 || i.offsetHeight < 8) { i.dataset.cfxArch = '0'; return; }
+      i.dataset.cfxArch = '1';
+      const foto = /image/.test(i.accept || ''), cam = i.hasAttribute('capture');
+      const w = document.createElement('div'); w.className = 'cfx-arch';
+      w.innerHTML = '<button type="button" class="cfx-arch-b no-ico">' + (foto ? SVG_CAM : SVG_SUBIR) + '<span></span></button><span class="cfx-arch-n"></span>';
+      w.querySelector('button span').textContent = cam ? 'Tomar foto' : foto ? (i.multiple ? 'Subir fotos' : 'Subir foto') : (i.multiple ? 'Subir archivos' : 'Subir archivo');
+      i.after(w); i.classList.add('cfx-arch-in'); i.tabIndex = -1;
+      w.querySelector('button').onclick = () => { if (!i.disabled) i.click(); };
+      const n = w.querySelector('.cfx-arch-n');
+      const pintar = () => {
+        const L = [...(i.files || [])], v = w.querySelector('.cfx-arch-v'); if (v) { URL.revokeObjectURL(v.src); v.remove(); }
+        n.textContent = L.length ? (L.length > 1 ? L.length + ' archivos' : L[0].name) : 'Ningún archivo elegido';
+        if (L[0] && /^image\//.test(L[0].type)) { const img = document.createElement('img'); img.className = 'cfx-arch-v'; img.alt = ''; img.src = URL.createObjectURL(L[0]); w.insertBefore(img, n); }
+      };
+      i.addEventListener('change', pintar, true); pintar();
+    });
+  }
+  // ---------- Letra mínima: nada de textos de 10–11 px (pills, "sin cuenta", pies) → 12 px ----------
+  function letraMinima() {
+    document.querySelectorAll('.pill, .tag, .chip, .badge, .etiqueta, small, footer, .pie, .hint, .nota, .sub, .muted, .meta, label, p, span').forEach((e) => {
+      if (e.dataset.cfxL || !e.offsetParent || e.closest('nav.cfx-barra, .cfx-cab, svg, .cfx-av, .ic-e, [data-sin-letra]')) return;
+      e.dataset.cfxL = '1';
+      if (!e.textContent.trim() || e.children.length > 3) return;
+      const f = parseFloat(getComputedStyle(e).fontSize); if (f && f < 12) e.style.setProperty('font-size', '12px', 'important');
+    });
+  }
+  // Fechas y textos del navegador en español de Chile (el selector de fecha muestra dd-mm-aaaa).
+  if (!/^es-CL$/i.test(document.documentElement.lang)) document.documentElement.lang = 'es-CL';
   let tTiras = 0;
-  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { separarBotones(); tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); }, 120); };
+  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { separarBotones(); tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); archivos(); letraMinima(); }, 120); };
   new MutationObserver(pedirTiras).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('resize', pedirTiras); addEventListener('hashchange', pedirTiras); pedirTiras();
 

@@ -165,7 +165,17 @@
     const h = [...document.querySelectorAll('header')].find((x) => { const st = getComputedStyle(x); return (st.position === 'fixed' || st.position === 'sticky') && x.getBoundingClientRect().top <= 1; });
     document.documentElement.style.setProperty('--cfx-top', (h ? Math.round(h.getBoundingClientRect().bottom) : 0) + 'px');
   }
+  // Pantallas que bajan dentro de su propia caja (no la página): también dejan espacio abajo para la barra y el +.
+  function espacioAbajo() {
+    if (innerWidth >= 900 || !document.body.classList.contains('cfx-con-barra')) return;
+    document.querySelectorAll('main, .view, .vista, .pantalla, .contenido, section').forEach((e) => {
+      if (e.classList.contains('cfx-pad-barra') || e.closest('dialog, .cfx-hoja-m, .modal, .sheet')) return;
+      const s = getComputedStyle(e);
+      if (/auto|scroll/.test(s.overflowY) && e.clientHeight > innerHeight * 0.5 && e.getBoundingClientRect().bottom > innerHeight - 90) e.classList.add('cfx-pad-barra');
+    });
+  }
   function apilar() {
+    espacioAbajo();
     if (innerWidth >= 900) return;
     cabeceraAlto();
     const padres = new Set([...document.querySelectorAll('.card, .tarjeta')].map((c) => c.parentElement).filter(Boolean));

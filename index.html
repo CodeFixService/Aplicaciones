@@ -81,6 +81,8 @@
   .ayuda { position: fixed; right: 14px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 30; width: 44px; height: 44px; border-radius: 50%;
     display: grid; place-items: center; text-decoration: none; font-size: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
   .ayuda.emprende { bottom: calc(138px + env(safe-area-inset-bottom)); font-size: 19px; }
+  /* Con la barra de abajo el ❓ flotante tapaba filas: la ayuda está en Más / Cuenta → Chat con soporte. */
+  body.cfx-con-barra .ayuda:not(.emprende) { display: none !important; }
   .app.bloq { opacity: .55; filter: grayscale(1); }
   .danger-zone { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
   .anual { margin-top: 12px; padding: 12px; border-radius: var(--radius-sm); border: 2px dashed var(--premium); }
@@ -324,9 +326,10 @@
   const showView = (v) => {
     views.forEach((x) => $(x).classList.toggle('hidden', x !== v));
     // Inicio: botón ⚙️ Ajustes. Ajustes: botón ‹ para volver.
-    const a = Cuenta.account, negocio = a && (a.role === 'user' || a.role === 'equipo');
-    $('bAjustes').classList.toggle('hidden', v !== 'v-home' || negocio);
-    $('bVolver').classList.toggle('hidden', v !== 'v-ajustes' || negocio);
+    // El cliente tiene todo en Cuenta (menú común): sin ⚙️ ni ‹ en la cabecera.
+    const a = Cuenta.account, negocio = a && (a.role === 'user' || a.role === 'equipo'), cli = a && a.role === 'client';
+    $('bAjustes').classList.toggle('hidden', v !== 'v-home' || negocio || cli);
+    $('bVolver').classList.toggle('hidden', v !== 'v-ajustes' || negocio || cli);
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
@@ -523,6 +526,9 @@
     Cuenta.aplicarLogo(acc);
     // Cliente: logo y nombre de su tienda en la bienvenida.
     $('tiendaChip').classList.toggle('hidden', !cliente || !acc.negocio);
+    // Cliente: su foto y nombre ya salen arriba del menú de Cuenta; aquí queda solo "Tu tienda" (sin perfil repetido).
+    ['avatar', 'hola', 'estadoPlan'].forEach((id) => $(id).classList.toggle('hidden', cliente));
+    document.querySelector('#v-home .card.hola').classList.toggle('hidden', cliente && !acc.negocio);
     if (cliente && acc.negocio) {
       $('tiendaNom').textContent = acc.negocio;
       const lg = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(acc.negocio_logo || '') ? acc.negocio_logo : '';

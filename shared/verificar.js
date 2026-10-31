@@ -33,6 +33,8 @@
     document.body.appendChild(capa); capa.showModal();
     const caja = capa.firstChild, cerrar = () => { capa.close(); capa.remove(); };
     capa.addEventListener('click', (ev) => { if (ev.target === capa || ev.target.closest('[data-x]')) cerrar(); });
+    // Escape (y "atrás" del teclado) también la cierra, igual que tocar afuera.
+    capa.addEventListener('cancel', (ev) => { ev.preventDefault(); cerrar(); });
     let e = null;
     try { e = await o.rpc('cfx_verif_estado'); } catch (x) { caja.innerHTML = '<p class="cp-err">' + esc(x.message) + '</p><button type="button" data-x>Cerrar</button>'; return; }
     if (e && e.estado !== 'rechazada') {

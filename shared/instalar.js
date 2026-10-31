@@ -6,9 +6,11 @@
       (ahí no se puede instalar ni recibir notificaciones).
    2) Si la app no está instalada → "Instalar" (Android: instala con un toque; iPhone: Compartir → Agregar a inicio).
    3) Si hay sesión y las notificaciones no están activas → "Activar notificaciones" (usa la función de cada app).
-   Si la persona toca "Ahora no", vuelve a aparecer al abrir la app otra vez y cada 1 hora mientras esté abierta.
-   Con sesión las notificaciones son OBLIGATORIAS: el aviso tapa la app y no tiene "Ahora no" (en iPhone primero hay que
-   instalarla, porque Safari no recibe avisos). Solo si activarlas falla aparece "Seguir sin avisos por ahora". */
+   Nunca es obligatorio: siempre hay "Ahora no" y ✕.
+   · "Ahora no" → no vuelve a salir hasta la próxima vez que abra la app, y como máximo 1 vez al día.
+   · "Ya la instalé" → no se vuelve a preguntar nunca en ese equipo (tampoco si ya se abre como app instalada).
+   · Notificaciones: una tarjeta chica arriba de la pantalla de inicio con "Activar" y ✕ (no una ventana encima cada minuto).
+     ✕ la esconde por 3 días. */
 (function () {
   'use strict';
   if (window.CodeFixInstalar || /legal|actualizar\.html/.test(location.pathname)) return;
@@ -65,24 +67,35 @@
     '@media(prefers-color-scheme:dark){.cfx-hoja{background:#111827;color:#f1f5f9;box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08)}.cfx-hoja p,.cfx-hoja ol{color:#cbd5e1}.cfx-hoja .cfx-no{background:#1f2937;color:#e2e8f0}}' +
     '@media(min-width:900px){.cfx-hoja{bottom:24px}}' +
     '.cfx-hoja-velo{position:fixed;inset:0;z-index:2147482999;background:rgba(15,23,42,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);animation:cfxVelo .2s ease}@keyframes cfxVelo{from{opacity:0}}' +
-    '.cfx-hoja.cfx-oblig .cfx-no{display:none}.cfx-hoja .cfx-luego{display:block;margin:10px auto 0;background:none;border:0;min-height:0;color:#64748b;font-size:13px;font-weight:600;text-decoration:underline}';
+    '.cfx-hoja .cfx-x{position:absolute;top:8px;right:8px;width:36px;height:36px;min-height:0;flex:none;padding:0;display:grid;place-items:center;border-radius:10px;background:transparent;color:#64748b}' +
+    '.cfx-hoja{padding-right:44px}.cfx-hoja .cfx-btns{margin-right:-28px}' +
+    '.cfx-av-tarj{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 12px 12px 14px;border-radius:16px;border:1px solid color-mix(in srgb,var(--cfx-color) 30%,var(--cfx-borde,#e2e7ec));' +
+    'background:color-mix(in srgb,var(--cfx-color) 8%,var(--cfx-tarjeta,#fff));color:var(--cfx-texto,#0f172a);font:14px/1.35 var(--cfx-letra,system-ui,sans-serif);animation:cfxSube .3s ease}' +
+    '.cfx-av-tarj .cfx-av-ic{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--cfx-color);color:#fff}.cfx-av-tarj .cfx-av-ic svg{width:18px;height:18px}' +
+    '.cfx-av-tarj div{flex:1;min-width:0}.cfx-av-tarj b{display:block;font-size:14.5px}.cfx-av-tarj small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px}' +
+    '.cfx-av-tarj .cfx-av-si{flex:none;min-height:40px;padding:0 14px;border-radius:12px;border:0;background:var(--cfx-color);color:#fff;font:700 14px/1 inherit;cursor:pointer}' +
+    '.cfx-av-tarj .cfx-av-x{flex:none;width:36px;height:36px;min-height:0;padding:0;display:grid;place-items:center;border-radius:10px;border:0;background:transparent;color:var(--cfx-texto-2,#64748b);cursor:pointer}';
   document.head.appendChild(css);
   const SVG = {
     compartir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 12v8h14v-8"/></svg>',
     mas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
-    puntos: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>'
+    puntos: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+    x: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    campana: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21a2 2 0 0 0 4 0"/></svg>'
   };
-  let hoja = null, velo = null, obligar = false;
-  function cerrar() { if (hoja) { hoja.remove(); hoja = null; } if (velo) { velo.remove(); velo = null; } }
+  let hoja = null;
+  const DIA = 864e5;
+  // "Ahora no" / ✕: hasta la próxima vez que abra la app y máximo 1 vez al día.
+  const posponer = () => { guardar('pospuesto', Date.now()); try { sessionStorage.setItem('cfx-inst:no', '1'); } catch (e) { /* nada */ } };
+  function cerrar() { if (hoja) { hoja.remove(); hoja = null; } }
   function mostrar(titulo, texto, extra, si, alSi, no) {
     cerrar();
-    hoja = document.createElement('div'); hoja.className = 'cfx-hoja no-ico' + (obligar ? ' cfx-oblig' : ''); hoja.setAttribute('role', 'dialog'); hoja.style.setProperty('--cfx-color', color);
-    if (obligar) { hoja.setAttribute('aria-modal', 'true'); velo = document.createElement('div'); velo.className = 'cfx-hoja-velo'; document.body.appendChild(velo); }
-    hoja.innerHTML = '<div class="cfx-fila">' + (icono ? '<img alt="" src="' + icono + '">' : '') + '<div><b></b><p></p></div></div>' + (extra || '') +
+    hoja = document.createElement('div'); hoja.className = 'cfx-hoja no-ico'; hoja.setAttribute('role', 'dialog'); hoja.style.setProperty('--cfx-color', color);
+    hoja.innerHTML = '<button type="button" class="cfx-x" aria-label="Cerrar">' + SVG.x + '</button><div class="cfx-fila">' + (icono ? '<img alt="" src="' + icono + '">' : '') + '<div><b></b><p></p></div></div>' + (extra || '') +
       '<div class="cfx-btns"><button type="button" class="cfx-no"></button>' + (si ? '<button type="button" class="cfx-si"></button>' : '') + '</div>';
     hoja.querySelector('b').textContent = titulo; hoja.querySelector('p').textContent = texto;
     hoja.querySelector('.cfx-no').textContent = no || 'Ahora no';
-    hoja.querySelector('.cfx-no').onclick = () => { guardar('pospuesto', Date.now()); cerrar(); };
+    hoja.querySelector('.cfx-no').onclick = hoja.querySelector('.cfx-x').onclick = () => { posponer(); cerrar(); };
     if (si) { const b = hoja.querySelector('.cfx-si'); b.textContent = si; b.onclick = async () => { b.disabled = true; try { await alSi(); } finally { b.disabled = false; } }; }
     document.body.appendChild(hoja);
   }
@@ -110,59 +123,61 @@
   }
   function pedirInstalar() {
     if (promptInstalar) {
-      return mostrar('Instala ' + nombre, 'Queda como una app en tu celular: entras con un toque, más rápido y seguro, y te llegan los avisos.', '',
+      return mostrar('Instala ' + nombre, 'Instálala en tu celular: abre más rápido, funciona mejor y te llegan los avisos. No es obligatorio.', '',
         'Instalar', async () => { const p = promptInstalar; promptInstalar = null; p.prompt(); const r = await p.userChoice.catch(() => ({})); if (r && r.outcome === 'accepted') { guardar('instalada', Date.now()); cerrar(); } else guardar('pospuesto', Date.now()); });
     }
     if (esIOS) {
-      return mostrar('Instala ' + nombre + ' en tu iPhone', 'Así entras con un toque y te llegan los avisos de tus pedidos.',
+      return mostrar('Instala ' + nombre + ' en tu iPhone', 'Instálala en tu celular: abre más rápido, funciona mejor y te llegan los avisos. No es obligatorio.',
         '<ol><li>Toca el botón Compartir ' + SVG.compartir + ' (abajo o arriba).</li><li>Elige <b style="display:inline">Agregar a inicio</b> ' + SVG.mas + '.</li><li>Abre la app desde el ícono nuevo.</li></ol>',
-        'Ya la agregué', async () => { guardar('instalada', Date.now()); cerrar(); }, 'Ahora no');
+        'Ya la instalé', async () => { guardar('instalada', Date.now()); cerrar(); }, 'Ahora no');
     }
-    return mostrar('Instala ' + nombre, '¿Ya la tienes? Ábrela desde el ícono de tu pantalla de inicio. Si no, toca ⋮ en el navegador y elige "Instalar aplicación" o "Agregar a pantalla de inicio".', '',
-      'Ya la tengo', async () => { guardar('instalada', Date.now()); cerrar(); });
+    return mostrar('Instala ' + nombre, 'Instálala en tu celular: abre más rápido, funciona mejor y te llegan los avisos. No es obligatorio. Toca ⋮ en el navegador y elige "Instalar aplicación".', '',
+      'Ya la instalé', async () => { guardar('instalada', Date.now()); cerrar(); });
+  }
+  // Tarjeta chica arriba de la pantalla de inicio: "Activa los avisos" · Activar · ✕ (3 días). Si la app vuelve a dibujar, se repone.
+  let tarj = null;
+  function lugarTarjeta() {
+    const vis = (e) => e && e.offsetParent !== null && e.getBoundingClientRect().height > 40;
+    const L = [...document.querySelectorAll('main .view.on, main .view.activa, main .vista.on, main section.on, main > section:not([hidden]), main, #app, .app')].filter(vis);
+    return L.find((e) => !e.closest('dialog, .cfx-hoja-m, header, nav')) || null;
   }
   function pedirAvisos(ad) {
-    const bloqueadas = Notification.permission === 'denied';
-    if (bloqueadas) {
-      return mostrar('Tus notificaciones están bloqueadas', 'Son obligatorias para enterarte al tiro de todo lo que pasa. Desbloquéalas:',
-        '<ol><li>Toca el candado o ' + SVG.puntos + ' junto a la dirección (o Ajustes del celular → esta app).</li><li>Notificaciones → <b style="display:inline">Permitir</b>.</li><li>Vuelve y recarga la página.</li></ol>',
-        'Ya las permití', async () => { location.reload(); });
-    }
-    mostrar('Activa las notificaciones', 'Son obligatorias: te avisamos al tiro de todo (pedidos, pagos, mensajes y cambios), aunque tengas la app cerrada.', '',
-      'Activar', async () => {
-        try { await ad.activar(); cerrar(); guardar('avisos', Date.now()); }
-        catch (e) {
-          // La app aún no tiene sus claves push (se crean en CM → Control → 🔔 Notificaciones): no se muestra el error y se vuelve a ofrecer en 1 día.
-          if (/administrador a[uú]n no activ/i.test((e && e.message) || '')) { guardar('sinclaves', Date.now()); return cerrar(); }
-          const p = hoja && hoja.querySelector('p'); if (p) p.textContent = (e && e.message) || 'No se pudo activar. Intenta de nuevo.';
-          if (hoja && !hoja.querySelector('.cfx-luego')) { const l = document.createElement('button'); l.type = 'button'; l.className = 'cfx-luego'; l.textContent = 'Seguir sin avisos por ahora'; l.onclick = () => { guardar('fallo', Date.now()); cerrar(); }; hoja.appendChild(l); }
-        }
-      });
+    const bloq = Notification.permission === 'denied', donde = lugarTarjeta(); if (!donde) return;
+    if (tarj && tarj.isConnected) return;
+    tarj = document.createElement('div'); tarj.className = 'cfx-av-tarj no-ico'; tarj.setAttribute('role', 'region'); tarj.setAttribute('aria-label', 'Notificaciones'); tarj.style.setProperty('--cfx-color', color);
+    tarj.innerHTML = '<span class="cfx-av-ic">' + SVG.campana + '</span><div><b></b><small></small></div>' + (bloq ? '' : '<button type="button" class="cfx-av-si">Activar</button>') + '<button type="button" class="cfx-av-x" aria-label="Ahora no">' + SVG.x + '</button>';
+    tarj.querySelector('b').textContent = bloq ? 'Tus avisos están bloqueados' : 'Activa los avisos';
+    tarj.querySelector('small').textContent = bloq ? 'Permítelos en el candado junto a la dirección o en Ajustes del celular.' : 'Te avisamos de pedidos, pagos y mensajes aunque la app esté cerrada.';
+    tarj.querySelector('.cfx-av-x').onclick = () => { guardar('avisos-no', Date.now()); tarj.remove(); tarj = null; };
+    const si = tarj.querySelector('.cfx-av-si');
+    if (si) si.onclick = async () => {
+      si.disabled = true; si.textContent = '…';
+      try { await ad.activar(); guardar('avisos', Date.now()); tarj.remove(); tarj = null; }
+      catch (e) {
+        if (/administrador a[uú]n no activ/i.test((e && e.message) || '')) { guardar('sinclaves', Date.now()); tarj.remove(); tarj = null; return; }
+        tarj.querySelector('small').textContent = (e && e.message) || 'No se pudo activar. Intenta de nuevo.'; si.disabled = false; si.textContent = 'Reintentar';
+      }
+    };
+    donde.prepend(tarj);
   }
 
   async function revisar() {
-    if (hoja || document.hidden) return;
-    if (document.querySelector('dialog[open], .velo, .modal.on, .modal-fondo')) return; // no tapar otra ventana
+    if (document.hidden || window.CFX_SIN_OBLIGAR) return;
     const ad = adaptador();
     let haySesion = false; try { haySesion = !!ad && await ad.sesion(); } catch (e) { /* sin sesión */ }
-    // Obligatorio: hay sesión, la app ya tiene claves push y activarlas no falló en las últimas 24 h.
-    const falta = haySesion && !window.CFX_SIN_OBLIGAR && !(Date.now() - (leer('sinclaves') || 0) < 864e5) && !(Date.now() - (leer('fallo') || 0) < 864e5) && !(await pushActiva());
-    const pos = leer('pospuesto');
-    if (!falta && pos && Date.now() - pos < CADA && sessionStorage.getItem('cfx-inst:visto')) return;
-    try { sessionStorage.setItem('cfx-inst:visto', '1'); } catch (e) { /* nada */ }
-    if (hoja) return;
+    // Notificaciones: tarjeta suave (no la ventana de abajo), salvo que la haya cerrado hace menos de 3 días o la app no tenga claves aún.
+    if (haySesion && pushPosible() && !(Date.now() - leer('avisos-no') < 3 * DIA) && !(Date.now() - leer('sinclaves') < DIA) && !(await pushActiva())) pedirAvisos(ad);
+    else if (tarj) { tarj.remove(); tarj = null; }
+    // Ventana de abajo (instalar / abrir en la app): 1 vez por apertura, como máximo 1 vez al día si dijo "Ahora no", nunca si dijo "Ya la instalé".
+    if (hoja || sessionStorage.getItem('cfx-inst:no') || sessionStorage.getItem('cfx-inst:visto')) return;
+    if (document.querySelector('dialog[open], .velo, .modal.on, .modal-fondo, .cfx-hoja-m')) return; // no tapar otra ventana
+    if (Date.now() - leer('pospuesto') < DIA) return;
     const movil = esIOS || esAndroid;
-    obligar = false;
-    if (esAndroid && !instalada() && (yaInstalada || (enApp && leer('instalada')))) return abrirEnApp();
-    if (enApp && movil) return abrirEnNavegador();
-    // iPhone: Safari no recibe avisos, así que con sesión instalarla también es obligatorio.
-    obligar = falta && esIOS && !pushPosible();
-    if (movil && !instalada() && !yaInstalada && (obligar || !(leer('instalada') && !promptInstalar && Date.now() - leer('instalada') < 7 * 864e5))) return pedirInstalar();
-    obligar = false;
-    if (!falta || !pushPosible()) return;
-    obligar = true;
-    pedirAvisos(ad);
+    if (esAndroid && !instalada() && (yaInstalada || (enApp && leer('instalada')))) { marcarVisto(); return abrirEnApp(); }
+    if (enApp && movil) { marcarVisto(); return abrirEnNavegador(); }
+    if (movil && !instalada() && !yaInstalada && !leer('instalada')) { marcarVisto(); return pedirInstalar(); }
   }
+  const marcarVisto = () => { try { sessionStorage.setItem('cfx-inst:visto', '1'); } catch (e) { /* nada */ } };
   // Para el perfil común (ayuda.js): estado y activar las notificaciones con el adaptador de cada app.
   const activarPush = async () => { const ad = adaptador(); if (!ad || !pushPosible()) throw new Error('Este navegador no permite notificaciones'); await ad.activar(); };
   window.CodeFixInstalar = { revisar, cerrar, pushActiva, activarPush };

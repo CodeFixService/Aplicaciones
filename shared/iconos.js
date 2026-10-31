@@ -103,7 +103,10 @@
     flecha: '<path d="M7 17L17 7M8 7h9v9"/>',
     mano: '<path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V11M10 10V4a1.5 1.5 0 0 1 3 0v6M13 10V5a1.5 1.5 0 0 1 3 0v6M16 11V8a1.5 1.5 0 0 1 3 0v6c0 4-3 7-7 7-3 0-4.5-1.5-6-4l-2-3.5a1.5 1.5 0 0 1 2.5-1.5L7 14"/>',
     musculo: '<path d="M4 15c2-6 5-10 9-11l1 3-3 1 1 3c3-1 6 0 7 3 1 4-3 6-8 6-4 0-6-2-7-5z"/>',
-    punto: '<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>'
+    punto: '<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>',
+    cara: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5v.01M15 9.5v.01"/>',
+    apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
+    cerebro: '<path d="M12 5a3 3 0 0 0-5.6-1.5A3 3 0 0 0 4 8a3 3 0 0 0 0 5 3.5 3.5 0 0 0 4 5.5A3 3 0 0 0 12 20zM12 5a3 3 0 0 1 5.6-1.5A3 3 0 0 1 20 8a3 3 0 0 1 0 5 3.5 3.5 0 0 1-4 5.5A3 3 0 0 1 12 20zM12 5v15"/>'
   };
   // emoji (sin variante) → [ícono, color]
   const M = {};
@@ -128,6 +131,7 @@
   asignar('🖥', 'pantalla'); asignar('👑', 'corona', 'oro'); asignar('🧮', 'calculadora'); asignar('🖨', 'impresora'); asignar('📞 ☎', 'telefono');
   asignar('↗', 'flecha'); asignar('👋', 'mano'); asignar('💪', 'musculo'); asignar('🟢', 'punto', 'verde'); asignar('🔴', 'punto', 'rojo');
   asignar('🟡 🟠', 'punto', 'ambar'); asignar('🔵', 'punto', 'azul'); asignar('⚪', 'punto', 'gris');
+  asignar('🙂 😊 😀 😃 🥰 😌', 'cara'); asignar('🧩 🔲', 'apps'); asignar('🧠', 'cerebro');
 
   const SEL = 'nav a, nav button, button, a.btn, .btn, a.item, .item, .chip, summary, h1, h2, h3, h4, .tag, .pill, .banda, .banner, .aviso, .alerta, th, .kpi .t, .sec, li, .stats span, .titulo, label, a[class]';
   const FUERA = '.no-ico, [data-emoji], textarea, input, select, [contenteditable], .logo-mini, .logo, .avatar, .app-ico, .emoji, .chat, .mensajes, .burbuja, .msg, .lp-tel, #toast, .toast, svg, script, style';
@@ -190,6 +194,8 @@
     obs = new MutationObserver((ms) => ms.forEach((m) => { if (m.type === 'characterData') anotar(m.target); else m.addedNodes.forEach(anotar); }));
     obs.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
-  window.CodeFixIconos = { procesar, iconos: Object.keys(P) };
+  // Para el núcleo: svg('usuario') dibuja un ícono por nombre; deEmoji('👤') da el nombre del ícono de ese emoji (o null).
+  const deEmoji = (e) => { const m = RX.exec(String(e || '')); const d = m && M[m[2].replace(/️/g, '')]; return d ? d[0] : null; };
+  window.CodeFixIconos = { procesar, iconos: Object.keys(P), svg: (n) => (P[n] ? svg(n) : ''), deEmoji };
   if (document.body) iniciar(); else document.addEventListener('DOMContentLoaded', iniciar);
 })();
