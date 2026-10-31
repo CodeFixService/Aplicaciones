@@ -21,7 +21,7 @@
   const pintarLogoArriba = () => $('bInicio').classList.toggle('logo', !!Cuenta.aplicarLogo(Cuenta.account));
   pintarLogoArriba();
   let perfiles = {};
-  const DB_VERSION = '5.13';
+  const DB_VERSION = Core.dbVersion; // una sola fuente: shared/core.js
 
   /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
   const loaders = { resumen: cargarResumen, negocios: cargarNegocios, clientes: cargarClientes, ajustes: () => verAjuste() };
@@ -40,7 +40,9 @@
   const MB = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB';
   async function cargarResumen() {
     const r = await Cuenta.rpc('admin_resumen');
-    $('cBase').classList.toggle('hidden', r.version === DB_VERSION);
+    // Aviso solo si la base está MÁS VIEJA que la que espera la app (si es más nueva, la app es la que se pone al día).
+    const num = (v) => String(v || '0').split('.').map(Number), vieja = (a, b) => { const x = num(a), y = num(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
+    $('cBase').classList.toggle('hidden', !vieja(r.version, DB_VERSION));
     $('baseTxt').textContent = 'La app es la ' + DB_VERSION + ' y la base de datos la ' + r.version + '. Se actualiza sola en máximo 10 minutos (no borra datos).';
     const item = (t, v) => '<div class="card"><span class="muted">' + t + '</span><b>' + v + '</b></div>';
     $('stats').innerHTML = item('🏪 Negocios', r.negocios) + item('⭐ Negocios Pro', r.negocios_pro) + item('🟢 Activos 7 días', r.activos_7d) +
