@@ -138,7 +138,7 @@
     '.cfx-btns-auto{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0}.cfx-btns-auto>*{margin:0!important}' +
     '.cfx-pf-w{margin-bottom:16px}.cfx-pf .cfx-pf-modos{margin-bottom:4px}' +
     // Perfil común (CFX_PERFIL): diseño propio, igual en las 7 apps (no hereda botones ni campos de la app). --pf = color de la app.
-    '.cfx-pf-w{--pf:var(--brand,var(--marca,#2563eb));--pf2:color-mix(in srgb,var(--pf) 62%,#7c3aed);--pf-borde:color-mix(in srgb,var(--pf) 22%,var(--cfx-borde,#e2e7ec))}' +
+    '.cfx-pf-w{--pf:var(--brand,var(--marca,#2563eb));--pf2:color-mix(in srgb,var(--pf) 80%,#000);--pf-borde:color-mix(in srgb,var(--pf) 22%,var(--cfx-borde,#e2e7ec))}' +
     '.cfx-pf{display:flex;flex-direction:column;gap:14px}.cfx-pf label{display:flex;flex-direction:column;gap:6px;font:700 12.5px/1.2 inherit;letter-spacing:.04em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472);margin:0}' +
     '.cfx-pf label small{text-transform:none;letter-spacing:0;font-weight:500}' +
     '.cfx-pf input:not([type=color]),.cfx-pf textarea{width:100%!important;box-sizing:border-box;margin:0!important;min-height:48px;padding:12px 14px!important;border-radius:14px!important;border:1.5px solid var(--pf-borde)!important;' +
