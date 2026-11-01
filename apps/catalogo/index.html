@@ -92,6 +92,41 @@
   .zoom { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.85); cursor: zoom-out; }
   .zoom img { max-width: 100%; max-height: 100%; border-radius: 12px; }
   #pagoTxt { white-space: pre-wrap; font: inherit; margin: 0; padding: 10px; background: var(--field); border-radius: 10px; }
+
+  /* ---- Tarjetas estilo tienda (galácticas, suaves) ---- */
+  .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .item { padding: 0 0 12px; overflow: hidden; border-radius: 18px; gap: 5px;
+    border: 1px solid color-mix(in srgb, var(--brand, #2563eb) 22%, var(--line));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--brand, #2563eb) 5%, var(--card)), var(--card) 40%);
+    box-shadow: 0 1px 2px rgba(15,10,40,.06), 0 8px 22px -12px color-mix(in srgb, var(--brand, #2563eb) 45%, transparent);
+    transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; animation: itemIn .45s cubic-bezier(.2,.8,.2,1) both; }
+  .item > :not(.foto):not(.fav):not(.cinta):not(.acc) { margin-left: 12px; margin-right: 12px; }
+  .item .acc { padding: 4px 12px 0; }
+  .item:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(15,10,40,.06), 0 14px 30px -12px color-mix(in srgb, var(--brand, #2563eb) 60%, transparent); }
+  .item:active { transform: scale(.985); }
+  .item:nth-child(2) { animation-delay: .04s } .item:nth-child(3) { animation-delay: .08s } .item:nth-child(4) { animation-delay: .12s }
+  .item:nth-child(5) { animation-delay: .16s } .item:nth-child(n+6) { animation-delay: .2s }
+  @keyframes itemIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+  .item .foto { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; margin: 0 0 6px; border-radius: 0; transition: transform .5s cubic-bezier(.2,.8,.2,1); }
+  .item:hover .foto { transform: scale(1.04); }
+  .item:not(:has(.foto)) { padding-top: 12px; }
+  .item .p { color: var(--brand, #2563eb); font-size: 19px; }
+  .item .p.tachado { color: var(--muted); }
+  .fav { backdrop-filter: blur(8px); background: color-mix(in srgb, var(--card) 75%, transparent); box-shadow: 0 2px 8px rgba(0,0,0,.12); transition: transform .2s; }
+  .fav:active { transform: scale(.85); }
+  .item select.opc { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .item .cfx-sel-btn { display: none !important; }
+  .item .acc { flex-wrap: wrap; } .item .acc .btn, .item .acc button { flex: 1 1 100%; white-space: nowrap; min-height: 40px; border-radius: 12px; }
+  .opc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opc-ch { min-height: 30px; min-width: 30px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; box-shadow: none;
+    background: var(--field); color: var(--text); border: 1.5px solid transparent; transition: transform .15s, border-color .2s, background .2s; }
+  .opc-ch:active { transform: scale(.92); }
+  .opc-ch.on { border-color: var(--brand, #2563eb); background: color-mix(in srgb, var(--brand, #2563eb) 14%, var(--card)); }
+  .opc-ch.sw { padding: 3px; width: 30px; }
+  .opc-ch.sw i { display: block; width: 100%; height: 100%; min-height: 22px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+  .opc-ch .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .opc-falta { animation: opcFalta .4s; } @keyframes opcFalta { 25% { transform: translateX(-4px) } 75% { transform: translateX(4px) } }
+  @media (prefers-reduced-motion: reduce) { .item, .item .foto, .opc-ch { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
@@ -351,7 +386,9 @@
         '<span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
         (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
         (i.opciones ? (comprador ? '<select class="opc" data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +
-          i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => '<option>' + Core.esc(o) + '</option>').join('') + '</select>'
+          i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => '<option>' + Core.esc(o) + '</option>').join('') + '</select>' +
+          '<div class="opc-chips" role="group" aria-label="Opciones">' + i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => { const c = window.colorDe ? window.colorDe(o) : '';
+            return '<button type="button" class="opc-ch' + (c ? ' sw' : '') + '" data-opc-v="' + Core.esc(o) + '" title="' + Core.esc(o) + '"' + (c ? ' style="--sw:' + c + '"' : '') + '>' + (c ? '<i></i><span class="sr">' + Core.esc(o) + '</span>' : Core.esc(o)) + '</button>'; }).join('') + '</div>'
           : '<span class="desc">🎨 ' + Core.esc(i.opciones) + '</span>') : '') +
         (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
               : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Más barato con Premium</span>' : '')) +
@@ -384,7 +421,7 @@
       if (it && it.opciones) {
         const sel = b.closest('.item').querySelector('select.opc');
         opcion = sel && sel.value;
-        if (!opcion) { if (sel) sel.focus(); return Core.toast('🎨 Elige el color u opción primero'); }
+        if (!opcion) { const ch = b.closest('.item').querySelector('.opc-chips'); if (ch) { ch.classList.remove('opc-falta'); void ch.offsetWidth; ch.classList.add('opc-falta'); } else if (sel) sel.focus(); return Core.toast('🎨 Elige el color u opción primero'); }
       }
       agregarAlCarro({ clave: b.dataset.add, opcion });
     }
@@ -662,5 +699,20 @@
 <script src="../../shared/verificar.js"></script>
 <script src="../../shared/premium.js"></script>
 <script src="../../shared/ayuda.js"></script>
+<script>
+// Opciones como botones: elegir uno marca la opción del producto (el carrito sigue leyendo el select).
+function colorDe(o) {
+  const C = { negro: '#111', blanco: '#fff', rojo: '#e11d48', azul: '#2563eb', verde: '#16a34a', amarillo: '#facc15', rosado: '#f472b6', rosa: '#f472b6',
+    morado: '#7c3aed', lila: '#c4b5fd', naranjo: '#f97316', naranja: '#f97316', gris: '#9ca3af', cafe: '#7c4a2d', café: '#7c4a2d', beige: '#e7d7b9',
+    celeste: '#7dd3fc', burdeo: '#7f1d1d', dorado: '#d4a017', plateado: '#cbd5e1', crema: '#f5ecd7', turquesa: '#14b8a6', fucsia: '#d946ef' };
+  return C[String(o).toLowerCase().trim()] || (/^#[0-9a-f]{3,6}$/i.test(o.trim()) ? o.trim() : '');
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-opc-v]'); if (!b) return;
+  const it = b.closest('.item'), sel = it && it.querySelector('select.opc'); if (!sel) return;
+  sel.value = b.dataset.opcV; sel.dispatchEvent(new Event('change', { bubbles: true }));
+  it.querySelectorAll('.opc-ch').forEach((x) => x.classList.toggle('on', x === b));
+});
+</script>
 </body>
 </html>
