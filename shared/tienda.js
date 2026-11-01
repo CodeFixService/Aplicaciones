@@ -42,13 +42,17 @@
   .opc-ch.sw i{display:block;width:100%;aspect-ratio:1;border-radius:50%;background:var(--sw);box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
   .opc-ch .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   .opc-falta{animation:opcFalta .4s}@keyframes opcFalta{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
-  #grid.v3 .item{border-radius:14px;padding-bottom:8px!important}
+  #grid.v3 .item{border-radius:14px;padding-bottom:8px!important;gap:3px}
   #grid.v3 .item>:not(.foto):not(.fav):not(.cinta):not(.acc){margin-left:8px;margin-right:8px}
-  #grid.v3 .item .desc,#grid.v3 .item .cat,#grid.v3 .item .prem,#grid.v3 .item .nuevo{display:none}
-  #grid.v3 .item b{font-size:12.5px;line-height:1.25;padding-right:22px}
-  #grid.v3 .item .p{font-size:14px} #grid.v3 .opc-ch{min-height:24px;min-width:24px;font-size:11px;padding:2px 7px} #grid.v3 .opc-ch.sw{width:24px;height:24px;padding:2px}
-  #grid.v3 .item .acc{padding:2px 8px 0} #grid.v3 .item .acc .btn,#grid.v3 .item .acc button{min-height:32px;font-size:12px;padding:4px}
+  #grid.v3 .item .desc,#grid.v3 .item .cat,#grid.v3 .item .prem,#grid.v3 .item .nuevo,#grid.v3 .item .cinta{display:none}
+  #grid.v3 .item b{font-size:12px;font-weight:700;line-height:1.3;padding-right:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+  #grid.v3 .item:not(:has(.foto)) b{padding-right:24px}
+  #grid.v3 .item .p{font-size:14px} #grid.v3 .item .p.tachado{font-size:11px}
+  #grid.v3 .opc-chips{gap:4px} #grid.v3 .opc-ch{min-height:22px;min-width:22px;font-size:10.5px;padding:1px 6px} #grid.v3 .opc-ch.sw{width:22px;height:22px;padding:2px}
+  #grid.v3 .item .acc{padding:2px 8px 0;gap:4px} #grid.v3 .item .acc .btn,#grid.v3 .item .acc button{min-height:32px;font-size:0;padding:0;border-radius:10px}
+  #grid.v3 .item .acc>:first-child::before{content:"＋ Agregar";font-size:12px;font-weight:700}#grid.v3 .item .acc>[disabled]:first-child::before{content:"Agotado"}
   #grid.v3 .item .acc>:not(:first-child){display:none} #grid.v3 .fav{width:28px;height:28px;font-size:14px;top:5px;right:5px}
+  @media (max-width:340px){#grid.v3{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
   #grid.v1 .item .foto{aspect-ratio:4/3}
   @media (prefers-reduced-motion:reduce){#grid .item,#grid .item .foto,.opc-ch{animation:none!important;transition:none!important}}`;
   d.head.appendChild(css);

@@ -153,7 +153,8 @@
         i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => '<option>' + Core.esc(o) + '</option>').join('') + '</select>' : '') +
       '<span class="p">' + precio(i.precio) + '</span>' +
       (i.disponible != null && i.disponible <= 3 ? '<span class="pill ' + (i.disponible ? 'warn' : 'bad') + '" style="align-self:flex-start">' + (i.disponible ? 'Quedan ' + i.disponible : 'Agotado') + '</span>' : '') +
-      '<div class="acc">' + (i.disponible === 0 ? '<button class="alt" disabled style="width:100%">Agotado</button>' : '<button class="ok" style="width:100%" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>') + '</div></div>').join('')
+      '<div class="acc">' + (i.disponible === 0 ? '<button class="alt" disabled style="width:100%">Agotado</button>' : '<button class="ok" style="width:100%" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>') +
+      '<a class="btn alt" href="../apps/mensajes/?con=' + encodeURIComponent(t.id) + '&txt=' + encodeURIComponent('Hola, me interesa: ' + i.nombre) + '">💬 Preguntar</a>' + '</div></div>').join('')
       : '<p class="empty" style="grid-column:1/-1">' + (items.length ? 'Sin resultados' : 'La tienda aún no publica productos.') + '</p>';
   }
   $('buscar').oninput = pintar;
