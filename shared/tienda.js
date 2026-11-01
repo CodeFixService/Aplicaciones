@@ -1,0 +1,83 @@
+// Tienda (catálogo del cliente y página pública): tarjetas estilo tienda, vista de 1, 2 o 3 columnas con un botón,
+// y las opciones (colores, tallas) como botones. No cambia cómo se arma el pedido: el <select> sigue guardando la opción.
+(function () {
+  const d = document, grid = d.getElementById('grid');
+  if (!grid || window.CFX_TIENDA) return;
+  window.CFX_TIENDA = true;
+  const C = { negro: '#111', blanco: '#fff', rojo: '#e11d48', azul: '#2563eb', verde: '#16a34a', amarillo: '#facc15', rosado: '#f472b6', rosa: '#f472b6',
+    morado: '#7c3aed', lila: '#c4b5fd', naranjo: '#f97316', naranja: '#f97316', gris: '#9ca3af', cafe: '#7c4a2d', café: '#7c4a2d', beige: '#e7d7b9',
+    celeste: '#7dd3fc', burdeo: '#7f1d1d', dorado: '#d4a017', plateado: '#cbd5e1', crema: '#f5ecd7', turquesa: '#14b8a6', fucsia: '#d946ef' };
+  window.colorDe = (o) => C[String(o).toLowerCase().trim()] || (/^#[0-9a-f]{3,6}$/i.test(String(o).trim()) ? String(o).trim() : '');
+  const B = 'var(--brand, #2563eb)';
+  const css = d.createElement('style');
+  css.textContent = `
+  .t-vistas{display:flex;justify-content:flex-end;gap:6px;margin:0 0 10px}
+  .t-vistas button{width:38px;height:38px;min-height:0;padding:0;border-radius:12px;display:grid;place-items:center;background:var(--field);color:var(--muted);box-shadow:none;border:1.5px solid transparent;transition:transform .15s,border-color .2s,color .2s}
+  .t-vistas button.on{border-color:${B};color:${B};background:color-mix(in srgb,${B} 12%,var(--card))}
+  .t-vistas button:active{transform:scale(.9)} .t-vistas svg{width:18px;height:18px}
+  #grid.v1{grid-template-columns:1fr!important} #grid.v2{grid-template-columns:repeat(2,minmax(0,1fr))!important} #grid.v3{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+  #grid .item{padding:0 0 12px!important;overflow:hidden;border-radius:18px;gap:5px;position:relative;
+    border:1px solid color-mix(in srgb,${B} 22%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,${B} 6%,var(--card)),var(--card) 40%);
+    box-shadow:0 1px 2px rgba(15,10,40,.06),0 8px 22px -12px color-mix(in srgb,${B} 45%,transparent);
+    transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;animation:tItem .45s cubic-bezier(.2,.8,.2,1) both}
+  #grid .item>:not(.foto):not(.fav):not(.cinta):not(.acc){margin-left:12px;margin-right:12px}
+  #grid .item .acc{padding:4px 12px 0;display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+  #grid .item .acc .btn,#grid .item .acc button{flex:1 1 100%;white-space:nowrap;min-height:40px;border-radius:12px}
+  #grid .item:hover{transform:translateY(-3px);box-shadow:0 2px 4px rgba(15,10,40,.06),0 14px 30px -12px color-mix(in srgb,${B} 60%,transparent)}
+  #grid .item:active{transform:scale(.985)}
+  #grid .item:nth-child(2){animation-delay:.04s}#grid .item:nth-child(3){animation-delay:.08s}#grid .item:nth-child(4){animation-delay:.12s}#grid .item:nth-child(n+5){animation-delay:.16s}
+  @keyframes tItem{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+  #grid .item .foto{width:100%!important;max-width:none;margin:0 0 6px!important;aspect-ratio:1;object-fit:cover;display:block;border-radius:0!important;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+  #grid .item:hover .foto{transform:scale(1.04)}
+  #grid .item:not(:has(.foto)){padding-top:12px!important}
+  #grid .item .p{color:${B};font-size:19px;font-weight:800}
+  #grid .item .p.tachado{color:var(--muted)}
+  #grid .item select{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+  #grid .item .cfx-sel-btn{display:none!important}
+  .opc-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .opc-ch{min-height:30px;min-width:30px;padding:4px 10px;border-radius:999px;font-size:12.5px;font-weight:600;box-shadow:none;background:var(--field);color:var(--text);border:1.5px solid transparent;transition:transform .15s,border-color .2s,background .2s;position:relative}
+  .opc-ch:active{transform:scale(.92)}
+  .opc-ch.on{border-color:${B};background:color-mix(in srgb,${B} 14%,var(--card))}
+  .opc-ch.sw{padding:3px;width:30px}
+  .opc-ch.sw i{display:block;width:100%;aspect-ratio:1;border-radius:50%;background:var(--sw);box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+  .opc-ch .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .opc-falta{animation:opcFalta .4s}@keyframes opcFalta{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  #grid.v3 .item{border-radius:14px;padding-bottom:8px!important}
+  #grid.v3 .item>:not(.foto):not(.fav):not(.cinta):not(.acc){margin-left:8px;margin-right:8px}
+  #grid.v3 .item .desc,#grid.v3 .item .cat,#grid.v3 .item .prem,#grid.v3 .item .nuevo{display:none}
+  #grid.v3 .item b{font-size:12.5px;line-height:1.25;padding-right:22px}
+  #grid.v3 .item .p{font-size:14px} #grid.v3 .opc-ch{min-height:24px;min-width:24px;font-size:11px;padding:2px 7px} #grid.v3 .opc-ch.sw{width:24px;height:24px;padding:2px}
+  #grid.v3 .item .acc{padding:2px 8px 0} #grid.v3 .item .acc .btn,#grid.v3 .item .acc button{min-height:32px;font-size:12px;padding:4px}
+  #grid.v3 .item .acc>:not(:first-child){display:none} #grid.v3 .fav{width:28px;height:28px;font-size:14px;top:5px;right:5px}
+  #grid.v1 .item .foto{aspect-ratio:4/3}
+  @media (prefers-reduced-motion:reduce){#grid .item,#grid .item .foto,.opc-ch{animation:none!important;transition:none!important}}`;
+  d.head.appendChild(css);
+
+  // Botones de vista (se recuerda en este equipo)
+  const ICO = { 1: '<rect x="4" y="4" width="16" height="16" rx="3"/>', 2: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+    3: [0, 1, 2].map((y) => [0, 1, 2].map((x) => '<rect x="' + (3 + x * 6.5) + '" y="' + (3 + y * 6.5) + '" width="5" height="5" rx="1"/>').join('')).join('') };
+  let v = '2'; try { v = localStorage.getItem('cfx-vista') || '2'; } catch (e) { /* nada */ }
+  const bar = d.createElement('div'); bar.className = 't-vistas'; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Cómo ver los productos');
+  bar.innerHTML = ['1', '2', '3'].map((n) => '<button type="button" data-v="' + n + '" aria-label="' + n + ' por fila"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' + ICO[n] + '</svg></button>').join('');
+  const poner = (n) => { v = n; grid.classList.remove('v1', 'v2', 'v3'); grid.classList.add('v' + n); bar.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === n)); try { localStorage.setItem('cfx-vista', n); } catch (e) { /* nada */ } };
+  bar.addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) poner(b.dataset.v); });
+  grid.before(bar); poner(v);
+
+  // Opciones como botones (si la pantalla aún no los dibujó)
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const chips = () => grid.querySelectorAll('.item select').forEach((s) => {
+    if (s.closest('.item').querySelector('.opc-chips')) return;
+    const ops = [...s.options].filter((o) => o.value).map((o) => o.value); if (!ops.length) return;
+    const w = d.createElement('div'); w.className = 'opc-chips'; w.setAttribute('role', 'group'); w.setAttribute('aria-label', 'Opciones');
+    w.innerHTML = ops.map((o) => { const c = window.colorDe(o); return '<button type="button" class="opc-ch' + (c ? ' sw' : '') + '" data-opc-v="' + esc(o) + '" title="' + esc(o) + '"' + (c ? ' style="--sw:' + c + '"' : '') + '>' + (c ? '<i></i><span class="sr">' + esc(o) + '</span>' : esc(o)) + '</button>'; }).join('');
+    (s.nextElementSibling && s.nextElementSibling.classList.contains('cfx-sel-btn') ? s.nextElementSibling : s).after(w);
+  });
+  new MutationObserver(chips).observe(grid, { childList: true }); chips();
+  d.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-opc-v]');
+    if (b) { const it = b.closest('.item'), s = it && it.querySelector('select'); if (!s) return; s.value = b.dataset.opcV; s.dispatchEvent(new Event('change', { bubbles: true })); it.querySelectorAll('.opc-ch').forEach((x) => x.classList.toggle('on', x === b)); return; }
+    // Agregar sin elegir opción: la fila tiembla un poquito
+    const it = e.target.closest('#grid .item'); const s = it && it.querySelector('select');
+    if (s && !s.value && e.target.closest('.acc button,.acc .btn')) { const ch = it.querySelector('.opc-chips'); if (ch) { ch.classList.remove('opc-falta'); void ch.offsetWidth; ch.classList.add('opc-falta'); } }
+  }, true);
+})();

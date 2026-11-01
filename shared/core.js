@@ -41,6 +41,9 @@
     return '$' + Math.round(Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
   }
 
+  // Texto de precio guardado ("$19,99", "10000") → "$19" / "$10.000"; si no es un precio, queda igual.
+  function precioTxt(v) { const n = precioNum(v); return isNaN(n) ? String(v == null ? '' : v) : money(n); }
+
   // "10.000", "$ 10.000", "10000" o "9,99" → número entero en pesos; NaN si no es un precio.
   function precioNum(v) {
     const t = String(v == null ? '' : v).trim();
@@ -331,7 +334,7 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.43';
+  const APP_VERSION = '5.44';
   const DB_VERSION = '5.15'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
@@ -355,7 +358,7 @@
 
   global.Core = {
     RUBROS,
-    store, uid, money, precioNum, esc, toast, registerSW, askNotify, notify, download,
+    store, uid, money, precioNum, precioTxt, esc, toast, registerSW, askNotify, notify, download,
     backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };
 })(window);

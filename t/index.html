@@ -181,7 +181,7 @@
   async function cargarOfertas() {
     try { ofertas = await Cuenta.rpc('ofertas_publicas', { p_slug: slug }); } catch (e) { ofertas = []; }
     $('ofertas').innerHTML = ofertas.length ? ofertas.map((o) => '<article class="oferta">' + (/^(https:|data:image\/)/.test(o.imagen || '') ? '<img src="' + Core.esc(o.imagen) + '" alt="" loading="lazy">' : '') +
-      '<div class="txt"><b>' + Core.esc(o.titulo) + '</b>' + (o.precio ? '<div style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</div>' : '') +
+      '<div class="txt"><b>' + Core.esc(o.titulo) + '</b>' + (o.precio ? '<div style="font-size:20px;font-weight:800">' + Core.esc(Core.precioTxt(o.precio)) + '</div>' : '') +
       (o.detalle ? '<p class="muted" style="white-space:pre-line">' + Core.esc(o.detalle) + '</p>' : '') +
       (o.precio_num != null ? '<button class="ok small" data-pub="' + o.id + '">🛒 Agregar</button>' : '') + '</div></article>').join('') : '<p class="empty">Sin ofertas por ahora.</p>';
   }
@@ -306,5 +306,6 @@
 <script src="../shared/verificar.js"></script>
 <script src="../shared/premium.js"></script>
 <script src="../shared/ayuda.js"></script>
+<script src="../shared/tienda.js"></script>
 </body>
 </html>

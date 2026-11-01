@@ -343,7 +343,7 @@
     return '<article class="oferta' + (o.vip ? ' vip' : '') + '">' + cinta + (esImg(o.image) ? '<img src="' + Core.esc(o.image) + '" alt="" loading="lazy">' : '') +
       '<div class="txt"><div class="pills">' + (o.pub ? '<span class="pill">' + (TIPOS[o.tipo] || '🏷️ Oferta') + '</span>' : '') +
       (!o.leido && esCliente ? '<span class="pill pro">Nueva</span>' : '') + (o.vip ? '<span class="pill pro">⭐ VIP</span>' : '') + '</div>' +
-      '<b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(o.precio) + '</span>' : '') +
+      '<b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(Core.precioTxt(o.precio)) + '</span>' : '') +
       (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
       '<span class="cat muted">' + fecha + '</span>' +
       (comprador ? '<div class="acc">' + (o.pub && o.precio_num != null ? '<button class="ok small" data-addpub="' + o.id + '">🛒 Agregar al carrito</button>' : '') +
@@ -714,5 +714,6 @@ document.addEventListener('click', (e) => {
   it.querySelectorAll('.opc-ch').forEach((x) => x.classList.toggle('on', x === b));
 });
 </script>
+<script src="../../shared/tienda.js"></script>
 </body>
 </html>

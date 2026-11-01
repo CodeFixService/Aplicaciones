@@ -668,7 +668,7 @@
     try {
       const k = await Cuenta.rpc('kit_whatsapp');
       const p = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
-      const ofs = (k.ofertas || []).map((o) => '🔥 ' + o.titulo + (o.precio ? ' — ' + o.precio : ''));
+      const ofs = (k.ofertas || []).map((o) => '🔥 ' + o.titulo + (o.precio ? ' — ' + Core.precioTxt(o.precio) : ''));
       const prods = (k.productos || []).map((x) => '• ' + x.nombre + ' — ' + p(x.precio));
       const txt = '🛍️ *' + (k.empresa || 'Mi tienda') + '*\n' + (ofs.length ? '\n' + ofs.join('\n') + '\n' : '') +
         (prods.length ? '\n' + prods.join('\n') + '\n' : '') + '\n🛒 Pide aquí: ' + hoyLink;
