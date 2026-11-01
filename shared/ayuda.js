@@ -1102,13 +1102,17 @@
     let L = [{ k: 'yo', ico: '👤', t: 'Foto y nombre', d: 'Cómo te ven', abrir: verYo, grupo: conf }, { k: 'estilo', ico: '🎨', t: 'Color y modo', d: 'Claro, oscuro o automático', abrir: verEstilo, grupo: conf },
       { k: 'avanzado', ico: '⚙️', t: 'Avanzado', d: 'Contraseña, avisos y cuenta', abrir: verAvanzado, grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
     // Menú: primero las opciones de la app; en Configuración van primero las del perfil y después las propias de la app.
+    // Menú: una sola fila "Mi perfil" arriba de Configuración que abre la misma ventana en las 7 apps (foto y nombre, color y modo, avanzado).
+    if (op.menu) L = [{ k: 'perfil', ico: '👤', t: 'Mi perfil', d: 'Foto, nombre, color y contraseña', accion: () => abrirPerfil(), grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
+    const PROPIO = /^(mi perfil|perfil|foto y nombre|color y modo|apariencia|estilo)$/i;
+    if (op.menu) op.items = (op.items || []).filter((x) => x && !['perfil', 'yo', 'estilo'].includes(x.k) && !PROPIO.test(String(x.t || '').trim()));
     if (op.menu) { const app = (op.items || []).filter(Boolean), esConf = (x) => x.grupo === 'Configuración'; L = app.filter((x) => !esConf(x)).concat(L, app.filter(esConf)); L = L.concat(cuentaItems(L.map((x) => x.k))); }
     el.classList.add('cfx-pf-w');
     const h = ajustes(el, L, { menu: op.menu, arriba: '<div data-pf-cab' + (op.menu ? ' role="button" tabindex="0" aria-label="Mi perfil"' : '') + '></div>' + (valor(P.arriba) || ''),
-      alPintar: (w) => { pintarCabeza(); const c = w.querySelector('[data-pf-cab]'); if (c && op.menu) c.onclick = () => h.abrir('yo'); } });
+      alPintar: (w) => { pintarCabeza(); const c = w.querySelector('[data-pf-cab]'); if (c && op.menu) c.onclick = () => abrirPerfil(); } });
     pintarCabeza = () => { const c = el.querySelector('[data-pf-cab]'); if (c) c.innerHTML = cabeza() + (op.menu ? CHEV_D : ''); };
     pintarCabeza();
-    const c0 = el.querySelector('[data-pf-cab]'); if (c0 && op.menu) c0.onclick = () => h.abrir('yo');
+    const c0 = el.querySelector('[data-pf-cab]'); if (c0 && op.menu) c0.onclick = () => abrirPerfil();
     Promise.resolve(valor(P.foto)).then((f) => { foto = f || ''; pintarCabeza(); });
     return h;
   }
