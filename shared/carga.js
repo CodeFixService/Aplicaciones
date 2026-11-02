@@ -22,6 +22,7 @@
     'background:linear-gradient(90deg,rgba(127,127,127,.13) 25%,rgba(127,127,127,.26) 45%,rgba(127,127,127,.13) 65%);background-size:300% 100%;animation:cfxCesq 1.3s linear infinite}' +
     '.cfx-esq i:nth-child(1){height:44px;border-radius:14px}.cfx-esq i:nth-child(2){width:82%}.cfx-esq i:nth-child(3){width:58%}' +
     '@keyframes cfxCesq{0%{background-position:100% 0}100%{background-position:-100% 0}}' +
+    '.cfx-ojo{background:transparent!important;box-shadow:none!important;border:0!important;outline-offset:0;width:34px!important;height:34px!important;min-width:0!important;min-height:0!important;padding:0!important;border-radius:50%!important;opacity:.55;transition:opacity .15s}.cfx-ojo:hover,.cfx-ojo:active{opacity:.9;background:transparent!important}' +
     '@media (prefers-reduced-motion:reduce){.cfx-carga-b,.cfx-ocupado::after,.cfx-listo::after,.cfx-esq i{animation:none!important}.cfx-carga-b{background-position:50% 0}}';
   d.head.appendChild(css);
 
@@ -67,14 +68,14 @@
     if (/^cargando\s*(…|\.\.\.)?$/i.test((el.textContent || '').trim())) esqueleto(el, 3);
   };
   // Ojito para ver la contraseña en todos los campos de clave (login, registro, cambiar contraseña).
-  const OJO = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-  const OJO_NO = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  const OJO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const OJO_NO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
   const ojo = (i) => {
     if (i.dataset.cfxOjo || i.hasAttribute('data-c1') || i.hasAttribute('data-c2') || i.closest('.cfx-pin')) return; i.dataset.cfxOjo = '1';
     const w = d.createElement('span'); w.style.cssText = 'position:relative;display:block;width:100%';
-    i.parentNode.insertBefore(w, i); w.appendChild(i); i.style.paddingRight = '48px';
+    i.parentNode.insertBefore(w, i); w.appendChild(i); i.style.paddingRight = '44px';
     const b = d.createElement('button'); b.type = 'button'; b.className = 'cfx-ojo'; b.setAttribute('aria-label', 'Ver contraseña'); b.innerHTML = OJO;
-    b.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;min-height:0;min-width:0;padding:0;margin:0;border:0;background:none;box-shadow:none;color:inherit;opacity:.65;display:grid;place-items:center;cursor:pointer';
+    b.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);margin:0;color:inherit;display:grid;place-items:center;cursor:pointer';
     b.onclick = () => { const v = i.type === 'password'; i.type = v ? 'text' : 'password'; b.innerHTML = v ? OJO_NO : OJO; b.setAttribute('aria-label', v ? 'Ocultar contraseña' : 'Ver contraseña'); };
     w.appendChild(b);
   };
