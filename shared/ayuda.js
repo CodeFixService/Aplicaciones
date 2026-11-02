@@ -640,9 +640,9 @@
     if (!tiene) { pinOk(); return; }
     const w = document.createElement('div'); w.className = 'cfx-pin'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Ingresa tu PIN');
     w.innerHTML = '<style>.cfx-pin{position:fixed;inset:0;z-index:2147483500;display:grid;place-items:center;background:radial-gradient(circle at 50% 20%,color-mix(in srgb,var(--brand,#3d63ff) 30%,#0a0e17),#0a0e17 70%);color:#fff;font-family:var(--cfx-letra,system-ui,sans-serif);padding:20px;animation:cfxPinIn .3s ease}' +
-      '@keyframes cfxPinIn{from{opacity:0}}.cfx-pin-c{width:100%;max-width:320px;text-align:center}.cfx-pin h2{margin:6px 0 4px;font-size:20px}.cfx-pin p{margin:0 0 16px;opacity:.75;font-size:14px;min-height:20px}' +
+      '@keyframes cfxPinIn{from{opacity:0}}.cfx-pin-c{width:100%;max-width:340px;text-align:center;padding:26px 22px;border-radius:28px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.45);backdrop-filter:blur(14px)}.cfx-pin h2{margin:6px 0 4px;font-size:20px}.cfx-pin p{margin:0 0 16px;opacity:.75;font-size:14px;min-height:20px}' +
       '.cfx-pin-d{display:flex;justify-content:center;gap:12px;margin:0 0 20px}.cfx-pin-d i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.6);transition:background .15s,transform .15s}.cfx-pin-d i.on{background:#fff;transform:scale(1.1)}' +
-      '.cfx-pin-t{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.cfx-pin-t button{height:62px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:600 24px inherit;cursor:pointer;transition:transform .1s,background .15s}' +
+      '.cfx-pin-t{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.cfx-pin-t button{height:64px;border-radius:50%;box-shadow:inset 0 1px 0 rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:600 24px inherit;cursor:pointer;transition:transform .1s,background .15s}' +
       '.cfx-pin-t button:active{transform:scale(.92);background:rgba(255,255,255,.2)}.cfx-pin-t .x{border:0;background:none;font-size:15px}.cfx-pin-mal{animation:cfxPinMal .35s}@keyframes cfxPinMal{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}' +
       '.cfx-pin-o{margin-top:18px;background:none;border:0;color:#fff;opacity:.8;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer}</style>' +
       '<div class="cfx-pin-c"><div style="font-size:30px">🔒</div><h2>Ingresa tu PIN</h2><p data-m>Para abrir la app</p><div class="cfx-pin-d" data-d></div>' +
@@ -656,13 +656,13 @@
       if (ocupado || v.length < 4) return; ocupado = true;
       let r = null; try { r = await R('cfx_pin_verificar', { p_pin: v }); } catch (e) { m.textContent = 'Sin conexión: inténtalo de nuevo'; }
       ocupado = false;
-      if (r && r.ok) { pinOk(); w.remove(); return; }
+      if (r && r.ok) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } pinOk(); w.style.transition = 'opacity .25s'; w.style.opacity = '0'; setTimeout(() => w.remove(), 250); return; }
       if (r) { v = ''; pintar(); const c = w.querySelector('.cfx-pin-c'); c.classList.remove('cfx-pin-mal'); void c.offsetWidth; c.classList.add('cfx-pin-mal');
         m.textContent = r.espera > 0 ? 'Demasiados intentos: espera ' + Math.ceil(r.espera / 60) + ' min' : 'PIN incorrecto' + (r.quedan != null ? ' · te quedan ' + r.quedan : ''); }
     };
     w.onclick = (e) => {
       const n = e.target.closest('[data-n]');
-      if (n && v.length < 6) { v += n.dataset.n; pintar(); if (v.length === 6) probar(); }
+      if (n && v.length < 6) { v += n.dataset.n; pintar(); let L = 6; try { L = +localStorage.getItem('cfx-pin-n') || 6; } catch (x) { /* nada */ } if (v.length === L) probar(); }
       if (e.target.closest('[data-b]')) { v = v.slice(0, -1); pintar(); }
       if (e.target.closest('[data-ok]')) probar();
       if (e.target.closest('[data-olv]')) { pinOk(); salir(); }
@@ -1136,7 +1136,7 @@
       z.onclick = async (ev) => {
         const b = ev.target.closest('[data-pf]'); if (!b) return; const a = b.dataset.pf;
         if (a === 'pin') { const v = q('[data-pin]').value.trim(); if (!/^\d{4,6}$/.test(v)) return aviso('El PIN debe tener de 4 a 6 números');
-          if (await listo(() => R('cfx_pin_guardar', { p_pin: v }), '🔒 PIN guardado', b)) { q('[data-pin]').value = ''; pinOk(); pinEst(); } }
+          if (await listo(() => R('cfx_pin_guardar', { p_pin: v }), '🔒 PIN guardado', b)) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } q('[data-pin]').value = ''; pinOk(); pinEst(); } }
         if (a === 'sinpin' && await listo(() => R('cfx_pin_guardar', { p_pin: '' }), 'PIN quitado', b)) pinEst();
         if (a === 'push') await (on && P.desactivarPush ? listo(() => P.desactivarPush(), 'Notificaciones desactivadas', b) : listo(() => P.activarPush(), '🔔 Notificaciones activadas', b)).then(estado);
         if (a === 'clave') {
