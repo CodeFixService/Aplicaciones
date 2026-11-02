@@ -66,7 +66,19 @@
     if (!el || el.nodeType !== 1 || SALTA.test(el.tagName) || el.children.length || el.closest('.cfx-esq')) return;
     if (/^cargando\s*(…|\.\.\.)?$/i.test((el.textContent || '').trim())) esqueleto(el, 3);
   };
-  const barrer = (raiz) => { if (raiz && raiz.querySelectorAll) { revisar(raiz); raiz.querySelectorAll('p,div,section').forEach(revisar); } };
+  // Ojito para ver la contraseña en todos los campos de clave (login, registro, cambiar contraseña).
+  const OJO = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const OJO_NO = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  const ojo = (i) => {
+    if (i.dataset.cfxOjo || i.hasAttribute('data-c1') || i.hasAttribute('data-c2') || i.closest('.cfx-pin')) return; i.dataset.cfxOjo = '1';
+    const w = d.createElement('span'); w.style.cssText = 'position:relative;display:block;width:100%';
+    i.parentNode.insertBefore(w, i); w.appendChild(i); i.style.paddingRight = '48px';
+    const b = d.createElement('button'); b.type = 'button'; b.className = 'cfx-ojo'; b.setAttribute('aria-label', 'Ver contraseña'); b.innerHTML = OJO;
+    b.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;min-height:0;min-width:0;padding:0;margin:0;border:0;background:none;box-shadow:none;color:inherit;opacity:.65;display:grid;place-items:center;cursor:pointer';
+    b.onclick = () => { const v = i.type === 'password'; i.type = v ? 'text' : 'password'; b.innerHTML = v ? OJO_NO : OJO; b.setAttribute('aria-label', v ? 'Ocultar contraseña' : 'Ver contraseña'); };
+    w.appendChild(b);
+  };
+  const barrer = (raiz) => { if (raiz && raiz.querySelectorAll) { revisar(raiz); raiz.querySelectorAll('p,div,section').forEach(revisar); (raiz.matches && raiz.matches('input[type=password]') ? [raiz] : raiz.querySelectorAll('input[type=password]')).forEach(ojo); } };
   let cola = [], rafo = 0;
   const vaciar = () => { rafo = 0; const l = cola; cola = []; l.forEach(barrer); };
   const empezar = () => {
