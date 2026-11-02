@@ -635,6 +635,8 @@
   const pinOk = () => { try { sessionStorage.setItem('cfx-pin-ok', '1'); } catch (e) { /* nada */ } };
   async function pinRevisar() {
     if (!R || document.querySelector('.cfx-pin')) return;
+    // Recuperar: tras "¿Olvidaste tu PIN?" y entrar con correo y contraseña, el PIN se borra y se crea uno nuevo en Mi perfil → Avanzado.
+    try { if (localStorage.getItem('cfx-pin-reset')) { localStorage.removeItem('cfx-pin-reset'); await R('cfx_pin_guardar', { p_pin: '' }); pinOk(); aviso('🔓 PIN borrado: crea uno nuevo en Mi perfil → Avanzado'); return; } } catch (e) { /* nada */ }
     try { if (sessionStorage.getItem('cfx-pin-ok')) return; } catch (e) { /* nada */ }
     let tiene = false; try { tiene = await R('cfx_pin_estado'); } catch (e) { return; }
     if (!tiene) { pinOk(); return; }
@@ -648,7 +650,7 @@
       '<div class="cfx-pin-c"><div style="font-size:30px">🔒</div><h2>Ingresa tu PIN</h2><p data-m>Para abrir la app</p><div class="cfx-pin-d" data-d></div>' +
       '<div class="cfx-pin-t">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => '<button type="button" data-n="' + n + '">' + n + '</button>').join('') +
       '<button type="button" class="x" data-ok>Entrar</button><button type="button" data-n="0">0</button><button type="button" class="x" data-b aria-label="Borrar">⌫</button></div>' +
-      '<button type="button" class="cfx-pin-o" data-olv>¿Olvidaste tu PIN? Entra con tu contraseña</button></div>';
+      '<button type="button" class="cfx-pin-o" data-olv>¿Olvidaste tu PIN? Entra con tu correo y contraseña</button></div>';
     document.body.appendChild(w);
     let v = '', ocupado = false; const m = w.querySelector('[data-m]'), d = w.querySelector('[data-d]');
     const pintar = () => { d.innerHTML = Array.from({ length: Math.max(4, v.length) }, (_, i) => '<i' + (i < v.length ? ' class="on"' : '') + '></i>').join(''); };
@@ -665,7 +667,7 @@
       if (n && v.length < 6) { v += n.dataset.n; pintar(); let L = 6; try { L = +localStorage.getItem('cfx-pin-n') || 6; } catch (x) { /* nada */ } if (v.length === L) probar(); }
       if (e.target.closest('[data-b]')) { v = v.slice(0, -1); pintar(); }
       if (e.target.closest('[data-ok]')) probar();
-      if (e.target.closest('[data-olv]')) { pinOk(); salir(); }
+      if (e.target.closest('[data-olv]')) { try { localStorage.setItem('cfx-pin-reset', '1'); } catch (x) { /* nada */ } pinOk(); salir(); }
     };
     pintar();
   }
@@ -1124,7 +1126,7 @@
         '<div class="cfx-pf-caja"><b>🔔 Notificaciones en este celular</b><div class="cfx-pf-fila"><span data-push>Revisando…</span><button type="button" data-pf="push">Activar</button></div></div>' +
         (P.clave ? '<div class="cfx-pf-caja"><b>🔑 Cambiar contraseña</b><input data-c1 type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 6)"><input data-c2 type="password" autocomplete="new-password" placeholder="Repítela">' +
           '<button type="button" data-pf="clave">Cambiar contraseña</button></div>' : '') +
-        (R ? '<div class="cfx-pf-caja"><b>🔒 PIN de la app</b><small data-pin-txt>Pide 4 a 6 números al abrir la app.</small><input data-pin type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="PIN nuevo (4 a 6 números)">' +
+        (R ? '<div class="cfx-pf-caja"><b>🔒 PIN de la app</b><small data-pin-txt>Pide 4 a 6 números al abrir la app.</small><div style="position:relative"><input data-pin type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="PIN nuevo (4 a 6 números)" style="padding-right:52px"><button type="button" data-pf="verpin" aria-label="Ver PIN" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;min-height:0;padding:0;border:0;background:none;box-shadow:none;font-size:18px">👁️</button></div>' +
           '<div class="cfx-pf-fila"><button type="button" data-pf="pin">Guardar PIN</button><button type="button" data-pf="sinpin" hidden>Quitar PIN</button></div></div>' : '') +
         (P.eliminar && valor(P.puedeEliminar) !== false ? '<div class="cfx-pf-caja cfx-pf-peligro"><b>🗑️ Eliminar mi cuenta</b><small>' + esc(valor(P.eliminarTexto) || 'Se borran tu cuenta y tus datos. No se puede deshacer.') + '</small><button type="button" data-pf="eliminar">Eliminar mi cuenta</button></div>' : '') + '</div>';
       const q = (s) => z.querySelector(s);
@@ -1137,6 +1139,7 @@
         const b = ev.target.closest('[data-pf]'); if (!b) return; const a = b.dataset.pf;
         if (a === 'pin') { const v = q('[data-pin]').value.trim(); if (!/^\d{4,6}$/.test(v)) return aviso('El PIN debe tener de 4 a 6 números');
           if (await listo(() => R('cfx_pin_guardar', { p_pin: v }), '🔒 PIN guardado', b)) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } q('[data-pin]').value = ''; pinOk(); pinEst(); } }
+        if (a === 'verpin') { const i = q('[data-pin]'); i.type = i.type === 'password' ? 'text' : 'password'; b.textContent = i.type === 'password' ? '👁️' : '🙈'; return; }
         if (a === 'sinpin' && await listo(() => R('cfx_pin_guardar', { p_pin: '' }), 'PIN quitado', b)) pinEst();
         if (a === 'push') await (on && P.desactivarPush ? listo(() => P.desactivarPush(), 'Notificaciones desactivadas', b) : listo(() => P.activarPush(), '🔔 Notificaciones activadas', b)).then(estado);
         if (a === 'clave') {
