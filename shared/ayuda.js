@@ -505,6 +505,17 @@
   addEventListener('hashchange', (e) => { hojas.filter((d) => d._t < e.timeStamp).reverse().forEach((d) => d._fuera(true)); });
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && hojas.length && !document.querySelector('dialog[open]')) hojas[hojas.length - 1]._fuera(); });
   const cerrarHojas = () => { while (hojas.length) hojas[hojas.length - 1]._fuera(); };
+  // U6 (núcleo 2.35): el menú Más no repite lo que ya está a la vista en la barra de abajo o en el + (mismo destino, misma clave o mismo nombre).
+  // No cuenta el botón que abre este mismo menú (Más/Ajustes/Perfil/Cuenta) ni los que la barra mandó a su hoja de sobrantes.
+  const destino = (u) => { try { const x = new URL(u, location.href); return x.origin + x.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + (x.hash.length > 1 ? x.hash : ''); } catch (e) { return ''; } };
+  function enBarra() {
+    const n = document.querySelector('nav.cfx-barra'); if (!n) return null;
+    const B = [...n.children].filter((b) => !b.classList.contains('cfx-oculto') && b.getClientRects().length).map((b) => {
+      const k = b.dataset.v || b.dataset.r || b.dataset.k || b.dataset.tab || (b.getAttribute('href') || '').replace(/^#\/?/, '');
+      return { k, d: b.getAttribute('href') && !/^#?$/.test(b.getAttribute('href')) ? destino(b.getAttribute('href')) : '', t: normal(b.getAttribute('aria-label') || b.textContent).replace(/\d+/g, '').trim() };
+    }).filter((b) => !/^(mas|ajustes|perfil|cuenta)$/.test(b.k) && !/^(m[aá]s|men[uú]|ajustes)$/.test(b.t));
+    return (s) => B.some((b) => (s.k && b.k && s.k === b.k) || (s.ir && b.d && destino(s.ir) === b.d) || (b.t && normal(s.t) === b.t));
+  }
   function ajustes(el, L, o) {
     o = o || {};
     L = L.filter(Boolean);
@@ -515,7 +526,8 @@
     const grilla = () => {
       nodos.forEach((n) => { if (!n.closest('.cfx-hm-zona')) n.classList.add('cfx-oc'); });
       const grupos = [];
-      L.forEach((s) => { const g = s.grupo || ''; let x = grupos.find((y) => y.g === g); if (!x) grupos.push(x = { g, l: [] }); x.l.push(s); });
+      const rep = o.menu && enBarra();
+      L.forEach((s) => { if (rep && rep(s)) return; const g = s.grupo || ''; let x = grupos.find((y) => y.g === g); if (!x) grupos.push(x = { g, l: [] }); x.l.push(s); });
       ['Configuración', 'Cuenta y ayuda'].forEach((g) => { const i = grupos.findIndex((x) => x.g === g); if (i >= 0) grupos.push(grupos.splice(i, 1)[0]); });
       w.innerHTML = (o.arriba || '') + grupos.map((x) => (x.g ? '<div class="cfx-aj-g">' + esc(x.g) + '</div>' : '') + '<div class="cfx-aj cfx-lista">' + x.l.map(fila).join('') + '</div>').join('') + (o.abajo || '');
       w.querySelectorAll('.cfx-aj > [data-k]').forEach((b) => { b.onclick = () => abrir(b.dataset.k); });
