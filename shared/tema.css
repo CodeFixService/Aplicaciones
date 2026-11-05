@@ -265,3 +265,16 @@ button.chip, a.chip, [role="button"].chip { min-height: 40px; }
   /* Tarjetas de números: llenan la fila pareja (auto-fit), sin hueco a la derecha */
   .stats, .kpis, .cfx-kpis { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important; gap: 12px !important; }
 }
+/* ===== Núcleo 2.31 · Barra de abajo que se esconde sola (celular y tablet) =====
+   Aparece al cargar, al cambiar de pantalla y al subir; se esconde al bajar o tras unos segundos sin usarla.
+   Queda una asa abajo al centro: tocarla (o deslizar hacia arriba) la vuelve a mostrar. */
+@media (max-width: 899px) {
+  nav.cfx-barra { transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s ease !important; }
+  nav.cfx-barra.cfx-escondida { transform: translateY(calc(100% + 40px)) !important; opacity: 0; pointer-events: none; }
+  .cfx-barra-asa { position: fixed; left: 50%; bottom: 0; z-index: 41; transform: translateX(-50%); width: 96px; height: calc(22px + env(safe-area-inset-bottom)); padding: 0 0 env(safe-area-inset-bottom); margin: 0;
+    border: 0; background: none; cursor: pointer; display: none; place-items: center; -webkit-tap-highlight-color: transparent; }
+  .cfx-barra-asa::before { content: ''; width: 44px; height: 5px; border-radius: 3px; background: var(--cfx-texto-2, #5b6472); opacity: .55; box-shadow: 0 0 0 2px var(--cfx-tarjeta, #fff); }
+  html.cfx-barra-oculta .cfx-barra-asa { display: grid; }
+}
+@media (min-width: 900px) { .cfx-barra-asa { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { nav.cfx-barra { transition: none !important; } }

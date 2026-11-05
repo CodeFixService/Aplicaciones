@@ -65,6 +65,12 @@
     'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);box-shadow:0 18px 44px -12px rgba(15,23,42,.45);font-family:var(--cfx-letra,system-ui,sans-serif);cursor:pointer;touch-action:none;animation:cfxBaja .26s cubic-bezier(.2,.8,.2,1)}' +
     '@keyframes cfxBaja{from{transform:translateY(-120%);opacity:0}}.cfx-emerg b{display:block;font-size:15px;line-height:1.25}.cfx-emerg small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:13px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.cfx-emerg>div{min-width:0}' +
     '.cfx-emerg-ico{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--brand,var(--marca,#2563eb))}.cfx-emerg-ico svg{width:20px;height:20px}' +
+    // Cabecera más liviana (núcleo 2.31): arriba solo campana + foto (32 px). El plan (PRO/FREE) va en ☰ y en el menú de la foto, no repetido arriba.
+    // Teléfono: lo demás de la cabecera (atajos, chips, botones propios) pasa al botón ☰; el nombre de la empresa queda con espacio. PC: todo a la vista.
+    '.cfx-cab>[data-cfx-campana],.cfx-cab>.cfx-av,.cfx-cab>.cfx-ham{width:32px!important;height:32px!important;min-width:32px!important;max-height:32px}.cfx-cab>[data-cfx-campana]>svg{width:18px!important;height:18px!important}.cfx-cab>.cfx-av{font-size:12.5px}' +
+    '.cfx-cab>.cfx-plan:not(.rol){display:none!important}.cfx-ham{display:none}' +
+    '.cfx-cab>.cfx-ham{place-items:center;padding:0!important;margin:0!important;border-radius:50%!important;cursor:pointer;flex:none;background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;color:var(--cfx-texto,#111827)!important;box-shadow:0 1px 3px rgba(15,23,42,.08)!important}.cfx-cab>.cfx-ham svg{width:18px;height:18px;display:block}' +
+    '@media(max-width:600px){.cfx-cab>.cfx-ham{display:grid}.cfx-cab>.cfx-plan,.cfx-cab>.cfx-atajo,.cfx-cab-extra{display:none!important}.cfx-cab{gap:7px}}' +
     '.cfx-cab>a,.cfx-cab>button{transition:transform .12s ease}.cfx-cab>a:active,.cfx-cab>button:active{transform:scale(.92)}' +
     // Título de la cabecera: más chico en celular y hasta 2 líneas antes de cortar con "…".
     ':is(button,a):has(> .cfx-titulo){justify-content:flex-start!important}.cfx-titulo{text-align:left;white-space:nowrap!important;display:block!important;overflow:hidden!important;text-overflow:ellipsis;line-height:1.2!important;min-width:0}' +
@@ -207,6 +213,7 @@
   // Lo que ya está en el menú (casa, chat, persona, ADMIN, cerrar sesión…) se esconde con CFG.quitar (selector de cada app).
   const SVG_CAMPANA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
   const SVG_CAMBIO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>';
+  const SVG_HAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
   const CAMPANA = '#bCampana, #campana, #btnAvisos, [aria-label="Avisos"], [aria-label="Notificaciones"], a[href$="#avisos"], [data-cfx-campana]';
   function encabezado() {
     return [...document.querySelectorAll('header.top, header.cab, .cab, header, .topbar, .top')].find((h) => {
@@ -222,8 +229,10 @@
     if (!R) return;
     if (!boya) {
       boya = document.createElement('div'); boya.className = 'cfx-cab';
-      boya.innerHTML = '<a class="cfx-atajo cfx-oc"></a><button type="button" class="cfx-plan"></button><button type="button" class="cfx-av" aria-label="Mi cuenta y menú"></button>';
+      boya.innerHTML = '<a class="cfx-atajo cfx-oc"></a><button type="button" class="cfx-plan"></button><button type="button" class="cfx-av" aria-label="Mi cuenta y menú"></button>' +
+        '<button type="button" class="cfx-ham" aria-label="Abrir menú">' + SVG_HAM + '</button>';
       boya.querySelector('.cfx-av').onclick = menu;
+      boya.querySelector('.cfx-ham').onclick = hamburguesa;
       boya.querySelector('.cfx-plan').onclick = () => (CFG.admin || !window.CFX_PAGOS ? menu() : window.CFX_PAGOS.abrir({ rpc: R }));
     }
     const h = encabezado();
@@ -239,6 +248,7 @@
       if (una && una.parentNode !== boya) { una.dataset.cfxCampana = '1'; boya.insertBefore(una, boya.querySelector('.cfx-plan')); }
       // Mismo ícono de campana en todas las apps (las que usan el emoji 🔔 pasan al dibujo de línea).
       if (una) [...una.childNodes].forEach((x) => { if (x.nodeType === 3 && /🔔/.test(x.textContent)) { const t = document.createElement('span'); t.innerHTML = SVG_CAMPANA; x.replaceWith(t.firstChild); } });
+      marcarExtras(h);
     } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); }
     const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av'), at = boya.querySelector('.cfx-atajo');
     // Atajo fijo { ir, t }: el Centro de Mando pasa el suyo (Panel ⇄ App); en las otras apps solo el administrador (no socios, negocios ni clientes) va al panel del Centro de Mando.
@@ -251,6 +261,38 @@
     plan.setAttribute('aria-label', rol ? (rol === 'ADMIN' ? 'Administrador' : 'Socio') : esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
     const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
     av.innerHTML = (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + (n ? '<i>' + n + '</i>' : '');
+  }
+  // ☰ (teléfono): los botones propios de la cabecera (no la flecha de volver, ni el logo/nombre, ni campana/foto) se esconden
+  // con .cfx-cab-extra y se ofrecen en una lista; al tocar uno se toca el original (no cambia lo que hace).
+  const ES_VOLVER = /volver|atr[aá]s|regresar|back|^\s*[‹<←◀]\s*$/i;
+  function marcarExtras(h) {
+    h.querySelectorAll('button, a, [role=button]').forEach((x) => {
+      if (boya.contains(x) || x.classList.contains('cfx-cab-extra') || x.closest('.cfx-cab-extra') || x.parentElement.closest('button, a') || x.closest('nav, .cfx-barra')) return;
+      if (x.matches(CAMPANA) || x.querySelector('h1, h2, h3, img, .cfx-titulo, [class*=logo], [class*=marca], [class*=brand]') || x.matches('[class*=logo], [class*=marca], [class*=brand]')) return;
+      if (ES_VOLVER.test([x.getAttribute('aria-label'), x.title, x.className, x.textContent].join(' '))) return;
+      if (x.dataset.cfxQueda !== undefined || x.closest('[data-cfx-queda]')) return;  // la app puede pedir que un botón se quede arriba
+      x.classList.add('cfx-cab-extra');
+    });
+  }
+  function hamburguesa() {
+    const h = boya.parentNode, L = [];
+    const vis = (x) => { x.classList.remove('cfx-cab-extra'); const v = !x.classList.contains('cfx-oc') && !x.hidden && x.getClientRects().length > 0; x.classList.add('cfx-cab-extra'); return v; };
+    if (h && h !== document.body) h.querySelectorAll('.cfx-cab-extra').forEach((x) => { if (vis(x)) L.push({ t: (x.getAttribute('aria-label') || x.title || x.textContent || '').replace(/\s+/g, ' ').trim() || 'Opción', el: x }); });
+    const at = boya.querySelector('.cfx-atajo');
+    const rol = CFG.admin ? (CFG.socio ? 'Socio' : 'Administrador') : '';
+    const c = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || rol || CFG.email || 'Mi cuenta') + '</b>' +
+      '<small>' + (rol || 'Plan ' + (esPro() ? 'PRO' : 'FREE')) + '</small></div></div><div class="ca-cuerpo">' +
+      L.map((x, i) => '<button type="button" class="ca-op" data-i="' + i + '"><span>•</span><b>' + esc(x.t.slice(0, 40)) + '</b></button>').join('') +
+      (at && !at.classList.contains('cfx-oc') ? '<button type="button" class="ca-op" data-a="atajo"><span>⇄</span><b>' + esc(at.textContent || 'Panel') + '</b></button>' : '') +
+      (!CFG.admin && window.CFX_PAGOS ? '<button type="button" class="ca-op" data-a="premium"><span>⭐</span><b>' + (esPro() ? 'Mi plan PRO' : 'Pasar a PRO') + '</b></button>' : '') +
+      (R ? '<button type="button" class="ca-op" data-a="perfil"><span>👤</span><b>Mi perfil</b></button>' : '') +
+      '<button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button></div>');
+    c.onclick = (ev) => {
+      const b = ev.target.closest('[data-i], [data-a]'); if (!b) return;
+      if (b.dataset.i !== undefined) { const x = L[+b.dataset.i]; cerrar(); if (x && x.el.isConnected) x.el.click(); return; }
+      const a = b.dataset.a;
+      if (a === 'atajo') { cerrar(); location.href = at.href; } else if (a === 'salir') confirmarSalir(); else if (a === 'perfil') abrirPerfil(); else { cerrar(); accion(a); }
+    };
   }
   // Inicio: la primera pantalla de la app en esta sesión. Cerrar sesión: la función de la app, su botón, o se borra la sesión guardada.
   function inicio() { cerrar(); let u = ''; try { u = sessionStorage.getItem('cfx-inicio') || ''; } catch (e) { /* nada */ } location.href = u || RAIZ; }
@@ -857,7 +899,7 @@
   }, true);
 
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
-  setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } }, 1500);
+  setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } else if (boya && boya.parentNode && boya.parentNode !== document.body) marcarExtras(boya.parentNode); }, 1500);
 
   window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM };
   window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad };
