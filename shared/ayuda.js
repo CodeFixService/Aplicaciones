@@ -80,11 +80,12 @@
     'background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:0 2px 10px rgba(15,23,42,.10)!important;color:var(--cfx-texto,#111827)!important;font-size:22px!important;line-height:1!important;text-decoration:none!important}' +
     '.cfx-cab-h .cfx-volver svg{width:20px!important;height:20px!important}.cfx-cab-h .cfx-volver:active{transform:scale(.92)}' +
     '.cfx-cinta{display:none;position:absolute;left:0;right:0;top:100%;height:3px;background:linear-gradient(90deg,#f7d774,#d9a21b,#f7d774);pointer-events:none;z-index:2}html.cfx-premium .cfx-cinta{display:block}' +
-    '.cfx-pest{position:absolute;left:50%;top:100%;translate:-50% 0;z-index:3;width:56px;height:20px;padding:0;margin:0;border:1px solid var(--cfx-borde,#e2e7ec);border-top:0;border-radius:0 0 14px 14px;' +
+    // Pestañita delgada a la orilla derecha, justo bajo la campana (a mano del pulgar derecho); el área para tocar es más grande que el dibujo.
+    '.cfx-pest{position:absolute;left:auto;right:var(--cfx-pest-d,12px);top:100%;z-index:3;width:34px;height:12px;padding:0;margin:0;border:1px solid var(--cfx-borde,#e2e7ec);border-top:0;border-radius:0 0 10px 10px;' +
     'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto-2,#5b6472);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 10px rgba(15,23,42,.10);-webkit-tap-highlight-color:transparent}' +
-    '.cfx-pest::before{content:"";position:absolute;inset:-4px -12px -14px}.cfx-pest svg{width:16px;height:16px;display:block}.cfx-pest:focus:not(:focus-visible){outline:0}' +
-    'html.cfx-premium .cfx-pest{top:calc(100% + 3px);color:#b07a00}.cfx-cab.cfx-fija .cfx-pest{left:auto;right:0;translate:none}' +
-    '.cfx-pest i{position:absolute;top:3px;right:6px;min-width:15px;height:15px;border-radius:8px;background:#dc2626;color:#fff;font:700 10px/15px system-ui,sans-serif;font-style:normal;padding:0 3px;box-sizing:border-box}' +
+    '.cfx-pest::before{content:"";position:absolute;inset:-6px -8px -18px}.cfx-pest svg{width:12px;height:12px;display:block}.cfx-pest:focus:not(:focus-visible){outline:0}' +
+    'html.cfx-premium .cfx-pest{top:calc(100% + 3px);color:#b07a00}.cfx-cab.cfx-fija .cfx-pest{right:1px}' +
+    '.cfx-pest i{position:absolute;top:0;right:calc(100% + 3px);min-width:15px;height:15px;border-radius:8px;background:#dc2626;color:#fff;font:700 10px/15px system-ui,sans-serif;font-style:normal;padding:0 3px;box-sizing:border-box}' +
     '.cfx-pnl-velo{position:fixed;inset:0;z-index:2147481500;background:rgba(15,23,42,.35);opacity:0;transition:opacity .22s}.cfx-pnl-velo.on{opacity:1}' +
     '.cfx-pnl{position:fixed;top:0;left:50%;width:100%;max-width:520px;z-index:2147481600;box-sizing:border-box;padding:calc(18px + env(safe-area-inset-top)) 14px 6px;background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);' +
     'border-radius:0 0 22px 22px;box-shadow:0 12px 32px rgba(15,23,42,.22);font-family:var(--cfx-letra,system-ui,sans-serif);transform:translate(-50%,-105%);transition:transform .26s cubic-bezier(.2,.8,.2,1);touch-action:pan-x}' +
@@ -273,6 +274,8 @@
       if (getComputedStyle(h).overflowY === 'hidden') h.style.overflow = 'visible';
       if (cinta.parentNode !== h) h.appendChild(cinta);
       if (pest.parentNode !== h) h.appendChild(pest);
+      requestAnimationFrame(() => { const c = boya.querySelector('[data-cfx-campana]'); if (!c || !c.getClientRects().length) return; const a = c.getBoundingClientRect(), b = h.getBoundingClientRect();
+        h.style.setProperty('--cfx-pest-d', Math.max(4, Math.round(b.right - a.right + (a.width - 34) / 2)) + 'px'); });
       // Sin logo ni foto del negocio arriba (teléfono): imágenes y cuadritos de logo (texto de hasta 3 letras o un emoji).
       h.querySelectorAll('img, [class*=logo]').forEach((x) => { if (boya.contains(x) || x === pest) return; if (x.tagName === 'IMG' || (!x.querySelector('h1, h2, b, strong') && [...(x.textContent || '').trim()].length <= 3)) x.classList.add('cfx-sin-logo'); });
       if (CFG.quitar) h.querySelectorAll(CFG.quitar).forEach((x) => x.classList.add('cfx-oc'));

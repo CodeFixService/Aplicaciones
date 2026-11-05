@@ -125,7 +125,7 @@
     extra.forEach((b) => { b.classList.add('cfx-oculto'); nav.appendChild(b); });
     nav.style.setProperty('--cfx-n', String(nav.querySelectorAll(':scope > :not(.cfx-oculto)').length));
     document.documentElement.classList.add('cfx-barra-lista');
-    verBarra();  // al cargar se ve; después se esconde sola
+    verBarra();  // al cargar se ve; se esconde al bajar
   }
 
   // ---------- Tiras de opciones que se deslizan de lado (pestañas, filtros, chips) ----------
@@ -214,16 +214,16 @@
   addEventListener('click', (e) => { if (e.target.closest && e.target.closest('nav, .tabs, .seg, .chips, [data-v], [data-s], [data-tab], [data-r]')) { clearTimeout(tPila); tPila = setTimeout(apilar, 120); } }, { passive: true, capture: true });
 
   // ---------- La barra se esconde sola (celular y tablet, todos los usuarios) ----------
-  // Se ve al cargar, al cambiar de pantalla, al subir y al llegar al final; se esconde al bajar o tras 4 s sin usarla.
+  // Regla igual en todas las apps (núcleo 2.34): al bajar se esconde, al subir aparece (y arriba del todo). No aparece sola al llegar al final
+  // ni se esconde sola con el tiempo: solo sigue el dedo. También se ve al cargar y al cambiar de pantalla.
   // Nunca se esconde con una hoja o ventana abierta, ni mientras escribes. El asa de abajo (o deslizar hacia arriba) la vuelve a mostrar.
-  const VE = 4000;
-  let tEsc = 0, asa = null, yIni = null;
+  let asa = null, yIni = null;
   const barraNav = () => document.querySelector('nav.cfx-barra');
   const raiz = document.documentElement;
   function ocultarBarra() {
     const n = barraNav(); if (!n || innerWidth >= 900 || window.CFX_BARRA_FIJA) return;
     const a = document.activeElement;
-    if (document.querySelector('.cfx-mv, dialog[open], .cfx-hoja-m') || n.contains(a) || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || n.matches(':hover:active')) { esperarBarra(); return; }
+    if (document.querySelector('.cfx-mv, dialog[open], .cfx-hoja-m') || n.contains(a) || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || n.matches(':hover:active')) return;
     if (!asa) {
       asa = document.createElement('button'); asa.type = 'button'; asa.className = 'cfx-barra-asa'; asa.setAttribute('aria-label', 'Mostrar el menú de abajo');
       asa.addEventListener('click', (e) => { e.preventDefault(); verBarra(); });
@@ -231,20 +231,18 @@
     }
     n.classList.add('cfx-escondida'); raiz.classList.add('cfx-barra-oculta');
   }
-  function esperarBarra(ms) { clearTimeout(tEsc); tEsc = setTimeout(ocultarBarra, ms || VE); }
-  function verBarra(ms) {
+  function verBarra() {
     const n = barraNav(); if (!n) return;
     if (n.classList.contains('cfx-escondida')) { n.classList.remove('cfx-escondida'); raiz.classList.remove('cfx-barra-oculta'); }
-    esperarBarra(ms);
   }
   const yDe = new WeakMap();
   addEventListener('scroll', (e) => {
     const el = e.target === document || e.target === document.documentElement ? document.scrollingElement || document.documentElement : e.target;
     if (!el || el.nodeType !== 1 || !barraNav() || (el !== document.scrollingElement && el.clientHeight < innerHeight * 0.5)) return;  // solo la página o cajas grandes
     const y = el.scrollTop, antes = yDe.has(el) ? yDe.get(el) : y; yDe.set(el, y);
-    const fin = y + el.clientHeight >= el.scrollHeight - 4;
-    if (y - antes > 6 && y > 60 && !fin) ocultarBarra();
-    else if (antes - y > 6 || fin || y < 20) verBarra();
+    const fin = y + el.clientHeight >= el.scrollHeight - 2;  // el rebote del final (iPhone/Android) no cuenta como subir
+    if (y - antes > 6 && y > 60) ocultarBarra();
+    else if ((antes - y > 10 && !fin) || y < 20) verBarra();
   }, { passive: true, capture: true });
   // Deslizar el dedo hacia arriba desde el borde de abajo también la muestra.
   addEventListener('touchstart', (e) => { const t = e.touches[0]; yIni = t && t.clientY > innerHeight - 60 ? t.clientY : null; }, { passive: true });
