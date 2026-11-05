@@ -26,7 +26,7 @@
     // Tamaño según el campo (en campos chicos el botón se achica) y el texto no queda debajo del micrófono.
     const alto = Math.round(Math.max(18, Math.min(campo.tagName === 'TEXTAREA' ? 30 : 28, r.height * 0.62, r.width / 6)));
     if (!campo.dataset.cfxPad) { campo.dataset.cfxPad = campo.style.paddingRight || '-'; campo.style.paddingRight = (alto + 12) + 'px'; }
-    b.style.cssText = 'position:fixed;z-index:130;width:' + alto + 'px;height:' + alto + 'px;left:' + Math.round(r.right - alto - Math.max(4, (r.height - alto) / 2.4)) + 'px;top:' + Math.round(campo.tagName === 'TEXTAREA' ? r.bottom - alto - 7 : r.top + (r.height - alto) / 2) + 'px';
+    b.style.cssText = 'position:fixed;z-index:2147483000;width:' + alto + 'px;height:' + alto + 'px;left:' + Math.round(r.right - alto - Math.max(4, (r.height - alto) / 2.4)) + 'px;top:' + Math.round(campo.tagName === 'TEXTAREA' ? r.bottom - alto - 7 : r.top + (r.height - alto) / 2) + 'px';
     b.hidden = false;
   }
   // forzar: también si estaba dictando (el campo desapareció, otra pantalla, la app pasó a segundo plano).
