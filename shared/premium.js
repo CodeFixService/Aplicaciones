@@ -1,12 +1,12 @@
 /* CodeFix · Núcleo · Sensación Premium (mismo archivo en cada repositorio).
-   CFX_PREMIUM.marcar({ premium, id, hasta, beneficios })  → con Premium la app se ve dorada (línea arriba, pestaña activa y botón + dorados)
+   CFX_PREMIUM.marcar({ premium, id, hasta, beneficios })  → con Premium la app se ve dorada (cinta dorada bajo la cabecera, pestaña activa y botón + dorados)
    y la primera vez muestra "¡Ya eres Premium!" con lo que incluye. Sin Premium no cambia nada. */
 (function () {
   'use strict';
   if (window.CFX_PREMIUM) return;
   const css = document.createElement('style');
   css.textContent =
-    'html.cfx-premium body::before{content:"";position:fixed;top:0;left:0;right:0;height:3px;z-index:2147482000;background:linear-gradient(90deg,#f7d774,#d9a21b,#f7d774);pointer-events:none}' +
+    'html.cfx-premium:not(.cfx-con-cinta) body::before{content:"";position:fixed;top:0;left:0;right:0;height:3px;z-index:2147482000;background:linear-gradient(90deg,#f7d774,#d9a21b,#f7d774);pointer-events:none}' +
     'html.cfx-premium nav.cfx-barra>.on,html.cfx-premium nav.cfx-barra>.activo,html.cfx-premium nav.cfx-barra>[aria-current="page"]{color:#c58b00!important}' +
     'html.cfx-premium nav.cfx-barra .cfx-mas>:first-child,html.cfx-premium nav.cfx-barra .cfx-mas .cfx-ico,html.cfx-premium nav.cfx-barra .nuevo span:first-child{background:linear-gradient(135deg,#f7d774,#d9a21b)!important;color:#3b2a00!important}' +
     '@media(min-width:900px){html.cfx-premium nav.cfx-barra>.cfx-mas{background:linear-gradient(135deg,#f7d774,#d9a21b)!important;color:#3b2a00!important}html.cfx-premium nav.cfx-barra>.cfx-mas>:first-child,html.cfx-premium nav.cfx-barra>.cfx-mas .cfx-ico{background:none!important}}' +

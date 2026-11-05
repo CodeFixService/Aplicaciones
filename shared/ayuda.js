@@ -72,6 +72,31 @@
     '.cfx-cab>.cfx-ham{place-items:center;padding:0!important;margin:0!important;border-radius:50%!important;cursor:pointer;flex:none;background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;color:var(--cfx-texto,#111827)!important;box-shadow:0 1px 3px rgba(15,23,42,.08)!important}.cfx-cab>.cfx-ham svg{width:18px;height:18px;display:block}' +
     '@media(max-width:600px){.cfx-cab>.cfx-ham{display:grid}.cfx-cab>.cfx-plan,.cfx-cab>.cfx-atajo,.cfx-cab-extra{display:none!important}.cfx-cab{gap:7px}}' +
     '.cfx-cab>a,.cfx-cab>button{transition:transform .12s ease}.cfx-cab>a:active,.cfx-cab>button:active{transform:scale(.92)}' +
+    // U7-U9 (núcleo 2.33): arriba solo campana; la foto, el plan, el atajo y ☰ pasan al panel que baja con la pestañita. Sin logo en teléfono.
+    // Flecha de volver en su propio cuadrado limpio. PRO = cinta dorada delgada bajo la cabecera.
+    '.cfx-cab>.cfx-av,.cfx-cab>.cfx-ham,.cfx-cab>.cfx-plan,.cfx-cab>.cfx-atajo{display:none!important}' +
+    '@media(max-width:600px){.cfx-sin-logo{display:none!important}.cfx-cab-h h1::before{display:none!important}}' +
+    '.cfx-cab-h .cfx-volver{display:inline-grid;place-items:center!important;width:38px!important;height:38px!important;min-width:38px!important;min-height:0!important;padding:0!important;margin:0 4px 0 0!important;border-radius:12px!important;flex:none;' +
+    'background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:0 2px 10px rgba(15,23,42,.10)!important;color:var(--cfx-texto,#111827)!important;font-size:22px!important;line-height:1!important;text-decoration:none!important}' +
+    '.cfx-cab-h .cfx-volver svg{width:20px!important;height:20px!important}.cfx-cab-h .cfx-volver:active{transform:scale(.92)}' +
+    '.cfx-cinta{display:none;position:absolute;left:0;right:0;top:100%;height:3px;background:linear-gradient(90deg,#f7d774,#d9a21b,#f7d774);pointer-events:none;z-index:2}html.cfx-premium .cfx-cinta{display:block}' +
+    '.cfx-pest{position:absolute;left:50%;top:100%;translate:-50% 0;z-index:3;width:56px;height:20px;padding:0;margin:0;border:1px solid var(--cfx-borde,#e2e7ec);border-top:0;border-radius:0 0 14px 14px;' +
+    'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto-2,#5b6472);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 10px rgba(15,23,42,.10);-webkit-tap-highlight-color:transparent}' +
+    '.cfx-pest::before{content:"";position:absolute;inset:-4px -12px -14px}.cfx-pest svg{width:16px;height:16px;display:block}.cfx-pest:focus:not(:focus-visible){outline:0}' +
+    'html.cfx-premium .cfx-pest{top:calc(100% + 3px);color:#b07a00}.cfx-cab.cfx-fija .cfx-pest{left:auto;right:0;translate:none}' +
+    '.cfx-pest i{position:absolute;top:3px;right:6px;min-width:15px;height:15px;border-radius:8px;background:#dc2626;color:#fff;font:700 10px/15px system-ui,sans-serif;font-style:normal;padding:0 3px;box-sizing:border-box}' +
+    '.cfx-pnl-velo{position:fixed;inset:0;z-index:2147481500;background:rgba(15,23,42,.35);opacity:0;transition:opacity .22s}.cfx-pnl-velo.on{opacity:1}' +
+    '.cfx-pnl{position:fixed;top:0;left:50%;width:100%;max-width:520px;z-index:2147481600;box-sizing:border-box;padding:calc(18px + env(safe-area-inset-top)) 14px 6px;background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);' +
+    'border-radius:0 0 22px 22px;box-shadow:0 12px 32px rgba(15,23,42,.22);font-family:var(--cfx-letra,system-ui,sans-serif);transform:translate(-50%,-105%);transition:transform .26s cubic-bezier(.2,.8,.2,1);touch-action:pan-x}' +
+    '.cfx-pnl.on{transform:translate(-50%,0)}html.cfx-premium .cfx-pnl{border-bottom:3px solid #d9a21b}' +
+    '.cfx-pnl-yo{display:flex;align-items:center;gap:12px;padding:0 4px 14px;border-bottom:1px solid var(--cfx-borde,#e2e7ec);margin-bottom:6px}.cfx-pnl-yo>div{min-width:0}' +
+    '.cfx-pnl-yo .cfx-av{width:56px!important;height:56px!important;min-width:56px!important;max-height:56px;font-size:20px;cursor:default}.cfx-pnl-yo b,.cfx-pnl-yo small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.cfx-pnl-yo b{font-size:17px}.cfx-pnl-yo small{font-size:13px;color:var(--cfx-texto-2,#5b6472);margin-top:2px}.cfx-pnl-yo small.pro{color:#b07a00;font-weight:800}' +
+    '.cfx-pnl-op{display:flex;align-items:center;gap:12px;width:100%;min-height:50px;padding:6px 4px;border:0;background:none;color:inherit;font:600 15.5px/1.2 var(--cfx-letra,system-ui,sans-serif);text-align:left;cursor:pointer;border-radius:12px}' +
+    '.cfx-pnl-op:active{background:color-mix(in srgb,var(--cfx-texto,#111827) 6%,transparent)}.cfx-pnl-op>span{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,var(--brand,#2563eb) 12%,transparent);color:var(--brand,#2563eb)}' +
+    '.cfx-pnl-op>span svg{width:19px;height:19px}.cfx-pnl-op b{flex:1;min-width:0;font-weight:650}.cfx-pnl-op small{display:block;font-weight:500;font-size:12.5px;color:var(--cfx-texto-2,#5b6472);margin-top:2px}' +
+    '.cfx-pnl-op.rojo{color:#dc2626}.cfx-pnl-op.rojo>span{background:color-mix(in srgb,#dc2626 10%,transparent);color:#dc2626}' +
+    '.cfx-pnl-cerrar{display:grid;place-items:center;width:64px;height:24px;margin:4px auto 0;padding:0;border:0;background:none;color:var(--cfx-texto-2,#5b6472);cursor:pointer}.cfx-pnl-cerrar svg{width:18px;height:18px}' +
     // Título de la cabecera: más chico en celular y hasta 2 líneas antes de cortar con "…".
     ':is(button,a):has(> .cfx-titulo){justify-content:flex-start!important}.cfx-titulo{text-align:left;white-space:nowrap!important;display:block!important;overflow:hidden!important;text-overflow:ellipsis;line-height:1.2!important;min-width:0}' +
     '@media(max-width:600px){.cfx-titulo{font-size:clamp(14px,4vw,18px)!important}}' +
@@ -187,7 +212,7 @@
     '.cfx-ayuda .cfx-pf-d{min-height:200px}';
   document.head.appendChild(css);
 
-  let R = null, APP = '', estado = { items: [], sin_leer: 0 }, boya = null, abierta = null;
+  let R = null, APP = '', estado = { items: [], sin_leer: 0 }, boya = null, pest = null, cinta = null, abierta = null;
   const CFG = {};
   const pend = () => estado.items.filter((x) => !x.ok);
 
@@ -214,6 +239,7 @@
   const SVG_CAMPANA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
   const SVG_CAMBIO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>';
   const SVG_HAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+  const CHEV_ABAJO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
   const CAMPANA = '#bCampana, #campana, #btnAvisos, [aria-label="Avisos"], [aria-label="Notificaciones"], a[href$="#avisos"], [data-cfx-campana]';
   function encabezado() {
     return [...document.querySelectorAll('header.top, header.cab, .cab, header, .topbar, .top')].find((h) => {
@@ -234,11 +260,21 @@
       boya.querySelector('.cfx-av').onclick = menu;
       boya.querySelector('.cfx-ham').onclick = hamburguesa;
       boya.querySelector('.cfx-plan').onclick = () => (CFG.admin || !window.CFX_PAGOS ? menu() : window.CFX_PAGOS.abrir({ rpc: R }));
+      pest = document.createElement('button'); pest.type = 'button'; pest.className = 'cfx-pest'; pest.setAttribute('aria-label', 'Abrir menú de la cuenta'); pest.setAttribute('aria-expanded', 'false');
+      pest.onclick = hamburguesa;
+      cinta = document.createElement('i'); cinta.className = 'cfx-cinta'; cinta.setAttribute('aria-hidden', 'true');
     }
     const h = encabezado();
     if (h) {
       if (boya.parentNode !== h) h.appendChild(boya);
       boya.classList.remove('cfx-fija');
+      h.classList.add('cfx-cab-h'); document.documentElement.classList.add('cfx-con-cinta');
+      if (getComputedStyle(h).position === 'static') h.style.position = 'relative';
+      if (getComputedStyle(h).overflowY === 'hidden') h.style.overflow = 'visible';
+      if (cinta.parentNode !== h) h.appendChild(cinta);
+      if (pest.parentNode !== h) h.appendChild(pest);
+      // Sin logo ni foto del negocio arriba (teléfono): imágenes y cuadritos de logo (texto de hasta 3 letras o un emoji).
+      h.querySelectorAll('img, [class*=logo]').forEach((x) => { if (boya.contains(x) || x === pest) return; if (x.tagName === 'IMG' || (!x.querySelector('h1, h2, b, strong') && [...(x.textContent || '').trim()].length <= 3)) x.classList.add('cfx-sin-logo'); });
       if (CFG.quitar) h.querySelectorAll(CFG.quitar).forEach((x) => x.classList.add('cfx-oc'));
       // El nombre de la cabecera que se cortaba con "…" pasa a 2 líneas (y letra más chica en celular).
       h.querySelectorAll('h1, h2, b, strong, span, div').forEach((x) => { if (!boya.contains(x) && !x.classList.contains('cfx-titulo') && x.childElementCount === 0 && (x.textContent || '').trim() && getComputedStyle(x).textOverflow === 'ellipsis') x.classList.add('cfx-titulo'); });
@@ -249,7 +285,8 @@
       // Mismo ícono de campana en todas las apps (las que usan el emoji 🔔 pasan al dibujo de línea).
       if (una) [...una.childNodes].forEach((x) => { if (x.nodeType === 3 && /🔔/.test(x.textContent)) { const t = document.createElement('span'); t.innerHTML = SVG_CAMPANA; x.replaceWith(t.firstChild); } });
       marcarExtras(h);
-    } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); }
+    } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); document.documentElement.classList.remove('cfx-con-cinta'); }
+    if (boya.classList.contains('cfx-fija') && pest.parentNode !== boya) boya.appendChild(pest);
     const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av'), at = boya.querySelector('.cfx-atajo');
     // Atajo fijo { ir, t }: el Centro de Mando pasa el suyo (Panel ⇄ App); en las otras apps solo el administrador (no socios, negocios ni clientes) va al panel del Centro de Mando.
     const atajo = 'atajo' in CFG ? CFG.atajo : CFG.admin && !CFG.socio && CFG.app !== 'mando' ? { ir: panelCM(), t: 'Panel' } : null;
@@ -261,37 +298,62 @@
     plan.setAttribute('aria-label', rol ? (rol === 'ADMIN' ? 'Administrador' : 'Socio') : esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
     const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
     av.innerHTML = (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + (n ? '<i>' + n + '</i>' : '');
+    pest.innerHTML = CHEV_ABAJO + (n ? '<i>' + n + '</i>' : '');
   }
   // ☰ (teléfono): los botones propios de la cabecera (no la flecha de volver, ni el logo/nombre, ni campana/foto) se esconden
   // con .cfx-cab-extra y se ofrecen en una lista; al tocar uno se toca el original (no cambia lo que hace).
   const ES_VOLVER = /volver|atr[aá]s|regresar|back|^\s*[‹<←◀]\s*$/i;
   function marcarExtras(h) {
     h.querySelectorAll('button, a, [role=button]').forEach((x) => {
-      if (boya.contains(x) || x.classList.contains('cfx-cab-extra') || x.closest('.cfx-cab-extra') || x.parentElement.closest('button, a') || x.closest('nav, .cfx-barra')) return;
+      if (boya.contains(x) || x === pest || x.classList.contains('cfx-cab-extra') || x.closest('.cfx-cab-extra') || x.parentElement.closest('button, a') || x.closest('nav, .cfx-barra')) return;
       if (x.matches(CAMPANA) || x.querySelector('h1, h2, h3, img, .cfx-titulo, [class*=logo], [class*=marca], [class*=brand]') || x.matches('[class*=logo], [class*=marca], [class*=brand]')) return;
-      if (ES_VOLVER.test([x.getAttribute('aria-label'), x.title, x.className, x.textContent].join(' '))) return;
+      if (ES_VOLVER.test([x.getAttribute('aria-label'), x.title, x.className, x.textContent].join(' ')) || x.classList.contains('cfx-flecha')) { x.classList.add('cfx-volver'); return; }
       if (x.dataset.cfxQueda !== undefined || x.closest('[data-cfx-queda]')) return;  // la app puede pedir que un botón se quede arriba
       x.classList.add('cfx-cab-extra');
     });
   }
+  // Panel de la cuenta (núcleo 2.33): baja desde arriba al tocar la pestañita. Foto, nombre y plan; los botones propios de la cabecera (teléfono),
+  // ⇄ cambiar de app/cuenta (admin), Premium, Mi perfil y Cerrar sesión. Se cierra tocando afuera, con Escape, deslizando hacia arriba o con la flecha.
+  let pnl = null;
+  function cerrarPanel() {
+    if (!pnl) return; const [v, c] = pnl; pnl = null; if (pest) pest.setAttribute('aria-expanded', 'false');
+    v.classList.remove('on'); c.classList.remove('on'); document.removeEventListener('keydown', escPanel);
+    setTimeout(() => { v.remove(); c.remove(); }, 280);
+  }
+  function escPanel(e) { if (e.key === 'Escape') cerrarPanel(); }
   function hamburguesa() {
+    if (pnl) return cerrarPanel();
     const h = boya.parentNode, L = [];
     const vis = (x) => { x.classList.remove('cfx-cab-extra'); const v = !x.classList.contains('cfx-oc') && !x.hidden && x.getClientRects().length > 0; x.classList.add('cfx-cab-extra'); return v; };
-    if (h && h !== document.body) h.querySelectorAll('.cfx-cab-extra').forEach((x) => { if (vis(x)) L.push({ t: (x.getAttribute('aria-label') || x.title || x.textContent || '').replace(/\s+/g, ' ').trim() || 'Opción', el: x }); });
+    const telefono = matchMedia('(max-width:600px)').matches;
+    if (telefono && h && h !== document.body) h.querySelectorAll('.cfx-cab-extra').forEach((x) => { if (vis(x)) L.push({ t: (x.getAttribute('aria-label') || x.title || x.textContent || '').replace(/\s+/g, ' ').trim() || 'Opción', el: x }); });
     const at = boya.querySelector('.cfx-atajo');
     const rol = CFG.admin ? (CFG.socio ? 'Socio' : 'Administrador') : '';
-    const c = dialogo('<div class="ca-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || rol || CFG.email || 'Mi cuenta') + '</b>' +
-      '<small>' + (rol || 'Plan ' + (esPro() ? 'PRO' : 'FREE')) + '</small></div></div><div class="ca-cuerpo">' +
-      L.map((x, i) => '<button type="button" class="ca-op" data-i="' + i + '"><span>•</span><b>' + esc(x.t.slice(0, 40)) + '</b></button>').join('') +
-      (at && !at.classList.contains('cfx-oc') ? '<button type="button" class="ca-op" data-a="atajo"><span>⇄</span><b>' + esc(at.textContent || 'Panel') + '</b></button>' : '') +
-      (!CFG.admin && window.CFX_PAGOS ? '<button type="button" class="ca-op" data-a="premium"><span>⭐</span><b>' + (esPro() ? 'Mi plan PRO' : 'Pasar a PRO') + '</b></button>' : '') +
-      (R ? '<button type="button" class="ca-op" data-a="perfil"><span>👤</span><b>Mi perfil</b></button>' : '') +
-      '<button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button></div>');
+    const op = (a, ic, t, d, rojo) => '<button type="button" class="cfx-pnl-op' + (rojo ? ' rojo' : '') + '" ' + a + '><span>' + ic + '</span><b>' + esc(t) + (d ? '<small>' + esc(d) + '</small>' : '') + '</b></button>';
+    const v = document.createElement('div'); v.className = 'cfx-pnl-velo';
+    const c = document.createElement('div'); c.className = 'cfx-pnl'; c.setAttribute('role', 'dialog'); c.setAttribute('aria-label', 'Menú de la cuenta');
+    c.innerHTML = '<div class="cfx-pnl-yo"><span class="cfx-av">' + (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + '</span><div><b>' + esc(CFG.nombre || rol || CFG.email || 'Mi cuenta') + '</b>' +
+      (CFG.email && (CFG.nombre || rol) ? '<small>' + esc(CFG.email) + '</small>' : '') + '<small' + (!rol && esPro() ? ' class="pro"' : '') + '>' + (rol || 'Plan ' + (esPro() ? 'PRO' : 'FREE')) + '</small></div></div>' +
+      L.map((x, i) => op('data-i="' + i + '"', icono({ t: x.t, ico: (x.t.match(/^\p{Extended_Pictographic}/u) || [''])[0] }), x.t.replace(/^\p{Extended_Pictographic}️?\s*/u, '').slice(0, 40))).join('') +
+      (at && !at.classList.contains('cfx-oc') ? op('data-a="atajo"', SVG_CAMBIO, at.textContent || 'Panel', 'Cambiar de app/cuenta') : '') +
+      (!CFG.admin && window.CFX_PAGOS ? op('data-a="premium"', icono({ k: 'premium' }), esPro() ? 'Mi plan PRO' : 'Pasar a PRO') : '') +
+      (R ? op('data-a="perfil"', icono({ k: 'perfil' }), 'Mi perfil') : '') +
+      op('data-a="salir"', icono({ k: 'salir' }), 'Cerrar sesión', '', true) +
+      '<button type="button" class="cfx-pnl-cerrar" aria-label="Cerrar menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>';
+    document.body.append(v, c); pnl = [v, c]; pest.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => requestAnimationFrame(() => { v.classList.add('on'); c.classList.add('on'); }));
+    document.addEventListener('keydown', escPanel);
+    v.onclick = cerrarPanel;
+    let y0 = null;
+    c.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+    c.addEventListener('pointerup', (e) => { if (y0 !== null && y0 - e.clientY > 50) cerrarPanel(); y0 = null; });
     c.onclick = (ev) => {
+      if (ev.target.closest('.cfx-pnl-cerrar')) return cerrarPanel();
       const b = ev.target.closest('[data-i], [data-a]'); if (!b) return;
-      if (b.dataset.i !== undefined) { const x = L[+b.dataset.i]; cerrar(); if (x && x.el.isConnected) x.el.click(); return; }
+      cerrarPanel();
+      if (b.dataset.i !== undefined) { const x = L[+b.dataset.i]; if (x && x.el.isConnected) x.el.click(); return; }
       const a = b.dataset.a;
-      if (a === 'atajo') { cerrar(); location.href = at.href; } else if (a === 'salir') confirmarSalir(); else if (a === 'perfil') abrirPerfil(); else { cerrar(); accion(a); }
+      if (a === 'atajo') location.href = at.href; else if (a === 'salir') confirmarSalir(); else if (a === 'perfil') abrirPerfil(); else accion(a);
     };
   }
   // Inicio: la primera pantalla de la app en esta sesión. Cerrar sesión: la función de la app, su botón, o se borra la sesión guardada.
