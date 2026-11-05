@@ -54,7 +54,9 @@ input, select, textarea, button { font-family: inherit; }
     border: 0 !important; border-radius: 12px !important; background: none !important; box-shadow: none !important;
     color: var(--cfx-texto-2) !important; font: 600 11px/1.15 var(--cfx-letra) !important; text-align: center !important; text-decoration: none !important;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; transform: none !important;
+    -webkit-tap-highlight-color: transparent; outline: none;  /* sin mancha oscura al tocar (Android) */
   }
+  nav.cfx-barra > :focus-visible { outline: 2px solid var(--brand, var(--marca, #2563eb)); outline-offset: 2px; }
   nav.cfx-barra > a > small, nav.cfx-barra > button > small { font: inherit !important; margin: 0 !important; }
   nav.cfx-barra > a > span:first-child, nav.cfx-barra > button > span:first-child, nav.cfx-barra .cfx-ico {
     display: grid !important; place-items: center !important; width: 26px !important; height: 26px !important; margin: 0 auto !important; padding: 0 !important;

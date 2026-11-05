@@ -6,6 +6,14 @@
 (function () {
   if (window.CFX_CARGA) return;
   const d = document;
+  // El color y el plan de la última vez se ponen al abrir (antes de pintar): el + y la barra parten con su color final, sin saltos.
+  try {
+    const r = d.documentElement, c = localStorage.getItem('cfx-brand');
+    if (/^#[0-9a-f]{6}$/i.test(c || '') && !r.style.getPropertyValue('--brand')) { r.style.setProperty('--brand', c); r.style.setProperty('--marca', c); }
+    if (localStorage.getItem('cfx-premium') === '1') r.classList.add('cfx-premium');
+    new MutationObserver(() => { const v = (r.style.getPropertyValue('--brand') || r.style.getPropertyValue('--marca')).trim(); try { if (/^#[0-9a-f]{6}$/i.test(v)) localStorage.setItem('cfx-brand', v); else if (!v) localStorage.removeItem('cfx-brand'); } catch (e) { /* lleno */ } })
+      .observe(r, { attributes: true, attributeFilter: ['style'] });
+  } catch (e) { /* sin almacenamiento */ }
   const css = d.createElement('style');
   css.textContent =
     '.cfx-carga-b{position:fixed;left:0;right:0;top:0;height:3px;z-index:2147483600;pointer-events:none;opacity:0;transition:opacity .25s;' +

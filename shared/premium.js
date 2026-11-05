@@ -34,6 +34,7 @@
   function marcar(o) {
     o = o || {};
     document.documentElement.classList.toggle('cfx-premium', !!o.premium);
+    try { if (o.premium) localStorage.setItem('cfx-premium', '1'); else localStorage.removeItem('cfx-premium'); } catch (e) { /* lleno */ }
     if (o.premium && o.id) setTimeout(() => hola(o), 2500);
   }
   window.CFX_PREMIUM = { marcar };
