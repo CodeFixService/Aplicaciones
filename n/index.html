@@ -104,7 +104,7 @@
     try {
       const acc = await Cuenta.signUp(email, pass, neg, { tipo: 'negocio', rubro, telefono: $('rTel').value });
       if (!acc) { $('rErr').textContent = '✅ Cuenta creada. Confirma tu correo con el enlace que te enviamos y luego ingresa.'; return; }
-      try { await Cuenta.rpc('accept_terms'); } catch (err) { /* lo pide al entrar */ }
+      try { await Cuenta.rpc('accept_terms'); await Cuenta.rpc('cfx_legal_aceptar', { p_version: (window.CFX_LEGAL || {}).version || 2 }).catch(() => {}); } catch (err) { /* lo pide al entrar */ }
       location.replace('../?bienvenida=1');
     } catch (err) {
       $('rErr').textContent = /Database error|saving new user/i.test(err.message) ? 'No se pudo crear la cuenta. Revisa los datos o intenta en un rato.' : err.message;

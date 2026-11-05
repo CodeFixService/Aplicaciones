@@ -490,7 +490,7 @@
 
   $('tBtn').onclick = async () => {
     if (!$('tAcepto').checked) { $('tErr').textContent = 'Marca la casilla para continuar'; return; }
-    try { entrar(await Cuenta.rpc('accept_terms')); } catch (err) { $('tErr').textContent = err.message; }
+    try { const r = await Cuenta.rpc('accept_terms'); await Cuenta.rpc('cfx_legal_aceptar', { p_version: (window.CFX_LEGAL || {}).version || 2 }).catch(() => {}); entrar(r); } catch (err) { $('tErr').textContent = err.message; }
   };
 
   // La app y la base de datos deben ser de la misma versión.

@@ -4679,7 +4679,7 @@ grant execute on function public.marca_publica() to anon, authenticated;
 --  · Funciones comunes cfx_* para el Centro de Mando (respaldo, limpieza e inventario).
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.15'::text $$;
+language sql immutable as $$ select '5.16'::text $$;
 
 alter table public.notification_reads add column if not exists oculto boolean not null default false;
 alter table public.profiles add column if not exists aviso_limpieza_at timestamptz;
@@ -5855,6 +5855,50 @@ end $$;
 revoke all on function public.cfx_pin_estado(), public.cfx_pin_guardar(text), public.cfx_pin_verificar(text) from public, anon;
 grant execute on function public.cfx_pin_estado(), public.cfx_pin_guardar(text), public.cfx_pin_verificar(text) to authenticated;
 -- ---------------------------------------------------------------------
+-- CodeFix · Legal (igual en las 7 apps; lo reparte nucleo/sincronizar.py).
+--   Términos y Política de privacidad con versión (Ley 19.628 modificada por la Ley 21.719, vigente desde el 1-dic-2026).
+--   El texto vive en nucleo/ayuda.js (CFX_LEGAL.version). Aquí solo queda la prueba de quién aceptó qué versión y cuándo.
+--   cfx_legal_estado()          → última versión aceptada por la cuenta (0 = ninguna).
+--   cfx_legal_aceptar(version)  → guarda la aceptación (una fila por versión, nunca se pisa).
+--   cfx_legal_resumen()         → admin: cuántas cuentas aceptaron cada versión.
+-- ---------------------------------------------------------------------
+create table if not exists public.cfx_legal (
+  cuenta    uuid not null,
+  version   int  not null check (version between 1 and 10000),
+  aceptado  timestamptz not null default now(),
+  agente    text not null default '',
+  primary key (cuenta, version)
+);
+alter table public.cfx_legal enable row level security;
+revoke all on public.cfx_legal from anon, authenticated;
+
+create or replace function public.cfx_legal_estado() returns int
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(max(version), 0) from public.cfx_legal where cuenta = auth.uid()
+$$;
+
+create or replace function public.cfx_legal_aceptar(p_version int) returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare u uuid := auth.uid();
+begin
+  if u is null then raise exception 'Inicia sesión para aceptar.'; end if;
+  if p_version is null or p_version < 1 or p_version > 10000 then raise exception 'Versión no válida.'; end if;
+  insert into public.cfx_legal (cuenta, version, agente)
+  values (u, p_version, left(coalesce(current_setting('request.headers', true)::jsonb ->> 'user-agent', ''), 300))
+  on conflict (cuenta, version) do nothing;
+end $$;
+
+create or replace function public.cfx_legal_resumen() returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+begin
+  perform public.cfx_es_admin();
+  return coalesce((select jsonb_agg(jsonb_build_object('version', version, 'cuentas', n, 'ultima', u) order by version desc)
+    from (select version, count(*) n, max(aceptado) u from public.cfx_legal group by version) x), '[]'::jsonb);
+end $$;
+
+revoke all on function public.cfx_legal_estado(), public.cfx_legal_aceptar(int), public.cfx_legal_resumen() from public, anon;
+grant execute on function public.cfx_legal_estado(), public.cfx_legal_aceptar(int), public.cfx_legal_resumen() to authenticated;
+-- ---------------------------------------------------------------------
 -- CodeFix · Referidos (igual en las 7 apps; lo reparte nucleo/sincronizar.py). Se administra desde CM → Control → Referidos.
 --   Cada usuario (negocio o cliente, nunca el admin) tiene su código. Quien se registra con él queda asociado a esa cuenta.
 --   El admin ve quién invitó a quién, da días de Premium o manda un sticker de ánimo. Premio automático (opcional):
@@ -6003,7 +6047,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;

@@ -3,7 +3,8 @@
        · Guía para partir: lo que le falta configurar al negocio (cfx_guia). No se marca como listo hasta que lo hace de verdad,
          y se le recuerda cada vez que entra (y cada 1 hora con la app abierta) mientras falte algo.
        · Chat con soporte: escribe y le respondes desde el Centro de Mando → Mensajes (cfx_chat_*). El globo muestra lo no leído.
-       · Términos y condiciones según el tipo de negocio (ley chilena: 19.496 del consumidor y 19.628 / 21.719 de datos personales).
+       · Términos y condiciones según el tipo de negocio (ley chilena: 19.496 del consumidor y 19.628 modificada por la 21.719 de datos personales).
+       · Política de privacidad y aceptación con versión (CFX_LEGAL; cfx_legal_* en sql/legal.sql).
    CFX_AYUDA.chat({ rpc }) · CFX_AYUDA.terminos(app) · CFX_AYUDA.guia()  (también se pueden abrir sueltos).
    CFX_AJUSTES.montar(el, secciones) → Ajustes en cuadrícula de tarjetas (igual en las 7 apps). */
 (function () {
@@ -184,14 +185,15 @@
   const CFG = {};
   const pend = () => estado.items.filter((x) => !x.ok);
 
-  function dialogo(html, alCerrar) {
+  function dialogo(html, alCerrar, fijo) {
     cerrar();
     const d = document.createElement('dialog'); d.className = 'cfx-ayuda'; d.style.setProperty('--ca-color', color());
     d.innerHTML = '<div>' + html + '</div>';
     document.body.appendChild(d); abierta = d;
     try { d.showModal(); } catch (e) { d.setAttribute('open', ''); }
     d.firstChild.tabIndex = -1; try { d.firstChild.focus({ preventScroll: true }); } catch (e) { /* nada */ }
-    d.addEventListener('click', (ev) => { if (ev.target === d || ev.target.closest('[data-cerrar]')) cerrar(); });
+    if (fijo) d.addEventListener('cancel', (ev) => ev.preventDefault());  // fijo: no se cierra con Escape ni tocando afuera
+    d.addEventListener('click', (ev) => { if ((ev.target === d && !fijo) || ev.target.closest('[data-cerrar]')) cerrar(); });
     // iPhone: el teclado no achica la página; la ventana se ajusta a lo visible para que el chat quede sobre el teclado.
     const vv = window.visualViewport, ajustar = () => { d.style.height = vv.height + 'px'; d.style.top = vv.offsetTop + 'px'; d.style.bottom = 'auto'; };
     if (vv) { vv.addEventListener('resize', ajustar); vv.addEventListener('scroll', ajustar); ajustar(); }
@@ -280,6 +282,7 @@
     if (a === 'guia') return guia();
     if (a === 'chat') return chat({ rpc: R });
     if (a === 'terminos') return terminos();
+    if (a === 'privacidad') return privacidad();
     if (a === 'premium' && window.CFX_PAGOS) return window.CFX_PAGOS.abrir({ rpc: R });
   }
   function cuentaEnMas() {
@@ -323,11 +326,11 @@
   // Íconos comunes: lo mismo se ve igual en las 7 apps. La app puede pasar una clave (ico: 'perfil') o un emoji; el núcleo reconoce
   // además las opciones conocidas por su nombre ("Mi perfil", "Cerrar sesión"…). Sin clave conocida → ícono genérico, nunca vacío.
   const ICO_CLAVE = { perfil: 'usuario', cuenta: 'carnet', estilo: 'paleta', avanzado: 'ajustes', ajustes: 'ajustes', guia: 'brujula', chat: 'chat', plan: 'estrella', premium: 'estrella',
-    invitar: 'regalo', terminos: 'documento', salir: 'puerta', respaldo: 'bajar', equipo: 'usuarios', qr: 'qr', link: 'enlace', pagos: 'tarjeta', avisos: 'campana', empresa: 'tienda',
+    invitar: 'regalo', terminos: 'documento', privacidad: 'candado', salir: 'puerta', respaldo: 'bajar', equipo: 'usuarios', qr: 'qr', link: 'enlace', pagos: 'tarjeta', avisos: 'campana', empresa: 'tienda',
     agregar: 'mas', tienda: 'tienda', reglas: 'balanza', socios: 'conexion', registro: 'portapapeles', calificaciones: 'corazon', panel: 'escudo', horario: 'reloj', limpieza: 'escoba',
     instalar: 'celular', reparar: 'herramienta', animo: 'cara', datos: 'bajar', textos: 'lapiz', versiones: 'cohete', servidor: 'servidor' };
   const ICO_TITULO = [[/^mi perfil|^foto y nombre/, 'perfil'], [/^mi cuenta$|^cuenta$|^datos de (la )?cuenta/, 'cuenta'], [/^color y modo|^apariencia|^estilo/, 'estilo'], [/^avanzado/, 'avanzado'],
-    [/^gu[ií]a/, 'guia'], [/^chat con soporte|^soporte/, 'chat'], [/^mi plan|^pasar a pro|^premium\b|^plan\b/, 'plan'], [/^invita/, 'invitar'], [/^t[ée]rminos/, 'terminos'],
+    [/^gu[ií]a/, 'guia'], [/^chat con soporte|^soporte/, 'chat'], [/^mi plan|^pasar a pro|^premium\b|^plan\b/, 'plan'], [/^invita/, 'invitar'], [/^t[ée]rminos/, 'terminos'], [/^pol[ií]tica de privacidad|^privacidad/, 'privacidad'],
     [/^cerrar sesi[oó]n/, 'salir'], [/^respaldo/, 'respaldo'], [/^(mi )?equipo\b|^trabajadores/, 'equipo'], [/^enlace y qr|^qr\b|^c[oó]digo qr|^mi qr/, 'qr'], [/^links? de pago/, 'pagos'],
     [/^notificaciones|^avisos/, 'avisos'], [/^otra empresa|^agregar|^nueva empresa/, 'agregar'], [/^(mi )?empresa/, 'empresa'], [/^(mi )?tienda/, 'tienda'], [/^reglas/, 'reglas'],
     [/^socios/, 'socios'], [/^registro\b/, 'registro'], [/calificaciones|^rese[ñn]as/, 'calificaciones'], [/^panel de administraci/, 'panel'], [/^horario/, 'horario'], [/^limpieza/, 'limpieza'],
@@ -438,6 +441,7 @@
       !adm && window.CFX_PAGOS && { k: 'premium', ico: '⭐', t: esPro() ? 'Mi plan PRO' : 'Pasar a PRO', accion: a('premium') },
       !adm && !PERSONALES.includes(APP) && { k: 'invitar', ico: '🎁', t: 'Invita y gana', accion: a('invitar') },
       { k: 'terminos', ico: '📄', t: 'Términos y condiciones', accion: a('terminos') },
+      { k: 'privacidad', ico: '🔒', t: 'Política de privacidad', accion: a('privacidad') },
       { k: 'salir', ico: '🚪', t: 'Cerrar sesión', rojo: true, accion: confirmarSalir }
     ].filter((x) => x && !(yaEstan || []).includes(x.k)).map((x) => Object.assign(x, { grupo: g }));
   }
@@ -570,10 +574,24 @@
     mando: ['Uso personal',
       'El Centro de Mando organiza tus tareas, metas, ideas y descanso. Lo que anotas es privado y solo tú lo ves.']
   };
-  function terminos(app) {
-    const a = app || detectar(), n = NOMBRE[a] || 'esta app', p = PROPIO[a];
-    const S = [
-      ['1. Quiénes somos', n + ' es una aplicación de CodeFix (Chile). Puedes escribirnos desde el chat de soporte de la app. Estos términos siguen la Ley 19.496 sobre Protección de los Derechos de los Consumidores y las leyes de datos personales 19.628 y 21.719.'],
+  // ---------- Legal (Ley 19.496 del consumidor y Ley 19.628 modificada por la Ley 21.719, vigente desde el 1-dic-2026) ----------
+  // CFX_LEGAL.version sube cada vez que cambian los términos o la privacidad: al entrar, quien no aceptó la versión nueva la ve y la acepta
+  // (cfx_legal_aceptar guarda quién, qué versión y cuándo). El admin no la ve. Si la base aún no tiene cfx_legal_*, no se pide nada.
+  const LEGAL = { version: 2, desde: '1 de diciembre de 2026', ley: 'Ley 19.628 sobre protección de datos personales, modificada por la Ley 21.719' };
+  // Lo propio de cada app en la privacidad: [quién responde por los datos de los clientes, datos especiales].
+  const PRIV = {
+    orbita: 'Cada tienda es responsable de los datos de sus clientes (pedidos, despacho, contacto) y CodeFix los trata por encargo de ella, solo para que la tienda funcione.',
+    barberia: 'Cada barbería es responsable de los datos de sus clientes (reservas, contacto, historial) y CodeFix los trata por encargo de ella, solo para que la agenda funcione.',
+    taller: 'Cada taller es responsable de los datos de sus clientes (reservas, bicicletas, presupuestos) y CodeFix los trata por encargo de él, solo para que el taller funcione.',
+    billetera: 'Cada negocio es responsable de los datos de sus clientes (saldos, abonos, contacto) y CodeFix los trata por encargo de él. El cliente puede pedir al negocio, o a nosotros, corregir un saldo mal anotado.',
+    estaciona: 'Para verificar identidad pedimos foto de la cédula y una selfie: son datos sensibles (biométricos) y solo se usan con tu consentimiento expreso, para esa revisión, y se borran apenas se revisan. Tu RUT, documento, correo y teléfono nunca se muestran a otros usuarios; la dirección exacta solo la ve quien tiene un arriendo aceptado.',
+    mando: 'Lo que anotas (tareas, metas, ideas, diario) es privado: solo tú lo ves. No lo usamos para nada más que mostrártelo.',
+    contenido: 'Las ideas, guiones y datos de tus empresas son tuyos: solo los ves tú y quienes invites.'
+  };
+  function textoTerminos(a) {
+    const n = NOMBRE[a] || 'esta app', p = PROPIO[a];
+    return [
+      ['1. Quiénes somos', n + ' es una aplicación de CodeFix (Chile). Puedes escribirnos desde el chat de soporte de la app. Estos términos siguen la Ley 19.496 sobre Protección de los Derechos de los Consumidores y la ' + LEGAL.ley + '.'],
       ['2. Tu cuenta', 'Para crear una cuenta de negocio debes ser mayor de 18 años y dar datos verdaderos. Cuida tu contraseña: lo que se haga con tu cuenta es tu responsabilidad. Puedes borrar tu cuenta cuando quieras desde la app o pidiéndolo por el chat.'],
       ['3. Planes y pagos', 'Hay una versión gratis y una Premium (mensual, por varios meses o anual), con precios en pesos chilenos publicados en la app. ' +
         'Por transferencia pagas el precio exacto. Con link de pago o tarjeta se suma un cargo por pago online que se muestra en una línea aparte antes de pagar. ' +
@@ -583,15 +601,76 @@
         'Si el servicio falla por causa nuestra y no lo solucionamos, te devolvemos la parte proporcional de los días no usados.'],
       p ? ['5. ' + p[0], p[1]] : null,
       [(p ? '6' : '5') + '. Responsabilidad de cada negocio', 'Cada negocio que usa la app es el proveedor frente a sus propios clientes: fija sus precios, cobra con sus propios medios de pago (los abonos y pagos de sus clientes le llegan directo a él, no a CodeFix), entrega boleta y responde por sus productos y servicios según la ley. CodeFix entrega la herramienta.'],
-      [(p ? '7' : '6') + '. Tus datos', 'Usamos tus datos solo para que la app funcione: cuenta, reservas o pedidos, avisos y soporte. No los vendemos. Los guardamos en servidores seguros (Supabase). ' +
-        'Las fotos de comprobantes y de identidad se borran apenas se revisan. Las fotos que solo ves tú quedan en tu teléfono. Puedes pedir acceso, corrección, borrado o copia de tus datos, u oponerte a su uso, escribiendo al chat de soporte.'],
+      [(p ? '7' : '6') + '. Tus datos', 'Tratamos tus datos según la Política de privacidad de esta app (está en el mismo menú): para qué los usamos, con quién se comparten, cuánto tiempo se guardan y cómo ejercer tus derechos de acceso, rectificación, supresión, oposición, portabilidad y bloqueo. No vendemos tus datos.'],
       [(p ? '8' : '7') + '. Buen uso', 'No está permitido publicar contenido falso, ilegal u ofensivo, suplantar a otras personas ni usar la app para estafas. Podemos suspender cuentas que lo hagan, avisándote el motivo.'],
       [(p ? '9' : '8') + '. Disponibilidad', 'Trabajamos para que la app esté siempre disponible y respaldamos la información, pero pueden ocurrir cortes por mantención o fallas de terceros (internet, servidores). Te recomendamos descargar tus respaldos.'],
-      [(p ? '10' : '9') + '. Cambios', 'Si cambiamos estos términos o los precios, te avisamos en la app con al menos 15 días de anticipación. Los días Premium que ya pagaste se respetan.'],
-      [(p ? '11' : '10') + '. Reclamos', 'Escríbenos primero por el chat: respondemos lo antes posible. Siempre puedes acudir al SERNAC (sernac.cl) o al Juzgado de Policía Local de tu comuna. Se aplica la ley chilena.']
+      [(p ? '10' : '9') + '. Cambios', 'Si cambiamos estos términos, la privacidad o los precios, te avisamos en la app con al menos 15 días de anticipación y te pedimos aceptar la versión nueva. Los días Premium que ya pagaste se respetan.'],
+      [(p ? '11' : '10') + '. Reclamos', 'Escríbenos primero por el chat: respondemos lo antes posible. Siempre puedes acudir al SERNAC (sernac.cl), a la Agencia de Protección de Datos Personales (en temas de datos) o al Juzgado de Policía Local de tu comuna. Se aplica la ley chilena.']
     ].filter(Boolean);
-    dialogo('<h2>📄 Términos y condiciones</h2><p style="margin:0">' + esc(n) + ' · vigentes desde octubre de 2026</p><div class="ca-cuerpo">' +
-      S.map((x) => '<h3>' + esc(x[0]) + '</h3><p>' + esc(x[1]) + '</p>').join('') + '</div><div class="ca-pie"><button type="button" data-cerrar>Entendido</button></div>');
+  }
+  function textoPrivacidad(a) {
+    const n = NOMBRE[a] || 'esta app', propio = PRIV[a];
+    return [
+      ['1. Quién es el responsable', 'CodeFix (Chile) es responsable de los datos de tu cuenta en ' + n + '. Contacto para todo lo de datos personales: el chat de soporte de la app. Esta política sigue la ' + LEGAL.ley + '.'],
+      ['2. Qué datos usamos', 'Los de tu cuenta (nombre, correo, teléfono, foto si la subes), lo que haces en la app (reservas, pedidos, pagos, mensajes, avisos), los comprobantes de pago que subes y datos técnicos mínimos (tipo de dispositivo y suscripción a notificaciones). Si un negocio lo pide para cobrar o facturar, también tu RUT.'],
+      ['3. Para qué y con qué base legal', 'Para darte el servicio que pediste (ejecución del contrato): cuenta, reservas o pedidos, pagos, avisos y soporte. Para cumplir la ley (por ejemplo, obligaciones tributarias o de consumidor). ' +
+        'Por interés legítimo, para la seguridad de la app y evitar fraudes (verificación humana, límites de intentos). Con tu consentimiento, que puedes retirar cuando quieras: publicidad, ofertas y lo que la app te pida aparte.'],
+      propio ? ['4. Lo propio de ' + n, propio] : null,
+      [(propio ? '5' : '4') + '. Con quién se comparten', 'Con el negocio con el que reservas o compras (solo lo necesario para atenderte). Con proveedores que nos ayudan a operar y tratan los datos por encargo nuestro: Supabase (base de datos), Cloudflare (publicación y seguridad) y el servicio de notificaciones de tu teléfono. ' +
+        'Algunos de estos servidores están fuera de Chile; usamos proveedores con medidas de seguridad y contratos que protegen tus datos. No vendemos ni arrendamos tus datos, y no los compartimos con fines publicitarios de terceros.'],
+      [(propio ? '6' : '5') + '. Cuánto tiempo se guardan', 'Mientras tengas la cuenta. Avisos y mensajes entre usuarios: 30 días. Chat de soporte: hasta 1 año. Comprobantes y fotos de identidad: se borran apenas se revisan. ' +
+        'Lo que la ley exige guardar (por ejemplo, registros de pagos) se guarda el plazo legal y luego se borra. Las fotos que solo ves tú quedan en tu teléfono.'],
+      [(propio ? '7' : '6') + '. Tus derechos', 'Puedes pedir acceso a tus datos, rectificarlos, suprimirlos, oponerte a su uso, pedir una copia para llevarla a otro servicio (portabilidad) y el bloqueo temporal mientras revisamos una solicitud. ' +
+        'También a no quedar sujeto a decisiones tomadas solo de forma automática. Pídelo por el chat de soporte: respondemos dentro de 30 días corridos (prorrogables una vez por otros 30, avisándote). Es gratis. Si eres cliente de un negocio, también puedes pedírselo a él.'],
+      [(propio ? '8' : '7') + '. Seguridad', 'Los datos viajan cifrados, cada cuenta solo ve lo suyo (reglas de acceso en la base de datos) y respaldamos la información. Si ocurre una vulneración que pueda afectarte, la informamos a la Agencia de Protección de Datos Personales y te avisamos sin demora.'],
+      [(propio ? '9' : '8') + '. Menores de edad', 'Las cuentas de negocio son para mayores de 18 años. Los datos de menores de 14 años solo se tratan con autorización de su madre, padre o representante legal.'],
+      [(propio ? '10' : '9') + '. Almacenamiento en tu teléfono', 'La app guarda en tu teléfono solo lo necesario para funcionar (sesión, preferencias, fotos propias y la app para usarla sin internet). No usamos cookies de publicidad ni rastreadores de terceros.'],
+      [(propio ? '11' : '10') + '. Cambios y reclamos', 'Si cambiamos esta política te avisamos en la app y te pedimos aceptarla de nuevo. Si no quedas conforme con nuestra respuesta, puedes reclamar ante la Agencia de Protección de Datos Personales.']
+    ].filter(Boolean);
+  }
+  const secciones = (S) => S.map((x) => '<h3>' + esc(x[0]) + '</h3><p>' + esc(x[1]) + '</p>').join('');
+  const vigencia = (n) => esc(n) + ' · versión ' + LEGAL.version + ' · vigente desde el ' + LEGAL.desde;
+  function terminos(app) {
+    const a = app || detectar();
+    const caja = dialogo('<h2>📄 Términos y condiciones</h2><p style="margin:0">' + vigencia(NOMBRE[a] || 'esta app') + '</p><div class="ca-cuerpo">' + secciones(textoTerminos(a)) +
+      '</div><div class="ca-pie"><button type="button" data-priv>🔒 Privacidad</button><button type="button" data-cerrar>Entendido</button></div>');
+    caja.querySelector('[data-priv]').onclick = () => privacidad(a);
+  }
+  function privacidad(app) {
+    const a = app || detectar();
+    const caja = dialogo('<h2>🔒 Política de privacidad</h2><p style="margin:0">' + vigencia(NOMBRE[a] || 'esta app') + '</p><div class="ca-cuerpo">' + secciones(textoPrivacidad(a)) +
+      '</div><div class="ca-pie"><button type="button" data-term>📄 Términos</button><button type="button" data-cerrar>Entendido</button></div>');
+    caja.querySelector('[data-term]').onclick = () => terminos(a);
+  }
+  // Al entrar: si la cuenta no aceptó la versión vigente, se le muestra (no se puede cerrar sin aceptar o salir).
+  const legalKey = () => 'cfx-legal-' + (CFG.id || CFG.email || '') + '-' + APP;
+  async function legal() {
+    if (!R || CFG.admin || window.CFX_SIN_HOLA) return;  // CFX_SIN_HOLA: pruebas (legal_ui.js la prueba con conHola)
+    try { if (+localStorage.getItem(legalKey()) >= LEGAL.version) return; } catch (e) { /* nada */ }
+    let v; try { v = await R('cfx_legal_estado'); } catch (e) { return; }  // base sin actualizar: no se pide nada
+    v = +v || 0;
+    if (v >= LEGAL.version) { try { localStorage.setItem(legalKey(), String(v)); } catch (e) { /* nada */ } return; }
+    const a = detectar(), n = NOMBRE[a] || 'la app';
+    await new Promise((listo) => {
+      const caja = dialogo('<h2>' + (v ? '📄 Actualizamos los términos' : '📄 Términos y privacidad') + '</h2>' +
+        '<p style="margin:0 0 6px">' + (v ? 'Pusimos al día los Términos y la Política de privacidad de ' + esc(n) + ' con la nueva ley de datos personales (Ley 21.719). Léelos y acéptalos para seguir.'
+          : 'Para usar ' + esc(n) + ' lee y acepta los Términos y la Política de privacidad (al día con la Ley 21.719 de datos personales).') + '</p>' +
+        '<div class="ca-cuerpo"><details><summary><b>📄 Términos y condiciones</b></summary>' + secciones(textoTerminos(a)) + '</details>' +
+        '<details><summary><b>🔒 Política de privacidad</b></summary>' + secciones(textoPrivacidad(a)) + '</details>' +
+        '<p style="margin-top:10px"><small>' + vigencia(n) + '</small></p>' +
+        '<label style="display:flex;gap:10px;align-items:flex-start;margin:12px 0 4px;font-size:14px"><input type="checkbox" data-ok style="width:22px;height:22px;flex:none;margin:0"> <span>Leí y acepto los Términos y la Política de privacidad.</span></label>' +
+        '<p class="ca-err" style="color:var(--cfx-mal,#dc2626);margin:4px 0 0"></p></div>' +
+        '<div class="ca-pie"><button type="button" data-salir>Salir</button><button type="button" data-acepto style="background:var(--ca-color);color:#fff">Aceptar</button></div>', listo, true);
+      const err = caja.querySelector('.ca-err');
+      caja.querySelector('[data-salir]').onclick = () => { cerrar(); salir(); };
+      caja.querySelector('[data-acepto]').onclick = async (ev) => {
+        if (!caja.querySelector('[data-ok]').checked) { err.textContent = 'Marca la casilla para aceptar.'; return; }
+        ev.target.disabled = true; err.textContent = '';
+        try { await R('cfx_legal_aceptar', { p_version: LEGAL.version }); } catch (e) { ev.target.disabled = false; err.textContent = 'No se pudo guardar. Revisa tu internet e intenta de nuevo.'; return; }
+        try { localStorage.setItem(legalKey(), String(LEGAL.version)); } catch (e) { /* nada */ }
+        cerrar();
+      };
+    });
   }
 
   // ---------- Inicio ----------
@@ -690,7 +769,7 @@
     if (CFG.admin && CFG.socio === undefined && SOCIOS_NUCLEO.includes(APP)) R('cfx_es_socio').then((v) => { CFG.socio = !!v; pintarBoya(); }).catch(() => { CFG.socio = false; });
     if (CFG.admin) return;
     refRegistrar();
-    revisar();
+    legal().then(revisar);  // primero los términos (si hay versión nueva) y después la guía
     if (primera) {
       setInterval(revisar, 5 * 60 * 1000);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
@@ -780,7 +859,8 @@
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } }, 1500);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, guia, revisar, menu, web, panelCM };
+  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM };
+  window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad };
   // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
   function marcarTira(x) {
     x.classList.toggle('cfx-d-izq', x.scrollLeft > 4);

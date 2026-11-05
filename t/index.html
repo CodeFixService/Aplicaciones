@@ -289,7 +289,7 @@
       if (error) throw new Error('No se pudo conectar con el servidor');
       if (!data || !data.ok) throw new Error((data && data.error) || 'No se pudo crear la cuenta');
       await Cuenta.signIn(d.email, d.password);
-      try { await Cuenta.rpc('accept_terms'); } catch (e) { /* lo pide al entrar */ }
+      try { await Cuenta.rpc('accept_terms'); await Cuenta.rpc('cfx_legal_aceptar', { p_version: (window.CFX_LEGAL || {}).version || 2 }).catch(() => {}); } catch (e) { /* lo pide al entrar */ }
       location.replace('../apps/catalogo/');
     } catch (err) { Core.toast(err.message); } finally { $('bCrear').disabled = false; }
   };
