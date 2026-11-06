@@ -270,8 +270,10 @@
   const precioDe = (i) => i.precio_premium != null ? i.precio_premium : i.precio;
   const descPrem = Number(tienda.desc_premium) || 0; // % de descuento que la tienda da a sus clientes Premium
   const esImg = (u) => /^(https?:\/\/|data:image\/)/i.test(u || '');
+  // Vista previa (dueño/equipo): los mismos botones que ve el cliente; al tocarlos solo avisa.
   const mensaje = (txt, etiqueta) => comprador ? '<a class="btn small alt" href="../mensajes/?con=' + negocio + '&txt=' +
-    encodeURIComponent(txt) + '">' + (etiqueta || '💬 Enviar mensaje') + '</a>' : '';
+    encodeURIComponent(txt) + '">' + (etiqueta || '💬 Enviar mensaje') + '</a>' : '<button class="small alt" data-prev>' + (etiqueta || '💬 Enviar mensaje') + '</button>';
+  const previa = () => Core.toast('👁️ Vista previa: así lo verán tus clientes');
   const hazte = '<a class="btn small warn" href="../../#plan">⭐ Hazte Premium</a>';
 
   /* ---------- Pestañas ---------- */
@@ -353,8 +355,8 @@
       '<b>' + Core.esc(o.title) + '</b>' + (o.precio ? '<span style="font-size:20px;font-weight:800">' + Core.esc(Core.precioTxt(o.precio)) + '</span>' : '') +
       (o.body ? '<p class="muted">' + Core.esc(o.body) + '</p>' : '') +
       '<span class="cat muted">' + fecha + '</span>' +
-      (comprador ? '<div class="acc">' + (o.pub && o.precio_num != null ? '<button class="ok small" data-addpub="' + o.id + '">🛒 Agregar al carrito</button>' : '') +
-        mensaje('Hola, vi su ' + (o.tipo === 'evento' ? 'evento' : 'oferta') + ' "' + o.title + '" y me interesa.') + '</div>' : '') +
+      ('<div class="acc">' + (o.pub && o.precio_num != null ? '<button class="ok small" data-addpub="' + o.id + '">🛒 Agregar al carrito</button>' : '') +
+        mensaje('Hola, vi su ' + (o.tipo === 'evento' ? 'evento' : 'oferta') + ' "' + o.title + '" y me interesa.') + '</div>') +
       '</div></article>';
   }
   function pintarOfertas() {
@@ -363,6 +365,7 @@
         : 'Aún no publicas nada. Guarda una ficha en Fichas y aparecerá aquí para tus clientes.') + '</p>';
   }
   $('ofertas').onclick = (e) => {
+    if (!comprador && e.target.closest('.acc button')) return previa();
     const b = e.target.closest('[data-addpub]');
     if (!b) return;
     const o = ofertas.find((x) => x.id === b.dataset.addpub);
@@ -388,21 +391,21 @@
       }
       const prem = i.precio_premium != null, fav = favs.includes(i.clave);
       return '<div class="item' + (i.solo_premium ? ' vip' : '') + '">' + cinta +
-        (fotos[i.clave] ? '<img class="foto" src="' + Core.esc(fotos[i.clave]) + '" data-zoom="' + Core.esc(i.clave) + '" alt="' + Core.esc(i.nombre) + '" loading="lazy">' : '') + (comprador ? '<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>' : '') +
+        (fotos[i.clave] ? '<img class="foto" src="' + Core.esc(fotos[i.clave]) + '" data-zoom="' + Core.esc(i.clave) + '" alt="' + Core.esc(i.nombre) + '" loading="lazy">' : '') + ('<button class="fav' + (fav ? ' on' : '') + '" data-fav="' + Core.esc(i.clave) + '" aria-label="Favorito">' + (fav ? '❤️' : '🤍') + '</button>') +
         (i.nuevo ? '<span class="pill ok nuevo">✨ Nuevo</span>' : '') +
         '<span class="cat">' + Core.esc(i.categoria || '') + '</span><b>' + Core.esc(i.nombre) + '</b>' +
         (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
-        (i.opciones ? (comprador ? '<select class="opc" data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +
+        (i.opciones ? ('<select class="opc" data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +
           i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => '<option>' + Core.esc(o) + '</option>').join('') + '</select>' +
           '<div class="opc-chips" role="group" aria-label="Opciones">' + i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => { const c = window.colorDe ? window.colorDe(o) : '';
             return '<button type="button" class="opc-ch' + (c ? ' sw' : '') + '" data-opc-v="' + Core.esc(o) + '" title="' + Core.esc(o) + '"' + (c ? ' style="--sw:' + c + '"' : '') + '>' + (c ? '<i></i><span class="sr">' + Core.esc(o) + '</span>' : Core.esc(o)) + '</button>'; }).join('') + '</div>'
-          : '<span class="desc">🎨 ' + Core.esc(i.opciones) + '</span>') : '') +
+          ) : '') +
         (prem ? '<span class="p tachado">' + precio(i.precio) + '</span><span class="p">' + precio(i.precio_premium) + '</span><span class="prem">⭐ Precio Premium</span>'
               : '<span class="p">' + precio(i.precio) + '</span>' + (i.tiene_premium ? '<span class="prem">⭐ Más barato con Premium</span>' : '')) +
         (stock[i.clave] != null && stock[i.clave] <= 3 ? '<span class="pill ' + (stock[i.clave] ? 'warn' : 'bad') + '" style="align-self:flex-start">' + (stock[i.clave] ? 'Quedan ' + stock[i.clave] : 'Agotado') + '</span>' : '') +
-        (comprador ? '<div class="acc">' + (stock[i.clave] === 0 ? (avisos.includes(i.clave) ? '<button class="alt" data-avisa="' + Core.esc(i.clave) + '">🔕 Te avisaremos</button>'
+        ('<div class="acc">' + (stock[i.clave] === 0 ? (avisos.includes(i.clave) ? '<button class="alt" data-avisa="' + Core.esc(i.clave) + '">🔕 Te avisaremos</button>'
           : '<button class="alt" data-avisa="' + Core.esc(i.clave) + '">🔔 Avísame' + (premium ? '' : ' ⭐') + '</button>') : '<button class="ok" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>') +
-          mensaje('Hola, me interesa: ' + i.nombre, '💬 Preguntar') + '</div>' : '') + '</div>';
+          mensaje('Hola, me interesa: ' + i.nombre, '💬 Preguntar') + '</div>') + '</div>';
     }).join('') : '<p class="empty" style="grid-column:1/-1">' + (items.length ? (cat === '__fav' ? 'Aún no marcas favoritos' : 'Sin resultados')
       : vacio('catalogo', comprador ? 'La tienda aún no publica productos.' : 'Aún no publicas productos: agrégalos en Caja Rápida → Productos.')) + '</p>';
     $('cPrem').classList.toggle('hidden', premium || !comprador);
@@ -414,6 +417,7 @@
     if (e.target.dataset.zoom !== undefined) { $('zoomImg').src = e.target.src; $('zoom').classList.remove('hidden'); return; }
     const b = e.target.closest('button');
     if (!b) return;
+    if (!comprador && b.dataset.opcV === undefined) return previa();
     if (b.dataset.fav !== undefined) {
       const k = b.dataset.fav;
       if (favs.includes(k)) favs = favs.filter((x) => x !== k);
