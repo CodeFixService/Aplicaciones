@@ -39,6 +39,7 @@
 
   // Achica la foto del comprobante en el teléfono (núcleo: fotos.js → comprobante).
   function achicar(file) {
+    if (window.CFX_ACHICAR) return window.CFX_ACHICAR(file, 'comprobante'); // núcleo fotos.js (WebP o JPEG)
     const q = (window.CFX_FOTO_DE && window.CFX_FOTO_DE('comprobante')) || { lado: 1000, calidad: 0.6 };
     return new Promise((ok, mal) => {
       const img = new Image(), u = URL.createObjectURL(file);

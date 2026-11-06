@@ -192,6 +192,7 @@
   const FOTO = (k) => (global.CFX_FOTO && global.CFX_FOTO[k]) || { comprobante: { lado: 1000, calidad: 0.6, kb: 110 }, documento: { lado: 1400, calidad: 0.72, kb: 300 }, vitrina: { lado: 1080, calidad: 0.8, kb: 220 }, portada: { lado: 1280, calidad: 0.8, kb: 300 }, perfil: { lado: 400, calidad: 0.8, kb: 45 }, logo: { lado: 256, calidad: 0.85, kb: 30 } }[k];
   // Foto de producto (vitrina): tamaño y calidad del núcleo (fotos.js) para que se vea bien en el teléfono.
   function fotoChica(src) {
+    if (global.CFX_ACHICAR) return global.CFX_ACHICAR(src, 'vitrina'); // núcleo fotos.js: WebP o JPEG
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
@@ -212,6 +213,7 @@
 
   // Foto de comprobante: legible pero liviana (máx. 1000 px, JPEG, ~120 KB). Si aún pesa, baja calidad y luego tamaño.
   function comprobante(src) {
+    if (global.CFX_ACHICAR) return global.CFX_ACHICAR(src, 'comprobante'); // núcleo fotos.js: WebP o JPEG
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
@@ -334,7 +336,7 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.68';
+  const APP_VERSION = '5.69';
   const DB_VERSION = '5.20'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {

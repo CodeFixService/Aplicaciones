@@ -11,6 +11,7 @@
     const d = 11 - (suma % 11); return (d === 11 ? '0' : d === 10 ? 'K' : String(d)) === s.slice(-1);
   };
   function achicar(file) {
+    if (window.CFX_ACHICAR) return window.CFX_ACHICAR(file, 'documento'); // núcleo fotos.js (WebP o JPEG)
     const q = (window.CFX_FOTO_DE && window.CFX_FOTO_DE('documento')) || { lado: 1400, calidad: 0.72 };
     return new Promise((ok, mal) => {
       const img = new Image(), u = URL.createObjectURL(file);
