@@ -3490,13 +3490,16 @@ begin
 end $$;
 
 -- Pedido sin cuenta desde la página pública de la tienda.
+drop function if exists public.crear_pedido_invitado(text, text, text, jsonb, text, text, text);
+-- p_humano: token de Cloudflare Turnstile (lo pone humano.js); solo se exige si el admin guardó la secret key.
 create or replace function public.crear_pedido_invitado(p_slug text, p_nombre text, p_tel text, p_items jsonb, p_entrega text,
-                                                        p_direccion text, p_nota text) returns jsonb
+                                                        p_direccion text, p_nota text, p_humano text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare t uuid; nom text := left(trim(coalesce(p_nombre, '')), 60); tel text := regexp_replace(coalesce(p_tel, ''), '\D', '', 'g');
 begin
   select id into t from public.profiles where slug = lower(trim(coalesce(p_slug, ''))) and role = 'user' and not suspended;
   if t is null then return jsonb_build_object('ok', false, 'error', 'Tienda no encontrada'); end if;
+  if not public.cfx_humano_ok(p_humano) then return jsonb_build_object('ok', false, 'error', 'Confirma que no eres un robot y vuelve a intentar'); end if;
   if nom = '' then return jsonb_build_object('ok', false, 'error', 'Escribe tu nombre'); end if;
   if length(tel) < 8 or length(tel) > 15 then return jsonb_build_object('ok', false, 'error', 'Escribe tu WhatsApp (con código de país, ej: 56912345678)'); end if;
   if (select count(*) from public.pedidos where negocio_id = t and invitado_tel = tel and estado in ('pagando', 'en_revision', 'recibido')) >= 3 then
@@ -3917,11 +3920,11 @@ revoke all on function public.negocio_de(uuid), public.asegurar_slug(uuid), publ
 grant execute on function public.prepare_registro_cliente(text, text, text) to service_role;
 grant execute on function public.negocio_de(uuid), public.plan_de(uuid), public.limite(uuid, text), public.estrellas_tienda(uuid) to authenticated;
 revoke all on function public.planes_publicos(), public.reglas(), public.premium_info(), public.tienda_publica(text), public.catalogo_publico(text),
-  public.fotos_publicas(text, text[]), public.ofertas_publicas(text), public.crear_pedido_invitado(text, text, text, jsonb, text, text, text),
+  public.fotos_publicas(text, text[]), public.ofertas_publicas(text), public.crear_pedido_invitado(text, text, text, jsonb, text, text, text, text),
   public.ver_pedido(text), public.subir_comprobante(text, text), public.cancelar_pedido(text), public.calificar_pedido(text, int),
   public.stock_catalogo(uuid) from public;
 grant execute on function public.planes_publicos(), public.reglas(), public.premium_info(), public.tienda_publica(text), public.catalogo_publico(text),
-  public.fotos_publicas(text, text[]), public.ofertas_publicas(text), public.crear_pedido_invitado(text, text, text, jsonb, text, text, text),
+  public.fotos_publicas(text, text[]), public.ofertas_publicas(text), public.crear_pedido_invitado(text, text, text, jsonb, text, text, text, text),
   public.ver_pedido(text), public.subir_comprobante(text, text), public.cancelar_pedido(text), public.calificar_pedido(text, int),
   public.stock_catalogo(uuid) to anon, authenticated;
 revoke all on function public.admin_plan_guardar(text, text, text, jsonb, int, jsonb), public.admin_set_regla(text, int), public.admin_auditoria(),
@@ -5856,10 +5859,10 @@ exception when others then
   raise notice 'Boleta automática no programada (%).', sqlerrm;
 end $$;
 -- =====================================================================
---  VERSIÓN 5.25 · 🗂️ Mis datos y privacidad (núcleo 2.43: consentimientos, derechos del titular y brechas).
+--  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.25'::text $$;
+language sql immutable as $$ select '5.26'::text $$;
 
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
@@ -6375,20 +6378,52 @@ drop trigger if exists cfx_cupon_usado on public.cfx_pagos;
 create trigger cfx_cupon_usado after update of estado on public.cfx_pagos for each row execute function public.cfx_cupon_usado();
 
 -- ---------- Verificación humana (Cloudflare Turnstile): la site key es pública; la secret key va en Supabase → Authentication → CAPTCHA ----------
+-- y, para las compras/reservas sin cuenta, también aquí (cfx_secretos, nunca sale de la base): la base revisa el token con Cloudflare.
 insert into public.cfx_config (clave, valor) values ('humano', '{"site_key": ""}') on conflict (clave) do nothing;
+create table if not exists public.cfx_secretos (clave text primary key, valor text not null, updated_at timestamptz not null default now());
+alter table public.cfx_secretos enable row level security;
+revoke all on public.cfx_secretos from anon, authenticated;
 create or replace function public.cfx_humano() returns jsonb
-language sql stable security definer set search_path = '' as $$ select valor from public.cfx_config where clave = 'humano' $$;
-create or replace function public.cfx_humano_guardar(p_site_key text) returns void
+language sql stable security definer set search_path = '' as $$
+  select valor || jsonb_build_object('invitados', exists (select 1 from public.cfx_secretos where clave = 'turnstile'))
+  from public.cfx_config where clave = 'humano' $$;
+drop function if exists public.cfx_humano_guardar(text);
+create or replace function public.cfx_humano_guardar(p_site_key text, p_secreto text default null) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
   perform public.cfx_es_admin();
   if coalesce(p_site_key, '') <> '' and p_site_key !~ '^[0-9A-Za-z_-]{10,60}$' then raise exception 'Site key no válida'; end if;
+  if coalesce(p_secreto, '') <> '' and p_secreto !~ '^[0-9A-Za-z_-]{10,80}$' then raise exception 'Secret key no válida'; end if;
   update public.cfx_config set valor = jsonb_build_object('site_key', coalesce(p_site_key, '')) where clave = 'humano';
-  perform public.cfx_anotar('humano', case when coalesce(p_site_key, '') = '' then 'apagado' else 'site key ' || right(p_site_key, 4) end);
+  -- null = dejar la secret key como está; '' = quitarla (o si se apaga la site key).
+  if coalesce(p_site_key, '') = '' or p_secreto = '' then delete from public.cfx_secretos where clave = 'turnstile';
+  elsif p_secreto is not null then
+    insert into public.cfx_secretos (clave, valor) values ('turnstile', p_secreto)
+    on conflict (clave) do update set valor = excluded.valor, updated_at = now();
+  end if;
+  perform public.cfx_anotar('humano', case when coalesce(p_site_key, '') = '' then 'apagado' else 'site key ' || right(p_site_key, 4) ||
+    case when exists (select 1 from public.cfx_secretos where clave = 'turnstile') then ' + compras sin cuenta' else '' end end);
 end $$;
-revoke all on function public.cfx_humano(), public.cfx_humano_guardar(text) from public;
+-- ¿El token de Turnstile es de una persona? Sin secret key no se exige. Si Cloudflare no responde, no frena la venta.
+create or replace function public.cfx_humano_ok(p_token text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare k text := (select valor from public.cfx_secretos where clave = 'turnstile'); st int; c text;
+begin
+  if k is null then return true; end if;
+  if coalesce(p_token, '') = '' or length(p_token) > 4000 then return false; end if;
+  begin
+    perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '5');
+    execute 'select status, content from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+      using 'POST', 'https://challenges.cloudflare.com/turnstile/v0/siteverify', array[]::extensions.http_header[],
+            'application/x-www-form-urlencoded', 'secret=' || k || '&response=' || p_token;
+  exception when others then return true;
+  end;
+  if st is distinct from 200 or c !~ '^\s*\{' then return true; end if;
+  return coalesce((c::jsonb ->> 'success')::boolean, false);
+end $$;
+revoke all on function public.cfx_humano(), public.cfx_humano_guardar(text, text), public.cfx_humano_ok(text) from public, anon, authenticated;
 grant execute on function public.cfx_humano() to anon, authenticated;
-grant execute on function public.cfx_humano_guardar(text) to authenticated;
+grant execute on function public.cfx_humano_guardar(text, text) to authenticated;
 
 revoke all on function public.cfx_anotar(text, text), public.cfx_cupon_usado() from public, anon, authenticated;
 revoke all on function public.cfx_registro_lista(int), public.cfx_planes(), public.cfx_plan_guardar(text, text, jsonb, jsonb), public.cfx_textos(), public.cfx_texto_guardar(text, text),
@@ -7082,7 +7117,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.boleta_cuentas', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_brechas', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.boleta_cuentas', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_brechas', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_secretos', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -7121,6 +7156,51 @@ begin
 end $$;
 revoke all on function public.cfx_tablas(), public.cfx_inventario(), public.cfx_inventario_datos(text), public.cfx_inventario_borrar(text, text) from public, anon;
 grant execute on function public.cfx_inventario(), public.cfx_inventario_datos(text), public.cfx_inventario_borrar(text, text) to authenticated;
+
+-- ---------- Seguridad (A7): lo que puede hacer alguien sin cuenta (anon) y los buckets de archivos ----------
+-- Va al final del núcleo: así alcanza a todas las funciones de la app.
+-- 1) En Supabase anon recibe permiso para TODA función nueva ("revoke ... from public" no se lo quita). Las que lo primero que hacen es
+--    exigir ser admin igual fallarían: se les quita el permiso a anon (no cambia nada para quien tiene cuenta).
+do $$
+declare f record;
+begin
+  for f in select p.oid::regprocedure as fn from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')
+      and p.prolang = (select oid from pg_language where lanname = 'plpgsql')
+      and substring(lower(p.prosrc) from '\mbegin\M(.*)$') ~ ('^\s*perform\s+' || regexp_replace(lower('public.cfx_es_admin()'), '([().])', '\\\1', 'g') || '\s*;')
+  loop
+    execute 'revoke execute on function ' || f.fn || ' from public, anon';
+  end loop;
+end $$;
+revoke execute on function public.cfx_anotar(text, text) from public, anon;
+
+-- 2) Buckets públicos (se ven con su dirección): solo fotos y de hasta 5 MB, si la app no puso otro límite.
+update storage.buckets set file_size_limit = 5242880 where public and file_size_limit is null;
+update storage.buckets set allowed_mime_types = array['image/webp', 'image/jpeg', 'image/png'] where public and allowed_mime_types is null;
+
+-- 3) Revisión para el Centro de Mando → Control → 🛡️ Seguridad.
+create or replace function public.cfx_seguridad() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return jsonb_build_object(
+    'sin_rls', coalesce((select jsonb_agg(c.relname order by c.relname) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity
+        and (has_table_privilege('anon', c.oid, 'select') or has_table_privilege('anon', c.oid, 'insert,update,delete'))), '[]'),
+    'anon_escribe', coalesce((select jsonb_agg(p.tablename || ' · ' || lower(p.cmd) order by p.tablename) from pg_policies p
+      where p.schemaname = 'public' and p.cmd <> 'SELECT' and (p.roles @> '{anon}' or p.roles @> '{public}')), '[]'),
+    'anon_lee', coalesce((select jsonb_agg(distinct p.tablename) from pg_policies p
+      where p.schemaname = 'public' and p.cmd in ('SELECT', 'ALL') and (p.roles @> '{anon}' or p.roles @> '{public}')), '[]'),
+    'funciones_anon', coalesce((select jsonb_agg(p.proname order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prokind = 'f' and p.prosecdef and has_function_privilege('anon', p.oid, 'execute')), '[]'),
+    'buckets', coalesce((select jsonb_agg(jsonb_build_object('id', b.id, 'publico', b.public, 'mb', round(b.file_size_limit / 1048576.0, 1),
+        'tipos', b.allowed_mime_types,
+        'anon_lista', exists (select 1 from pg_policies p where p.schemaname = 'storage' and p.tablename = 'objects'
+          and p.cmd in ('SELECT', 'ALL') and (p.roles @> '{anon}' or p.roles @> '{public}'))) order by b.id) from storage.buckets b), '[]'),
+    'humano', public.cfx_humano() - 'site_key' || jsonb_build_object('activo', coalesce(public.cfx_humano() ->> 'site_key', '') <> ''));
+end $$;
+revoke all on function public.cfx_seguridad() from public, anon;
+grant execute on function public.cfx_seguridad() to authenticated;
 -- <<< CFX núcleo
 
 -- =====================================================================

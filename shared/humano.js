@@ -1,7 +1,9 @@
 /* CodeFix · Núcleo · Verificación humana con Cloudflare Turnstile (mismo archivo en cada repositorio).
    Va en el <head>, antes que todo: así alcanza a revisar el ingreso y la creación de cuentas de cualquier app sin tocar su código.
-   Si el administrador guardó la "site key" (Centro de Mando → Control → Humano), antes de entrar o crear una cuenta aparece
-   "Confirma que no eres un robot" y el token viaja a Supabase (gotrue_meta_security.captcha_token). Sin site key no hace nada.
+   Si el administrador guardó la "site key" (Centro de Mando → Control → Humano), antes de entrar, crear una cuenta, recuperar la contraseña
+   o pedir un enlace aparece "Confirma que no eres un robot" y el token viaja a Supabase (gotrue_meta_security.captcha_token).
+   Si además guardó la secret key, las compras sin cuenta (INVITADO) llevan el token en p_humano y la base lo revisa con Cloudflare.
+   Sin site key no hace nada.
    Para que Supabase lo exija: Authentication → Attack Protection → CAPTCHA (Turnstile) con la "secret key". */
 // Sesión vinculada: el Centro de Mando abre el panel de esta app con ?cfx-entrar=… (una sesión propia, de un solo uso)
 // y queda iniciada sin escribir la contraseña. Se guarda antes de que la app cree su conexión y se borra de la dirección.
@@ -20,15 +22,19 @@
   'use strict';
   if (window.CFX_HUMANO || !window.fetch) return;
   const original = window.fetch.bind(window), claves = {};
+  // Funciones sin cuenta que reciben p_humano (la app debe aceptarlo en su SQL antes de sumarla aquí).
+  const INVITADO = /\/rest\/v1\/rpc\/(crear_pedido_invitado)$/;
+  const AUTH = /\/auth\/v1\/(token\?grant_type=password|signup|recover|otp|resend)/;
   // Site key de cada proyecto (se pregunta una vez por página a cfx_humano, función pública de la app).
-  function siteKey(origen, apikey) {
+  function config(origen, apikey) {
     if (!claves[origen]) {
       claves[origen] = original(origen + '/rest/v1/rpc/cfx_humano', { method: 'POST', body: '{}',
         headers: { apikey: apikey || '', Authorization: 'Bearer ' + (apikey || ''), 'Content-Type': 'application/json' } })
-        .then((r) => (r.ok ? r.json() : null)).then((j) => (j && j.site_key) || '').catch(() => '');
+        .then((r) => (r.ok ? r.json() : null)).then((j) => j || {}).catch(() => ({}));
     }
     return claves[origen];
   }
+  const siteKey = (origen, apikey) => config(origen, apikey).then((j) => j.site_key || '');
   function cargar() {
     if (window.turnstile) return Promise.resolve();
     return new Promise((ok, mal) => {
@@ -57,12 +63,14 @@
   }
   window.fetch = async function (entrada, init) {
     const url = typeof entrada === 'string' ? entrada : entrada && entrada.url;
-    if (url && /\/auth\/v1\/(token\?grant_type=password|signup)/.test(url) && init && typeof init.body === 'string') {
+    const auth = url && AUTH.test(url), inv = url && !auth && INVITADO.test(url.split('?')[0]);
+    if ((auth || inv) && init && typeof init.body === 'string') {
       const u = new URL(url, location.href), h = new Headers(init.headers || {});
-      const clave = await siteKey(u.origin, h.get('apikey'));
-      if (clave) {
-        const b = JSON.parse(init.body);
-        b.gotrue_meta_security = Object.assign({}, b.gotrue_meta_security, { captcha_token: await token(clave) });
+      const c = await config(u.origin, h.get('apikey'));
+      if (c.site_key && (auth || c.invitados)) {
+        const b = JSON.parse(init.body), t = await token(c.site_key);
+        if (auth) b.gotrue_meta_security = Object.assign({}, b.gotrue_meta_security, { captcha_token: t });
+        else b.p_humano = t;
         init = Object.assign({}, init, { body: JSON.stringify(b) });
       }
     }
