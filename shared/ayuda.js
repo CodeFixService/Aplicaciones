@@ -5,6 +5,7 @@
        · Chat con soporte: escribe y le respondes desde el Centro de Mando → Mensajes (cfx_chat_*). El globo muestra lo no leído.
        · Términos y condiciones según el tipo de negocio (ley chilena: 19.496 del consumidor y 19.628 modificada por la 21.719 de datos personales).
        · Política de privacidad y aceptación con versión (CFX_LEGAL; cfx_legal_* en sql/legal.sql).
+       · Mis datos y privacidad: consentimientos, copia de los datos y solicitudes de derechos (CFX_LEGAL.misDatos; cfx_consent_*, cfx_derecho_* en sql/legal.sql).
    CFX_AYUDA.chat({ rpc }) · CFX_AYUDA.terminos(app) · CFX_AYUDA.guia()  (también se pueden abrir sueltos).
    CFX_AJUSTES.montar(el, secciones) → Ajustes en cuadrícula de tarjetas (igual en las 7 apps). */
 (function () {
@@ -433,6 +434,7 @@
     if (a === 'chat') return chat({ rpc: R });
     if (a === 'terminos') return terminos();
     if (a === 'privacidad') return privacidad();
+    if (a === 'misdatos') return misDatos();
     if (a === 'premium' && window.CFX_PAGOS) return window.CFX_PAGOS.abrir({ rpc: R });
   }
   function cuentaEnMas() {
@@ -476,11 +478,11 @@
   // Íconos comunes: lo mismo se ve igual en las 7 apps. La app puede pasar una clave (ico: 'perfil') o un emoji; el núcleo reconoce
   // además las opciones conocidas por su nombre ("Mi perfil", "Cerrar sesión"…). Sin clave conocida → ícono genérico, nunca vacío.
   const ICO_CLAVE = { perfil: 'usuario', cuenta: 'carnet', estilo: 'paleta', avanzado: 'ajustes', ajustes: 'ajustes', guia: 'brujula', chat: 'chat', plan: 'estrella', premium: 'estrella',
-    invitar: 'regalo', terminos: 'documento', privacidad: 'candado', salir: 'puerta', respaldo: 'bajar', equipo: 'usuarios', qr: 'qr', link: 'enlace', pagos: 'tarjeta', avisos: 'campana', empresa: 'tienda',
+    invitar: 'regalo', terminos: 'documento', privacidad: 'candado', misdatos: 'carpeta', salir: 'puerta', respaldo: 'bajar', equipo: 'usuarios', qr: 'qr', link: 'enlace', pagos: 'tarjeta', avisos: 'campana', empresa: 'tienda',
     agregar: 'mas', tienda: 'tienda', reglas: 'balanza', socios: 'conexion', registro: 'portapapeles', calificaciones: 'corazon', panel: 'escudo', horario: 'reloj', limpieza: 'escoba',
     instalar: 'celular', reparar: 'herramienta', animo: 'cara', datos: 'bajar', textos: 'lapiz', versiones: 'cohete', servidor: 'servidor' };
   const ICO_TITULO = [[/^mi perfil|^foto y nombre/, 'perfil'], [/^mi cuenta$|^cuenta$|^datos de (la )?cuenta/, 'cuenta'], [/^color y modo|^apariencia|^estilo/, 'estilo'], [/^avanzado/, 'avanzado'],
-    [/^gu[ií]a/, 'guia'], [/^chat con soporte|^soporte/, 'chat'], [/^mi plan|^pasar a pro|^premium\b|^plan\b/, 'plan'], [/^invita/, 'invitar'], [/^t[ée]rminos/, 'terminos'], [/^pol[ií]tica de privacidad|^privacidad/, 'privacidad'],
+    [/^gu[ií]a/, 'guia'], [/^chat con soporte|^soporte/, 'chat'], [/^mi plan|^pasar a pro|^premium\b|^plan\b/, 'plan'], [/^invita/, 'invitar'], [/^t[ée]rminos/, 'terminos'], [/^pol[ií]tica de privacidad|^privacidad/, 'privacidad'], [/^mis datos/, 'misdatos'],
     [/^cerrar sesi[oó]n/, 'salir'], [/^respaldo/, 'respaldo'], [/^(mi )?equipo\b|^trabajadores/, 'equipo'], [/^enlace y qr|^qr\b|^c[oó]digo qr|^mi qr/, 'qr'], [/^links? de pago/, 'pagos'],
     [/^notificaciones|^avisos/, 'avisos'], [/^otra empresa|^agregar|^nueva empresa/, 'agregar'], [/^(mi )?empresa/, 'empresa'], [/^(mi )?tienda/, 'tienda'], [/^reglas/, 'reglas'],
     [/^socios/, 'socios'], [/^registro\b/, 'registro'], [/calificaciones|^rese[ñn]as/, 'calificaciones'], [/^panel de administraci/, 'panel'], [/^horario/, 'horario'], [/^limpieza/, 'limpieza'],
@@ -605,6 +607,7 @@
       suelto && { k: 'reparar', ico: '🛠️', t: 'Reparar la app', accion: reparar },
       { k: 'terminos', ico: '📄', t: 'Términos y condiciones', accion: a('terminos') },
       { k: 'privacidad', ico: '🔒', t: 'Política de privacidad', accion: a('privacidad') },
+      !adm && { k: 'misdatos', ico: '🗂️', t: 'Mis datos y privacidad', accion: a('misdatos') },
       { k: 'salir', ico: '🚪', t: 'Cerrar sesión', rojo: true, accion: confirmarSalir }
     ].filter((x) => x && !(yaEstan || []).includes(x.k)).map((x) => Object.assign(x, { grupo: g }));
   }
@@ -784,7 +787,7 @@
       [(propio ? '6' : '5') + '. Cuánto tiempo se guardan', 'Mientras tengas la cuenta. Avisos y mensajes entre usuarios: 30 días. Chat de soporte: hasta 1 año. Comprobantes y fotos de identidad: se borran apenas se revisan. ' +
         'Lo que la ley exige guardar (por ejemplo, registros de pagos) se guarda el plazo legal y luego se borra. Las fotos que solo ves tú quedan en tu teléfono.'],
       [(propio ? '7' : '6') + '. Tus derechos', 'Puedes pedir acceso a tus datos, rectificarlos, suprimirlos, oponerte a su uso, pedir una copia para llevarla a otro servicio (portabilidad) y el bloqueo temporal mientras revisamos una solicitud. ' +
-        'También a no quedar sujeto a decisiones tomadas solo de forma automática. Pídelo por el chat de soporte: respondemos dentro de 30 días corridos (prorrogables una vez por otros 30, avisándote). Es gratis. Si eres cliente de un negocio, también puedes pedírselo a él.'],
+        'También a no quedar sujeto a decisiones tomadas solo de forma automática. Pídelo en Cuenta y ayuda → Mis datos y privacidad (ahí también descargas tu copia al instante) o por el chat de soporte: respondemos dentro de 30 días corridos (prorrogables una vez por otros 30, avisándote). Es gratis. Si eres cliente de un negocio, también puedes pedírselo a él.'],
       [(propio ? '8' : '7') + '. Seguridad', 'Los datos viajan cifrados, cada cuenta solo ve lo suyo (reglas de acceso en la base de datos) y respaldamos la información. Si ocurre una vulneración que pueda afectarte, la informamos a la Agencia de Protección de Datos Personales y te avisamos sin demora.'],
       [(propio ? '9' : '8') + '. Menores de edad', 'Las cuentas de negocio son para mayores de 18 años. Los datos de menores de 14 años solo se tratan con autorización de su madre, padre o representante legal.'],
       [(propio ? '10' : '9') + '. Almacenamiento en tu teléfono', 'La app guarda en tu teléfono solo lo necesario para funcionar (sesión, preferencias, fotos propias y la app para usarla sin internet). No usamos cookies de publicidad ni rastreadores de terceros.'],
@@ -804,6 +807,68 @@
     const caja = dialogo('<h2>🔒 Política de privacidad</h2><p style="margin:0">' + vigencia(NOMBRE[a] || 'esta app') + '</p><div class="ca-cuerpo">' + secciones(textoPrivacidad(a)) +
       '</div><div class="ca-pie"><button type="button" data-term>📄 Términos</button><button type="button" data-cerrar>Entendido</button></div>');
     caja.querySelector('[data-term]').onclick = () => terminos(a);
+  }
+
+  // ---------- Mis datos y privacidad (A2 consentimientos + A3 derechos del titular; sql/legal.sql) ----------
+  // Consentimientos aparte de los términos (ofertas de CodeFix y de los negocios), copia de los datos al instante (acceso y portabilidad)
+  // y solicitudes de rectificación, oposición, bloqueo y supresión con su plazo (30 días, +30 una vez). Todo queda registrado.
+  const DER = { rectificacion: ['✏️', 'Corregir un dato', '¿Qué dato está mal y cuál es el correcto?'], oposicion: ['✋', 'Oponerme a un uso', '¿Qué uso de tus datos no quieres?'],
+    bloqueo: ['⏸️', 'Bloquear mis datos', 'Mientras revisamos, tus datos no se usan para nada más que guardarlos. ¿Por qué? (opcional)'],
+    supresion: ['🗑️', 'Borrar mi cuenta y mis datos', 'Se borra todo lo que la ley no obliga a guardar. ¿Algo que debamos saber? (opcional)'],
+    acceso: ['📄', 'Acceso'], portabilidad: ['📥', 'Copia de mis datos'] };
+  const ESTADO_D = { pendiente: 'En revisión', prorrogada: 'En revisión (prorrogada)', respondida: 'Respondida', rechazada: 'No acogida' };
+  // Apps donde el negocio manda ofertas a sus clientes (respetan cfx_acepta(cuenta, 'negocios')). Al sumar otra, filtrar su envío igual.
+  const CON_NEGOCIOS = ['barberia'];
+  const fechaC = (x) => x ? new Date(x).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  async function misDatos() {
+    const a = detectar(), caja = dialogo('<h2>🗂️ Mis datos y privacidad</h2><div class="ca-cuerpo" data-md><p>Cargando…</p></div>' +
+      '<div class="ca-pie"><button type="button" data-priv>🔒 Política</button><button type="button" data-cerrar>Cerrar</button></div>');
+    caja.querySelector('[data-priv]').onclick = () => privacidad(a);
+    const z = caja.querySelector('[data-md]');
+    let c, L;
+    try { [c, L] = await Promise.all([R('cfx_consent_estado'), R('cfx_derechos_mios')]); }
+    catch (e) { z.innerHTML = '<p>Esta opción llega con la próxima actualización de la app (se actualiza sola en máx. 10 minutos). Mientras, pídelo por el chat de soporte.</p>'; return; }
+    const sw = (k, t, d) => '<label class="cfx-md-sw" style="display:flex;gap:10px;align-items:flex-start;margin:8px 0"><input type="checkbox" data-c="' + k + '"' + (c[k] ? ' checked' : '') +
+      ' style="width:22px;height:22px;flex:none;margin:0"><span><b>' + t + '</b><br><small>' + d + (c.cambiado && c.cambiado[k] ? ' · cambiado el ' + fechaC(c.cambiado[k]) : '') + '</small></span></label>';
+    z.innerHTML = '<h3>Lo que aceptas</h3><p style="margin:0"><small>Aparte de los términos. Puedes cambiarlo cuando quieras y se respeta al tiro.</small></p>' +
+      sw('ofertas', 'Ofertas y novedades de CodeFix', 'Avisos con promociones de la app.') +
+      (CON_NEGOCIOS.includes(a) ? sw('negocios', 'Ofertas de los negocios', 'Promociones de los negocios donde eres cliente.') : '') +
+      '<h3>Tus derechos</h3><button type="button" class="cfx-md-b" data-bajar style="width:100%;margin:4px 0">📥 Descargar mis datos</button>' +
+      '<p style="margin:2px 0 8px"><small>Copia de todo lo de tu cuenta en un archivo (acceso y portabilidad). Es gratis y al instante.</small></p>' +
+      Object.keys(DER).filter((k) => DER[k][2]).map((k) => '<button type="button" class="cfx-md-b" data-t="' + k + '" style="width:100%;margin:4px 0;text-align:left">' + DER[k][0] + ' ' + DER[k][1] + '</button>').join('') +
+      '<div data-form hidden style="margin:8px 0"><p data-preg style="margin:0 0 6px"></p><textarea data-txt rows="3" maxlength="600" style="width:100%;box-sizing:border-box"></textarea>' +
+      '<button type="button" class="ca-si" data-enviar style="width:100%;margin-top:6px;background:var(--ca-color);color:#fff">Enviar solicitud</button></div>' +
+      '<p style="margin:6px 0"><small>Respondemos dentro de 30 días corridos (prorrogables una vez por otros 30, avisándote).</small></p>' +
+      '<h3>Mis solicitudes</h3><div data-lista></div>';
+    const lista = () => { z.querySelector('[data-lista]').innerHTML = L.length ? L.map((x) => '<div class="cfx-md-sol" style="padding:6px 0;border-top:1px solid rgba(127,127,127,.25)"><b>' + (DER[x.tipo] || ['', x.tipo])[0] + ' ' + esc((DER[x.tipo] || ['', x.tipo])[1]) + '</b> · ' + esc(ESTADO_D[x.estado] || x.estado) +
+      '<br><small>' + fechaC(x.creado) + (/pendiente|prorrogada/.test(x.estado) ? ' · respondemos antes del ' + fechaC(x.vence) : '') + '</small>' + (x.respuesta ? '<br><small>' + esc(x.respuesta) + '</small>' : '') + '</div>').join('')
+      : '<p style="margin:0"><small>No has hecho solicitudes.</small></p>'; };
+    lista();
+    let tipo = '';
+    z.onchange = async (ev) => {
+      const i = ev.target.closest('[data-c]'); if (!i) return;
+      i.disabled = true;
+      try { c = await R('cfx_consent_guardar', { p_tipo: i.dataset.c, p_si: i.checked }); aviso(i.checked ? '✓ Aceptado' : '✓ Ya no te llegan'); } catch (e) { i.checked = !i.checked; aviso((e && e.message) || 'No se pudo guardar.'); }
+      i.disabled = false;
+    };
+    z.onclick = async (ev) => {
+      const b = ev.target.closest('[data-bajar],[data-t],[data-enviar]'); if (!b) return;
+      if (b.dataset.t) { tipo = b.dataset.t; const f = z.querySelector('[data-form]'); f.hidden = false; f.querySelector('[data-preg]').textContent = DER[tipo][0] + ' ' + DER[tipo][1] + ': ' + DER[tipo][2]; f.querySelector('[data-txt]').focus(); return; }
+      b.disabled = true;
+      try {
+        if (b.hasAttribute('data-bajar')) {
+          const d = await R('cfx_mis_datos');
+          const u = URL.createObjectURL(new Blob([JSON.stringify(Object.assign({ app: NOMBRE[a] || a }, d), null, 2)], { type: 'application/json' }));
+          const l = document.createElement('a'); l.href = u; l.download = 'mis-datos-' + (a || 'app') + '-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(l); l.click(); l.remove();
+          setTimeout(() => URL.revokeObjectURL(u), 5000); aviso('📥 Listo: se descargó tu copia');
+        } else {
+          await R('cfx_derecho_pedir', { p_tipo: tipo, p_detalle: z.querySelector('[data-txt]').value });
+          z.querySelector('[data-form]').hidden = true; z.querySelector('[data-txt]').value = ''; aviso('✓ Solicitud enviada');
+        }
+        L = await R('cfx_derechos_mios'); lista();
+      } catch (e) { aviso((e && e.message) || 'No se pudo. Revisa tu internet.'); }
+      b.disabled = false;
+    };
   }
   // Al entrar: si la cuenta no aceptó la versión vigente, se le muestra (no se puede cerrar sin aceptar o salir).
   const legalKey = () => 'cfx-legal-' + (CFG.id || CFG.email || '') + '-' + APP;
@@ -1023,7 +1088,7 @@
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } else if (boya && boya.parentNode && boya.parentNode !== document.body) marcarExtras(boya.parentNode); }, 1500);
 
   window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM };
-  window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad };
+  window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad, misDatos };
   // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
   function marcarTira(x) {
     x.classList.toggle('cfx-d-izq', x.scrollLeft > 4);
