@@ -1,1 +1,1 @@
-{"version": "5.72", "bd": "5.22", "notas": "👥 Equipo con roles: Vendedor (Caja y Pedidos), Bodega (Inventario y Pedidos) y Admin (Caja, Inventario, Pedidos y Estadísticas); el dueño elige y cambia el rol en Mi equipo"}
+{"version": "5.73", "bd": "5.22", "notas": "🏪 La portada de la tienda (logo, descripción, horario, dirección, redes y WhatsApp) ahora también se ve en el catálogo con cuenta"}

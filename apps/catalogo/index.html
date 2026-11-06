@@ -142,6 +142,7 @@
   <section id="vOfertas" class="hidden"><p class="muted hidden" id="ofTip" style="margin:0 0 12px"></p><div class="ofertas" id="ofertas"></div></section>
 
   <section id="vProductos">
+    <div id="perfil"></div>
     <input id="buscar" placeholder="Buscar producto…" aria-label="Buscar producto" style="margin-bottom:12px">
     <div class="cats" id="cats"></div>
     <p class="muted" id="tipCarro" style="margin:0 0 10px">Toca <b>➕ Agregar</b> para armar tu pedido 🛒 y envíalo a la tienda.</p>
@@ -246,22 +247,25 @@
 
   // Abierto / cerrado, vacaciones, horario y reseñas de la tienda.
   const vacaciones = /^\d{4}-\d{2}-\d{2}$/.test(tienda.vacaciones_hasta || '') ? new Date(tienda.vacaciones_hasta + 'T12:00') : null;
-  const est = tienda.estrellas || {};
-  let resumenResenas = est.total ? '<span>⭐ <b>' + Number(est.promedio).toLocaleString('es-CL') + '</b> · ' + est.total + ' calificaci' + (est.total === 1 ? 'ón' : 'ones') + '</span>' : '';
+  // Portada con el perfil del negocio (núcleo: vitrina.js), igual que la página pública de la tienda.
   function pintarEstado() {
-    const partes = [];
-    if (vacaciones) {
-      partes.push('🌴 <b>De vacaciones hasta el ' + vacaciones.toLocaleDateString('es', { day: 'numeric', month: 'long' }) + '</b>' +
-        (tienda.vacaciones_msg ? ': ' + Core.esc(tienda.vacaciones_msg) : '') + '<br><span class="muted">Puedes mirar los productos; los pedidos se reciben a su regreso.</span>');
-    } else if (tienda.horario || tienda.abierto === false) {
-      partes.push(tienda.abierto === false ? '🔴 <b>Cerrado ahora</b>: puedes pedir igual, te responderemos al abrir.' : '🟢 <b>Abierto</b>');
-    }
-    if (tienda.horario) partes.push('<span class="muted">🕒 ' + Core.esc(tienda.horario) + '</span>');
-    if (resumenResenas) partes.push(resumenResenas);
-    $('estado').classList.toggle('hidden', !partes.length);
-    $('estado').innerHTML = partes.join('<br>');
+    $('estado').classList.toggle('hidden', !vacaciones);
+    $('estado').innerHTML = vacaciones ? '🌴 <span class="muted">Puedes mirar los productos; los pedidos se reciben a su regreso.</span>' : '';
   }
   pintarEstado();
+  function pintarVitrina() {
+    if (!tienda.empresa) return;
+    CodeFixVitrina.montar($('perfil'), tienda);
+    // Compartir: el link público de la tienda (este catálogo pide cuenta).
+    const b = $('perfil').querySelector('[data-pf="compartir"]');
+    if (b && tienda.slug) b.onclick = async () => {
+      const url = Core.rootUrl() + 't/?s=' + encodeURIComponent(tienda.slug);
+      try { if (navigator.share) return await navigator.share({ title: tienda.empresa, url }); } catch (e) { return; }
+      try { await navigator.clipboard.writeText(url); Core.toast('🔗 Link copiado'); } catch (e) { prompt('Copia el link', url); }
+    };
+    else if (b) b.remove();
+  }
+  if (window.CodeFixVitrina) pintarVitrina(); else addEventListener('load', pintarVitrina);
 
   const precioDe = (i) => i.precio_premium != null ? i.precio_premium : i.precio;
   const descPrem = Number(tienda.desc_premium) || 0; // % de descuento que la tienda da a sus clientes Premium
