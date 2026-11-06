@@ -1,7 +1,8 @@
 /* CodeFix · Íconos modernos para todas las apps (mismo archivo en cada repositorio).
    Cambia el emoji del inicio de menús, botones, títulos, etiquetas y avisos por un ícono de línea (SVG),
-   también en lo que se dibuja después (pantallas que cambian). Los emojis que son contenido no se tocan:
-   selector de íconos o avatares, logos del negocio, mensajes de chat, campos de texto y avisos emergentes.
+   en cualquier parte del texto (inicio, medio o final: "Hola 👋") y también en lo que se dibuja después.
+   Los emojis que son contenido no se tocan: selector de íconos o avatares, logos del negocio, mensajes de chat,
+   campos de texto y listas desplegables (option no admite íconos).
    Para que un elemento conserve su emoji: class="no-ico" o data-emoji. */
 (function () {
   'use strict';
@@ -106,7 +107,34 @@
     punto: '<circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/>',
     cara: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5v.01M15 9.5v.01"/>',
     apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
-    cerebro: '<path d="M12 5a3 3 0 0 0-5.6-1.5A3 3 0 0 0 4 8a3 3 0 0 0 0 5 3.5 3.5 0 0 0 4 5.5A3 3 0 0 0 12 20zM12 5a3 3 0 0 1 5.6-1.5A3 3 0 0 1 20 8a3 3 0 0 1 0 5 3.5 3.5 0 0 1-4 5.5A3 3 0 0 1 12 20zM12 5v15"/>'
+    cerebro: '<path d="M12 5a3 3 0 0 0-5.6-1.5A3 3 0 0 0 4 8a3 3 0 0 0 0 5 3.5 3.5 0 0 0 4 5.5A3 3 0 0 0 12 20zM12 5a3 3 0 0 1 5.6-1.5A3 3 0 0 1 20 8a3 3 0 0 1 0 5 3.5 3.5 0 0 1-4 5.5A3 3 0 0 1 12 20zM12 5v15"/>',
+    pulgar: '<path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.3 20H7"/>',
+    derecha: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    abajo: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+    arriba: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+    torta: '<path d="M4 21h16v-8H4zM4 16c2 1.5 4 1.5 5.3 0 1.4 1.5 4 1.5 5.4 0 1.3 1.5 3.3 1.5 5.3 0M8 13V9M12 13V9M16 13V9M8 6v.01M12 6v.01M16 6v.01"/>',
+    comida: '<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1-3 4-3 8h3"/>',
+    ropa: '<path d="M8 3l-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z"/>',
+    belleza: '<path d="M10 3h4v5h-4zM8 10a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"/>',
+    huella: '<circle cx="12" cy="16" r="3.5"/><circle cx="5.5" cy="10.5" r="2"/><circle cx="9.5" cy="6" r="2"/><circle cx="14.5" cy="6" r="2"/><circle cx="18.5" cy="10.5" r="2"/>',
+    planta: '<path d="M12 21v-9M12 12c0-4-3-6-7-6 0 4 3 6 7 6zM12 12c0-5 3-8 8-8 0 5-3 8-8 8z"/>',
+    taza: '<path d="M4 9h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/>',
+    sueno: '<path d="M4 10h6l-6 7h6M13 4h5l-5 6h5"/>',
+    carpeta: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
+    enchufe: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',
+    senal: '<path d="M5 20v-3M10 20v-7M15 20V9M20 20V4"/>',
+    bateria: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M6 10v4M10 10v4M14 10v4"/>',
+    bateriaBaja: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M6 10v4"/>',
+    video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>',
+    bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 13v.01M15 13v.01M9 17h6"/>',
+    ojoNo: '<path d="M3 3l18 18M10.6 5.1A9.7 9.7 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.4 2 12 2 12s4 7 10 7c1.9 0 3.6-.7 5-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+    medalla: '<circle cx="12" cy="15" r="6"/><path d="M8.5 10L6 3h4l2 5M15.5 10L18 3h-4l-1 3"/>',
+    triste: '<circle cx="12" cy="12" r="9"/><path d="M15.5 16a4.5 4.5 0 0 0-7 0M9 9.5v.01M15 9.5v.01"/>',
+    control: '<path d="M7 7h10a5 5 0 0 1 5 5v1a4 4 0 0 1-7.2 2.4L14 14h-4l-.8 1.4A4 4 0 0 1 2 13v-1a5 5 0 0 1 5-5zM7 10v4M5 12h4M15.5 11v.01M17.5 13v.01"/>',
+    audifonos: '<path d="M4 15v-3a8 8 0 0 1 16 0v3M4 15h3v5H5a1 1 0 0 1-1-1zM20 15h-3v5h2a1 1 0 0 0 1-1z"/>',
+    numeros: '<path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/>',
+    pelota: '<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10zM12 7V3M16 10l4-1M14.5 14.5l2.5 3.5M9.5 14.5L7 18M8 10L4 9"/>',
+    dado: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9v.01M15 15v.01M12 12v.01"/>'
   };
   // emoji (sin variante) → [ícono, color]
   const M = {};
@@ -123,22 +151,31 @@
   asignar('📈', 'tendencia'); asignar('📉', 'baja'); asignar('➕', 'mas'); asignar('🚀', 'cohete'); asignar('⚙', 'ajustes'); asignar('⚡', 'rayo');
   asignar('🕐 🕒 ⏰ ⏱ 🕑 🕓 🕔 🕕', 'reloj'); asignar('🎯', 'diana'); asignar('👁 👀', 'ojo'); asignar('💎', 'diamante'); asignar('📍', 'pin');
   asignar('🔳', 'qr'); asignar('⚖', 'balanza'); asignar('🏠 🏡', 'casa'); asignar('🚚', 'camion'); asignar('📦', 'caja'); asignar('🚪', 'puerta');
-  asignar('💡', 'ampolleta'); asignar('🔎 🔍', 'lupa'); asignar('📜 📄 📃 📑', 'documento'); asignar('📒 📗 📚 📖 📓', 'libro'); asignar('❤ 💚 🤍', 'corazon', 'rojo');
+  asignar('💡', 'ampolleta'); asignar('🔎 🔍', 'lupa'); asignar('📜 📄 📃 📑', 'documento'); asignar('📒 📗 📚 📖 📓', 'libro'); asignar('❤ 💚 🤍 💙 💛 🧡 💜', 'corazon', 'rojo');
   asignar('🗺', 'mapa'); asignar('🧭', 'brujula'); asignar('🛡', 'escudo'); asignar('🏆 🥇', 'trofeo', 'oro'); asignar('🚩 🏁', 'bandera');
   asignar('🖼', 'imagen'); asignar('🩺', 'pulso'); asignar('🚗 🚙 🚕 🛻 🏍 🛵', 'auto'); asignar('♾', 'infinito'); asignar('📎', 'clip');
   asignar('☁', 'nube'); asignar('📧 ✉ 📩', 'correo'); asignar('🪪 📇', 'carnet'); asignar('🌙', 'luna'); asignar('☀', 'sol'); asignar('🌓', 'contraste');
   asignar('⏸', 'pausa'); asignar('🌐 📡 🛰', 'mundo'); asignar('❓', 'ayuda'); asignar('🛟', 'salvavidas'); asignar('🗄 💻', 'servidor');
   asignar('🖥', 'pantalla'); asignar('👑', 'corona', 'oro'); asignar('🧮', 'calculadora'); asignar('🖨', 'impresora'); asignar('📞 ☎', 'telefono');
-  asignar('↗', 'flecha'); asignar('👋', 'mano'); asignar('💪', 'musculo'); asignar('🟢', 'punto', 'verde'); asignar('🔴', 'punto', 'rojo');
+  asignar('↗', 'flecha'); asignar('👋 ✋ 🖐 🙌 🙏 👏', 'mano'); asignar('💪', 'musculo'); asignar('🟢', 'punto', 'verde'); asignar('🔴', 'punto', 'rojo');
   asignar('🟡 🟠', 'punto', 'ambar'); asignar('🔵', 'punto', 'azul'); asignar('⚪', 'punto', 'gris');
-  asignar('🙂 😊 😀 😃 🥰 😌', 'cara'); asignar('🧩 🔲', 'apps'); asignar('🧠', 'cerebro');
+  asignar('🙂 😊 😀 😃 🥰 😌 😄 😁 😎 😉', 'cara'); asignar('🧩 🔲', 'apps'); asignar('🧠', 'cerebro');
+  asignar('👍', 'pulgar'); asignar('👉 ➡', 'derecha'); asignar('👇', 'abajo'); asignar('👆', 'arriba'); asignar('🍰 🎂 🧁 🍩', 'torta');
+  asignar('🍔 🍕 🌭 🥖 🍳 🍽 🥑 🍎 🍓', 'comida'); asignar('👗 👕 👚 👖', 'ropa'); asignar('💅 💄', 'belleza'); asignar('🐾', 'huella');
+  asignar('🌱 🌿 🪴 🌵 🌸 🌷 🌴 🌻', 'planta', 'verde'); asignar('☕', 'taza'); asignar('💤 😴', 'sueno'); asignar('🗂 📁 📂', 'carpeta');
+  asignar('🔌', 'enchufe'); asignar('📶', 'senal'); asignar('🔋', 'bateria', 'verde'); asignar('🪫', 'bateriaBaja', 'rojo'); asignar('🎬 🎥 📹', 'video');
+  asignar('🤖', 'bot'); asignar('🙈', 'ojoNo'); asignar('🥈 🥉 🏅 🎖', 'medalla', 'oro'); asignar('😕 😞 😩 😐 😬 🙁 😢', 'triste'); asignar('🤔', 'ayuda');
+  asignar('🎮', 'control'); asignar('🎧', 'audifonos'); asignar('🔢', 'numeros'); asignar('⚽ 🏀', 'pelota'); asignar('🎲', 'dado');
 
-  const SEL = 'nav a, nav button, button, a.btn, .btn, a.item, .item, .chip, summary, h1, h2, h3, h4, .tag, .pill, .banda, .banner, .aviso, .alerta, th, .kpi .t, .sec, li, .stats span, .titulo, label, a[class]';
-  const FUERA = '.no-ico, [data-emoji], textarea, input, select, [contenteditable], .logo-mini, .logo, .avatar, .app-ico, .emoji, .chat, .mensajes, .burbuja, .msg, .lp-tel, #toast, .toast, svg, script, style';
+  // Bloque al que pertenece un texto (para saber si el ícono va al inicio, en medio o solo).
+  const BLOQUE = 'button, a, li, label, h1, h2, h3, h4, h5, h6, p, td, th, summary, dt, dd, legend, div, section, article, header, footer, nav';
+  const FUERA = '.no-ico, [data-emoji], textarea, input, select, option, optgroup, title, code, pre, [contenteditable], .logo-mini, .logo, .avatar, .app-ico, .emoji, .chat, .mensajes, .burbuja, .msg, .lp-tel, svg, script, style, noscript';
+  const EMO = /\p{Extended_Pictographic}(?:️|[\u{1F3FB}-\u{1F3FF}]|‍\p{Extended_Pictographic}️?)*️?/gu;
   const RX = /^(\s*)(\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}️?)*)️?(\s*)/u;
+  const clave = (e) => e.replace(/[️\u{1F3FB}-\u{1F3FF}]/gu, '');
   const css = document.createElement('style');
   css.textContent = '.ic-e{display:inline-flex;align-items:center;justify-content:center;vertical-align:-.17em;margin-right:.4em;flex:none;line-height:1}' +
-    '.ic-e.solo{margin-right:0}.ic-e svg{width:1.12em;height:1.12em;display:block}.ic-e.verde{color:#16a34a}.ic-e.rojo{color:#dc2626}' +
+    '.ic-e.solo,.ic-e.en{margin-right:0}.ic-e svg{width:1.12em;height:1.12em;display:block}.ic-e.verde{color:#16a34a}.ic-e.rojo{color:#dc2626}' +
     '.ic-e.ambar{color:#d97706}.ic-e.oro{color:#f59e0b}.ic-e.azul{color:#2563eb}.ic-e.gris{color:#94a3b8}';
   document.head.appendChild(css);
 
@@ -153,40 +190,59 @@
     p.dataset.esSel = n >= 6 ? '1' : '0';
     return n >= 6;
   }
-  function convertir(el) {
-    if (el.closest(FUERA)) return;
+  function primerTexto(el) {
     const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-    let t; while ((t = w.nextNode()) && !t.data.trim()) { /* busca el primer texto */ }
-    if (!t || (t.parentElement && t.parentElement.closest(FUERA))) return;
-    const m = RX.exec(t.data); if (!m) return;
-    const clave = m[2].replace(/️/g, ''), d = M[clave]; if (!d) return;
-    // ¿Queda texto después del emoji? (también el que viene en otra etiqueta: "🔄 <b>Hay que…</b>")
-    const queda = el.textContent.replace(m[0], '').trim();
-    const resto = t.data.slice(m[0].length);
-    if (!queda && el.matches('button, .btn') && esSelector(el)) return;
-    const s = document.createElement('span');
-    s.className = 'ic-e' + (d[1] ? ' ' + d[1] : '') + (queda ? '' : ' solo');
-    s.innerHTML = svg(d[0]);
-    t.parentNode.insertBefore(s, t);
-    t.data = resto;
+    let t; while ((t = w.nextNode())) if (t.data.trim()) return t;
+    return null;
+  }
+  // Cambia cada emoji conocido de un texto (al inicio, en medio o al final) por su ícono de línea.
+  function convertirTexto(t) {
+    const pe = t.parentElement;
+    if (!pe || !t.data || pe.closest(FUERA)) return;
+    EMO.lastIndex = 0; if (!EMO.test(t.data)) return;
+    const bl = pe.closest(BLOQUE) || pe;
+    const solo = !bl.textContent.replace(EMO, '').trim();
+    if (solo) { const b = pe.closest('button, .btn'); if (b && esSelector(b)) return; }
+    const inicio = primerTexto(bl) === t;
+    const frag = document.createDocumentFragment();
+    let ult = 0, cambio = false, m;
+    EMO.lastIndex = 0;
+    while ((m = EMO.exec(t.data))) {
+      const d = M[clave(m[0])]; if (!d) continue;
+      const antes = t.data.slice(ult, m.index), alInicio = inicio && !antes.trim() && !cambio;
+      if (antes && !alInicio) frag.appendChild(document.createTextNode(antes));
+      const s = document.createElement('span');
+      s.className = 'ic-e' + (d[1] ? ' ' + d[1] : '') + (solo ? ' solo' : alInicio ? '' : ' en');
+      s.innerHTML = svg(d[0]);
+      frag.appendChild(s);
+      ult = m.index + m[0].length;
+      if (alInicio) { const sp = /^\s*/.exec(t.data.slice(ult))[0].length; ult += sp; } // como antes: el margen reemplaza el espacio
+      cambio = true;
+    }
+    if (!cambio) return;
+    if (ult < t.data.length) frag.appendChild(document.createTextNode(t.data.slice(ult)));
+    t.parentNode.replaceChild(frag, t);
   }
   let pendiente = new Set(), programado = false, obs = null;
   function procesar(raiz) {
-    if (!raiz || raiz.nodeType !== 1) return;
-    if (raiz.matches && raiz.matches(SEL)) convertir(raiz);
-    raiz.querySelectorAll(SEL).forEach(convertir);
+    if (!raiz) return;
+    if (raiz.nodeType === 3) return convertirTexto(raiz);
+    if (raiz.nodeType !== 1 || raiz.closest(FUERA)) return;
+    const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, null), lista = [];
+    let t; while ((t = w.nextNode())) { EMO.lastIndex = 0; if (EMO.test(t.data)) lista.push(t); }
+    lista.forEach(convertirTexto);
   }
   function correr() {
     programado = false;
     const lista = Array.from(pendiente); pendiente = new Set();
     if (obs) obs.disconnect();
-    lista.forEach((n) => { if (n.isConnected) procesar(n.nodeType === 1 ? n : n.parentElement); });
+    lista.forEach((n) => { if (n.isConnected) procesar(n); });
     if (obs) obs.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
   function anotar(n) {
     if (!n) return;
     const e = n.nodeType === 1 ? n : n.parentElement; if (!e) return;
-    pendiente.add(e.closest(SEL) || e);
+    pendiente.add(e.closest(BLOQUE) || e); // el bloque entero: así sabe si el ícono va al inicio
     if (!programado) { programado = true; requestAnimationFrame(correr); }
   }
   function iniciar() {
