@@ -222,6 +222,8 @@
       <textarea id="tPago" maxlength="400" placeholder="Banco · Tipo de cuenta · N° de cuenta · RUT · Nombre · Correo"></textarea>
       <label for="tHorario">Horario de atención</label>
       <input id="tHorario" maxlength="120" placeholder="Lun a Vie 9:00 a 19:00 · Sáb 10:00 a 14:00">
+      <details id="dPerfil"><summary style="cursor:pointer;font-weight:700;margin:12px 0 4px">📇 Perfil de tu tienda (descripción, dirección y redes)</summary>
+        <p class="muted" style="font-size:13px;margin:4px 0">Se luce arriba en tu página de tienda.</p><div id="tPerfil"></div></details>
       <label class="terms"><input type="checkbox" id="tAbierto" checked> <span>Tienda abierta ahora (si la desmarcas, tus clientes ven "Cerrado: te responderemos al abrir")</span></label>
       <label class="terms"><input type="checkbox" id="tVac"> <span>🌴 <b>Modo vacaciones</b>: tus clientes ven el aviso y no pueden enviar pedidos hasta tu regreso (se apaga solo)</span></label>
       <div class="row hidden" id="rowVac" style="flex-wrap:wrap">
@@ -759,6 +761,7 @@
       $('rowVac').classList.toggle('hidden', !t.vacaciones_hasta);
       $('tDescPrem').value = t.desc_premium ? t.desc_premium : '';
       $('tRubro').value = t.rubro || '';
+      CodeFixVitrina.editor($('tPerfil'), t.perfil); $('tPerfil').dataset.listo = '1';
     } catch (e) { /* sin red */ }
   }
   $('tRubro').innerHTML += Core.RUBROS.map(([i, n]) => '<option value="' + Core.esc(n) + '">' + i + ' ' + Core.esc(n) + '</option>').join('');
@@ -775,6 +778,7 @@
     try {
       await Cuenta.rpc('set_desc_premium', { p_pct: dp });
       await Cuenta.rpc('set_mi_rubro', { p_rubro: $('tRubro').value });
+      if ($('tPerfil').dataset.listo) await Cuenta.rpc('set_mi_perfil', { p_perfil: CodeFixVitrina.leer($('tPerfil')) });
       await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value });
       await Cuenta.rpc('set_vacaciones', { p_hasta: $('tVac').checked ? $('tVacHasta').value : null, p_msg: $('tVacMsg').value });
       pintar(await Cuenta.rpc('set_mi_tienda', { p_datos_pago: $('tPago').value, p_horario: $('tHorario').value,
@@ -957,5 +961,6 @@
 <script src="shared/premium.js"></script>
 <script src="shared/ayuda.js"></script>
 <script src="shared/datos.js"></script>
+<script src="shared/vitrina.js"></script>
 </body>
 </html>

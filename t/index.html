@@ -42,7 +42,6 @@
   .qty button { width: 34px; height: 34px; padding: 0; border-radius: 10px; }
   .entrega { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .entrega button:not(.on) { background: var(--brand-soft); color: var(--brand); box-shadow: none; }
-  .estado { border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; font-size: 14px; border: 1px solid var(--line); background: var(--card); }
 </style>
 </head>
 <body>
@@ -51,7 +50,7 @@
   <p class="empty" id="cargando">Cargando…</p>
   <div class="card hidden" id="noExiste"><h2>Tienda no encontrada</h2><p class="muted">Revisa el link o pídeselo de nuevo a la tienda.</p></div>
   <div id="tienda" class="hidden">
-    <div class="estado hidden" id="estado"></div>
+    <div id="perfil"></div>
     <div class="card hidden" id="misPed"><h2>🧾 Tus pedidos en esta tienda</h2><ul class="list" id="misPedL"></ul></div>
     <div class="seg"><button class="on" data-t="productos">🛍️ Productos</button><button data-t="ofertas">🏷️ Ofertas</button><button data-t="pedido">🛒 Pedido</button></div>
     <section id="v-productos">
@@ -123,12 +122,9 @@
     }
   $('bIngresar').href = '../?volver=' + encodeURIComponent('/apps/catalogo/');
   $('tienda').classList.remove('hidden');
-  const est = [];
-  if (t.vacaciones_hasta) est.push('🌴 <b>De vacaciones hasta el ' + new Date(t.vacaciones_hasta + 'T12:00').toLocaleDateString('es', { day: 'numeric', month: 'long' }) + '</b>' + (t.vacaciones_msg ? ': ' + Core.esc(t.vacaciones_msg) : ''));
-  else if (t.abierto === false) est.push('🔴 <b>Cerrado ahora</b>: puedes pedir igual.');
-  if (t.horario) est.push('<span class="muted">🕒 ' + Core.esc(t.horario) + '</span>');
-  if (t.estrellas && t.estrellas.total) est.push('⭐ <b>' + Number(t.estrellas.promedio).toLocaleString('es-CL') + '</b> · ' + t.estrellas.total + ' calificaciones');
-  $('estado').classList.toggle('hidden', !est.length); $('estado').innerHTML = est.join('<br>');
+  // Portada con el perfil del negocio (núcleo: perfil.js).
+  const pf = () => CodeFixVitrina.montar($('perfil'), t);
+  if (window.CodeFixVitrina) pf(); else addEventListener('load', pf);
   $('pagoTip').textContent = t.cobra_online ? '💳 Al enviar, tu pedido queda apartado ' + t.retencion_min + ' min para que pagues con el link de la tienda y subas el comprobante.'
     : 'La tienda te contactará por WhatsApp para coordinar el pago.';
 
@@ -309,5 +305,6 @@
 <script src="../shared/ayuda.js"></script>
 <script src="../shared/tienda.js"></script>
 <script src="../shared/datos.js"></script>
+<script src="../shared/vitrina.js"></script>
 </body>
 </html>

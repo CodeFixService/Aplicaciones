@@ -4679,7 +4679,7 @@ grant execute on function public.marca_publica() to anon, authenticated;
 --  · Funciones comunes cfx_* para el Centro de Mando (respaldo, limpieza e inventario).
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.17'::text $$;
+language sql immutable as $$ select '5.18'::text $$;
 
 alter table public.notification_reads add column if not exists oculto boolean not null default false;
 alter table public.profiles add column if not exists aviso_limpieza_at timestamptz;
@@ -5060,6 +5060,58 @@ language sql stable security definer set search_path = '' as $$
     jsonb_build_object('k', 'despacho', 't', 'Despacho o retiro', 'd', 'Elige si haces retiro en tienda y cuánto cobras de despacho por comuna.', 'ir', '#despacho',
       'ok', coalesce((p.despacho ->> 'retiro')::boolean, false) or jsonb_array_length(coalesce(p.despacho -> 'zonas', '[]'::jsonb)) > 0))
   from public.profiles p where p.id = auth.uid()), '[]'::jsonb)
+$$;
+
+-- =====================================================================
+--  VERSIÓN 5.18 · Perfil de la tienda (U12): descripción, dirección y redes que se lucen en la página pública.
+-- =====================================================================
+alter table public.profiles add column if not exists perfil jsonb not null default '{}'::jsonb;
+
+-- Guarda el perfil (solo textos cortos y limpios; redes como usuario o link https).
+create or replace function public.set_mi_perfil(p_perfil jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r jsonb := '{}'::jsonb; k text; v text;
+  lim constant jsonb := '{"descripcion":400,"direccion":150,"comuna":60,"instagram":100,"facebook":100,"tiktok":100,"web":150,"correo":120}';
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  for k in select jsonb_object_keys(lim) loop
+    v := nullif(trim(regexp_replace(coalesce(p_perfil ->> k, ''), '[<>]', '', 'g')), '');
+    if v is null then continue; end if;
+    v := left(v, (lim ->> k)::int);
+    if k = 'web' and v !~* '^https?://' then v := 'https://' || v; end if;
+    if k = 'correo' and v !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'Correo no válido'; end if;
+    r := r || jsonb_build_object(k, v);
+  end loop;
+  update public.profiles set perfil = r where id = auth.uid();
+  return r;
+end $$;
+revoke all on function public.set_mi_perfil(jsonb) from public, anon;
+grant execute on function public.set_mi_perfil(jsonb) to authenticated;
+
+create or replace function public.tienda_publica(p_slug text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug, 'telefono', t.telefono, 'horario', t.horario, 'abierto', t.abierto,
+    'logo', t.logo, 'color', t.color, 'datos_pago', t.datos_pago,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'retencion_min', public.regla('retencion_min', 30), 'pro', public.is_pro(t.id), 'desc_premium', t.desc_premium, 'despacho', t.despacho,
+    'perfil', t.perfil, 'rubro', t.rubro, 'desde', t.created_at::date)
+  from public.profiles t where t.slug = lower(trim(coalesce(p_slug, ''))) and t.role = 'user' and not t.suspended
+$$;
+
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', case when public.is_pro(t.id) then t.sellos_meta end, 'sellos_premio', t.sellos_premio,
+    'pro', public.is_pro(t.id), 'logo', t.logo, 'color', t.color,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'desc_premium', t.desc_premium, 'rubro', t.rubro, 'despacho', t.despacho, 'perfil', t.perfil, 'desde', t.created_at::date)
+  from public.profiles t
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
 $$;
 
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
