@@ -335,7 +335,7 @@
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
   const APP_VERSION = '5.64';
-  const DB_VERSION = '5.17'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const DB_VERSION = '5.18'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
