@@ -38,6 +38,8 @@
   .resp { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--field); margin-top: 8px; }
   .ped .dest { border: 2px solid #f59e0b; }
   .ped .prem { border: 2px solid var(--premium); }
+  .card.nuevo { animation: ped-nuevo 1.2s ease-in-out 3; box-shadow: 0 0 0 2px var(--brand, #2563eb); }
+  @keyframes ped-nuevo { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand, #2563eb) 35%, transparent); } }
 </style>
 </head>
 <body>
@@ -143,8 +145,26 @@
       auto = false;
     }
     catch (e) { $('lista').innerHTML = '<p class="empty">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    const nuevos = vistos && ultFiltro === filtro ? pedidos.filter((p) => !vistos.has(p.id) && ['pagando', 'en_revision', 'recibido'].includes(p.estado)) : [];
+    vistos = vistos || new Set(); ultFiltro = filtro; pedidos.forEach((p) => vistos.add(p.id));
     pintar();
+    if (nuevos.length) avisarNuevo(nuevos);
   }
+  /* ---------- 🔔 Pedido nuevo en vivo: con Pedidos abierto suena, vibra y se marca la tarjeta ---------- */
+  let vistos = null, ultFiltro = null;
+  function avisarNuevo(l) {
+    try {
+      const A = window.AudioContext || window.webkitAudioContext, c = new A(), t = c.currentTime;
+      [880, 1320].forEach((f, i) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; o.connect(g); g.connect(c.destination);
+        g.gain.setValueAtTime(0.0001, t + i * 0.18); g.gain.exponentialRampToValueAtTime(0.25, t + i * 0.18 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.18 + 0.3);
+        o.start(t + i * 0.18); o.stop(t + i * 0.18 + 0.32); });
+      setTimeout(() => c.close(), 900);
+    } catch (e) { /* sin sonido */ }
+    try { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); } catch (e) { /* nada */ }
+    Core.toast(l.length > 1 ? '📦 ' + l.length + ' pedidos nuevos' : (l[0].estado === 'pagando' ? '⏳ Pedido por pagar de ' : l[0].estado === 'en_revision' ? '🧾 Comprobante de ' : '📦 Pedido nuevo de ') + l[0].cliente);
+    l.forEach((p) => { const c = document.querySelector('[data-ped="' + p.id + '"]'); if (c) c.classList.add('nuevo'); });
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); });
   $('buscar').oninput = () => pintar();
   function pintar() {
     const q = $('buscar').value.trim().toLowerCase();
@@ -154,7 +174,7 @@
         : p.estado === 'listo' || p.estado === 'en_camino' ? ['entregado'] : [];
       const abierto = ['pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado);
       const tel = String(p.telefono || '').replace(/\D/g, '');
-      return '<div class="card' + (p.premium && abierto ? ' prem' : '') + '"><div class="cab"><div><b>' + Core.esc(p.cliente) + '</b>' +
+      return '<div class="card' + (p.premium && abierto ? ' prem' : '') + '" data-ped="' + p.id + '"><div class="cab"><div><b>' + Core.esc(p.cliente) + '</b>' +
         (p.premium ? ' <span class="pill pro">⭐ Premium</span>' : '') + (p.invitado ? ' <span class="pill">Sin cuenta</span>' : '') +
         (p.cliente_estrellas ? ' <span class="estrellas5">★ ' + p.cliente_estrellas + '</span>' : '') +
         '<div class="muted">' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) +
@@ -266,7 +286,7 @@
 
   cargar();
   if (params.get('v') === 'cupones' || params.get('v') === 'stats') show(params.get('v'));
-  setInterval(() => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); }, 30000);
+  setInterval(() => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); }, 20000);
 })();
 </script>
 <script src="../../shared/iconos.js"></script>
