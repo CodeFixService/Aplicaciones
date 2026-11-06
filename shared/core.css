@@ -317,3 +317,7 @@ header.top h1::before { display: inline-block; vertical-align: middle; margin-ri
 }
 /* Celular: con "‹" a la vista el logo cuadrado se oculta para que el nombre de la tienda no quede en "T…". */
 @media (max-width: 420px) { header.top > a:not(.hidden) + h1::before { display: none; } }
+/* Tienda en 5 minutos: barra de progreso */
+.t5 { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+.t5b { flex: 1; height: 10px; border-radius: 99px; background: var(--line, #e5e7eb); overflow: hidden; }
+.t5b i { display: block; height: 100%; width: 0; background: var(--brand, #2563eb); border-radius: 99px; transition: width .5s; }

@@ -168,7 +168,7 @@
     <div id="hoy" class="hidden">
       <div class="stats" id="hoyStats"></div>
       <div class="card hidden" id="hoyStock" style="border-color:#f59e0b"></div>
-      <div class="card hidden" id="hoyFalta"><h2>👋 Te falta configurar</h2><ul class="list" id="hoyFaltaL"></ul></div>
+      <div class="card hidden" id="hoyFalta"><h2>🚀 Tu tienda en 5 minutos</h2><div class="t5"><div class="t5b"><i id="hoyFaltaB"></i></div><b id="hoyFaltaN"></b></div><ul class="list" id="hoyFaltaL"></ul></div>
       <div class="card hidden" id="hoyTienda"><h2>🔗 Tu tienda</h2>
         <p class="muted" style="margin-top:0">Compártela en WhatsApp o Instagram, o imprime el QR. Sin cuenta piden desde ahí; con cuenta entran directo a su app.</p>
         <input id="hoyLink" readonly aria-label="Link de tu tienda">
@@ -634,18 +634,20 @@
     if (!dueno) { $('hoyFalta').classList.add('hidden'); return; }
     let t = {};
     try { t = await Cuenta.rpc('tienda_info', { p_negocio: acc.id }) || {}; } catch (e) { /* sin red */ }
-    const falta = [];
-    if (!acc.logo) falta.push(['#ajustes', 'Sube tu logo y elige tu color']);
-    // Ejemplo según el rubro, para que cualquier negocio (productos o servicios) sepa qué cargar.
-    const rb = Core.RUBROS.find((x) => x[1] === t.rubro);
-    if (!h.productos) falta.push(['apps/caja/#productos', 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '')]);
-    if (!t.rubro) falta.push(['#ajustes', 'Elige a qué se dedica tu negocio']);
-    if (!h.link_pago) falta.push(['#links', 'Pega tu link de pago para cobrar pedidos online']);
-    if (!acc.telefono) falta.push(['#ajustes', 'Escribe el WhatsApp de tu tienda']);
-    if (!t.horario) falta.push(['#ajustes', 'Escribe tu horario de atención']);
-    $('hoyFalta').classList.toggle('hidden', !falta.length);
-    $('hoyFaltaL').innerHTML = falta.map(([u, x]) => '<li><a class="mini" href="' + u + '" style="width:100%"><span class="grow">◻️ ' + x + '</span><span>›</span></a></li>').join('');
+    // D20/D23 Tienda en 5 min: pasos con barra de progreso; los hechos quedan con ✅ y la tarjeta se va al completar todo.
+    const rb = Core.RUBROS.find((x) => x[1] === t.rubro); // ejemplo según el rubro
+    let compartio = false; try { compartio = !!localStorage.getItem('cfx:compartio'); } catch (e) { /* sin almacenamiento */ }
+    const pasos = [[!!t.rubro, '#ajustes', 'Elige a qué se dedica tu negocio'], [!!acc.logo, '#ajustes', 'Sube tu logo y elige tu color'],
+      [!!acc.telefono, '#ajustes', 'Escribe el WhatsApp de tu tienda'], [!!t.horario, '#ajustes', 'Escribe tu horario de atención'],
+      [!!h.productos, 'apps/caja/#productos', 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '')],
+      [!!h.link_pago, '#links', 'Pega tu link de pago para cobrar pedidos online'], [compartio, '#hoyTienda', 'Comparte tu tienda por WhatsApp o con el QR']];
+    const hechos = pasos.filter((x) => x[0]).length, pct = Math.round(hechos * 100 / pasos.length);
+    $('hoyFalta').classList.toggle('hidden', hechos === pasos.length);
+    $('hoyFaltaB').style.width = pct + '%'; $('hoyFaltaN').textContent = hechos + ' de ' + pasos.length;
+    $('hoyFaltaL').innerHTML = pasos.map(([ok, u, x]) => ok ? '<li class="muted" style="padding:6px 10px">✅ <s>' + x + '</s></li>'
+      : '<li><a class="mini" href="' + u + '" style="width:100%"><span class="grow">◻️ ' + x + '</span><span>›</span></a></li>').join('');
   }
+  function compartida() { try { localStorage.setItem('cfx:compartio', '1'); } catch (e) { /* sin almacenamiento */ } }
   function qrCanvas(text, px) {
     const q = qrcode(0, 'M'); q.addData(text); q.make();
     const n = q.getModuleCount(), m = 4, c = document.createElement('canvas'), k = Math.floor(px / (n + 2 * m));
@@ -654,9 +656,10 @@
     for (let r = 0; r < n; r++) for (let j = 0; j < n; j++) if (q.isDark(r, j)) g.fillRect((j + m) * k, (r + m) * k, k, k);
     return c;
   }
-  $('hoyQR').onclick = () => { $('hoyQRimg').src = qrCanvas(hoyLink, 440).toDataURL(); $('hoyQRbox').classList.toggle('hidden'); };
+  $('hoyQR').onclick = () => { compartida(); $('hoyQRimg').src = qrCanvas(hoyLink, 440).toDataURL(); $('hoyQRbox').classList.toggle('hidden'); };
   $('hoyQRdl').onclick = () => qrCanvas(hoyLink, 1000).toBlob((b) => Core.download('qr-mi-tienda.png', b));
   $('hoyCompartir').onclick = async () => {
+    compartida();
     const txt = '🛍️ Pide en ' + (Cuenta.account.empresa || 'mi tienda') + ': ' + hoyLink;
     if (navigator.share) { try { await navigator.share({ title: Cuenta.account.empresa || 'Mi tienda', text: txt }); return; } catch (e) { return; } }
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
