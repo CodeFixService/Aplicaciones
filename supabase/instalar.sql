@@ -5258,6 +5258,79 @@ drop trigger if exists variantes_stock_avisos on public.variantes;
 create trigger variantes_stock_avisos after insert or update of stock on public.variantes for each row execute function public.variante_avisos();
 revoke all on function public.variante_avisos() from public, anon, authenticated;
 
+-- =====================================================================
+--  VERSIÓN 5.21 · 📦 Inventario: la venta en Caja descuenta también la opción (color, talla…),
+--  "Entró mercadería" suma stock sin pisar ventas, e inventario() da el stock real de productos y opciones.
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.21'::text $$;
+
+-- Venta en la Caja: descuenta del producto y, si trae opción, de esa opción (dueño o equipo).
+create or replace function public.caja_descontar(p_items jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); it jsonb; c int;
+begin
+  if n is null then raise exception 'Sin permiso'; end if;
+  if jsonb_typeof(coalesce(p_items, '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p_items, '[]'::jsonb)) > 500 then raise exception 'Lista no válida'; end if;
+  for it in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
+    c := least(greatest(coalesce((it ->> 'cant')::int, 0), 0), 999);
+    continue when c = 0;
+    update public.catalog_items set stock = greatest(0, stock - c)
+    where owner_id = n and client_key = it ->> 'clave' and stock is not null;
+    if nullif(trim(coalesce(it ->> 'opcion', '')), '') is not null then
+      update public.variantes set stock = greatest(0, stock - c)
+      where owner_id = n and clave = it ->> 'clave' and lower(nombre) = lower(trim(it ->> 'opcion')) and stock is not null;
+    end if;
+  end loop;
+end $$;
+
+-- Entró mercadería (o ajuste): suma o resta al stock actual del producto o de una opción. Devuelve el stock nuevo.
+create or replace function public.stock_sumar(p_clave text, p_opcion text, p_cant int) returns int
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := auth.uid(); r int;
+begin
+  if not public.is_business(n) then raise exception 'Solo el dueño del negocio'; end if;
+  if p_cant is null or p_cant = 0 or abs(p_cant) > 100000 then raise exception 'Cantidad no válida'; end if;
+  if nullif(trim(coalesce(p_opcion, '')), '') is null then
+    update public.catalog_items set stock = least(1000000, greatest(0, coalesce(stock, 0) + p_cant)), updated_at = now()
+    where owner_id = n and client_key = p_clave returning stock into r;
+  else
+    update public.variantes set stock = least(1000000, greatest(0, coalesce(stock, 0) + p_cant))
+    where owner_id = n and clave = p_clave and lower(nombre) = lower(trim(p_opcion)) returning stock into r;
+  end if;
+  if r is null then raise exception 'Publica el producto primero'; end if;
+  return r;
+end $$;
+
+-- Inventario del negocio (dueño o equipo): stock real, lo apartado por pedidos y el precio de cada opción (opcion null = el producto).
+create or replace function public.inventario() returns table (clave text, opcion text, stock int, apartado int, precio numeric)
+language sql stable security definer set search_path = '' as $$
+  select c.client_key, null::text, c.stock, public.apartado(c.owner_id, c.client_key), null::numeric
+  from public.catalog_items c where c.owner_id = public.negocio_de(auth.uid()) and c.stock is not null
+  union all
+  select v.clave, v.nombre, v.stock, public.apartado_op(v.owner_id, v.clave, v.nombre), v.precio
+  from public.variantes v where v.owner_id = public.negocio_de(auth.uid())
+$$;
+
+-- 🔔 El aviso de un pedido abre ESE pedido: a 'apps/pedidos/' le suma ?p=<id> del pedido creado o cambiado en esta misma operación.
+create or replace function public.aviso_pedido_url() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare n uuid; pid uuid;
+begin
+  if new.url is distinct from 'apps/pedidos/' or new.target_id is null then return new; end if;
+  n := coalesce(public.negocio_de(new.target_id), new.target_id);
+  select x.id into pid from public.pedidos x where x.negocio_id = n and (x.created_at = now() or x.updated_at = now())
+  order by x.updated_at desc limit 1;
+  if pid is not null then new.url := 'apps/pedidos/?p=' || pid; end if;
+  return new;
+end $$;
+drop trigger if exists notifications_pedido_url on public.notifications;
+create trigger notifications_pedido_url before insert on public.notifications for each row execute function public.aviso_pedido_url();
+revoke all on function public.aviso_pedido_url() from public, anon, authenticated;
+
+revoke all on function public.caja_descontar(jsonb), public.stock_sumar(text, text, int), public.inventario() from public, anon;
+grant execute on function public.caja_descontar(jsonb), public.stock_sumar(text, text, int), public.inventario() to authenticated;
+
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
 -- CodeFix · Pagos (igual en las 6 apps; lo reparte nucleo/sincronizar.py). Se administra desde el Centro de Mando → Pagos.

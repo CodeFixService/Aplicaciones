@@ -381,7 +381,7 @@
   $('f-foto').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    ficha.foto = await Core.readImage(file, 1080);
+    ficha.foto = window.CFX_ACHICAR ? await CFX_ACHICAR(file, 'vitrina') : await Core.readImage(file, 1080);
     e.target.value = '';
     changed();
   };

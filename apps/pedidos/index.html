@@ -284,7 +284,18 @@
     } catch (e) { Core.toast(e.message); }
   }
 
-  cargar();
+  // 🔔 Desde el aviso: ?p=<id> busca ese pedido en las pestañas, lo muestra y lo marca.
+  (async () => {
+    await cargar();
+    const ir = params.get('p');
+    if (!ir) return;
+    for (const f of ['revisar', 'activos', 'pagando', 'devolver', 'historial']) {
+      if (pedidos.some((p) => p.id === ir)) break;
+      filtro = f; await cargar();
+    }
+    const c = document.querySelector('[data-ped="' + ir + '"]');
+    if (c) { c.classList.add('nuevo'); c.scrollIntoView({ block: 'center' }); }
+  })();
   if (params.get('v') === 'cupones' || params.get('v') === 'stats') show(params.get('v'));
   setInterval(() => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); }, 20000);
 })();

@@ -38,7 +38,7 @@
     ['tabProd', 'tabFin'].forEach((id) => $(id).classList.add('hidden'));
     try {
       const l = await Cuenta.rpc('catalog_of', { p_negocio: cuenta.negocio_id });
-      productos = l.map((x) => ({ id: x.clave, nombre: x.nombre, precio: Number(x.precio), costo: 0, stock: '', categoria: x.categoria || '', publicado: true }));
+      productos = l.map((x) => ({ id: x.clave, nombre: x.nombre, precio: Number(x.precio), costo: 0, stock: '', categoria: x.categoria || '', publicado: true, ops: x.opciones || '' }));
       db.set('productos', productos);
     } catch (e) { /* sin red: usa la copia */ }
   }
@@ -51,9 +51,18 @@
   async function traerStock() {
     if (esCliente) return;
     try {
-      const l = await Cuenta.rpc('stock_catalogo', { p_negocio: equipo ? cuenta.negocio_id : cuenta.id });
-      l.forEach((x) => { const p = productos.find((y) => y.id === x.clave && y.publicado); if (p) p.stock = x.stock; });
-      guardarProductos(); renderProds();
+      const l = await Cuenta.rpc('inventario');
+      productos.forEach((p) => { if (p.publicado) p.apartado = 0; });
+      l.forEach((x) => {
+        const p = productos.find((y) => y.id === x.clave && y.publicado);
+        if (!p) return;
+        if (x.opcion == null) { p.stock = x.stock; p.apartado = x.apartado; return; }
+        p.vars = p.vars || [];
+        const v = p.vars.find((y) => y.nombre.toLowerCase() === x.opcion.toLowerCase());
+        const d = { stock: x.stock, apartado: x.apartado, precio: x.precio == null ? null : Number(x.precio) };
+        if (v) Object.assign(v, d); else p.vars.push(Object.assign({ nombre: x.opcion }, d));
+      });
+      guardarProductos(); renderProds(); renderInv();
     } catch (e) { /* sin red */ }
   }
   let ventas = db.get('ventas', []);
@@ -67,7 +76,7 @@
     document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
     document.querySelectorAll('.view').forEach((x) => x.classList.toggle('on', x.id === 'v-' + v));
     scrollTo(0, 0);
-    if (v === 'productos') renderLista();
+    if (v === 'productos') { renderLista(); renderInv(); }
     if (v === 'reporte') renderReporte();
     if (v === 'finanzas') renderFinanzas();
     if (v === 'vender') renderProds();
@@ -88,9 +97,13 @@
   function renderProds() {
     renderCats();
     // Aviso de stock bajo (3 o menos).
-    const bajos = productos.filter((p) => p.stock !== '' && p.stock <= 3);
+    const bajos = [];
+    productos.forEach((p) => {
+      if (p.stock !== '' && p.stock != null && p.stock <= 3) bajos.push(p.nombre + ' (' + p.stock + ')');
+      if (p.ops) (p.vars || []).forEach((v) => { if (v.stock != null && v.stock <= 3 && opsDe(p).some((o) => o.toLowerCase() === v.nombre.toLowerCase())) bajos.push(p.nombre + ' ' + v.nombre + ' (' + v.stock + ')'); });
+    });
     $('stockBajo').classList.toggle('hidden', !bajos.length);
-    $('stockBajo').innerHTML = '⚠️ <b>Stock bajo:</b> ' + bajos.map((p) => Core.esc(p.nombre) + ' (' + p.stock + ')').join(', ');
+    $('stockBajo').innerHTML = '⚠️ <b>Stock bajo:</b> ' + bajos.map(Core.esc).join(', ');
     const q = $('q').value.trim().toLowerCase();
     const l = productos.filter((p) => (!cat || p.categoria === cat) && (!q || p.nombre.toLowerCase().includes(q)));
     $('prods').innerHTML = '<button class="prod otro" id="bOtro"><b>➕ Otro</b><small>sin registrar</small></button>' +
@@ -104,11 +117,20 @@
     if (!b) return;
     if (b.id === 'bOtro') return abrirOtro();
     const p = productos.find((x) => x.id === b.dataset.id);
-    agregar({ id: p.id, nombre: p.nombre, precio: +p.precio, costo: +p.costo || 0 });
+    const ops = opsDe(p);
+    if (!ops.length) return agregar({ id: p.id, nombre: p.nombre, precio: +p.precio, costo: +p.costo || 0 });
+    const txt = ops.map((o) => { const v = varDe(p, o); return o + (v && v.stock != null ? ' · stock ' + v.stock : '') + (v && v.precio != null ? ' · ' + money(v.precio) : ''); });
+    Core.elegir(p.nombre + ': ¿qué opción?', txt).then((t) => {
+      if (t == null) return;
+      const o = ops[txt.indexOf(t)], v = varDe(p, o);
+      agregar({ id: p.id, opcion: o, nombre: p.nombre + ' (' + o + ')', precio: v && v.precio != null ? +v.precio : +p.precio, costo: +p.costo || 0 });
+    });
   };
+  const opsDe = (p) => (p.ops || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20);
+  const varDe = (p, o) => (p.vars || []).find((v) => v.nombre.toLowerCase() === String(o).toLowerCase());
 
   function agregar(item) {
-    const line = ticket.find((l) => l.id === item.id && l.precio === item.precio);
+    const line = ticket.find((l) => l.id === item.id && l.precio === item.precio && (l.opcion || '') === (item.opcion || ''));
     if (line) line.cant++; else ticket.push(Object.assign({ cant: 1 }, item));
     if (navigator.vibrate) navigator.vibrate(12);
     renderTicket();
@@ -183,9 +205,11 @@
     ticket.forEach((l) => {
       const p = productos.find((x) => x.id === l.id);
       if (p && p.stock !== '') p.stock = Math.max(0, p.stock - l.cant);
+      const v = p && l.opcion && varDe(p, l.opcion);
+      if (v && v.stock != null) v.stock = Math.max(0, v.stock - l.cant);
     });
-    db.set('ventas', ventas); guardarProductos();
-    ticket.forEach((l) => { const p = productos.find((x) => x.id === l.id); if (p && p.publicado) pendStock.push({ clave: p.id, cant: l.cant }); });
+    db.set('ventas', ventas); guardarProductos(); renderInv();
+    ticket.forEach((l) => { const p = productos.find((x) => x.id === l.id); if (p && p.publicado) pendStock.push(l.opcion ? { clave: p.id, cant: l.cant, opcion: l.opcion } : { clave: p.id, cant: l.cant }); });
     db.set('stockPend', pendStock); enviarStock();
     const low = productos.filter((p) => p.stock !== '' && p.stock <= 3);
     if (low.length) Core.notify('Stock bajo', { body: low.map((p) => p.nombre + ' (' + p.stock + ')').join(', ') });
@@ -193,6 +217,47 @@
     ticket = []; $('recibido').value = '';
     renderTicket(); renderProds();
   };
+
+  /* ---------- Inventario: stock real de productos y opciones + "Entró mercadería" ---------- */
+  function renderInv() {
+    if (!$('invLista')) return;
+    const filas = [];
+    let unidades = 0, valor = 0, agotados = 0;
+    productos.forEach((p) => {
+      const vs = opsDe(p).map((o) => varDe(p, o)).filter((v) => v && v.stock != null);
+      const st = p.stock === '' || p.stock == null ? null : +p.stock;
+      if (st == null && !vs.length) return;
+      const u = vs.length ? vs.reduce((a, v) => a + v.stock, 0) : st;
+      unidades += u; valor += u * (+p.costo || 0);
+      if ((st != null && st <= 0) || (vs.length && vs.every((v) => v.stock <= 0))) agotados++;
+      const ap = (n) => n ? ' · ' + n + ' apartado(s)' : '';
+      const btn = (o) => '<button class="small alt" data-inv="' + p.id + '"' + (o ? ' data-op="' + Core.esc(o) + '"' : '') + ' aria-label="Entró mercadería">➕ Entró</button>';
+      filas.push('<div class="linea"><div class="grow"><b>' + Core.esc(p.nombre) + '</b><div class="muted">' +
+        (st == null ? 'Stock por opción' : 'Stock ' + st + ap(p.apartado)) + '</div></div>' + (st == null ? '' : btn('')) + '</div>' +
+        vs.map((v) => '<div class="linea" style="padding-left:16px"><div class="grow">🎨 ' + Core.esc(v.nombre) + '<div class="muted">' +
+          (v.stock <= 0 ? '⛔ Agotado' : 'Stock ' + v.stock) + ap(v.apartado) + '</div></div>' + btn(v.nombre) + '</div>').join(''));
+    });
+    $('invKpis').innerHTML = '<div class="card"><b>' + filas.length + '</b>con stock</div><div class="card"><b>' + unidades + '</b>unidades</div>' +
+      '<div class="card"><b>' + money(valor) + '</b>valor a costo</div><div class="card"><b>' + agotados + '</b>agotados</div>';
+    $('invLista').innerHTML = filas.join('') || '<p class="empty">Pon un stock a tus productos (o a sus opciones) y aquí verás tu inventario.</p>';
+  }
+  $('invLista') && ($('invLista').onclick = async (e) => {
+    const b = e.target.closest('[data-inv]');
+    if (!b) return;
+    const p = productos.find((x) => x.id === b.dataset.inv), o = b.dataset.op || '';
+    const t = prompt('¿Cuántas unidades entraron de ' + p.nombre + (o ? ' (' + o + ')' : '') + '?\n(Para restar, escribe con signo menos: -2)', '');
+    const n = parseInt(t, 10);
+    if (!t || isNaN(n) || !n) return;
+    const v = o && varDe(p, o);
+    try {
+      let nuevo;
+      if (!esCliente && p.publicado) nuevo = await Cuenta.rpc('stock_sumar', { p_clave: p.id, p_opcion: o || null, p_cant: n });
+      else nuevo = Math.max(0, (+(v ? v.stock : p.stock) || 0) + n);
+      if (v) v.stock = nuevo; else p.stock = nuevo;
+      guardarProductos(); renderInv(); renderLista();
+      Core.toast('📦 ' + p.nombre + (o ? ' ' + o : '') + ': stock ' + nuevo);
+    } catch (err) { Core.toast('⚠️ ' + (err.message || err)); }
+  });
 
   /* ---------- Productos ---------- */
   $('pq').oninput = renderLista;
