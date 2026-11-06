@@ -5233,6 +5233,31 @@ revoke all on function public.variantes_guardar(text, jsonb), public.variantes_d
 grant execute on function public.variantes_guardar(text, jsonb) to authenticated;
 grant execute on function public.variantes_de(uuid) to anon, authenticated;
 
+-- =====================================================================
+--  VERSIÓN 5.20 · 🔔 "Volvió el stock" también por opción: si una opción (color, talla…) vuelve a tener stock,
+--  avisa a quienes pidieron "Avísame" de ese producto.
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.20'::text $$;
+
+create or replace function public.variante_avisos() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare r record; nom text;
+begin
+  if new.stock is null or new.stock <= coalesce(old.stock, 0) then return new; end if;
+  if new.stock - public.apartado_op(new.owner_id, new.clave, new.nombre) <= 0 then return new; end if;
+  select c.nombre into nom from public.catalog_items c where c.owner_id = new.owner_id and c.client_key = new.clave
+    and (c.stock is null or c.stock - public.apartado(new.owner_id, new.clave) > 0);
+  if nom is null then return new; end if;
+  for r in delete from public.avisos_stock where negocio_id = new.owner_id and clave = new.clave returning cliente_id loop
+    perform public.notify_user(r.cliente_id, '🔔 ¡Llegó ' || nom || ' (' || new.nombre || ')!', 'Volvió a haber stock. Pídelo antes de que se agote.', 'apps/catalogo/');
+  end loop;
+  return new;
+end $$;
+drop trigger if exists variantes_stock_avisos on public.variantes;
+create trigger variantes_stock_avisos after insert or update of stock on public.variantes for each row execute function public.variante_avisos();
+revoke all on function public.variante_avisos() from public, anon, authenticated;
+
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
 -- CodeFix · Pagos (igual en las 6 apps; lo reparte nucleo/sincronizar.py). Se administra desde el Centro de Mando → Pagos.

@@ -63,6 +63,8 @@
   .t-ficha .t-q{display:flex;align-items:center;gap:12px} .t-ficha .t-q button{width:42px;height:42px;min-height:0;padding:0;border-radius:12px;font-size:20px}
   .t-ficha .t-q b{min-width:28px;text-align:center;font-size:18px}
   .t-barra{position:sticky;bottom:0;margin:0 -16px -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--card);box-shadow:0 -6px 18px rgba(0,0,0,.08);display:flex}
+  .t-mas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .t-mas button{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:6px;min-height:0;border-radius:14px;background:var(--field);color:inherit;box-shadow:none;text-align:left;font-weight:600;font-size:13px}
+  .t-mas img,.t-mas i{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--card);display:grid;place-items:center;font-style:normal;font-size:28px} .t-mas span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .t-mas small{color:${B};font-weight:800}
   .t-barra button{flex:1;min-height:50px;font-size:16px;font-weight:800;border-radius:14px}
   @media (prefers-reduced-motion:reduce){#grid .item,#grid .item .foto,.opc-ch{animation:none!important;transition:none!important}}`;
   d.head.appendChild(css);
@@ -113,14 +115,20 @@
     const x = varDe(s.dataset.opc, s.value); p.textContent = x && x.precio != null ? plata(x.precio) : p.dataset.base;
   });
   // Ficha: tocar la foto o el nombre abre el producto en grande con sus opciones, cantidad y una barra fija "Agregar".
-  function ficha(it) {
+  // "Te puede gustar": hasta 4 productos con stock, primero los de la misma categoría.
+  const cat = (x) => ((x.querySelector('.cat') || {}).textContent || '').trim();
+  const sugeridos = (it) => [...grid.querySelectorAll('.item:not(.gris)')].filter((x) => x !== it && x.querySelector(':scope>b') && !x.querySelector('[data-avisa],.pill.bad,.acc button[disabled]'))
+    .map((x, i) => ({ x, s: (cat(x) && cat(x) === cat(it) ? 4 : 0) + (x.querySelector('.foto') ? 2 : 0) + ((i * 7 + (it.textContent.length % 5)) % 5) / 5 }))
+    .sort((a, b) => b.s - a.s).slice(0, 4).map((o) => o.x);
+  function ficha(it, H) {
     const s = it.querySelector('select[data-opc]'), add = it.querySelector('[data-add]');
     if (!window.CFX_MENU || !it.querySelector('.acc')) return false;
     const k = s ? s.dataset.opc : '', ops = s ? [...s.options].filter((o) => o.value).map((o) => o.value) : [];
     const foto = it.querySelector('.foto'), pb = [...it.querySelectorAll('.p:not(.tachado)')].pop(), base = pb ? (pb.dataset.base || pb.textContent) : '';
     const nombre = (it.querySelector(':scope>b') || {}).textContent || '', desc = it.querySelector('.desc');
     let op = s ? s.value : '', n = 1;
-    const H = CFX_MENU.hoja(esc(nombre)), z = H.zona;
+    if (H) { H.d.querySelector('h2').textContent = nombre; H.zona.scrollTop = 0; } else H = CFX_MENU.hoja(esc(nombre));
+    const z = H.zona, mas = sugeridos(it), avisa = it.querySelector('[data-avisa]');
     const pintar = () => {
       const x = varDe(k, op), ag = !add || add.disabled || CFX_FICHA.agotada(k, op), pre = x && x.precio != null ? plata(x.precio) : base;
       z.innerHTML = '<div class="t-ficha">' + (foto ? '<img src="' + esc(foto.src) + '" alt="">' : '') + '<h3>' + esc(nombre) + '</h3><div class="t-p">' + esc(pre) + '</div>' +
@@ -128,11 +136,15 @@
         (ops.length ? '<b>Elige una opción</b><div class="opc-chips" role="group" aria-label="Opciones">' + ops.map((o) => { const c = window.colorDe(o), a = CFX_FICHA.agotada(k, o);
           return '<button type="button" class="opc-ch' + (c ? ' sw' : '') + (o === op ? ' on' : '') + (a ? ' agot' : '') + '" data-f-op="' + esc(o) + '" title="' + esc(o) + '"' + (c ? ' style="--sw:' + c + '"' : '') + '>' + (c ? '<i></i><span class="sr">' + esc(o) + '</span>' : esc(o)) + '</button>'; }).join('') + '</div>' + (c0(op) ? '<small class="muted">' + esc(op) + '</small>' : '') : '') +
         (ag ? '' : '<div class="t-q"><button type="button" class="alt" data-f-n="-1" aria-label="Uno menos">−</button><b>' + n + '</b><button type="button" class="alt" data-f-n="1" aria-label="Uno más">+</button></div>') +
-        '<div class="t-barra"><button type="button" class="ok" data-f-add' + (ag ? ' disabled' : '') + '>' + (ag ? 'Agotado' : '➕ Agregar' + (pre ? ' · ' + esc(n > 1 ? plata((x && x.precio != null ? x.precio : (window.Core && Core.precioNum ? Core.precioNum(base) : 0)) * n) : pre) : '')) + '</button></div></div>';
+        (mas.length ? '<b>Te puede gustar</b><div class="t-mas">' + mas.map((x, i) => { const f = x.querySelector('.foto'), p = [...x.querySelectorAll('.p:not(.tachado)')].pop();
+          return '<button type="button" data-f-mas="' + i + '">' + (f ? '<img src="' + esc(f.src) + '" alt="" loading="lazy">' : '<i>🛍️</i>') + '<span>' + esc(x.querySelector(':scope>b').textContent) + '</span><small>' + esc(p ? p.dataset.base || p.textContent : '') + '</small></button>'; }).join('') + '</div>' : '') +
+        '<div class="t-barra">' + (ag && avisa ? '<button type="button" class="alt" data-f-avisa>' + esc(avisa.textContent) + '</button>' : '<button type="button" class="ok" data-f-add' + (ag ? ' disabled' : '') + '>' + (ag ? 'Agotado' : '➕ Agregar' + (pre ? ' · ' + esc(n > 1 ? plata((x && x.precio != null ? x.precio : (window.Core && Core.precioNum ? Core.precioNum(base) : 0)) * n) : pre) : '')) + '</button>') + '</div></div>';
     };
     const c0 = (o) => o && window.colorDe(o);
     z.onclick = (e) => {
-      const b = e.target.closest('[data-f-op],[data-f-n],[data-f-add]'); if (!b) return;
+      const b = e.target.closest('[data-f-op],[data-f-n],[data-f-add],[data-f-mas],[data-f-avisa]'); if (!b) return;
+      if (b.dataset.fMas !== undefined) return ficha(mas[+b.dataset.fMas], H);
+      if (b.dataset.fAvisa !== undefined) { avisa.click(); return H.cerrar(); }
       if (b.dataset.fOp !== undefined) { op = b.dataset.fOp; return pintar(); }
       if (!add) return;
       if (b.dataset.fN) { n = Math.min(99, Math.max(1, n + +b.dataset.fN)); return pintar(); }
