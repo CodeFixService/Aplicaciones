@@ -402,6 +402,21 @@
       '<div class="ca-pie"><button type="button" data-cerrar>Cancelar</button><button type="button" class="ca-si" data-salir>Cerrar sesión</button></div>');
     caja.querySelector('[data-salir]').onclick = salir;
   }
+  // "Reparar la app" (igual en las 7 apps): borra lo guardado sin conexión (caché y service worker) y vuelve a abrir con la última versión.
+  // No toca la sesión, el PIN ni los datos: solo lo que el teléfono guardó de la app.
+  function reparar() {
+    const caja = dialogo('<h2>🛠️ Reparar la app</h2><p>Si algo se ve raro, no carga o quedó en una versión antigua, esto la deja como nueva: borra lo que el teléfono guardó de la app y la vuelve a abrir con la última versión.</p>' +
+      '<p><b>No se pierde nada:</b> tus datos y tu sesión quedan igual.</p><div class="ca-pie"><button type="button" data-cerrar>Cancelar</button><button type="button" class="ca-si" data-rep>Reparar ahora</button></div>');
+    const b = caja.querySelector('[data-rep]');
+    b.onclick = async () => {
+      b.disabled = true; b.textContent = 'Reparando…';
+      try { if (window.caches) await Promise.all((await caches.keys()).map((k) => caches.delete(k))); } catch (e) { /* nada */ }
+      try { if (navigator.serviceWorker) await Promise.all((await navigator.serviceWorker.getRegistrations()).map((r) => r.unregister())); } catch (e) { /* nada */ }
+      try { localStorage.setItem('cfx-reparada', Date.now()); } catch (e) { /* nada */ }
+      const u = new URL(location.href); u.searchParams.set('cfx', Date.now().toString(36));
+      location.replace(u.toString());
+    };
+  }
   function irA(dest) { cerrar(); if (typeof dest === 'function') return dest(); ir(dest); }
   // La foto de arriba solo cierra sesión (en todas las apps). Lo demás (cuenta, guía, soporte, términos, plan, invitar)
   // va en "Cuenta y ayuda", que el núcleo agrega al final de Más / Ajustes / Cuenta de cada app.
@@ -587,6 +602,7 @@
       !adm && { k: 'chat', ico: '💬', t: 'Chat con soporte', dato: estado.sin_leer || '', accion: a('chat') },
       !adm && window.CFX_PAGOS && { k: 'premium', ico: '⭐', t: esPro() ? 'Mi plan PRO' : 'Pasar a PRO', accion: a('premium') },
       !adm && !PERSONALES.includes(APP) && { k: 'invitar', ico: '🎁', t: 'Invita y gana', accion: a('invitar') },
+      suelto && { k: 'reparar', ico: '🛠️', t: 'Reparar la app', accion: reparar },
       { k: 'terminos', ico: '📄', t: 'Términos y condiciones', accion: a('terminos') },
       { k: 'privacidad', ico: '🔒', t: 'Política de privacidad', accion: a('privacidad') },
       { k: 'salir', ico: '🚪', t: 'Cerrar sesión', rojo: true, accion: confirmarSalir }
@@ -1388,7 +1404,7 @@
     if (op.menu) L = [{ k: 'perfil', ico: '👤', t: 'Mi perfil', d: 'Foto, nombre, color y contraseña', accion: () => abrirPerfil(), grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
     const PROPIO = /^(mi perfil|perfil|foto y nombre|color y modo|apariencia|estilo)$/i;
     if (op.menu) op.items = (op.items || []).filter((x) => x && !['perfil', 'yo', 'estilo'].includes(x.k) && !PROPIO.test(String(x.t || '').trim()));
-    if (op.menu) { const app = (op.items || []).filter(Boolean), esConf = (x) => x.grupo === 'Configuración'; L = app.filter((x) => !esConf(x)).concat(L, app.filter(esConf)); L = L.concat(cuentaItems(L.map((x) => x.k))); }
+    if (op.menu) { const app = (op.items || []).filter(Boolean), esConf = (x) => x.grupo === 'Configuración'; L = app.filter((x) => !esConf(x)).concat(L, app.filter(esConf), [{ k: 'reparar', ico: '🛠️', t: 'Reparar la app', d: 'Si algo falla o no se actualiza', accion: reparar, grupo: conf }]); L = L.concat(cuentaItems(L.map((x) => x.k))); }
     el.classList.add('cfx-pf-w');
     const h = ajustes(el, L, { menu: op.menu, arriba: '<div data-pf-cab' + (op.menu ? ' role="button" tabindex="0" aria-label="Mi perfil"' : '') + '></div>' + (valor(P.arriba) || ''),
       alPintar: (w) => { pintarCabeza(); const c = w.querySelector('[data-pf-cab]'); if (c && op.menu) c.onclick = () => abrirPerfil(); } });
