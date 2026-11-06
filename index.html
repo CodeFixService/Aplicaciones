@@ -246,7 +246,8 @@
 
     <div class="card hidden" id="cLinks"><span id="links"></span>
       <h2>💳 Links de pago</h2>
-      <p class="muted">Pega el link de tu Mercado Pago (o similar). El cliente ve el total de su pedido en grande con un botón <b>📋 Copiar monto</b>,
+      <div class="slotpago" id="mpBody"></div>
+      <p class="muted">O pega el link de tu Mercado Pago (o similar). El cliente ve el total de su pedido en grande con un botón <b>📋 Copiar monto</b>,
         paga ahí y sube la foto del comprobante: el pedido y el stock quedan apartados mientras lo revisas. Si rechazas el comprobante, puede subir otro.
         Tienes 2 espacios; solo uno queda activo.</p>
       <div id="linksBody"></div>
@@ -473,7 +474,7 @@
     Cuenta.revisarActualizacion();
     if (acc.role === 'user') cargarTienda(acc);
     if (acc.role !== 'client') cargarHoy(acc);
-    if (acc.role === 'user') { cargarLinks(); cargarEquipo(); }
+    if (acc.role === 'user') { cargarLinks(); cargarMp(); cargarEquipo(); }
     cargarPagos();
     // Núcleo (pagos.js): tienda nueva que debe su primer pago → pantalla de activación.
     // Núcleo (ayuda.js): cabecera común, guía para partir, chat con soporte y términos.
@@ -703,6 +704,29 @@
         '<div class="btns"><button class="small" data-gl="' + n + '">Guardar</button></div></div>';
     }).join('') + '<p class="muted" style="margin:0">Sin link activo, los pedidos llegan igual y cobras al entregar o por transferencia.</p>';
   }
+  /* ---------- ⚡ Mercado Pago automático (el token queda solo en el servidor) ---------- */
+  async function cargarMp() {
+    let m = {};
+    try { m = await Cuenta.rpc('mp_estado'); } catch (e) { $('mpBody').innerHTML = '<p class="muted">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    $('mpBody').classList.toggle('on', !!m.activo);
+    $('mpBody').innerHTML = '<b>⚡ Mercado Pago automático' + (m.conectado ? (m.activo ? ' · ✅ Activo' : ' · ⏸️ En pausa') : '') + '</b>' +
+      '<p class="muted" style="margin:4px 0">Tu cliente paga con tarjeta o saldo en Mercado Pago y el pedido se aprueba <b>solo</b> (sin comprobante). La plata llega directo a tu cuenta.' +
+      (m.conectado ? ' Conectado como <b>' + Core.esc(m.nick || 'tu cuenta') + '</b> (…' + Core.esc(m.fin || '') + ').' : '') + '</p>' +
+      '<label for="mpTok">' + (m.conectado ? 'Cambiar Access Token' : 'Access Token') + '</label><input id="mpTok" type="password" autocomplete="off" placeholder="APP_USR-…">' +
+      '<p class="muted" style="margin:4px 0 0;font-size:13px">Lo sacas en Mercado Pago → Tu negocio → Configuración → Credenciales → <b>Credenciales de producción</b> → Access Token. Nadie más lo ve.</p>' +
+      (m.conectado ? '<label class="terms"><input type="checkbox" id="mpOn"' + (m.activo ? ' checked' : '') + '> <span>Cobrar mis pedidos con Mercado Pago</span></label>' : '') +
+      '<div class="btns"><button class="small" data-mp="guardar">' + (m.conectado ? 'Guardar' : '⚡ Conectar') + '</button>' +
+      (m.conectado ? '<button class="small alt" data-mp="quitar">Desconectar</button>' : '') + '</div>';
+  }
+  $('mpBody').onclick = async (e) => {
+    const a = e.target.dataset.mp;
+    if (!a || (a === 'quitar' && !confirm('¿Desconectar Mercado Pago? Tus pedidos volverán al link y comprobante.'))) return;
+    e.target.disabled = true;
+    try {
+      await Cuenta.rpc('mp_guardar', a === 'quitar' ? { p_token: null, p_activo: null } : { p_token: $('mpTok').value, p_activo: $('mpOn') ? $('mpOn').checked : true });
+      Core.toast(a === 'quitar' ? 'Mercado Pago desconectado' : '⚡ Mercado Pago guardado'); cargarMp();
+    } catch (err) { Core.toast(err.message); e.target.disabled = false; }
+  };
   $('linksBody').onclick = async (e) => {
     const n = e.target.dataset.gl;
     if (!n) return;

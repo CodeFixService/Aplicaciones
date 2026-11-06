@@ -3329,7 +3329,8 @@ begin
 end $$;
 
 -- Equipo del negocio.
-create or replace function public.mi_equipo() returns table (id uuid, nombre text, email text, desde timestamptz, visto timestamptz)
+drop function if exists public.mi_equipo(); -- 5.22 le agregó el rol: sin esto, volver a correr el archivo falla
+create function public.mi_equipo() returns table (id uuid, nombre text, email text, desde timestamptz, visto timestamptz)
 language sql stable security definer set search_path = '' as $$
   select p.id, p.empresa, p.email, p.created_at, p.visto_at from public.profiles p
   where p.negocio_id = auth.uid() and p.role = 'equipo' and public.is_business(auth.uid()) order by p.created_at
@@ -5428,6 +5429,164 @@ revoke all on function public.equipo_puede(text), public.equipo_rol(text, text),
   public.caja_descontar(jsonb), public.stock_sumar(text, text, int) from public, anon;
 grant execute on function public.equipo_puede(text), public.equipo_rol(text, text), public.mi_equipo(), public.my_account(),
   public.caja_descontar(jsonb), public.stock_sumar(text, text, int) to authenticated;
+-- =====================================================================
+--  VERSIÓN 5.23 · ⚡ Mercado Pago automático: la tienda pega su Access Token y el cliente paga con
+--  Mercado Pago (Checkout Pro). El pedido se aprueba solo (al volver del pago y cada 2 min): sin comprobante.
+--  El token queda solo en la base (nadie lo puede leer, ni el equipo ni la app).
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.23'::text $$;
+
+create table if not exists public.mp_cuentas (
+  owner_id   uuid primary key references public.profiles (id) on delete cascade,
+  token      text not null,
+  nick       text,
+  activo     boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+alter table public.mp_cuentas enable row level security;
+revoke all on public.mp_cuentas from anon, authenticated;
+alter table public.pedidos add column if not exists mp_desde timestamptz;
+alter table public.pedidos add column if not exists mp_pago text;
+
+-- Llamada a la API de Mercado Pago con el token de la tienda (solo dentro de la base).
+create or replace function public.mp_api(p_token text, p_metodo text, p_ruta text, p_cuerpo jsonb default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare st int; c text;
+begin
+  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '10');
+  execute 'select status, content from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+    using p_metodo, 'https://api.mercadopago.com' || p_ruta, array[row('Authorization', 'Bearer ' || p_token)::extensions.http_header],
+          'application/json', p_cuerpo::text;
+  return jsonb_build_object('status', st, 'body', case when c ~ '^\s*[\{\[]' then c::jsonb end);
+exception when others then
+  return jsonb_build_object('status', 0, 'error', sqlerrm);
+end $$;
+
+-- Para los pedidos: si la tienda tiene Mercado Pago activo, el "link" lleva mp = true (el pedido queda por pagar).
+create or replace function public.link_activo(o uuid, t text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when t = 'pedido' and exists (select 1 from public.mp_cuentas m where m.owner_id = o and m.activo)
+    then coalesce(s.l, '{}'::jsonb) || '{"mp": true}'::jsonb else s.l end
+  from (select (select jsonb_build_object('titulo', titulo, 'url', url, 'precio', precio) from public.links_pago
+                where owner_id = o and tipo = t and activo and url <> '' limit 1) as l) s
+$$;
+
+create or replace function public.mp_estado() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('conectado', m.owner_id is not null, 'activo', coalesce(m.activo, false), 'nick', m.nick, 'fin', right(m.token, 4))
+  from (select 1) x left join public.mp_cuentas m on m.owner_id = auth.uid()
+$$;
+
+-- El dueño conecta (token), activa/pausa (p_activo) o desconecta (sin token y p_activo null).
+create or replace function public.mp_guardar(p_token text, p_activo boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare tk text := nullif(regexp_replace(coalesce(p_token, ''), '\s', '', 'g'), ''); r jsonb;
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and role = 'user' and not suspended) then raise exception 'Solo el dueño de la tienda'; end if;
+  if tk is null then
+    if p_activo is null then delete from public.mp_cuentas where owner_id = auth.uid();
+    else
+      update public.mp_cuentas set activo = p_activo, updated_at = now() where owner_id = auth.uid();
+      if not found and p_activo then raise exception 'Pega tu Access Token de Mercado Pago'; end if;
+    end if;
+    return public.mp_estado();
+  end if;
+  if tk !~ '^(APP_USR|TEST)-[A-Za-z0-9-]{20,}$' or length(tk) > 300 then raise exception 'Ese no es un Access Token: empieza con APP_USR-'; end if;
+  r := public.mp_api(tk, 'GET', '/users/me');
+  if coalesce((r ->> 'status')::int, 0) = 0 then raise exception 'No se pudo conectar con Mercado Pago. Intenta de nuevo.'; end if;
+  if (r ->> 'status')::int <> 200 then raise exception 'Mercado Pago no aceptó el token: copia el Access Token de producción'; end if;
+  insert into public.mp_cuentas (owner_id, token, nick, activo)
+  values (auth.uid(), tk, left(coalesce(r #>> '{body,nickname}', r #>> '{body,email}', ''), 80), coalesce(p_activo, true))
+  on conflict (owner_id) do update set token = excluded.token, nick = excluded.nick, activo = excluded.activo, updated_at = now();
+  perform public.auditar('Mercado Pago conectado', coalesce(r #>> '{body,nickname}', ''));
+  return public.mp_estado();
+end $$;
+
+-- El cliente (con cuenta o con su enlace) pide el pago: devuelve la página de Mercado Pago.
+create or replace function public.mp_pagar(p_ref text, p_volver text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref); tk text; t text; r jsonb; v text := left(coalesce(p_volver, ''), 500);
+begin
+  if x.id is null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
+  if x.estado <> 'pagando' or x.retenido_hasta < now() then return jsonb_build_object('ok', false, 'error', 'Este pedido ya no espera pago'); end if;
+  select token into tk from public.mp_cuentas where owner_id = x.negocio_id and activo;
+  if tk is null then return jsonb_build_object('ok', false, 'error', 'La tienda no tiene Mercado Pago activo'); end if;
+  if round(x.total) < 1 then return jsonb_build_object('ok', false, 'error', 'Monto no válido'); end if;
+  if v !~ '^https://[^\s"<>]+$' then v := null; end if;
+  select coalesce(nullif(trim(empresa), ''), 'Tienda') into t from public.profiles where id = x.negocio_id;
+  r := public.mp_api(tk, 'POST', '/checkout/preferences', jsonb_build_object(
+    'items', jsonb_build_array(jsonb_build_object('id', x.id, 'title', left('Pedido en ' || t, 120), 'quantity', 1,
+                                                  'currency_id', 'CLP', 'unit_price', round(x.total))),
+    'external_reference', x.id::text,
+    'payment_methods', jsonb_build_object('excluded_payment_types', jsonb_build_array(jsonb_build_object('id', 'ticket'))),
+    'expires', true,
+    'expiration_date_to', to_char(x.retenido_hasta at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS".000+00:00"'))
+    || case when v is null then '{}'::jsonb else jsonb_build_object('back_urls', jsonb_build_object('success', v, 'pending', v, 'failure', v),
+                                                                   'auto_return', 'approved') end);
+  if coalesce((r ->> 'status')::int, 0) not in (200, 201) or r #>> '{body,init_point}' is null then
+    return jsonb_build_object('ok', false, 'error', 'Mercado Pago no respondió. Intenta de nuevo o usa otro medio de pago.');
+  end if;
+  update public.pedidos set mp_desde = coalesce(mp_desde, now()) where id = x.id;
+  return jsonb_build_object('ok', true, 'url', r #>> '{body,init_point}');
+end $$;
+
+-- Busca en Mercado Pago un pago aprobado del pedido; si está, lo aprueba (igual que aprobar un comprobante).
+create or replace function public.mp_confirmar(p_id uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; tk text; r jsonb; pg jsonb;
+begin
+  select * into x from public.pedidos where id = p_id for update;
+  if x.id is null or x.estado not in ('pagando', 'expirado') or x.mp_desde is null or x.mp_pago is not null then return x.estado; end if;
+  select token into tk from public.mp_cuentas where owner_id = x.negocio_id;
+  if tk is null then return x.estado; end if;
+  r := public.mp_api(tk, 'GET', '/v1/payments/search?sort=date_created&criteria=desc&external_reference=' || x.id::text);
+  select e into pg from jsonb_array_elements(coalesce(r #> '{body,results}', '[]'::jsonb)) e
+  where e ->> 'status' = 'approved' and e ->> 'external_reference' = x.id::text
+    and coalesce(e ->> 'currency_id', 'CLP') = 'CLP' and (e ->> 'transaction_amount')::numeric >= round(x.total) limit 1;
+  if pg is null then return x.estado; end if;
+  perform public.mover_stock(x, -1);
+  update public.pedidos set estado = 'preparando', pagado_at = now(), stock_descontado = true, motivo = null,
+    mp_pago = left(pg ->> 'id', 40), updated_at = now() where id = x.id;
+  perform public.notify_user(x.negocio_id, '⚡ Pagado con Mercado Pago', coalesce(x.invitado_nombre, 'Un cliente') || ' · $' ||
+    to_char(x.total, 'FM999G999G999') || case when x.estado = 'expirado' then ' · llegó tarde: revisa el stock' else '' end, 'apps/pedidos/');
+  perform public.aviso_cliente(x, '✅ Pago recibido', 'Mercado Pago aprobó tu pago: estamos preparando tu pedido');
+  return 'preparando';
+end $$;
+
+create or replace function public.mp_revisar(p_ref text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref);
+begin
+  if x.id is null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
+  return jsonb_build_object('ok', true, 'estado', public.mp_confirmar(x.id));
+end $$;
+
+-- Cada 2 minutos: revisa los pedidos que abrieron Mercado Pago (por si el cliente no volvió a la página).
+create or replace function public.mp_revisar_pendientes() returns int
+language plpgsql security definer set search_path = '' as $$
+declare i uuid; n int := 0;
+begin
+  for i in select id from public.pedidos
+           where mp_desde is not null and mp_pago is null and mp_desde > now() - interval '1 day'
+             and (estado = 'pagando' or (estado = 'expirado' and updated_at > now() - interval '30 minutes'))
+           order by mp_desde desc limit 40 loop
+    if public.mp_confirmar(i) = 'preparando' then n := n + 1; end if;
+  end loop;
+  return n;
+end $$;
+
+revoke all on function public.mp_api(text, text, text, jsonb), public.mp_confirmar(uuid), public.mp_revisar_pendientes() from public, anon, authenticated;
+revoke all on function public.mp_estado(), public.mp_guardar(text, boolean), public.mp_pagar(text, text), public.mp_revisar(text) from public, anon;
+grant execute on function public.mp_estado(), public.mp_guardar(text, boolean) to authenticated;
+grant execute on function public.mp_pagar(text, text), public.mp_revisar(text) to anon, authenticated;
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'mp-revisar';
+  perform cron.schedule('mp-revisar', '*/2 * * * *', 'select public.mp_revisar_pendientes()');
+exception when others then
+  raise notice 'Revisión de Mercado Pago no programada (%).', sqlerrm;
+end $$;
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
 -- CodeFix · Pagos (igual en las 6 apps; lo reparte nucleo/sincronizar.py). Se administra desde el Centro de Mando → Pagos.
@@ -6441,7 +6600,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;

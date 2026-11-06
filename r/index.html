@@ -30,13 +30,14 @@
   <div class="card hidden" id="noExiste"><h2>Pedido no encontrado</h2><p class="muted">Revisa el enlace que te quedó al pedir.</p></div>
   <div id="ped" class="hidden">
     <div class="card"><div class="grande" id="estado"></div><p class="muted" id="estadoTxt" style="margin:4px 0 0"></p></div>
-    <div class="card hidden" id="cPagar"><h2>💳 Paga y sube tu comprobante</h2>
+    <div class="card hidden" id="cPagar"><h2 id="pagarT">💳 Paga y sube tu comprobante</h2>
       <p class="aviso hidden" id="rechazo"></p>
       <span class="muted">Monto a pagar</span>
       <div class="montoPagar"><b id="monto"></b><button class="small alt" id="bCopiarMonto" type="button">📋 Copiar monto</button></div>
       <p class="muted" style="margin-top:0">Tu pedido y su stock quedan apartados por:</p><div class="reloj" id="reloj"></div>
+      <div class="btns hidden" id="rowMp"><button class="ok" id="bMp" type="button" style="flex:1">⚡ Pagar con Mercado Pago</button></div>
       <div class="btns"><a class="btn ok" id="bPagar" target="_blank" rel="noopener" style="flex:1">💳 Pagar</a></div>
-      <div class="btns"><label class="btn" for="fComp" style="flex:1">📷 Subir foto del comprobante</label><input type="file" accept="image/*" id="fComp" class="hidden"></div>
+      <div class="btns" id="rowComp"><label class="btn" for="fComp" style="flex:1">📷 Subir foto del comprobante</label><input type="file" accept="image/*" id="fComp" class="hidden"></div>
     </div>
     <div class="card hidden" id="cDatos"><h2>🏦 Datos de la tienda</h2><pre id="datos"></pre></div>
     <div class="card"><h2>🧾 Detalle</h2><pre id="detalle"></pre><div class="row" style="justify-content:space-between" ><b>Total</b><b id="total"></b></div></div>
@@ -88,8 +89,14 @@
     // Comprobante rechazado: el pedido sigue apartado y se puede subir otro.
     $('rechazo').classList.toggle('hidden', !(p.estado === 'pagando' && p.motivo));
     $('rechazo').innerHTML = '❌ <b>La tienda rechazó tu comprobante</b>: ' + Core.esc(p.motivo || '') + '. Revisa el pago y sube otro.';
-    $('bPagar').classList.toggle('hidden', !p.link);
-    if (p.link) { $('bPagar').href = p.link.url; $('bPagar').textContent = '💳 Pagar ' + precio(p.total) + (p.link.titulo ? ' · ' + p.link.titulo : ''); }
+    // ⚡ Mercado Pago automático: paga ahí y el pedido se aprueba solo (sin comprobante si la tienda no tiene otro link).
+    const mp = !!(p.link && p.link.mp), soloMp = mp && !p.link.url;
+    $('rowMp').classList.toggle('hidden', !mp);
+    $('rowComp').classList.toggle('hidden', soloMp);
+    $('pagarT').textContent = soloMp ? '💳 Paga tu pedido' : '💳 Paga y sube tu comprobante';
+    if (p.estado === 'pagando' && mp) $('estadoTxt').textContent = soloMp ? 'Paga con Mercado Pago antes de que se acabe el tiempo: el pedido se confirma solo.' : 'Paga con Mercado Pago (se confirma solo) o con el link y sube la foto del comprobante.';
+    $('bPagar').classList.toggle('hidden', !(p.link && p.link.url));
+    if (p.link && p.link.url) { $('bPagar').href = p.link.url; $('bPagar').textContent = '💳 Pagar ' + precio(p.total) + (p.link.titulo ? ' · ' + p.link.titulo : ''); }
     $('cDatos').classList.toggle('hidden', !t.datos_pago || !['pagando', 'recibido'].includes(p.estado));
     $('datos').textContent = t.datos_pago || '';
     const tel = String(t.telefono || '').replace(/\D/g, '');
@@ -105,6 +112,14 @@
       tic(); timer = setInterval(tic, 1000);
     }
   }
+  $('bMp').onclick = async () => {
+    $('bMp').disabled = true;
+    try {
+      const r = await Cuenta.rpc('mp_pagar', { p_ref: tk, p_volver: location.origin + location.pathname + '?t=' + encodeURIComponent(tk) });
+      if (!r.ok) throw new Error(r.error);
+      location.href = r.url;
+    } catch (err) { Core.toast(err.message); $('bMp').disabled = false; }
+  };
   $('bCopiarMonto').onclick = () => p && Core.copiar(Math.round(Number(p.total)), '📋 Monto copiado: ' + precio(p.total));
   $('fComp').onchange = async (e) => {
     const f = e.target.files[0]; e.target.value = '';
@@ -131,8 +146,19 @@
     try { const r = await Cuenta.rpc('calificar_pedido', { p_ref: tk, p_estrellas: +n }); if (!r.ok) throw new Error(r.error); Core.toast('⭐ ¡Gracias!'); cargar(); }
     catch (err) { Core.toast(err.message); }
   };
+  // Vuelve de Mercado Pago: confirma el pago (reintenta unos segundos por si Mercado Pago tarda en informarlo).
+  const q = new URLSearchParams(location.search);
+  if (q.has('payment_id') || q.has('collection_status') || q.has('preference_id')) {
+    history.replaceState(null, '', location.pathname + '?t=' + encodeURIComponent(tk));
+    for (let i = 0; i < 6; i++) {
+      const r = await Cuenta.rpc('mp_revisar', { p_ref: tk }).catch(() => null);
+      if (!r || r.estado !== 'pagando') break;
+      if (i === 0) Core.toast('⏳ Confirmando tu pago con Mercado Pago…');
+      await new Promise((ok) => setTimeout(ok, 4000));
+    }
+  }
   await cargar();
-  setInterval(() => { if (!document.hidden && p && ['en_revision', 'recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado)) cargar(); }, 30000);
+  setInterval(() => { if (!document.hidden && p && (p.link && p.link.mp && p.estado === 'pagando' || ['en_revision', 'recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado))) cargar(); }, 30000);
 })();
 </script>
 <script src="../shared/iconos.js"></script>
