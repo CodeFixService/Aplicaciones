@@ -5114,6 +5114,125 @@ language sql stable security definer set search_path = '' as $$
   where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
 $$;
 
+-- =====================================================================
+--  VERSIÓN 5.19 · Variantes: cada opción (color, talla…) con su propio precio y stock (tabla public.variantes).
+--  · El dueño las pone en Caja (debajo de "Colores, tallas u opciones"); vacío = usa el precio/stock del producto.
+--  · La tienda las muestra (variantes_de) y el pedido cobra y aparta por opción (armar_pedido, mover_stock).
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.19'::text $$;
+
+create table if not exists public.variantes (
+  owner_id  uuid not null references public.profiles (id) on delete cascade,
+  clave     text not null,
+  nombre    text not null,
+  precio    numeric(12, 2) check (precio >= 0),
+  stock     int check (stock >= 0),
+  orden     int not null default 0,
+  primary key (owner_id, clave, nombre)
+);
+alter table public.variantes enable row level security;  -- sin políticas: solo por funciones
+revoke all on public.variantes from anon, authenticated;
+
+-- Lo apartado de una opción (pedidos aún sin descontar).
+create or replace function public.apartado_op(n uuid, k text, op text) returns int
+language sql stable security definer set search_path = '' as $$
+  select coalesce(sum((l ->> 'cant')::int), 0)::int from public.pedidos x, jsonb_array_elements(x.lineas) l
+  where x.negocio_id = n and not x.stock_descontado and x.estado in ('pagando', 'en_revision', 'recibido') and l ->> 'clave' = k and lower(l ->> 'opcion') = lower(op)
+$$;
+
+-- El dueño guarda la lista completa de un producto: [{ nombre, precio, stock }]. También deja catalog_items.opciones con los nombres.
+create or replace function public.variantes_guardar(p_clave text, p_lista jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+declare v jsonb; i int := 0; nom text;
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo el dueño del negocio'; end if;
+  if not exists (select 1 from public.catalog_items where owner_id = auth.uid() and client_key = p_clave) then raise exception 'Publica el producto primero'; end if;
+  if jsonb_typeof(coalesce(p_lista, '[]')) <> 'array' or jsonb_array_length(coalesce(p_lista, '[]')) > 20 then raise exception 'Máximo 20 opciones'; end if;
+  delete from public.variantes where owner_id = auth.uid() and clave = p_clave;
+  for v in select * from jsonb_array_elements(coalesce(p_lista, '[]')) loop
+    nom := left(trim(coalesce(v ->> 'nombre', '')), 40);
+    continue when nom = '';
+    if (v ->> 'precio') is not null and (v ->> 'precio')::numeric < 0 or (v ->> 'stock') is not null and (v ->> 'stock')::int < 0 then raise exception 'Revisa precio y stock de "%"', nom; end if;
+    insert into public.variantes (owner_id, clave, nombre, precio, stock, orden)
+    values (auth.uid(), p_clave, nom, (v ->> 'precio')::numeric, case when (v ->> 'stock') is null then null else least((v ->> 'stock')::int, 1000000) end, i)
+    on conflict do nothing;
+    i := i + 1;
+  end loop;
+  update public.catalog_items set opciones = coalesce((select string_agg(nombre, ', ' order by orden) from public.variantes where owner_id = auth.uid() and clave = p_clave), opciones), updated_at = now()
+  where owner_id = auth.uid() and client_key = p_clave;
+end $$;
+
+-- Opciones de la tienda con su precio (null = el del producto) y lo disponible (null = sin control de stock).
+create or replace function public.variantes_de(p_negocio uuid) returns table (clave text, nombre text, precio numeric, disponible int)
+language sql stable security definer set search_path = '' as $$
+  select v.clave, v.nombre, v.precio, case when v.stock is null then null else greatest(0, v.stock - public.apartado_op(v.owner_id, v.clave, v.nombre)) end
+  from public.variantes v
+  where v.owner_id = p_negocio
+    and (public.negocio_de(auth.uid()) = p_negocio or public.is_admin() or public.puede_comprar(auth.uid(), p_negocio)
+         or exists (select 1 from public.profiles t where t.id = p_negocio and t.slug is not null))
+  order by v.clave, v.orden
+$$;
+
+-- Arma las líneas con precios del servidor y revisa stock (ahora también el precio y stock de cada opción).
+create or replace function public.armar_pedido(p_negocio uuid, p_items jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare it jsonb; k text; n int; op text; ops text; nom text; pre numeric; st int; vp numeric; vs int; hay boolean; lineas jsonb := '[]'::jsonb; sub numeric := 0;
+begin
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 or jsonb_array_length(p_items) > 50 then
+    return jsonb_build_object('error', 'El pedido está vacío');
+  end if;
+  for it in select * from jsonb_array_elements(p_items) loop
+    k := it ->> 'clave'; n := least(greatest(coalesce((it ->> 'cant')::int, 0), 0), 99);
+    op := nullif(left(trim(coalesce(it ->> 'opcion', '')), 40), '');
+    continue when n = 0 or k is null;
+    nom := null; ops := null; st := null;
+    if k like 'pub:%' then
+      select x.titulo, x.precio_num into nom, pre from public.publicaciones x where x.owner_id = p_negocio and x.id::text = substr(k, 5);
+    else
+      select c.nombre, c.precio, c.opciones, case when c.stock is null then null else c.stock - public.apartado(p_negocio, k) end
+        into nom, pre, ops, st from public.catalog_items c where c.owner_id = p_negocio and c.client_key = k;
+    end if;
+    if coalesce(ops, '') <> '' then
+      if op is null or not exists (select 1 from unnest(string_to_array(ops, ',')) o where lower(trim(o)) = lower(op)) then
+        return jsonb_build_object('error', 'Elige el color u opción de "' || nom || '"');
+      end if;
+      select true, v.precio, case when v.stock is null then null else v.stock - public.apartado_op(p_negocio, k, v.nombre) end into hay, vp, vs
+      from public.variantes v where v.owner_id = p_negocio and v.clave = k and lower(v.nombre) = lower(op);
+      if hay then pre := coalesce(vp, pre); if vs is not null then st := least(coalesce(st, vs), vs); end if; end if;
+    end if;
+    if nom is null or pre is null then return jsonb_build_object('error', 'Un producto ya no está disponible: actualiza el pedido'); end if;
+    if st is not null and st < n then
+      nom := nom || coalesce(' (' || op || ')', '');
+      return jsonb_build_object('error', case when st <= 0 then '"' || nom || '" está agotado' else 'De "' || nom || '" quedan ' || st end);
+    end if;
+    lineas := lineas || jsonb_build_object('nombre', nom || coalesce(' (' || op || ')', ''), 'cant', n, 'precio', pre, 'subtotal', pre * n, 'clave', k, 'opcion', op);
+    sub := sub + pre * n;
+  end loop;
+  if jsonb_array_length(lineas) = 0 then return jsonb_build_object('error', 'El pedido está vacío'); end if;
+  if (select count(*) from public.pedidos where negocio_id = p_negocio and created_at >= date_trunc('month', now())) >= public.limite(p_negocio, 'pedidos_mes') then
+    return jsonb_build_object('error', 'La tienda alcanzó su máximo de pedidos online este mes. Escríbele por WhatsApp.');
+  end if;
+  return jsonb_build_object('lineas', lineas, 'sub', sub);
+end $$;
+
+-- Descontar / devolver stock: del producto y de su opción.
+create or replace function public.mover_stock(p public.pedidos, signo int) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.catalog_items c set stock = greatest(0, c.stock + signo * z.cant)
+  from (select l ->> 'clave' k, sum((l ->> 'cant')::int) cant from jsonb_array_elements(p.lineas) l group by 1) z
+  where c.owner_id = p.negocio_id and c.client_key = z.k and c.stock is not null;
+  update public.variantes v set stock = greatest(0, v.stock + signo * z.cant)
+  from (select l ->> 'clave' k, lower(l ->> 'opcion') o, sum((l ->> 'cant')::int) cant from jsonb_array_elements(p.lineas) l where l ->> 'opcion' is not null group by 1, 2) z
+  where v.owner_id = p.negocio_id and v.clave = z.k and lower(v.nombre) = z.o and v.stock is not null;
+end $$;
+
+revoke all on function public.apartado_op(uuid, text, text), public.mover_stock(public.pedidos, int), public.armar_pedido(uuid, jsonb) from public, anon, authenticated;
+revoke all on function public.variantes_guardar(text, jsonb), public.variantes_de(uuid) from public, anon;
+grant execute on function public.variantes_guardar(text, jsonb) to authenticated;
+grant execute on function public.variantes_de(uuid) to anon, authenticated;
+
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
 -- CodeFix · Pagos (igual en las 6 apps; lo reparte nucleo/sincronizar.py). Se administra desde el Centro de Mando → Pagos.

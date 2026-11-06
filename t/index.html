@@ -172,6 +172,9 @@
     }
   }
   pintar(); cargarFotos();
+  // Precio y stock de cada opción (shared/tienda.js).
+  const vars = () => CFX_FICHA.cargar(t.id, Cuenta.rpc).then(() => { try { pintar(); pintarCarro(); } catch (e) { /* aún cargando */ } });
+  if (window.CFX_FICHA) vars(); else addEventListener('load', vars);
 
   /* ---------- Ofertas ---------- */
   let ofertas = null;
@@ -195,7 +198,7 @@
   /* ---------- Carrito ---------- */
   let carro = mem.get('carro', []);
   const itemDe = (l) => /^pub:/.test(l.clave) ? { nombre: l.nombre, precio: l.precio } : items.find((i) => i.clave === l.clave);
-  const lineas = () => carro.map((l) => ({ l, i: itemDe(l) })).filter((x) => x.i);
+  const lineas = () => carro.map((l) => ({ l, i: window.CFX_FICHA ? CFX_FICHA.con(itemDe(l), l.opcion) : itemDe(l) })).filter((x) => x.i);
   const total = () => lineas().reduce((s, x) => s + x.i.precio * x.l.cant, 0);
   function pintarCarro() {
     carro = carro.filter((l) => l.cant > 0 && itemDe(l));

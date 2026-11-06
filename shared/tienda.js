@@ -54,6 +54,16 @@
   #grid.v3 .item .acc>:not(:first-child){display:none} #grid.v3 .fav{width:28px;height:28px;font-size:14px;top:5px;right:5px}
   @media (max-width:340px){#grid.v3{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
   #grid.v1 .item .foto{aspect-ratio:4/3}
+  .opc-ch.agot{opacity:.4;text-decoration:line-through} .opc-ch.agot.sw i{background:repeating-linear-gradient(135deg,var(--sw) 0 5px,transparent 5px 8px)}
+  #grid .item .foto,#grid .item>b{cursor:pointer}
+  .t-ficha{display:flex;flex-direction:column;gap:10px;padding-bottom:84px}
+  .t-ficha img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:16px;background:var(--field)}
+  .t-ficha h3{margin:0;font-size:20px} .t-ficha .t-p{color:${B};font-size:24px;font-weight:800}
+  .t-ficha .t-d{color:var(--muted);white-space:pre-line;margin:0} .t-ficha .opc-ch{min-height:38px;font-size:14px;padding:6px 14px} .t-ficha .opc-ch.sw{width:38px;padding:4px}
+  .t-ficha .t-q{display:flex;align-items:center;gap:12px} .t-ficha .t-q button{width:42px;height:42px;min-height:0;padding:0;border-radius:12px;font-size:20px}
+  .t-ficha .t-q b{min-width:28px;text-align:center;font-size:18px}
+  .t-barra{position:sticky;bottom:0;margin:0 -16px -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--card);box-shadow:0 -6px 18px rgba(0,0,0,.08);display:flex}
+  .t-barra button{flex:1;min-height:50px;font-size:16px;font-weight:800;border-radius:14px}
   @media (prefers-reduced-motion:reduce){#grid .item,#grid .item .foto,.opc-ch{animation:none!important;transition:none!important}}`;
   d.head.appendChild(css);
 
@@ -77,11 +87,74 @@
     (s.nextElementSibling && s.nextElementSibling.classList.contains('cfx-sel-btn') ? s.nextElementSibling : s).after(w);
   });
   new MutationObserver(chips).observe(grid, { childList: true }); chips();
+  // ---------- Variantes (precio y stock por opción) y ficha del producto con barra "Agregar" ----------
+  // La página llama CFX_FICHA.cargar(idTienda, rpc) y usa CFX_FICHA.con(item, opcion) para el precio en el carrito.
+  const V = {};  // clave → { opción en minúscula: { precio, disponible } }
+  const varDe = (k, o) => (V[k] && o ? V[k][String(o).toLowerCase()] : null) || null;
+  const plata = (n) => (window.Core && Core.money ? Core.money(n) : '$' + n);
+  const marcar = () => grid.querySelectorAll('.item select[data-opc]').forEach((s) => {
+    s.closest('.item').querySelectorAll('[data-opc-v]').forEach((b) => { const x = varDe(s.dataset.opc, b.dataset.opcV); const ag = !!x && x.disponible === 0;
+      b.classList.toggle('agot', ag); b.title = b.dataset.opcV + (ag ? ' · agotado' : x && x.precio != null ? ' · ' + plata(x.precio) : ''); });
+  });
+  new MutationObserver(marcar).observe(grid, { childList: true });
+  window.CFX_FICHA = {
+    async cargar(negocio, rpc) {
+      try { (await rpc('variantes_de', { p_negocio: negocio })).forEach((x) => { (V[x.clave] = V[x.clave] || {})[x.nombre.toLowerCase()] = { precio: x.precio == null ? null : Number(x.precio), disponible: x.disponible }; }); } catch (e) { /* base anterior */ }
+      marcar();
+    },
+    con(i, op) { const x = i && varDe(i.clave, op); return x && x.precio != null ? Object.assign({}, i, { precio: x.precio, precio_premium: null }) : i; },
+    agotada: (k, op) => { const x = varDe(k, op); return !!x && x.disponible === 0; }
+  };
+  // El precio de la tarjeta cambia con la opción elegida.
+  d.addEventListener('change', (e) => {
+    const s = e.target.closest('#grid .item select[data-opc]'); if (!s) return;
+    const p = [...s.closest('.item').querySelectorAll('.p:not(.tachado)')].pop(); if (!p) return;
+    if (p.dataset.base === undefined) p.dataset.base = p.textContent;
+    const x = varDe(s.dataset.opc, s.value); p.textContent = x && x.precio != null ? plata(x.precio) : p.dataset.base;
+  });
+  // Ficha: tocar la foto o el nombre abre el producto en grande con sus opciones, cantidad y una barra fija "Agregar".
+  function ficha(it) {
+    const s = it.querySelector('select[data-opc]'), add = it.querySelector('[data-add]');
+    if (!window.CFX_MENU || !it.querySelector('.acc')) return false;
+    const k = s ? s.dataset.opc : '', ops = s ? [...s.options].filter((o) => o.value).map((o) => o.value) : [];
+    const foto = it.querySelector('.foto'), pb = [...it.querySelectorAll('.p:not(.tachado)')].pop(), base = pb ? (pb.dataset.base || pb.textContent) : '';
+    const nombre = (it.querySelector(':scope>b') || {}).textContent || '', desc = it.querySelector('.desc');
+    let op = s ? s.value : '', n = 1;
+    const H = CFX_MENU.hoja(esc(nombre)), z = H.zona;
+    const pintar = () => {
+      const x = varDe(k, op), ag = !add || add.disabled || CFX_FICHA.agotada(k, op), pre = x && x.precio != null ? plata(x.precio) : base;
+      z.innerHTML = '<div class="t-ficha">' + (foto ? '<img src="' + esc(foto.src) + '" alt="">' : '') + '<h3>' + esc(nombre) + '</h3><div class="t-p">' + esc(pre) + '</div>' +
+        (desc ? '<p class="t-d">' + esc(desc.textContent) + '</p>' : '') +
+        (ops.length ? '<b>Elige una opción</b><div class="opc-chips" role="group" aria-label="Opciones">' + ops.map((o) => { const c = window.colorDe(o), a = CFX_FICHA.agotada(k, o);
+          return '<button type="button" class="opc-ch' + (c ? ' sw' : '') + (o === op ? ' on' : '') + (a ? ' agot' : '') + '" data-f-op="' + esc(o) + '" title="' + esc(o) + '"' + (c ? ' style="--sw:' + c + '"' : '') + '>' + (c ? '<i></i><span class="sr">' + esc(o) + '</span>' : esc(o)) + '</button>'; }).join('') + '</div>' + (c0(op) ? '<small class="muted">' + esc(op) + '</small>' : '') : '') +
+        (ag ? '' : '<div class="t-q"><button type="button" class="alt" data-f-n="-1" aria-label="Uno menos">−</button><b>' + n + '</b><button type="button" class="alt" data-f-n="1" aria-label="Uno más">+</button></div>') +
+        '<div class="t-barra"><button type="button" class="ok" data-f-add' + (ag ? ' disabled' : '') + '>' + (ag ? 'Agotado' : '➕ Agregar' + (pre ? ' · ' + esc(n > 1 ? plata((x && x.precio != null ? x.precio : (window.Core && Core.precioNum ? Core.precioNum(base) : 0)) * n) : pre) : '')) + '</button></div></div>';
+    };
+    const c0 = (o) => o && window.colorDe(o);
+    z.onclick = (e) => {
+      const b = e.target.closest('[data-f-op],[data-f-n],[data-f-add]'); if (!b) return;
+      if (b.dataset.fOp !== undefined) { op = b.dataset.fOp; return pintar(); }
+      if (!add) return;
+      if (b.dataset.fN) { n = Math.min(99, Math.max(1, n + +b.dataset.fN)); return pintar(); }
+      if (ops.length && !op) { const ch = z.querySelector('.opc-chips'); ch.classList.remove('opc-falta'); void ch.offsetWidth; ch.classList.add('opc-falta'); return; }
+      if (s) { s.value = op; s.dispatchEvent(new Event('change', { bubbles: true })); it.querySelectorAll('.opc-ch').forEach((x) => x.classList.toggle('on', x.dataset.opcV === op)); }
+      for (let i = 0; i < n; i++) add.click();
+      H.cerrar();
+    };
+    pintar();
+    return true;
+  }
+  d.addEventListener('click', (e) => {
+    const t = e.target.closest('#grid .item .foto, #grid .item>b'); if (!t) return;
+    if (ficha(t.closest('.item'))) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+
   d.addEventListener('click', (e) => {
     const b = e.target.closest('[data-opc-v]');
     if (b) { const it = b.closest('.item'), s = it && it.querySelector('select'); if (!s) return; s.value = b.dataset.opcV; s.dispatchEvent(new Event('change', { bubbles: true })); it.querySelectorAll('.opc-ch').forEach((x) => x.classList.toggle('on', x === b)); return; }
     // Agregar sin elegir opción: la fila tiembla un poquito
     const it = e.target.closest('#grid .item'); const s = it && it.querySelector('select');
+    if (s && s.value && window.CFX_FICHA.agotada(s.dataset.opc, s.value) && e.target.closest('.acc>:first-child')) { e.stopPropagation(); e.preventDefault(); if (window.Core) Core.toast('😕 "' + s.value + '" está agotado: elige otra opción'); return; }
     if (s && !s.value && e.target.closest('.acc button,.acc .btn')) { const ch = it.querySelector('.opc-chips'); if (ch) { ch.classList.remove('opc-falta'); void ch.offsetWidth; ch.classList.add('opc-falta'); } }
   }, true);
 })();

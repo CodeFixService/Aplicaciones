@@ -235,6 +235,9 @@
   const stock = {};
   async function cargarStock() {
     try { (await Cuenta.rpc('stock_catalogo', { p_negocio: negocio })).forEach((x) => { stock[x.clave] = x.disponible; }); pintar(); } catch (e) { /* base anterior */ }
+    // Precio y stock de cada opción (shared/tienda.js).
+    const vars = () => CFX_FICHA.cargar(negocio, Cuenta.rpc).then(() => { try { pintar(); pintarCarro(); } catch (e) { /* aún cargando */ } });
+    if (window.CFX_FICHA) vars(); else addEventListener('load', vars);
   }
   let favs = db.get('favs', []);
   let carro = db.get('carro', []);       // [{clave, cant, nombre?, precio?}] (nombre/precio: ofertas con precio)
@@ -480,7 +483,7 @@
   // Producto del catálogo, u oferta con precio (guarda su nombre y precio en el carrito).
   const itemDe = (l) => /^pub:/.test(l.clave) ? (l.nombre != null && l.precio != null ? { nombre: l.nombre, precio: l.precio } : null)
     : items.find((x) => x.clave === l.clave && !x.bloqueado) || null;
-  const lineasCarro = () => carro.map((l) => ({ l, i: itemDe(l) })).filter((x) => x.i);
+  const lineasCarro = () => carro.map((l) => ({ l, i: window.CFX_FICHA ? CFX_FICHA.con(itemDe(l), l.opcion) : itemDe(l) })).filter((x) => x.i);
   const totalCarro = () => lineasCarro().reduce((s, x) => s + precioDe(x.i) * x.l.cant, 0);
   // El carrito también queda en el servidor: si no terminas el pedido, la tienda (Pro) te lo recuerda al día siguiente.
   let carroEnviado = null, carroTimer = null;

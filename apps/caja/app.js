@@ -261,12 +261,28 @@
     } catch (err) { Core.toast('📷 Foto: ' + err.message); }
   }
 
+  // Precio y stock por opción (tabla variantes): una fila por cada opción escrita arriba.
+  function pintarVars(lista) {
+    const ant = {}; (lista || leerVars()).forEach((x) => { ant[x.nombre.toLowerCase()] = x; });
+    const ops = $('p-ops').value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20);
+    $('p-varsW').classList.toggle('hidden', !ops.length || esCliente);
+    $('p-vars').innerHTML = ops.map((o) => { const x = ant[o.toLowerCase()] || {};
+      return '<div class="row" style="align-items:center" data-var="' + Core.esc(o) + '"><b style="flex:1.2;min-width:70px">' + Core.esc(o) + '</b>' +
+        '<input aria-label="Precio de ' + Core.esc(o) + '" inputmode="decimal" placeholder="Precio" value="' + (x.precio == null ? '' : x.precio) + '" style="flex:1">' +
+        '<input aria-label="Stock de ' + Core.esc(o) + '" inputmode="numeric" placeholder="Stock" value="' + (x.stock == null ? '' : x.stock) + '" style="flex:1"></div>'; }).join('');
+  }
+  function leerVars() {
+    return [...$('p-vars').querySelectorAll('[data-var]')].map((r) => { const [a, b] = r.querySelectorAll('input'), pr = num(a.value), st = parseInt(b.value, 10);
+      return { nombre: r.dataset.var, precio: a.value.trim() === '' || isNaN(pr) ? null : pr, stock: b.value.trim() === '' || isNaN(st) ? null : Math.max(0, st) }; });
+  }
+  $('p-ops').addEventListener('input', () => pintarVars());
+
   function limpiarForm() {
     editId = null;
     fotoNueva = null; fotoQuitar = false; verFoto(null);
     ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem', 'desc', 'ops'].forEach((k) => { $('p-' + k).value = ''; });
     $('p-pub').checked = !esCliente; $('rowPrem').classList.toggle('hidden', esCliente); // lo nuevo se publica por defecto
-    $('p-vip').checked = false;
+    $('p-vip').checked = false; pintarVars([]);
     renderLista();
   }
   $('bCancelarProd').onclick = limpiarForm;
@@ -295,7 +311,8 @@
       premium: null,
       vip: false,
       desc: $('p-desc').value.trim(),
-      ops: $('p-ops').value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20).join(', ')
+      ops: $('p-ops').value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20).join(', '),
+      vars: leerVars()
     };
     if (!p.nombre || isNaN(p.precio)) return Core.toast('Nombre y precio son obligatorios');
     let prod;
@@ -315,6 +332,7 @@
     }
     await guardarFoto(prod);
     if (!esCliente && prod.publicado) Cuenta.rpc('set_stock', { p_key: prod.id, p_stock: prod.stock === '' ? null : prod.stock }).catch(() => {});
+    if (!esCliente && prod.publicado && (prod.ops || (prod.vars || []).length)) Cuenta.rpc('variantes_guardar', { p_clave: prod.id, p_lista: prod.ops ? prod.vars || [] : [] }).catch((e) => Core.toast('⚠️ ' + (e.message || e)));
     guardarProductos();
     Core.toast('Producto guardado');
     limpiarForm(); renderProds();
@@ -329,7 +347,7 @@
       $('p-stock').value = p.stock; $('p-cat').value = p.categoria || '';
       $('p-pub').checked = !!p.publicado; $('p-prem').value = p.premium == null ? '' : p.premium;
       $('p-vip').checked = !!p.vip;
-      $('p-desc').value = p.desc || ''; $('p-ops').value = p.ops || '';
+      $('p-desc').value = p.desc || ''; $('p-ops').value = p.ops || ''; pintarVars(p.vars || []);
       $('rowPrem').classList.toggle('hidden', !p.publicado);
       fotoNueva = null; fotoQuitar = false; verFoto(null);
       if (p.publicado && !esCliente) {
