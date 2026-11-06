@@ -255,6 +255,11 @@
 
     <div class="card hidden" id="cDespacho"><span id="despacho"></span><div id="despachoBody"></div></div>
 
+    <div class="card hidden" id="cBoleta"><span id="boleta"></span>
+      <h2>🧾 Boleta SII</h2>
+      <div id="boletaBody"></div>
+    </div>
+
     <div class="card hidden" id="cEquipo"><span id="equipo"></span>
       <h2>🧑‍🍳 Mi equipo <span class="pill pro">PRO</span></h2>
       <p class="muted">Cada persona tiene un rol: <b>Vendedor</b> (Caja y Pedidos), <b>Bodega</b> (Inventario y Pedidos) o <b>Admin</b> (Caja, Inventario, Pedidos y Estadísticas). Nadie del equipo ve tus links de pago, tu plan ni tus ajustes.</p>
@@ -338,13 +343,13 @@
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho)$/.test(location.hash);
-  let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo y #despacho abren su hoja
+  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta)$/.test(location.hash);
+  let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho y #boleta abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho)$/.test(location.hash) ? location.hash.slice(1) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta)$/.test(location.hash) ? location.hash.slice(1) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -474,7 +479,7 @@
     Cuenta.revisarActualizacion();
     if (acc.role === 'user') cargarTienda(acc);
     if (acc.role !== 'client') cargarHoy(acc);
-    if (acc.role === 'user') { cargarLinks(); cargarMp(); cargarEquipo(); }
+    if (acc.role === 'user') { cargarLinks(); cargarMp(); cargarBoleta(); cargarEquipo(); }
     cargarPagos();
     // Núcleo (pagos.js): tienda nueva que debe su primer pago → pantalla de activación.
     // Núcleo (ayuda.js): cabecera común, guía para partir, chat con soporte y términos.
@@ -545,7 +550,7 @@
     $('hoy').classList.toggle('hidden', cliente);
     $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Órbita') : (acc.empresa || 'Órbita'));
     const dueno = acc.role === 'user';
-    ['cTienda', 'cLinks', 'cDespacho', 'cEquipo', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
+    ['cTienda', 'cLinks', 'cDespacho', 'cBoleta', 'cEquipo', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
     if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x)); }
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
@@ -566,6 +571,7 @@
         dueno && { k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario y pagos', grupo: 'Tu tienda', nodo: $('cTienda') },
         dueno && { k: 'links', ico: '💳', t: 'Links de pago', grupo: 'Tu tienda', nodo: $('cLinks') },
         dueno && { k: 'despacho', ico: '🚚', t: 'Despacho', grupo: 'Tu tienda', nodo: $('cDespacho') },
+        dueno && { k: 'boleta', ico: '🧾', t: 'Boleta SII', d: 'Boleta electrónica de tus pedidos', grupo: 'Tu tienda', nodo: $('cBoleta') },
         dueno && { k: 'equipo', ico: '🧑‍🍳', t: 'Mi equipo', dato: acc.is_pro ? '' : 'PRO', grupo: 'Tu tienda', nodo: $('cEquipo') },
         !equipo && { k: 'premium', ico: '⭐', t: 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
         cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
@@ -725,6 +731,37 @@
     try {
       await Cuenta.rpc('mp_guardar', a === 'quitar' ? { p_token: null, p_activo: null } : { p_token: $('mpTok').value, p_activo: $('mpOn') ? $('mpOn').checked : true });
       Core.toast(a === 'quitar' ? 'Mercado Pago desconectado' : '⚡ Mercado Pago guardado'); cargarMp();
+    } catch (err) { Core.toast(err.message); e.target.disabled = false; }
+  };
+  /* ---------- 🧾 Boleta SII: manual (folio del portal del SII) o automática con OpenFactura (la API key queda solo en el servidor) ---------- */
+  async function cargarBoleta() {
+    let b = {};
+    try { b = await Cuenta.rpc('boleta_estado'); } catch (e) { $('boletaBody').innerHTML = '<p class="muted">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    const of = b.modo === 'openfactura', v = (k) => Core.esc(b[k] || '');
+    const campo = (id, t, k, ph, max) => '<label for="' + id + '">' + t + '</label><input id="' + id + '" maxlength="' + max + '" placeholder="' + ph + '" value="' + v(k) + '">';
+    $('boletaBody').innerHTML = '<p class="muted" style="margin:0 0 6px">Entrega la boleta electrónica de cada pedido pagado: tu cliente la ve en su pedido y le llega un aviso.' +
+      (b.conectado ? ' <b>' + (of ? '✅ Automática' + (b.auto ? '' : ' (al tocar 🧾 en Pedidos)') + (b.fin ? ' · key …' + Core.esc(b.fin) : '') : '✅ Manual') + '</b>' : '') + '</p>' +
+      '<div class="row" style="flex-wrap:wrap;gap:6px">' +
+      '<label class="terms"><input type="radio" name="bModo" value="manual"' + (of ? '' : ' checked') + '> <span><b>Manual</b>: la emites gratis en sii.cl y anotas el folio</span></label>' +
+      '<label class="terms"><input type="radio" name="bModo" value="openfactura"' + (of ? ' checked' : '') + '> <span><b>Automática</b> con OpenFactura</span></label></div>' +
+      campo('bRut', 'RUT de la empresa', 'rut', '76.123.456-7', 12) + campo('bRazon', 'Razón social', 'razon', 'Mi Tienda SpA', 100) +
+      campo('bGiro', 'Giro', 'giro', 'Venta al por menor de vestuario', 80) + campo('bDir', 'Dirección', 'direccion', 'Av. Siempre Viva 123', 70) +
+      campo('bComuna', 'Comuna', 'comuna', 'Santiago', 20) +
+      '<div id="bOf"' + (of ? '' : ' class="hidden"') + '><label for="bKey">' + (b.fin ? 'Cambiar API key' : 'API key de OpenFactura') + '</label>' +
+      '<input id="bKey" type="password" autocomplete="off" placeholder="' + (b.fin ? '…' + v('fin') : 'Pega tu API key') + '">' +
+      '<p class="muted" style="margin:4px 0 0;font-size:13px">La sacas en OpenFactura (Haulmer) → Configuración → API. Nadie más la ve.</p>' +
+      '<label class="terms"><input type="checkbox" id="bAuto"' + (b.auto !== false ? ' checked' : '') + '> <span>Emitir sola al pagar en línea o al entregar</span></label></div>' +
+      '<div class="btns"><button class="small" data-bo="guardar">Guardar</button>' + (b.conectado ? '<button class="small alt" data-bo="quitar">Quitar</button>' : '') + '</div>';
+  }
+  $('boletaBody').onchange = (e) => { if (e.target.name === 'bModo') $('bOf').classList.toggle('hidden', e.target.value !== 'openfactura'); };
+  $('boletaBody').onclick = async (e) => {
+    const a = e.target.dataset.bo;
+    if (!a || (a === 'quitar' && !confirm('¿Quitar tus datos de boleta? Las boletas ya entregadas no cambian.'))) return;
+    e.target.disabled = true;
+    try {
+      await Cuenta.rpc('boleta_guardar', { p: a === 'quitar' ? null : { modo: document.querySelector('[name=bModo]:checked').value, rut: $('bRut').value, razon: $('bRazon').value,
+        giro: $('bGiro').value, direccion: $('bDir').value, comuna: $('bComuna').value, apikey: $('bKey').value, auto: $('bAuto').checked } });
+      Core.toast(a === 'quitar' ? 'Boleta quitada' : '🧾 Datos de boleta guardados'); cargarBoleta();
     } catch (err) { Core.toast(err.message); e.target.disabled = false; }
   };
   $('linksBody').onclick = async (e) => {

@@ -632,6 +632,8 @@
       (p.estado === 'rechazado' && p.motivo ? '<p class="muted" style="margin:6px 0 0">❌ ' + Core.esc(p.motivo) + '</p>' : '') +
       (p.estado === 'en_revision' ? '<p class="muted" style="margin:6px 0 0">🧾 La tienda está revisando tu comprobante.</p>' : '') +
       (p.devolucion === 'pendiente' ? '<p class="muted" style="margin:6px 0 0">💸 La tienda te devolverá el pago.</p>' : '') +
+      (p.boleta && p.boleta.folio ? '<p class="muted" style="margin:6px 0 0">🧾 Boleta electrónica N° ' + Core.esc(p.boleta.folio) + (p.boleta.razon ? ' · ' + Core.esc(p.boleta.razon) + ' (' + Core.esc(p.boleta.rut || '') + ')' : '') +
+        (p.boleta.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(p.boleta.url) + '">Ver boleta</a>' : '') + '</p>' : '') +
       (p.estado === 'entregado' && !p.calificado ? '<div style="margin-top:8px"><span class="muted">Califica tu compra: </span><span class="califica">' +
         [1, 2, 3, 4, 5].map((k) => '<button type="button" data-cal="' + p.id + '" data-n="' + k + '" aria-label="' + k + ' estrellas">★</button>').join('') + '</span></div>' : '') +
       '</div><div class="acc" style="display:flex;gap:6px;flex-wrap:wrap">' +

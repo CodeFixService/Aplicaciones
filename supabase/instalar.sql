@@ -5587,6 +5587,274 @@ begin
 exception when others then
   raise notice 'Revisión de Mercado Pago no programada (%).', sqlerrm;
 end $$;
+-- =====================================================================
+--  VERSIÓN 5.24 · 🧾 Boleta SII: la tienda guarda sus datos de emisor y entrega la boleta del pedido.
+--  Manual: emite en el portal gratuito del SII y anota el folio. Automática: con su API key de OpenFactura
+--  (Haulmer) la boleta electrónica (tipo 39) se emite sola al pagar o entregar. La API key queda solo en la base.
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.24'::text $$;
+
+create table if not exists public.boleta_cuentas (
+  owner_id   uuid primary key references public.profiles (id) on delete cascade,
+  modo       text not null default 'manual' check (modo in ('manual', 'openfactura')),
+  apikey     text,
+  rut        text not null,
+  razon      text not null,
+  giro       text not null,
+  direccion  text not null,
+  comuna     text not null,
+  auto       boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+alter table public.boleta_cuentas enable row level security;
+revoke all on public.boleta_cuentas from anon, authenticated;
+alter table public.pedidos add column if not exists boleta_folio text;
+alter table public.pedidos add column if not exists boleta_url text;
+alter table public.pedidos add column if not exists boleta_at timestamptz;
+alter table public.pedidos add column if not exists boleta_error text;
+alter table public.pedidos add column if not exists boleta_intentos int not null default 0;
+
+-- RUT chileno con dígito verificador (módulo 11): devuelve '12345678-5' o null.
+create or replace function public.rut_normal(p text) returns text
+language plpgsql immutable set search_path = '' as $$
+declare r text := upper(regexp_replace(coalesce(p, ''), '[^0-9kK]', '', 'g')); c text; s int := 0; m int := 2; d text;
+begin
+  if r !~ '^[0-9]{7,8}[0-9K]$' then return null; end if;
+  c := left(r, -1);
+  for i in reverse length(c)..1 loop s := s + substr(c, i, 1)::int * m; m := case when m = 7 then 2 else m + 1 end; end loop;
+  d := case 11 - s % 11 when 11 then '0' when 10 then 'K' else (11 - s % 11)::text end;
+  return case when d = right(r, 1) then ltrim(c, '0') || '-' || d end;
+end $$;
+
+-- Lo que ve la tienda (dueño o su equipo); la API key nunca sale, solo sus 4 últimos caracteres al dueño.
+create or replace function public.boleta_estado() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('conectado', b.owner_id is not null, 'modo', b.modo, 'rut', b.rut, 'razon', b.razon, 'giro', b.giro,
+    'direccion', b.direccion, 'comuna', b.comuna, 'auto', coalesce(b.auto, true),
+    'fin', case when b.owner_id = auth.uid() then right(b.apikey, 4) end)
+  from (select 1) x left join public.boleta_cuentas b on b.owner_id = public.negocio_de(auth.uid())
+$$;
+
+-- El dueño guarda sus datos de emisor (p null = quitar). apikey vacía mantiene la anterior.
+create or replace function public.boleta_guardar(p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  md text := coalesce(p ->> 'modo', 'manual');
+  rt text := public.rut_normal(p ->> 'rut');
+  k text := nullif(regexp_replace(coalesce(p ->> 'apikey', ''), '\s', '', 'g'), '');
+  t text;
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and role = 'user' and not suspended) then raise exception 'Solo el dueño de la tienda'; end if;
+  if p is null then delete from public.boleta_cuentas where owner_id = auth.uid(); return public.boleta_estado(); end if;
+  if md not in ('manual', 'openfactura') then raise exception 'Modo no válido'; end if;
+  if rt is null then raise exception 'RUT no válido: revisa el número y el dígito verificador'; end if;
+  foreach t in array array['razon', 'giro', 'direccion', 'comuna'] loop
+    if length(trim(coalesce(p ->> t, ''))) < 2 then
+      raise exception 'Falta %', case t when 'razon' then 'la razón social' when 'giro' then 'el giro' when 'direccion' then 'la dirección' else 'la comuna' end;
+    end if;
+  end loop;
+  if k is not null and (k !~ '^[A-Za-z0-9_-]{16,120}$') then raise exception 'Esa no parece una API key de OpenFactura'; end if;
+  if md = 'openfactura' and k is null and not exists (select 1 from public.boleta_cuentas where owner_id = auth.uid() and apikey is not null) then
+    raise exception 'Pega tu API key de OpenFactura';
+  end if;
+  insert into public.boleta_cuentas (owner_id, modo, apikey, rut, razon, giro, direccion, comuna, auto)
+  values (auth.uid(), md, k, rt, left(trim(p ->> 'razon'), 100), left(trim(p ->> 'giro'), 80), left(trim(p ->> 'direccion'), 70),
+          left(trim(p ->> 'comuna'), 20), coalesce((p ->> 'auto')::boolean, true))
+  on conflict (owner_id) do update set modo = excluded.modo, apikey = coalesce(excluded.apikey, public.boleta_cuentas.apikey),
+    rut = excluded.rut, razon = excluded.razon, giro = excluded.giro, direccion = excluded.direccion, comuna = excluded.comuna,
+    auto = excluded.auto, updated_at = now();
+  perform public.auditar('Boleta SII configurada', md || ' · ' || rt);
+  return public.boleta_estado();
+end $$;
+
+-- Boleta electrónica (tipo 39, precios con IVA) del pedido, en el formato de OpenFactura.
+create or replace function public.boleta_dte(x public.pedidos, c public.boleta_cuentas) returns jsonb
+language plpgsql stable set search_path = '' as $$
+declare det jsonb := '[]'::jsonb; l jsonb; n int := 0; suma numeric := 0; m numeric; q numeric; tot numeric := round(x.total); neto numeric; d numeric;
+begin
+  for l in select * from jsonb_array_elements(x.lineas) loop
+    exit when n >= 59;
+    q := greatest(coalesce((l ->> 'cant')::numeric, 1), 1); m := round(coalesce((l ->> 'subtotal')::numeric, 0));
+    if m <= 0 then continue; end if;
+    n := n + 1; suma := suma + m;
+    det := det || jsonb_build_object('NroLinDet', n, 'NmbItem', left(coalesce(nullif(trim(l ->> 'nombre'), ''), 'Producto'), 80),
+      'QtyItem', q, 'PrcItem', round(m / q, 2), 'MontoItem', m);
+  end loop;
+  if suma < tot then n := n + 1; det := det || jsonb_build_object('NroLinDet', n, 'NmbItem', 'Otros', 'QtyItem', 1, 'PrcItem', tot - suma, 'MontoItem', tot - suma); suma := tot; end if;
+  d := suma - tot; neto := round(tot / 1.19);
+  return jsonb_build_object('response', jsonb_build_array('FOLIO', 'SELF_SERVICE'), 'dte', jsonb_build_object(
+    'Encabezado', jsonb_build_object(
+      'IdDoc', jsonb_build_object('TipoDTE', 39, 'Folio', 0, 'FchEmis', to_char(now() at time zone 'America/Santiago', 'YYYY-MM-DD'), 'IndServicio', 3),
+      'Emisor', jsonb_build_object('RUTEmisor', c.rut, 'RznSocEmisor', c.razon, 'GiroEmisor', c.giro, 'DirOrigen', c.direccion, 'CmnaOrigen', c.comuna),
+      'Receptor', jsonb_build_object('RUTRecep', '66666666-6'),
+      'Totales', jsonb_build_object('MntNeto', neto, 'IVA', tot - neto, 'MntTotal', tot)),
+    'Detalle', det) || case when d > 0 then jsonb_build_object('DscRcgGlobal', jsonb_build_array(
+      jsonb_build_object('NroLinDR', 1, 'TpoMov', 'D', 'GlosaDR', 'Descuento', 'TpoValor', '$', 'ValorDR', d))) else '{}'::jsonb end);
+end $$;
+
+create or replace function public.of_api(p_key text, p_cuerpo jsonb, p_idem text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare st int; c text;
+begin
+  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '15');
+  execute 'select status, content from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+    using 'POST', 'https://api.haulmer.com/v2/dte/document',
+          array[row('apikey', p_key)::extensions.http_header, row('Idempotency-Key', p_idem)::extensions.http_header], 'application/json', p_cuerpo::text;
+  return jsonb_build_object('status', st, 'body', case when c ~ '^\s*[\{\[]' then c::jsonb end);
+exception when others then
+  return jsonb_build_object('status', 0, 'error', sqlerrm);
+end $$;
+
+-- Emite en OpenFactura (sin revisar quién llama: lo usan boleta_emitir y la revisión cada 5 min).
+create or replace function public.boleta_intentar(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; c public.boleta_cuentas; r jsonb; f text; e text;
+begin
+  select * into x from public.pedidos where id = p_id for update;
+  if x.id is null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
+  if x.boleta_folio is not null then return jsonb_build_object('ok', true, 'folio', x.boleta_folio, 'url', x.boleta_url); end if;
+  if x.estado not in ('preparando', 'listo', 'en_camino', 'entregado') then return jsonb_build_object('ok', false, 'error', 'El pedido aún no está pagado'); end if;
+  if round(x.total) < 1 then return jsonb_build_object('ok', false, 'error', 'Pedido sin monto'); end if;
+  select * into c from public.boleta_cuentas where owner_id = x.negocio_id;
+  if c.owner_id is null or c.modo <> 'openfactura' or c.apikey is null then return jsonb_build_object('ok', false, 'error', 'Configura la boleta automática en Ajustes'); end if;
+  r := public.of_api(c.apikey, public.boleta_dte(x, c), 'cfx-' || x.id::text);
+  f := nullif(coalesce(r #>> '{body,FOLIO}', r #>> '{body,folio}'), '');
+  if coalesce((r ->> 'status')::int, 0) in (200, 201) and f is not null then
+    update public.pedidos set boleta_folio = left(f, 20), boleta_url = case when r #>> '{body,SELF_SERVICE,url}' ~ '^https://[^\s"<>]+$' then left(r #>> '{body,SELF_SERVICE,url}', 500) end,
+      boleta_at = now(), boleta_error = null where id = x.id returning * into x;
+    perform public.aviso_cliente(x, '🧾 Tu boleta', 'Boleta electrónica N° ' || f || ' de tu pedido');
+    return jsonb_build_object('ok', true, 'folio', x.boleta_folio, 'url', x.boleta_url);
+  end if;
+  e := left(coalesce(case when (r ->> 'status')::int = 0 then 'No se pudo conectar con OpenFactura' end,
+                     r #>> '{body,error,message}', r #>> '{body,message}', 'OpenFactura respondió ' || coalesce(r ->> 'status', '?')), 200);
+  if (r ->> 'status')::int in (401, 403) then e := 'OpenFactura no aceptó la API key'; end if;
+  update public.pedidos set boleta_error = e, boleta_intentos = boleta_intentos + 1 where id = x.id;
+  return jsonb_build_object('ok', false, 'error', e);
+end $$;
+
+-- La tienda (dueño o equipo con Pedidos) emite la boleta de un pedido pagado.
+create or replace function public.boleta_emitir(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.equipo_puede('pedidos') or not exists (select 1 from public.pedidos where id = p_id and negocio_id = public.negocio_de(auth.uid())) then
+    raise exception 'Sin permiso';
+  end if;
+  return public.boleta_intentar(p_id);
+end $$;
+
+-- Modo manual: anota el folio de la boleta emitida en el SII (folio null = borrar si te equivocaste).
+create or replace function public.boleta_anotar(p_id uuid, p_folio text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; f text := nullif(regexp_replace(coalesce(p_folio, ''), '\D', '', 'g'), '');
+begin
+  select * into x from public.pedidos where id = p_id and negocio_id = public.negocio_de(auth.uid()) for update;
+  if x.id is null or not public.equipo_puede('pedidos') then raise exception 'Sin permiso'; end if;
+  if x.estado not in ('preparando', 'listo', 'en_camino', 'entregado') then raise exception 'El pedido aún no está pagado'; end if;
+  if f is not null and length(f) > 10 then raise exception 'Folio no válido'; end if;
+  if x.boleta_url is not null then raise exception 'Esta boleta la emitió OpenFactura: no se cambia'; end if;
+  update public.pedidos set boleta_folio = f, boleta_at = case when f is null then null else now() end, boleta_error = null
+  where id = x.id returning * into x;
+  if f is not null then perform public.aviso_cliente(x, '🧾 Tu boleta', 'Boleta electrónica N° ' || f || ' de tu pedido'); end if;
+  return jsonb_build_object('ok', true, 'folio', f);
+end $$;
+
+-- Cada 5 minutos: boleta automática de los pedidos pagados en línea o entregados (hasta 5 intentos, últimos 3 días).
+create or replace function public.boleta_pendientes() returns int
+language plpgsql security definer set search_path = '' as $$
+declare i uuid; n int := 0;
+begin
+  for i in select x.id from public.pedidos x join public.boleta_cuentas c on c.owner_id = x.negocio_id
+           where c.modo = 'openfactura' and c.auto and c.apikey is not null and x.boleta_folio is null and x.boleta_intentos < 5
+             and x.estado in ('preparando', 'listo', 'en_camino', 'entregado') and (x.pagado_at is not null or x.estado = 'entregado')
+             and x.updated_at > now() - interval '3 days'
+           order by x.updated_at limit 30 loop
+    if (public.boleta_intentar(i) ->> 'ok')::boolean then n := n + 1; end if;
+  end loop;
+  return n;
+end $$;
+
+-- Lo que ve el cliente y la tienda de la boleta del pedido.
+create or replace function public.boleta_de(x public.pedidos) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when x.boleta_folio is not null then jsonb_build_object('folio', x.boleta_folio, 'url', x.boleta_url, 'fecha', x.boleta_at,
+    'rut', c.rut, 'razon', c.razon) when x.boleta_error is not null then jsonb_build_object('error', x.boleta_error) end
+  from (select 1) z left join public.boleta_cuentas c on c.owner_id = x.negocio_id
+$$;
+
+create or replace function public.ver_pedido(p_ref text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref); t public.profiles;
+begin
+  if x.id is null then return null; end if;
+  select * into t from public.profiles where id = x.negocio_id;
+  return jsonb_build_object('id', x.id, 'token', x.token, 'estado', x.estado, 'lineas', x.lineas, 'subtotal', x.subtotal, 'descuento', x.descuento,
+    'desc_premium', x.desc_premium, 'total', x.total, 'entrega', x.entrega, 'direccion', x.direccion, 'nota', x.nota, 'fecha', x.created_at,
+    'retenido_hasta', x.retenido_hasta, 'rechazos', x.rechazos,
+    'tiene_comprobante', x.comprobante is not null, 'devolucion', x.devolucion, 'motivo', x.motivo, 'nombre', x.invitado_nombre,
+    'tienda', jsonb_build_object('nombre', t.empresa, 'slug', t.slug, 'logo', t.logo, 'color', t.color, 'telefono', t.telefono, 'datos_pago', t.datos_pago),
+    'link', case when x.estado = 'pagando' then public.link_activo(x.negocio_id, 'pedido') end,
+    'cancel_min', public.regla('cancel_min', 10),
+    'calificado', exists (select 1 from public.calificaciones c where c.pedido_id = x.id and not c.de_negocio),
+    'boleta', case when x.boleta_folio is not null then public.boleta_de(x) end);
+end $$;
+
+drop function if exists public.pedidos_tienda(text);
+create or replace function public.pedidos_tienda(p_estado text default null)
+returns table (id uuid, cliente_id uuid, cliente text, telefono text, lineas jsonb, subtotal numeric, descuento numeric,
+               total numeric, cupon text, entrega text, direccion text, nota text, estado text, fecha timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, invitado boolean, calificado boolean, cliente_estrellas numeric,
+               premium boolean, desc_premium numeric, rechazos int, motivo text, boleta jsonb)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.cliente_id, coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1), x.invitado_nombre, 'Cliente'),
+         coalesce(c.telefono, x.invitado_tel), x.lineas, x.subtotal, x.descuento, x.total, x.cupon, x.entrega, x.direccion, x.nota, x.estado,
+         x.created_at, x.retenido_hasta, x.comprobante is not null, x.devolucion, x.cliente_id is null,
+         exists (select 1 from public.calificaciones q where q.pedido_id = x.id and q.de_negocio),
+         (select round(avg(q.estrellas), 1) from public.calificaciones q join public.pedidos y on y.id = q.pedido_id
+          where q.de_negocio and ((x.cliente_id is not null and y.cliente_id = x.cliente_id) or (x.cliente_id is null and y.invitado_tel = x.invitado_tel))),
+         pr.premium, x.desc_premium, x.rechazos, x.motivo, public.boleta_de(x)
+  from public.pedidos x left join public.profiles c on c.id = x.cliente_id
+  cross join lateral (select c.role = 'client' and public.is_pro(c.id) as premium) pr
+  where x.negocio_id = public.negocio_de(auth.uid())
+    and (p_estado is null or (p_estado = 'activos' and x.estado in ('recibido', 'preparando', 'listo', 'en_camino'))
+         or (p_estado = 'revisar' and x.estado = 'en_revision') or (p_estado = 'pagando' and x.estado = 'pagando')
+         or (p_estado = 'devolver' and x.devolucion = 'pendiente')
+         or (p_estado = 'historial' and x.estado in ('entregado', 'cancelado', 'rechazado', 'expirado')) or x.estado = p_estado)
+  -- ⭐ Los pedidos pendientes de clientes Premium van primero en la fila.
+  order by (coalesce(pr.premium, false) and x.estado in ('pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino')) desc, x.created_at desc
+  limit 300
+$$;
+
+drop function if exists public.mis_pedidos(uuid);
+create or replace function public.mis_pedidos(p_negocio uuid default null)
+returns table (id uuid, negocio text, lineas jsonb, subtotal numeric, descuento numeric, total numeric, cupon text,
+               entrega text, direccion text, nota text, estado text, fecha timestamptz, actualizado timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, calificado boolean, token text,
+               desc_premium numeric, motivo text, rechazos int, boleta jsonb)
+language sql stable security definer set search_path = '' as $$
+  select x.id, t.empresa, x.lineas, x.subtotal, x.descuento, x.total, x.cupon,
+         x.entrega, x.direccion, x.nota, x.estado, x.created_at, x.updated_at, x.retenido_hasta, x.comprobante is not null, x.devolucion,
+         exists (select 1 from public.calificaciones q where q.pedido_id = x.id and not q.de_negocio), x.token, x.desc_premium, x.motivo, x.rechazos,
+         case when x.boleta_folio is not null then public.boleta_de(x) end
+  from public.pedidos x join public.profiles t on t.id = x.negocio_id
+  where x.cliente_id = auth.uid() and (p_negocio is null or x.negocio_id = p_negocio)
+  order by x.created_at desc limit 50
+$$;
+
+revoke all on function public.of_api(text, jsonb, text), public.boleta_intentar(uuid), public.boleta_pendientes(),
+  public.boleta_dte(public.pedidos, public.boleta_cuentas), public.boleta_de(public.pedidos) from public, anon, authenticated;
+revoke all on function public.boleta_estado(), public.boleta_guardar(jsonb), public.boleta_emitir(uuid), public.boleta_anotar(uuid, text),
+  public.mis_pedidos(uuid), public.pedidos_tienda(text) from public, anon;
+grant execute on function public.boleta_estado(), public.boleta_guardar(jsonb), public.boleta_emitir(uuid), public.boleta_anotar(uuid, text),
+  public.mis_pedidos(uuid), public.pedidos_tienda(text) to authenticated;
+grant execute on function public.rut_normal(text) to anon, authenticated;
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'boleta-emitir';
+  perform cron.schedule('boleta-emitir', '*/5 * * * *', 'select public.boleta_pendientes()');
+exception when others then
+  raise notice 'Boleta automática no programada (%).', sqlerrm;
+end $$;
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
 -- CodeFix · Pagos (igual en las 6 apps; lo reparte nucleo/sincronizar.py). Se administra desde el Centro de Mando → Pagos.
@@ -6600,7 +6868,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.boleta_cuentas', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_cupones', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;

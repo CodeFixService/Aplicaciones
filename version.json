@@ -1,1 +1,1 @@
-{"version": "5.75", "bd": "5.23", "notas": "⚡ Mercado Pago automático: conecta tu cuenta en Ajustes → Links de pago y tus clientes pagan con Mercado Pago; el pedido se aprueba solo, sin comprobante"}
+{"version": "5.76", "bd": "5.24", "notas": "🧾 Boleta SII: guarda tus datos de emisor en Ajustes → Boleta SII; anota el folio de la boleta del SII o emítela sola con OpenFactura. Tu cliente la ve en su pedido"}

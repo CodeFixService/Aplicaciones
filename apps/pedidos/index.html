@@ -137,11 +137,16 @@
     listo: '✅ Listo', en_camino: '🚚 En camino', entregado: '🎉 Entregado', cancelado: '❌ Cancelado', rechazado: '❌ Rechazado', expirado: '⌛ Expirado' };
   let filtro = params.has('f') ? params.get('f') : 'revisar', pedidos = [], auto = !params.has('f');
   const MOTIVOS = ['📷 La foto no se ve clara', '💸 No vemos el pago en la cuenta', '🔢 El monto no coincide con el total', '📅 El comprobante es de otra fecha o persona'];
+  // 🧾 Boleta SII de la tienda (manual: anotar folio; openfactura: emitir).
+  let BOL = {};
+  const bolP = Cuenta.rpc('boleta_estado').then((b) => { BOL = b || {}; }).catch(() => {});
+  const PAGADO = ['preparando', 'listo', 'en_camino', 'entregado'];
   const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
   async function cargar() {
     document.querySelectorAll('#filtros button').forEach((x) => { x.classList.toggle('on', x.dataset.f === filtro); x.classList.toggle('alt', x.dataset.f !== filtro); });
     try {
       pedidos = await Cuenta.rpc('pedidos_tienda', { p_estado: filtro || null });
+      await bolP;
       // Sin comprobantes por revisar, se abre en "Activos" para que nunca quede oculto un pedido nuevo.
       if (auto && filtro === 'revisar' && !pedidos.length) { auto = false; filtro = 'activos'; return cargar(); }
       auto = false;
@@ -192,12 +197,15 @@
           (p.estado === 'pagando' && p.motivo ? ' (' + Core.esc(p.motivo) + ')' : '') + (p.estado === 'en_revision' ? ': este es el reintento' : ': esperando otro comprobante') + '</div>' : '') +
         (p.estado === 'rechazado' && p.motivo ? '<div class="muted">❌ ' + Core.esc(p.motivo) + '</div>' : '') +
         (p.devolucion === 'pendiente' ? '<div class="aviso">💸 <b>Devuelve el pago</b>: canceló a tiempo.</div>' : p.devolucion === 'hecha' ? '<div class="muted">💸 Devuelto</div>' : '') +
+        (p.boleta && p.boleta.folio ? '<div class="muted">🧾 Boleta N° ' + Core.esc(p.boleta.folio) + (p.boleta.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(p.boleta.url) + '">Ver</a>' : '') + '</div>'
+          : p.boleta && p.boleta.error && PAGADO.includes(p.estado) ? '<div class="aviso">🧾 Boleta no emitida: ' + Core.esc(p.boleta.error) + '</div>' : '') +
         '<div data-img="' + p.id + '"></div>' +
         '<div class="acc">' +
         (p.tiene_comprobante ? '<button class="alt small" data-comp="' + p.id + '">🧾 Ver comprobante</button>' : '') +
         (p.estado === 'en_revision' ? '<button class="ok small" data-rev="' + p.id + '" data-si="1">✅ Aprobar pago</button><button class="danger small" data-rev="' + p.id + '" data-si="0">Rechazar</button>' : '') +
         sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
         (abierto && p.estado !== 'en_revision' ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
+        (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir boleta' : 'Anotar boleta') + '</button>' : '') +
         (p.devolucion === 'pendiente' ? '<button class="small" data-dev="' + p.id + '">💸 Ya devolví</button>' : '') +
         (p.cliente_id ? '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' : '') +
         (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div>' +
@@ -233,6 +241,19 @@
         if (b.dataset.e === 'cancelado' && !confirm('¿Cancelar este pedido? Se le avisará al cliente.')) return;
         await Cuenta.rpc('actualizar_pedido', { p_id: b.dataset.id, p_estado: b.dataset.e });
         Core.toast('Pedido: ' + ESTADOS[b.dataset.e]);
+      }
+      if (b.dataset.bol) {
+        if (BOL.modo === 'openfactura') {
+          b.disabled = true;
+          const r = await Cuenta.rpc('boleta_emitir', { p_id: b.dataset.bol });
+          if (!r.ok) throw new Error(r.error);
+          Core.toast('🧾 Boleta N° ' + r.folio + ' emitida');
+        } else {
+          const f = prompt('Emite la boleta en sii.cl (Boleta electrónica) y escribe aquí su folio (N°):');
+          if (!f) return;
+          await Cuenta.rpc('boleta_anotar', { p_id: b.dataset.bol, p_folio: f });
+          Core.toast('🧾 Boleta anotada: le avisamos al cliente');
+        }
       }
       if (b.dataset.dev) { await Cuenta.rpc('marcar_devuelto', { p_id: b.dataset.dev }); Core.toast('💸 Marcado como devuelto'); }
       if (b.dataset.cal) {

@@ -40,7 +40,7 @@
       <div class="btns" id="rowComp"><label class="btn" for="fComp" style="flex:1">📷 Subir foto del comprobante</label><input type="file" accept="image/*" id="fComp" class="hidden"></div>
     </div>
     <div class="card hidden" id="cDatos"><h2>🏦 Datos de la tienda</h2><pre id="datos"></pre></div>
-    <div class="card"><h2>🧾 Detalle</h2><pre id="detalle"></pre><div class="row" style="justify-content:space-between" ><b>Total</b><b id="total"></b></div></div>
+    <div class="card"><h2>🧾 Detalle</h2><pre id="detalle"></pre><div class="row" style="justify-content:space-between" ><b>Total</b><b id="total"></b></div><p class="muted hidden" id="boleta" style="margin:8px 0 0"></p></div>
     <div class="card hidden" id="cCalif"><h2>⭐ ¿Cómo te fue?</h2><span class="califica" id="calif"></span></div>
     <div class="btns"><a class="btn alt" id="bWsp" target="_blank" rel="noopener">💬 WhatsApp de la tienda</a><a class="btn alt" id="bTienda">🛍️ Volver a la tienda</a>
       <button class="danger hidden" id="bCancelar">Cancelar pedido</button></div>
@@ -84,6 +84,11 @@
       (p.descuento > 0 ? 'Descuento: −' + precio(p.descuento) + '\n' : '') +
       (p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') + ' (costo según distancia)' : '🏪 Retiro en tienda');
     $('total').textContent = precio(p.total);
+    // 🧾 Boleta electrónica que entregó la tienda.
+    const bo = p.boleta;
+    $('boleta').classList.toggle('hidden', !(bo && bo.folio));
+    if (bo && bo.folio) $('boleta').innerHTML = '🧾 Boleta electrónica N° <b>' + Core.esc(bo.folio) + '</b>' + (bo.razon ? ' · ' + Core.esc(bo.razon) + ' (' + Core.esc(bo.rut || '') + ')' : '') +
+      (bo.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(bo.url) + '">Ver boleta</a>' : '');
     $('cPagar').classList.toggle('hidden', p.estado !== 'pagando');
     $('monto').textContent = precio(p.total);
     // Comprobante rechazado: el pedido sigue apartado y se puede subir otro.
