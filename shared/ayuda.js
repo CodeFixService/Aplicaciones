@@ -81,8 +81,10 @@
     '.cfx-cab-h .cfx-volver svg{width:20px!important;height:20px!important}.cfx-cab-h .cfx-volver:active{transform:scale(.92)}' +
     '.cfx-cinta{display:none;position:absolute;left:0;right:0;top:100%;height:3px;background:linear-gradient(90deg,#f7d774,#d9a21b,#f7d774);pointer-events:none;z-index:2}html.cfx-premium .cfx-cinta{display:block}' +
     // Pestañita delgada a la orilla derecha, justo bajo la campana (a mano del pulgar derecho); el área para tocar es más grande que el dibujo.
-    '.cfx-pest{position:absolute;left:auto;right:var(--cfx-pest-d,12px);top:100%;z-index:3;width:34px;height:12px;padding:0;margin:0;border:1px solid var(--cfx-borde,#e2e7ec);border-top:0;border-radius:0 0 10px 10px;' +
-    'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto-2,#5b6472);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 10px rgba(15,23,42,.10);-webkit-tap-highlight-color:transparent}' +
+    // Medidas con !important: algunas apps dan estilo a todo botón de la cabecera (alto mínimo, relleno, fondo) y la deformaban.
+    '.cfx-pest{position:absolute!important;left:auto!important;right:var(--cfx-pest-d,12px)!important;top:100%;z-index:3;width:34px!important;height:12px!important;min-width:0!important;min-height:0!important;max-height:12px!important;padding:0!important;margin:0!important;' +
+    'border:1px solid var(--cfx-borde,#e2e7ec)!important;border-top:0!important;border-radius:0 0 10px 10px!important;font-size:0!important;line-height:0!important;' +
+    'background:var(--cfx-tarjeta,#fff)!important;color:var(--cfx-texto-2,#5b6472)!important;display:grid!important;place-items:center;cursor:pointer;box-shadow:0 4px 10px rgba(15,23,42,.10)!important;-webkit-tap-highlight-color:transparent}' +
     '.cfx-pest::before{content:"";position:absolute;inset:-6px -8px -18px}.cfx-pest svg{width:12px;height:12px;display:block}.cfx-pest:focus:not(:focus-visible){outline:0}' +
     'html.cfx-premium .cfx-pest{top:calc(100% + 3px);color:#b07a00}.cfx-cab.cfx-fija .cfx-pest{right:1px}' +
     '.cfx-pest i{position:absolute;top:0;right:calc(100% + 3px);min-width:15px;height:15px;border-radius:8px;background:#dc2626;color:#fff;font:700 10px/15px system-ui,sans-serif;font-style:normal;padding:0 3px;box-sizing:border-box}' +
@@ -213,7 +215,7 @@
     '.cfx-ayuda .cfx-pf-d{min-height:200px}';
   document.head.appendChild(css);
 
-  let R = null, APP = '', estado = { items: [], sin_leer: 0 }, boya = null, pest = null, cinta = null, abierta = null;
+  let R = null, APP = '', estado = { items: [], sin_leer: 0 }, boya = null, campanaN = null, pest = null, cinta = null, abierta = null;
   const CFG = {};
   const pend = () => estado.items.filter((x) => !x.ok);
 
@@ -285,11 +287,18 @@
       const una = campanas.find((x) => x.dataset.cfxCampana) || campanas.find((x) => !x.classList.contains('cfx-oc')) || campanas[0];
       campanas.forEach((x) => { if (x !== una) x.classList.add('cfx-oc'); });
       if (una && una.parentNode !== boya) { una.dataset.cfxCampana = '1'; boya.insertBefore(una, boya.querySelector('.cfx-plan')); }
+      if (una && una !== campanaN && campanaN) { campanaN.remove(); campanaN = null; }
       // Mismo ícono de campana en todas las apps (las que usan el emoji 🔔 pasan al dibujo de línea).
       if (una) [...una.childNodes].forEach((x) => { if (x.nodeType === 3 && /🔔/.test(x.textContent)) { const t = document.createElement('span'); t.innerHTML = SVG_CAMPANA; x.replaceWith(t.firstChild); } });
       marcarExtras(h);
     } else if (!boya.isConnected) { document.body.appendChild(boya); boya.classList.add('cfx-fija'); document.documentElement.classList.remove('cfx-con-cinta'); }
     if (boya.classList.contains('cfx-fija') && pest.parentNode !== boya) boya.appendChild(pest);
+    // Pantallas sin campana propia (p. ej. paneles de administración): el núcleo pone la suya, así arriba siempre está igual.
+    if (!boya.querySelector('[data-cfx-campana]')) {
+      campanaN = document.createElement('button'); campanaN.type = 'button'; campanaN.className = 'cfx-campana-n'; campanaN.dataset.cfxCampana = '1';
+      campanaN.setAttribute('aria-label', 'Avisos'); campanaN.innerHTML = SVG_CAMPANA; campanaN.onclick = avisosNucleo;
+      boya.insertBefore(campanaN, boya.querySelector('.cfx-plan'));
+    }
     const plan = boya.querySelector('.cfx-plan'), av = boya.querySelector('.cfx-av'), at = boya.querySelector('.cfx-atajo');
     // Atajo fijo { ir, t }: el Centro de Mando pasa el suyo (Panel ⇄ App); en las otras apps solo el administrador (no socios, negocios ni clientes) va al panel del Centro de Mando.
     const atajo = 'atajo' in CFG ? CFG.atajo : CFG.admin && !CFG.socio && CFG.app !== 'mando' ? { ir: panelCM(), t: 'Panel' } : null;
@@ -358,6 +367,15 @@
       const a = b.dataset.a;
       if (a === 'atajo') location.href = at.href; else if (a === 'salir') confirmarSalir(); else if (a === 'perfil') abrirPerfil(); else accion(a);
     };
+  }
+  // Campana del núcleo (cuando la pantalla no trae una): muestra si los avisos al teléfono están activos y permite activarlos.
+  async function avisosNucleo() {
+    const I = window.CodeFixInstalar, h = hoja('<span class="cfx-hm-ic no-ico">' + SVG_CAMPANA + '</span><span class="cfx-hm-tx">Avisos</span>');
+    const on = I && I.pushActiva ? await I.pushActiva() : false;
+    h.zona.innerHTML = '<p style="margin:4px 0 14px">' + (on ? 'Los avisos están activos: te llegan al teléfono aunque la app esté cerrada.' : 'Activa los avisos para enterarte al tiro, aunque la app esté cerrada.') + '</p>' +
+      (!on && I && I.activarPush ? '<button type="button" class="cfx-pf-si" style="width:100%">Activar avisos</button><p class="cfx-av-err" style="color:#dc2626;margin:8px 0 0"></p>' : '');
+    const b = h.zona.querySelector('button'); if (!b) return;
+    b.onclick = async () => { b.disabled = true; try { await I.activarPush(); h.zona.querySelector('p').textContent = 'Listo: los avisos quedaron activos.'; b.remove(); } catch (e) { b.disabled = false; h.zona.querySelector('.cfx-av-err').textContent = (e && e.message) || 'No se pudo activar.'; } };
   }
   // Inicio: la primera pantalla de la app en esta sesión. Cerrar sesión: la función de la app, su botón, o se borra la sesión guardada.
   function inicio() { cerrar(); let u = ''; try { u = sessionStorage.getItem('cfx-inicio') || ''; } catch (e) { /* nada */ } location.href = u || RAIZ; }
