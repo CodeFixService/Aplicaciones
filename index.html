@@ -256,11 +256,12 @@
 
     <div class="card hidden" id="cEquipo"><span id="equipo"></span>
       <h2>🧑‍🍳 Mi equipo <span class="pill pro">PRO</span></h2>
-      <p class="muted">Ven Hoy, Caja, Pedidos y Mensajes. No ven tus links de pago, tu plan ni tus ajustes.</p>
+      <p class="muted">Cada persona tiene un rol: <b>Vendedor</b> (Caja y Pedidos), <b>Bodega</b> (Inventario y Pedidos) o <b>Admin</b> (Caja, Inventario, Pedidos y Estadísticas). Nadie del equipo ve tus links de pago, tu plan ni tus ajustes.</p>
       <ul class="list" id="eqL"></ul>
       <div class="row" style="flex-wrap:wrap">
         <div style="min-width:150px"><label for="eqNom">Nombre</label><input id="eqNom" maxlength="60"></div>
         <div style="min-width:180px"><label for="eqMail">Correo</label><input id="eqMail" type="email" autocomplete="off"></div>
+        <div style="min-width:130px"><label for="eqRol">Rol</label><select id="eqRol"><option value="vendedor">🛒 Vendedor</option><option value="bodega">📦 Bodega</option><option value="admin">🧑‍💼 Admin</option></select></div>
       </div>
       <label for="eqPass">Contraseña</label>
       <div class="row"><input id="eqPass" autocomplete="off" style="flex:2"><button class="alt small" id="eqGen" type="button" style="flex:none">Generar</button></div>
@@ -715,8 +716,10 @@
   async function cargarEquipo() {
     try {
       const l = await Cuenta.rpc('mi_equipo');
+      const rol = (x) => '<select class="small" data-rol="' + Core.esc(x.email) + '" aria-label="Rol de ' + Core.esc(x.nombre) + '" style="width:auto">' +
+        [['vendedor', '🛒 Vendedor'], ['bodega', '📦 Bodega'], ['admin', '🧑‍💼 Admin']].map(([v, t]) => '<option value="' + v + '"' + ((x.rol || 'vendedor') === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>';
       $('eqL').innerHTML = l.length ? l.map((x) => '<li><div class="grow"><b>' + Core.esc(x.nombre) + '</b><div class="muted">' + Core.esc(x.email) + '</div></div>' +
-        '<button class="small danger" data-q="' + x.id + '">Quitar</button></li>').join('') : '<li class="empty">Aún no agregas a nadie</li>';
+        rol(x) + '<button class="small danger" data-q="' + x.id + '">Quitar</button></li>').join('') : '<li class="empty">Aún no agregas a nadie</li>';
     } catch (e) { $('eqL').innerHTML = ''; }
   }
   $('eqGen').onclick = () => { $('eqPass').value = Cuenta.claveAleatoria(); };
@@ -727,11 +730,17 @@
     $('eqCrear').disabled = true;
     try {
       await Cuenta.crearUsuario(d);
+      if ($('eqRol').value !== 'vendedor') { try { await Cuenta.rpc('equipo_rol', { p_email: d.email, p_rol: $('eqRol').value }); } catch (e) { Core.toast('⚠️ Rol: ' + e.message); } }
       $('eqCred').textContent = Cuenta.mensajeAcceso(Object.assign({ tienda: Cuenta.account.empresa }, d));
       $('eqCred').classList.remove('hidden');
       $('eqNom').value = ''; $('eqMail').value = ''; $('eqPass').value = '';
       Core.toast('✅ Agregado al equipo'); cargarEquipo();
     } catch (err) { Core.toast(err.message); } finally { $('eqCrear').disabled = false; }
+  };
+  $('eqL').onchange = async (e) => {
+    const s = e.target.closest('[data-rol]');
+    if (!s) return;
+    try { await Cuenta.rpc('equipo_rol', { p_email: s.dataset.rol, p_rol: s.value }); Core.toast('✅ Rol cambiado'); } catch (err) { Core.toast(err.message); cargarEquipo(); }
   };
   $('eqL').onclick = async (e) => {
     const id = e.target.dataset.q;

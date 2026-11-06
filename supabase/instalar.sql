@@ -5331,6 +5331,103 @@ revoke all on function public.aviso_pedido_url() from public, anon, authenticate
 revoke all on function public.caja_descontar(jsonb), public.stock_sumar(text, text, int), public.inventario() from public, anon;
 grant execute on function public.caja_descontar(jsonb), public.stock_sumar(text, text, int), public.inventario() to authenticated;
 
+
+-- =====================================================================
+--  VERSIÓN 5.22 · 👥 Equipo con roles: vendedor (Caja y Pedidos), bodega (Inventario y Pedidos)
+--  y admin (Caja, Inventario, Pedidos y Estadísticas). El dueño elige el rol de cada persona.
+-- =====================================================================
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '5.22'::text $$;
+
+alter table public.profiles add column if not exists equipo_rol text not null default 'vendedor';
+alter table public.profiles drop constraint if exists profiles_equipo_rol_check;
+alter table public.profiles add constraint profiles_equipo_rol_check check (equipo_rol in ('vendedor', 'bodega', 'admin'));
+
+-- ¿Puede la persona conectada usar esta parte de la tienda? (caja, inventario, pedidos, estadisticas). El dueño, todo.
+create or replace function public.equipo_puede(p_que text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select case when p.role in ('user', 'admin') then true
+    when p.role = 'equipo' then case p.equipo_rol
+      when 'admin' then p_que in ('caja', 'inventario', 'pedidos', 'estadisticas')
+      when 'bodega' then p_que in ('inventario', 'pedidos')
+      else p_que in ('caja', 'pedidos') end
+    else false end
+  from public.profiles p where p.id = auth.uid() and not p.suspended), false)
+$$;
+
+-- El dueño cambia el rol de una persona de su equipo.
+create or replace function public.equipo_rol(p_email text, p_rol text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if p_rol not in ('vendedor', 'bodega', 'admin') then raise exception 'Rol no válido'; end if;
+  update public.profiles set equipo_rol = p_rol
+  where lower(email) = lower(trim(coalesce(p_email, ''))) and role = 'equipo' and negocio_id = auth.uid() and public.is_business(auth.uid());
+  if not found then raise exception 'No es de tu equipo'; end if;
+end $$;
+
+drop function if exists public.mi_equipo();
+create function public.mi_equipo() returns table (id uuid, nombre text, email text, desde timestamptz, visto timestamptz, rol text)
+language sql stable security definer set search_path = '' as $$
+  select p.id, p.empresa, p.email, p.created_at, p.visto_at, p.equipo_rol from public.profiles p
+  where p.negocio_id = auth.uid() and p.role = 'equipo' and public.is_business(auth.uid()) order by p.created_at
+$$;
+
+create or replace function public.my_account() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'id', p.id, 'email', p.email, 'empresa', p.empresa, 'plan', p.plan, 'role', p.role,
+    'pro_until', p.pro_until, 'suspended', p.suspended, 'trial_used', p.trial_used,
+    'mute_offers', p.mute_offers, 'terms_at', p.terms_at,
+    'negocio_id', p.negocio_id, 'negocio', n.empresa, 'telefono', p.telefono, 'negocio_telefono', n.telefono,
+    'logo', p.logo, 'negocio_logo', n.logo, 'color', p.color, 'negocio_color', n.color,
+    'avisos_limpios_at', p.avisos_limpios_at, 'slug', coalesce(p.slug, n.slug),
+    'equipo_rol', case when p.role = 'equipo' then p.equipo_rol end,
+    'is_pro', public.is_pro(p.id), 'is_admin', public.is_admin())
+  from public.profiles p left join public.profiles n on n.id = p.negocio_id
+  where p.id = auth.uid()
+$$;
+
+-- Venta en la Caja: solo quien puede vender (dueño, vendedor o admin del equipo).
+create or replace function public.caja_descontar(p_items jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); it jsonb; c int;
+begin
+  if n is null or not public.equipo_puede('caja') then raise exception 'Sin permiso para vender en la Caja'; end if;
+  if jsonb_typeof(coalesce(p_items, '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p_items, '[]'::jsonb)) > 500 then raise exception 'Lista no válida'; end if;
+  for it in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
+    c := least(greatest(coalesce((it ->> 'cant')::int, 0), 0), 999);
+    continue when c = 0;
+    update public.catalog_items set stock = greatest(0, stock - c)
+    where owner_id = n and client_key = it ->> 'clave' and stock is not null;
+    if nullif(trim(coalesce(it ->> 'opcion', '')), '') is not null then
+      update public.variantes set stock = greatest(0, stock - c)
+      where owner_id = n and clave = it ->> 'clave' and lower(nombre) = lower(trim(it ->> 'opcion')) and stock is not null;
+    end if;
+  end loop;
+end $$;
+
+-- Entró mercadería: el dueño, o bodega/admin del equipo (al stock de su negocio).
+create or replace function public.stock_sumar(p_clave text, p_opcion text, p_cant int) returns int
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); r int;
+begin
+  if n is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso para el inventario'; end if;
+  if p_cant is null or p_cant = 0 or abs(p_cant) > 100000 then raise exception 'Cantidad no válida'; end if;
+  if nullif(trim(coalesce(p_opcion, '')), '') is null then
+    update public.catalog_items set stock = least(1000000, greatest(0, coalesce(stock, 0) + p_cant)), updated_at = now()
+    where owner_id = n and client_key = p_clave returning stock into r;
+  else
+    update public.variantes set stock = least(1000000, greatest(0, coalesce(stock, 0) + p_cant))
+    where owner_id = n and clave = p_clave and lower(nombre) = lower(trim(p_opcion)) returning stock into r;
+  end if;
+  if r is null then raise exception 'Publica el producto primero'; end if;
+  return r;
+end $$;
+
+revoke all on function public.equipo_puede(text), public.equipo_rol(text, text), public.mi_equipo(), public.my_account(),
+  public.caja_descontar(jsonb), public.stock_sumar(text, text, int) from public, anon;
+grant execute on function public.equipo_puede(text), public.equipo_rol(text, text), public.mi_equipo(), public.my_account(),
+  public.caja_descontar(jsonb), public.stock_sumar(text, text, int) to authenticated;
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
 -- CodeFix · Pagos (igual en las 6 apps; lo reparte nucleo/sincronizar.py). Se administra desde el Centro de Mando → Pagos.

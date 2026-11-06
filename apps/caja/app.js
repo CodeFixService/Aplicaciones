@@ -34,8 +34,17 @@
 
   let productos = db.get('productos', []).map((p) => Object.assign({ categoria: '', publicado: false, premium: null }, p));
   // Equipo: vende los productos publicados del negocio (sin editar precios ni ver finanzas).
+  // Rol en el equipo: vendedor (vende), bodega (inventario) o admin (las dos cosas). Nadie del equipo edita productos ni ve Finanzas.
+  const rol = equipo ? (cuenta.equipo_rol || 'vendedor') : '';
+  const vende = !equipo || rol !== 'bodega', invEquipo = equipo && rol !== 'vendedor';
   if (equipo) {
     ['tabProd', 'tabFin'].forEach((id) => $(id).classList.add('hidden'));
+    if (invEquipo) {
+      $('tabProd').classList.remove('hidden');
+      $('tabProd').lastChild.textContent = 'Inventario';
+      document.querySelectorAll('#v-productos > .card:not(#invCard)').forEach((c) => c.classList.add('hidden'));
+    }
+    if (!vende) document.querySelectorAll('nav.tabs button[data-v="vender"], nav.tabs button[data-v="reporte"]').forEach((b) => b.classList.add('hidden'));
     try {
       const l = await Cuenta.rpc('catalog_of', { p_negocio: cuenta.negocio_id });
       productos = l.map((x) => ({ id: x.clave, nombre: x.nombre, precio: Number(x.precio), costo: 0, stock: '', categoria: x.categoria || '', publicado: true, ops: x.opciones || '' }));
@@ -238,7 +247,7 @@
           (v.stock <= 0 ? '⛔ Agotado' : 'Stock ' + v.stock) + ap(v.apartado) + '</div></div>' + btn(v.nombre) + '</div>').join(''));
     });
     $('invKpis').innerHTML = '<div class="card"><b>' + filas.length + '</b>con stock</div><div class="card"><b>' + unidades + '</b>unidades</div>' +
-      '<div class="card"><b>' + money(valor) + '</b>valor a costo</div><div class="card"><b>' + agotados + '</b>agotados</div>';
+      (equipo ? '' : '<div class="card"><b>' + money(valor) + '</b>valor a costo</div>') + '<div class="card"><b>' + agotados + '</b>agotados</div>';
     $('invLista').innerHTML = filas.join('') || '<p class="empty">Pon un stock a tus productos (o a sus opciones) y aquí verás tu inventario.</p>';
   }
   $('invLista') && ($('invLista').onclick = async (e) => {
@@ -608,5 +617,5 @@
   renderProds(); renderTicket();
   if (!equipo) { respaldoAuto(); publicarPendientes(); }
   enviarStock().then(traerStock);
-  if (location.hash === '#productos' && !equipo) show('productos');
+  if (!vende || (location.hash === '#productos' && (!equipo || invEquipo))) show('productos');
 })();

@@ -1,1 +1,1 @@
-{"version": "5.71", "bd": "5.21", "notas": "📦 Inventario en Caja (stock real, valor y ➕ Entró mercadería) · la venta en Caja pide la opción y la descuenta · el aviso de pedido abre ese pedido · fotos de fichas en WebP"}
+{"version": "5.72", "bd": "5.22", "notas": "👥 Equipo con roles: Vendedor (Caja y Pedidos), Bodega (Inventario y Pedidos) y Admin (Caja, Inventario, Pedidos y Estadísticas); el dueño elige y cambia el rol en Mi equipo"}
