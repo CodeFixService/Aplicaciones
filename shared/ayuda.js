@@ -79,15 +79,17 @@
     '.cfx-cab-h .cfx-volver{display:inline-grid;place-items:center!important;width:38px!important;height:38px!important;min-width:38px!important;min-height:0!important;padding:0!important;margin:0 4px 0 0!important;border-radius:12px!important;flex:none;' +
     'background:var(--cfx-tarjeta,#fff)!important;border:1px solid var(--cfx-borde,#e2e7ec)!important;box-shadow:0 2px 10px rgba(15,23,42,.10)!important;color:var(--cfx-texto,#111827)!important;font-size:22px!important;line-height:1!important;text-decoration:none!important}' +
     '.cfx-cab-h .cfx-volver svg{width:20px!important;height:20px!important}.cfx-cab-h .cfx-volver:active{transform:scale(.92)}' +
-    '.cfx-cinta{display:none;position:absolute;left:0;right:0;top:100%;height:3px;background:linear-gradient(90deg,#f7d774,#d9a21b,#f7d774);pointer-events:none;z-index:2}html.cfx-premium .cfx-cinta{display:block}' +
+    '.cfx-cinta{display:none!important}' +
+    // Espacio entre la cabecera y lo que sigue (tira de pestañas): la pestañita no la pisa.
+    '.cfx-cab-h+:not(dialog):not([hidden]){margin-top:16px!important}' +
     // Pestañita delgada a la orilla derecha, justo bajo la campana (a mano del pulgar derecho); el área para tocar es más grande que el dibujo.
     // Medidas con !important: algunas apps dan estilo a todo botón de la cabecera (alto mínimo, relleno, fondo) y la deformaban.
     '.cfx-pest{position:absolute!important;left:auto!important;right:var(--cfx-pest-d,12px)!important;top:100%;z-index:3;width:34px!important;height:12px!important;min-width:0!important;min-height:0!important;max-height:12px!important;padding:0!important;margin:0!important;' +
     'border:1px solid var(--cfx-borde,#e2e7ec)!important;border-top:0!important;border-radius:0 0 10px 10px!important;font-size:0!important;line-height:0!important;' +
     'background:var(--cfx-tarjeta,#fff)!important;color:var(--cfx-texto-2,#5b6472)!important;display:grid!important;place-items:center;cursor:pointer;box-shadow:0 4px 10px rgba(15,23,42,.10)!important;-webkit-tap-highlight-color:transparent}' +
     '.cfx-pest::before{content:"";position:absolute;inset:-6px -8px -18px}.cfx-pest svg{width:12px;height:12px;display:block}.cfx-pest:focus:not(:focus-visible){outline:0}' +
-    'html.cfx-premium .cfx-pest{top:calc(100% + 3px);color:#b07a00}.cfx-cab.cfx-fija .cfx-pest{right:1px}' +
-    '.cfx-pest i{position:absolute;top:0;right:calc(100% + 3px);min-width:15px;height:15px;border-radius:8px;background:#dc2626;color:#fff;font:700 10px/15px system-ui,sans-serif;font-style:normal;padding:0 3px;box-sizing:border-box}' +
+    'html.cfx-premium .cfx-pest{color:#b07a00}.cfx-cab.cfx-fija .cfx-pest{right:1px}' +
+    '[data-cfx-campana]{position:relative}[data-cfx-n]::after{content:attr(data-cfx-n);position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:#dc2626;color:#fff;font:700 10px/16px system-ui,sans-serif;font-style:normal;text-align:center;padding:0 4px;box-sizing:border-box;pointer-events:none;z-index:1}[data-cfx-n-izq]::after{right:auto;left:-4px}' +
     '.cfx-pnl-velo{position:fixed;inset:0;z-index:2147481500;background:rgba(15,23,42,.35);opacity:0;transition:opacity .22s}.cfx-pnl-velo.on{opacity:1}' +
     '.cfx-pnl{position:fixed;top:0;left:50%;width:100%;max-width:520px;z-index:2147481600;box-sizing:border-box;padding:calc(18px + env(safe-area-inset-top)) 14px 6px;background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);' +
     'border-radius:0 0 22px 22px;box-shadow:0 12px 32px rgba(15,23,42,.22);font-family:var(--cfx-letra,system-ui,sans-serif);transform:translate(-50%,-105%);transition:transform .26s cubic-bezier(.2,.8,.2,1);touch-action:pan-x}' +
@@ -310,7 +312,15 @@
     plan.setAttribute('aria-label', rol ? (rol === 'ADMIN' ? 'Administrador' : 'Socio') : esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
     const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
     av.innerHTML = (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + (n ? '<i>' + n + '</i>' : '');
-    pest.innerHTML = CHEV_ABAJO + (n ? '<i>' + n + '</i>' : '');
+    pest.innerHTML = CHEV_ABAJO;
+    // El número va solo en la campana (no junto a la flechita), como atributo: la app puede rehacer el contenido de su campana sin borrarlo.
+    // Si la campana ya trae su propio número visible, el del núcleo va a la izquierda.
+    const camp = boya.querySelector('[data-cfx-campana]');
+    boya.querySelectorAll('[data-cfx-n]').forEach((x) => { if (!n || x !== camp) { x.removeAttribute('data-cfx-n'); x.removeAttribute('data-cfx-n-izq'); } });
+    if (camp && n) {
+      camp.setAttribute('data-cfx-n', n > 99 ? '99+' : n);
+      camp.toggleAttribute('data-cfx-n-izq', [...camp.querySelectorAll('*')].some((x) => x.offsetParent && /^\s*\d+\+?\s*$/.test(x.textContent)));
+    }
   }
   // ☰ (teléfono): los botones propios de la cabecera (no la flecha de volver, ni el logo/nombre, ni campana/foto) se esconden
   // con .cfx-cab-extra y se ofrecen en una lista; al tocar uno se toca el original (no cambia lo que hace).

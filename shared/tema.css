@@ -256,8 +256,8 @@ button, .btn, a.btn, .chip { align-items: center; }
 .chip, .seg > button, .tabs > button, .cp-tabs > button { white-space: nowrap; }
 /* ===== Núcleo 2.20 · Lo último de cada pestaña nunca queda bajo la barra ni el + (barra 62 px + mitad del + + 16 px) ===== */
 @media (max-width: 899px) {
-  body.cfx-con-barra { padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important; }
-  body.cfx-con-barra .cfx-pad-barra { padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important; }
+  body.cfx-con-barra { padding-bottom: calc(136px + env(safe-area-inset-bottom)) !important; }
+  body.cfx-con-barra .cfx-pad-barra { padding-bottom: calc(136px + env(safe-area-inset-bottom)) !important; }
 }
 /* Botones chicos (chips, ✕) con alto táctil de 40 px */
 button.chip, a.chip, [role="button"].chip { min-height: 40px; }
@@ -280,3 +280,13 @@ button.chip, a.chip, [role="button"].chip { min-height: 40px; }
 }
 @media (min-width: 900px) { .cfx-barra-asa { display: none !important; } }
 @media (prefers-reduced-motion: reduce) { nav.cfx-barra { transition: none !important; } }
+/* ===== Núcleo 2.40 · U14 ===== */
+/* Etiquetas PRO/FREE/números: nunca se parten ("PR / O") ni se achican en una fila. */
+.pill, .pill.pro, .pill.gold, .cfx-plan { white-space: nowrap; flex: none; }
+/* Cifras: ícono arriba, número y texto abajo, sin cortes (CodeFix: <div class="cfx-cifras"><div><i>🔔</i><b>3</b><span>con avisos</span></div>…</div>). */
+.cfx-cifras { width: 100%; box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin: 8px 0; list-style: none; padding: 0; }
+.cfx-cifras > * { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; text-align: center; padding: 10px 6px; border-radius: 12px; background: var(--cfx-suave, rgba(127,127,127,.08)); min-width: 0; }
+.cfx-cifras i { font-style: normal; font-size: 20px; line-height: 1; color: var(--cfx-acento, currentColor); }
+.cfx-cifras i svg, .cfx-cifras i .ic-e { width: 22px !important; height: 22px !important; margin: 0 !important; }
+.cfx-cifras b { font-size: 20px; line-height: 1.2; }
+.cfx-cifras span { font-size: 12px; line-height: 1.25; color: var(--cfx-texto-2, #5b6472); overflow-wrap: anywhere; }

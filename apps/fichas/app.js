@@ -918,8 +918,10 @@
     try {
       const { data, error } = await sb.from('subscribers').select('id,nombre,email,endpoint,created_at').order('created_at', { ascending: false });
       if (error) throw error;
-      $('subsLista').innerHTML = '<li class="muted">' + data.length + ' suscriptor(es) · 🔔 ' +
-        data.filter((x) => x.endpoint).length + ' con notificaciones · ✉️ ' + data.filter((x) => x.email).length + ' con correo</li>' +
+      // Cifras del núcleo (tema.css .cfx-cifras): ícono arriba, número y texto abajo.
+      const cifra = (ico, n, t) => '<div><i>' + ico + '</i><b>' + n + '</b><span>' + t + '</span></div>';
+      $('subsLista').innerHTML = '<li class="cfx-cifras-li"><div class="cfx-cifras">' + cifra('👥', data.length, data.length === 1 ? 'suscriptor' : 'suscriptores') +
+        cifra('🔔', data.filter((x) => x.endpoint).length, 'con notificaciones') + cifra('✉️', data.filter((x) => x.email).length, 'con correo') + '</div></li>' +
         data.slice(0, 50).map((x) => '<li><div class="grow"><b>' + Core.esc(x.nombre || 'Sin nombre') + '</b><div class="muted">' +
           (x.endpoint ? '🔔 ' : '') + Core.esc(x.email || '') + '</div></div>' +
           '<button class="small danger" data-id="' + x.id + '">✕</button></li>').join('');
