@@ -51,11 +51,7 @@
     return Math.round(+t.replace(/,\d{1,2}$/, '').replace(/\D/g, ''));
   }
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+  const esc = (s) => window.CFX_ESC(s);  // una sola función: shared/seguro.js (núcleo)
 
   let toastTimer;
   function toast(msg) {
@@ -336,8 +332,8 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.81';
-  const DB_VERSION = '5.29'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const APP_VERSION = '5.82';
+  const DB_VERSION = '5.30'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};

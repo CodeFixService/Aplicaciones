@@ -9,6 +9,7 @@
 <link rel="icon" href="../icons/icon-192.png">
 <link rel="stylesheet" href="../shared/core.css">
 <link rel="stylesheet" href="../shared/tema.css">
+<script src="../shared/seguro.js"></script>
 <script src="../shared/carga.js"></script>
 <script src="../shared/humano.js"></script>
 <script src="../shared/core.js"></script>
@@ -132,7 +133,7 @@
   const KEY = 'pub:' + slug, mem = Core.store(KEY);
   const tokens = mem.get('tokens', []);
   $('misPed').classList.toggle('hidden', !tokens.length);
-  $('misPedL').innerHTML = tokens.slice(-5).reverse().map((x) => '<li><a class="mini" href="../r/?t=' + x.t + '" style="width:100%"><span class="grow">Pedido del ' +
+  $('misPedL').innerHTML = tokens.slice(-5).reverse().map((x) => '<li><a class="mini" href="../r/?t=' + encodeURIComponent(x.t) + '" style="width:100%"><span class="grow">Pedido del ' +
     new Date(x.f).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + ' · ' + precio(x.total) + '</span><span>›</span></a></li>').join('');
 
   /* ---------- Catálogo con fotos (guardadas en el celular) ---------- */
@@ -142,7 +143,7 @@
   function pintar() {
     const q = $('buscar').value.toLowerCase();
     const l = items.filter((i) => !q || i.nombre.toLowerCase().includes(q));
-    $('grid').innerHTML = l.length ? l.map((i) => '<div class="item">' + (fotos[i.clave] ? '<img class="foto" src="' + fotos[i.clave] + '" alt="" loading="lazy">' : '') +
+    $('grid').innerHTML = l.length ? l.map((i) => '<div class="item">' + (fotos[i.clave] ? '<img class="foto" src="' + CFX_ESC(fotos[i.clave]) + '" alt="" loading="lazy">' : '') +
       (i.categoria ? '<span class="muted" style="font-size:12px">' + Core.esc(i.categoria) + '</span>' : '') + '<b>' + Core.esc(i.nombre) + '</b>' +
       (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
       (i.opciones ? '<select data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +

@@ -150,90 +150,18 @@ begin
   return public.my_account();
 end $$;
 
--- ---------------------------------------------------------------------
--- Licencias (keys Pro). Solo el admin las crea y las ve.
--- ---------------------------------------------------------------------
-create table if not exists public.licenses (
-  id           uuid primary key default gen_random_uuid(),
-  key          text not null unique,
-  empresa      text not null,
-  months       int check (months is null or months > 0),
-  price        numeric(12, 2),
-  note         text,
-  created_at   timestamptz not null default now(),
-  redeemed_by  uuid references public.profiles (id) on delete set null,
-  redeemed_at  timestamptz,
-  revoked      boolean not null default false
-);
-alter table public.licenses enable row level security;
-drop policy if exists "solo admin" on public.licenses;
-create policy "solo admin" on public.licenses
-  for select to authenticated using (public.is_admin());
 
-create or replace function public.admin_create_license(p_empresa text, p_months int, p_price numeric, p_note text default null)
-returns public.licenses
-language plpgsql security definer set search_path = '' as $$
-declare
-  k text;
-  lic public.licenses;
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador puede crear licencias'; end if;
-  if coalesce(trim(p_empresa), '') = '' then raise exception 'Falta el nombre de la empresa'; end if;
-  k := upper(replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''));
-  k := 'CFX-' || substr(k, 1, 4) || '-' || substr(k, 13, 4) || '-' || substr(k, 33, 4) || '-' || substr(k, 45, 4);
-  insert into public.licenses (key, empresa, months, price, note)
-  values (k, left(trim(p_empresa), 80), p_months, p_price, p_note)
-  returning * into lic;
-  return lic;
-end $$;
 
-create or replace function public.admin_revoke_license(p_id uuid) returns void
-language plpgsql security definer set search_path = '' as $$
-declare uid uuid;
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  update public.licenses set revoked = true where id = p_id returning redeemed_by into uid;
-  if uid is not null then
-    update public.profiles set plan = 'free', pro_until = null where id = uid and role <> 'admin';
-  end if;
-end $$;
 
 -- El usuario pega la key: si es válida su cuenta pasa a Pro.
 -- Devuelve {ok, error|account}. Bloquea 1 hora tras 10 intentos fallidos.
 create or replace function public.redeem_license(p_key text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare
-  me public.profiles;
-  lic public.licenses;
-  k text := upper(regexp_replace(coalesce(p_key, ''), '\s', '', 'g'));
-begin
-  select * into me from public.profiles where id = auth.uid() for update;
-  if me.id is null then return jsonb_build_object('ok', false, 'error', 'Inicia sesión primero'); end if;
-  if me.suspended then return jsonb_build_object('ok', false, 'error', 'Cuenta suspendida'); end if;
-  if me.failed_redeems >= 10 and me.last_failed_at > now() - interval '1 hour' then
-    return jsonb_build_object('ok', false, 'error', 'Demasiados intentos. Espera una hora.');
-  end if;
-
-  select * into lic from public.licenses where key = k for update;
-  if lic.id is null or lic.revoked or (lic.redeemed_by is not null and lic.redeemed_by <> me.id) then
-    update public.profiles
-      set failed_redeems = case when last_failed_at > now() - interval '1 hour' then failed_redeems + 1 else 1 end,
-          last_failed_at = now()
-      where id = me.id;
-    return jsonb_build_object('ok', false, 'error', 'Key no válida o ya usada');
-  end if;
-
-  if lic.redeemed_by is null then
-    update public.licenses set redeemed_by = me.id, redeemed_at = now() where id = lic.id;
-  end if;
-  update public.profiles
-    set plan = 'pro',
-        pro_until = case when lic.months is null then null
-                         else greatest(coalesce(pro_until, now()), now()) + make_interval(months => lic.months) end,
-        empresa = case when empresa = '' then lic.empresa else empresa end,
-        failed_redeems = 0
-    where id = me.id;
+begin  -- A5 (bd 5.30): las keys viven en cfx_keys (núcleo; se crean en el Centro de Mando). Se mantiene el nombre que usan las pantallas.
+  perform public.cfx_key_canjear(p_key);
   return jsonb_build_object('ok', true, 'account', public.my_account());
+exception when others then
+  return jsonb_build_object('ok', false, 'error', sqlerrm);
 end $$;
 
 create or replace function public.admin_set_plan(p_user uuid, p_plan text, p_until timestamptz, p_suspended boolean)
@@ -499,23 +427,6 @@ language sql stable security definer set search_path = '' as $$
   order by coalesce(n.sent_at, n.send_at) desc limit 40
 $$;
 
-create or replace function public.admin_stats() returns jsonb
-language plpgsql stable security definer set search_path = '' as $$
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  return jsonb_build_object(
-    'usuarios', (select count(*) from public.profiles),
-    'empresas', (select count(*) from public.profiles where role = 'user'),
-    'clientes', (select count(*) from public.profiles where role = 'client'),
-    'pendientes', (select count(*) from public.requests where status = 'pending'),
-    'reportes', (select count(*) from public.reports where not resolved),
-    'pro', (select count(*) from public.profiles where public.is_pro(id) and role <> 'admin'),
-    'licencias', (select count(*) from public.licenses where not revoked),
-    'canjeadas', (select count(*) from public.licenses where redeemed_by is not null and not revoked),
-    'ingresos', (select coalesce(sum(price), 0) from public.licenses where not revoked),
-    'suscriptores', (select count(*) from public.subscribers),
-    'dispositivos', (select count(*) from public.push_subscriptions));
-end $$;
 
 -- ---------------------------------------------------------------------
 -- Funciones que usa SOLO el servidor de envíos (Edge Function "enviar").
@@ -620,30 +531,26 @@ revoke all on function public.save_my_push(text, text, text) from public, anon;
 revoke all on function public.schedule_notification(text, text, text, text, text, text[], timestamptz) from public, anon;
 revoke all on function public.cancel_notification(uuid) from public, anon;
 revoke all on function public.my_inbox() from public, anon;
-revoke all on function public.admin_create_license(text, int, numeric, text) from public, anon;
-revoke all on function public.admin_revoke_license(uuid) from public, anon;
 revoke all on function public.admin_set_plan(uuid, text, timestamptz, boolean) from public, anon;
 revoke all on function public.admin_set_secret(text, text) from public, anon;
 revoke all on function public.admin_secret_status() from public, anon;
-revoke all on function public.admin_stats() from public, anon;
 
 grant execute on function public.my_account(), public.update_my_company(text), public.redeem_license(text),
   public.save_my_push(text, text, text),
   public.schedule_notification(text, text, text, text, text, text[], timestamptz),
   public.cancel_notification(uuid), public.my_inbox(),
-  public.admin_create_license(text, int, numeric, text), public.admin_revoke_license(uuid),
   public.admin_set_plan(uuid, text, timestamptz, boolean), public.admin_set_secret(text, text),
-  public.admin_secret_status(), public.admin_stats()
+  public.admin_secret_status()
   to authenticated;
 grant execute on function public.public_config(), public.negocio_publico(uuid),
   public.subscribe_negocio(uuid, text, text, text, text, text) to anon, authenticated;
 
 -- Las tablas solo se leen (según las políticas); se escriben por funciones.
-revoke insert, update, delete, truncate on public.profiles, public.licenses, public.app_secrets,
+revoke insert, update, delete, truncate on public.profiles, public.app_secrets,
   public.push_subscriptions, public.subscribers, public.notifications from anon, authenticated;
 revoke select on public.app_secrets, public.push_subscriptions from anon, authenticated;
-revoke select on public.profiles, public.licenses, public.subscribers, public.notifications from anon;
-grant select on public.profiles, public.licenses, public.subscribers, public.notifications to authenticated;
+revoke select on public.profiles, public.subscribers, public.notifications from anon;
+grant select on public.profiles, public.subscribers, public.notifications to authenticated;
 grant delete on public.subscribers to authenticated;
 
 -- ---------------------------------------------------------------------
@@ -1875,7 +1782,7 @@ begin
   return jsonb_build_object(
     'empresas_pro', ne, 'clientes_premium', nc, 'precio_empresa', pe, 'precio_cliente', pc,
     'estimado_mes', ne * pe,
-    'licencias_mes', (select coalesce(sum(price), 0) from public.licenses where not revoked and created_at > date_trunc('month', now())),
+    'licencias_mes', (select coalesce(sum(monto), 0) from public.cfx_pagos where estado = 'aprobado' and resuelto > date_trunc('month', now())),
     'pedidos_mes', (select count(*) from public.pedidos where created_at > date_trunc('month', now())),
     'vencen', (select coalesce(jsonb_agg(z order by z.pro_until), '[]') from (
         select p.id, coalesce(nullif(p.empresa, ''), p.email) as nombre, p.email, p.role, p.pro_until
@@ -2499,49 +2406,8 @@ begin
   return l;
 end $$;
 
--- ---------- ⭐ Reseñas: solo opina quien ya recibió un pedido de la tienda ----------
-create table if not exists public.resenas (
-  id          uuid primary key default gen_random_uuid(),
-  negocio_id  uuid not null references public.profiles (id) on delete cascade,
-  autor_id    uuid not null references public.profiles (id) on delete cascade,
-  estrellas   int not null check (estrellas between 1 and 5),
-  texto       text not null default '',
-  respuesta   text,
-  destacada   boolean not null default false,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
-  unique (negocio_id, autor_id)
-);
-create index if not exists resenas_negocio_idx on public.resenas (negocio_id, updated_at desc);
-alter table public.resenas enable row level security;  -- sin políticas: solo por funciones
-revoke all on public.resenas from anon, authenticated;
 
-create or replace function public.puede_resenar(me uuid, t uuid) returns boolean
-language sql stable security definer set search_path = '' as $$
-  select public.puede_comprar(me, t)
-     and exists (select 1 from public.pedidos x where x.negocio_id = t and x.cliente_id = me and x.estado = 'entregado')
-$$;
 
-create or replace function public.dejar_resena(p_negocio uuid, p_estrellas int, p_texto text) returns jsonb
-language plpgsql security definer set search_path = '' as $$
-declare me public.profiles; nueva boolean;
-begin
-  select * into me from public.profiles where id = auth.uid();
-  if me.id is null or me.suspended then return jsonb_build_object('ok', false, 'error', 'Inicia sesión primero'); end if;
-  if not public.puede_resenar(me.id, p_negocio) then
-    return jsonb_build_object('ok', false, 'error', 'Podrás dejar tu reseña cuando recibas tu primer pedido de esta tienda');
-  end if;
-  if p_estrellas is null or p_estrellas < 1 or p_estrellas > 5 then return jsonb_build_object('ok', false, 'error', 'Elige de 1 a 5 estrellas'); end if;
-  nueva := not exists (select 1 from public.resenas where negocio_id = p_negocio and autor_id = me.id);
-  insert into public.resenas (negocio_id, autor_id, estrellas, texto)
-  values (p_negocio, me.id, p_estrellas, left(trim(coalesce(p_texto, '')), 300))
-  on conflict (negocio_id, autor_id) do update set estrellas = excluded.estrellas, texto = excluded.texto, updated_at = now();
-  if nueva then
-    perform public.notify_user(p_negocio, '⭐ Nueva reseña: ' || repeat('★', p_estrellas) || repeat('☆', 5 - p_estrellas),
-      coalesce(nullif(left(trim(coalesce(p_texto, '')), 120), ''), 'Un cliente calificó tu tienda'), 'apps/pedidos/?v=resenas');
-  end if;
-  return jsonb_build_object('ok', true);
-end $$;
 
 -- Nombre corto del autor ("Rosa M."): nunca el correo.
 create or replace function public.nombre_corto(n text) returns text
@@ -2550,51 +2416,8 @@ language sql immutable as $$
     case when split_part(trim(coalesce(n, '')), ' ', 2) <> '' then ' ' || upper(left(split_part(trim(n), ' ', 2), 1)) || '.' else '' end), ''), 'Cliente')
 $$;
 
-create or replace function public.ver_resenas(p_negocio uuid) returns jsonb
-language plpgsql stable security definer set search_path = '' as $$
-declare pro boolean := public.is_pro(p_negocio);
-begin
-  if not (public.puede_comprar(auth.uid(), p_negocio) or p_negocio = auth.uid() or public.is_admin()) then
-    raise exception 'No puedes ver las reseñas de esta tienda';
-  end if;
-  return jsonb_build_object(
-    'promedio', (select round(avg(estrellas)::numeric, 1) from public.resenas where negocio_id = p_negocio),
-    'total', (select count(*) from public.resenas where negocio_id = p_negocio),
-    'puede', public.puede_resenar(auth.uid(), p_negocio),
-    'pro', pro,
-    'mia', (select jsonb_build_object('estrellas', estrellas, 'texto', texto) from public.resenas
-            where negocio_id = p_negocio and autor_id = auth.uid()),
-    'lista', (select coalesce(jsonb_agg(z), '[]') from (
-      select r.id, public.nombre_corto(a.empresa) as autor, r.estrellas, r.texto, r.respuesta,
-             r.destacada and pro as destacada, r.updated_at as fecha, r.autor_id = auth.uid() as mia
-      from public.resenas r join public.profiles a on a.id = r.autor_id
-      where r.negocio_id = p_negocio
-      order by (r.destacada and pro) desc, r.updated_at desc limit 50) z));
-end $$;
 
-create or replace function public.responder_resena(p_id uuid, p_respuesta text) returns void
-language plpgsql security definer set search_path = '' as $$
-declare r public.resenas; t text := nullif(left(trim(coalesce(p_respuesta, '')), 300), '');
-begin
-  select * into r from public.resenas where id = p_id and negocio_id = auth.uid();
-  if r.id is null then raise exception 'Reseña no encontrada'; end if;
-  if not public.is_pro(auth.uid()) then raise exception 'Responder reseñas es de la versión Pro'; end if;
-  update public.resenas set respuesta = t where id = p_id;
-  if t is not null and r.respuesta is null then
-    perform public.notify_user(r.autor_id, '💬 La tienda respondió tu reseña', t, 'apps/catalogo/?v=productos#resenas');
-  end if;
-end $$;
 
-create or replace function public.destacar_resena(p_id uuid, p_destacar boolean) returns void
-language plpgsql security definer set search_path = '' as $$
-begin
-  if not exists (select 1 from public.resenas where id = p_id and negocio_id = auth.uid()) then raise exception 'Reseña no encontrada'; end if;
-  if not public.is_pro(auth.uid()) then raise exception 'Destacar reseñas es de la versión Pro'; end if;
-  if coalesce(p_destacar, false) and (select count(*) from public.resenas where negocio_id = auth.uid() and destacada and id <> p_id) >= 3 then
-    raise exception 'Puedes destacar hasta 3 reseñas';
-  end if;
-  update public.resenas set destacada = coalesce(p_destacar, false) where id = p_id;
-end $$;
 
 revoke all on function public.hoy_cl() from public, anon;
 revoke all on function public.registrar_actividad() from public, anon;
@@ -2609,17 +2432,11 @@ revoke all on function public.pedido_sin_vacaciones() from public, anon, authent
 revoke all on function public.set_mi_color(text) from public, anon;
 revoke all on function public.mis_respuestas() from public, anon;
 revoke all on function public.set_mis_respuestas(jsonb) from public, anon;
-revoke all on function public.puede_resenar(uuid, uuid) from public, anon;
-revoke all on function public.dejar_resena(uuid, int, text) from public, anon;
 revoke all on function public.nombre_corto(text) from public, anon;
-revoke all on function public.ver_resenas(uuid) from public, anon;
-revoke all on function public.responder_resena(uuid, text) from public, anon;
-revoke all on function public.destacar_resena(uuid, boolean) from public, anon;
 grant execute on function public.hoy_cl(), public.registrar_actividad(), public.admin_actividad(), public.admin_actividad_hoy(),
   public.admin_empresa_actividad(uuid), public.admin_limpiar_actividad(), public.admin_motivar(uuid, text, text),
   public.en_vacaciones(uuid), public.set_vacaciones(date, text), public.set_mi_color(text), public.my_account(), public.tienda_info(uuid),
-  public.mis_respuestas(), public.set_mis_respuestas(jsonb), public.puede_resenar(uuid, uuid), public.dejar_resena(uuid, int, text),
-  public.nombre_corto(text), public.ver_resenas(uuid), public.responder_resena(uuid, text), public.destacar_resena(uuid, boolean)
+  public.mis_respuestas(), public.set_mis_respuestas(jsonb), public.nombre_corto(text)
   to authenticated;
 
 -- =====================================================================
@@ -3035,86 +2852,10 @@ language sql stable security definer set search_path = '' as $$
     'planes', public.planes_publicos())
 $$;
 
--- ---------- Pagos del Premium al administrador (con comprobante) ----------
-create table if not exists public.pagos (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references public.profiles (id) on delete cascade,
-  tipo        text not null check (tipo in ('premium_negocio', 'premium_cliente')),
-  monto       int,
-  comprobante text,
-  estado      text not null default 'en_revision' check (estado in ('en_revision', 'aprobado', 'rechazado')),
-  motivo      text,
-  dias        int,
-  created_at  timestamptz not null default now(),
-  revisado_at timestamptz
-);
-create index if not exists pagos_estado_idx on public.pagos (estado, created_at desc);
-alter table public.pagos enable row level security;
-revoke all on public.pagos from anon, authenticated;
 
 create or replace function public.img_ok(i text, maxlen int) returns boolean
 language sql immutable as $$ select coalesce(i, '') ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$' and length(i) <= maxlen $$;
 
-create or replace function public.subir_pago_premium(p_comprobante text) returns jsonb
-language plpgsql security definer set search_path = '' as $$
-declare me public.profiles; t text; l jsonb;
-begin
-  select * into me from public.profiles where id = auth.uid();
-  if me.id is null or me.role not in ('user', 'client') then return jsonb_build_object('ok', false, 'error', 'Solo negocios y clientes'); end if;
-  if not public.img_ok(p_comprobante, 400000) then return jsonb_build_object('ok', false, 'error', 'Sube una foto del comprobante'); end if;
-  if exists (select 1 from public.pagos where user_id = me.id and estado = 'en_revision') then
-    return jsonb_build_object('ok', false, 'error', 'Ya tienes un comprobante en revisión. Te avisamos apenas lo revisemos.');
-  end if;
-  t := case when me.role = 'client' then 'premium_cliente' else 'premium_negocio' end;
-  l := public.link_activo(public.admin_id(), t);
-  insert into public.pagos (user_id, tipo, monto, comprobante) values (me.id, t, (l ->> 'precio')::int, p_comprobante);
-  perform public.notify_user(public.admin_id(), '💰 Comprobante de ' || coalesce(nullif(me.empresa, ''), me.email),
-    'Revisa el pago Premium en Administración → Pagos', 'apps/admin/#pagos');
-  return jsonb_build_object('ok', true);
-end $$;
-drop function if exists public.mis_pagos();
-create or replace function public.mis_pagos() returns table (id uuid, tipo text, monto int, estado text, motivo text, fecha timestamptz)
-language sql stable security definer set search_path = '' as $$
-  select id, tipo, monto, estado, motivo, created_at from public.pagos where user_id = auth.uid() order by created_at desc limit 20
-$$;
-drop function if exists public.admin_pagos(text);
-create or replace function public.admin_pagos(p_estado text)
-returns table (id uuid, user_id uuid, nombre text, email text, rol text, tipo text, monto int, estado text, motivo text,
-               fecha timestamptz, revisado timestamptz, pro_until timestamptz, tiene_comprobante boolean)
-language plpgsql stable security definer set search_path = '' as $$
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  return query select x.id, x.user_id, coalesce(nullif(p.empresa, ''), p.email), p.email, p.role, x.tipo, x.monto, x.estado, x.motivo,
-    x.created_at, x.revisado_at, p.pro_until, x.comprobante is not null
-  from public.pagos x join public.profiles p on p.id = x.user_id
-  where p_estado is null or p_estado = '' or x.estado = p_estado order by x.created_at desc limit 200;
-end $$;
-create or replace function public.admin_pago_comprobante(p_id uuid) returns text
-language plpgsql stable security definer set search_path = '' as $$
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  return (select comprobante from public.pagos where id = p_id);
-end $$;
-create or replace function public.admin_revisar_pago(p_id uuid, p_aprobar boolean, p_motivo text) returns jsonb
-language plpgsql security definer set search_path = '' as $$
-declare x public.pagos; d int; hasta timestamptz;
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  select * into x from public.pagos where id = p_id and estado = 'en_revision';
-  if x.id is null then raise exception 'Ese pago ya fue revisado'; end if;
-  if coalesce(p_aprobar, false) then
-    d := (select duracion_dias from public.planes where codigo = case when x.tipo = 'premium_cliente' then 'cliente_pro' else 'negocio_pro' end);
-    update public.profiles set plan = 'pro', pro_until = greatest(now(), coalesce(pro_until, now())) + make_interval(days => d), aviso_venc_at = null
-    where id = x.user_id returning pro_until into hasta;
-    update public.pagos set estado = 'aprobado', dias = d, revisado_at = now() where id = x.id;
-    perform public.notify_user(x.user_id, '⭐ ¡Pago aprobado!', 'Tu plan Pro/Premium está activo hasta el ' || to_char(hasta at time zone 'America/Santiago', 'DD-MM-YYYY'), './#plan');
-  else
-    update public.pagos set estado = 'rechazado', motivo = nullif(left(trim(coalesce(p_motivo, '')), 200), ''), revisado_at = now() where id = x.id;
-    perform public.notify_user(x.user_id, '❌ Comprobante rechazado', coalesce(nullif(trim(p_motivo), ''), 'Revisa el comprobante y vuelve a subirlo.'), './#plan');
-  end if;
-  perform public.auditar(case when p_aprobar then 'Pago aprobado' else 'Pago rechazado' end, x.tipo || ' · ' || x.user_id);
-  return jsonb_build_object('ok', true);
-end $$;
 
 -- Dar / quitar Premium, suspender y eliminar cuentas (admin).
 create or replace function public.admin_premium(p_user uuid, p_dias int) returns void
@@ -3716,14 +3457,12 @@ begin
   if not found then return jsonb_build_object('ok', false, 'error', 'Este pedido ya fue calificado'); end if;
   return jsonb_build_object('ok', true);
 end $$;
--- Promedio de la tienda: calificaciones por pedido + estrellas de las reseñas anteriores.
+-- Promedio de la tienda: calificaciones por pedido.
 create or replace function public.estrellas_tienda(n uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('promedio', round(avg(e), 1), 'total', count(e)) from (
-    select q.estrellas e from public.calificaciones q join public.pedidos x on x.id = q.pedido_id where x.negocio_id = n and not q.de_negocio
-    union all select r.estrellas from public.resenas r where r.negocio_id = n) z
+    select q.estrellas e from public.calificaciones q join public.pedidos x on x.id = q.pedido_id where x.negocio_id = n and not q.de_negocio) z
 $$;
-update public.resenas set texto = '', respuesta = null, destacada = false where texto <> '' or respuesta is not null or destacada;
 
 create or replace function public.tienda_info(p_negocio uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
@@ -3808,7 +3547,7 @@ begin
     (select count(*)::int from public.catalog_items c where c.owner_id = p.id),
     (select count(*)::int from public.pedidos x where x.negocio_id = p.id and x.created_at >= date_trunc('month', now())),
     public.link_activo(p.id, 'pedido') is not null, (public.estrellas_tienda(p.id) ->> 'promedio')::numeric,
-    exists (select 1 from public.pagos g where g.user_id = p.id and g.estado = 'en_revision')
+    exists (select 1 from public.cfx_pagos g where g.cuenta = p.id and g.estado = 'pendiente')
   from public.profiles p where p.role = 'user' order by p.created_at desc;
 end $$;
 create or replace function public.admin_clientes()
@@ -3837,15 +3576,14 @@ begin
     'equipo', (select count(*) from public.profiles where role = 'equipo'),
     'pedidos_mes', (select count(*) from public.pedidos where created_at >= m),
     'pedidos_hoy', (select count(*) from public.pedidos where created_at >= public.hoy_cl()::timestamp at time zone 'America/Santiago'),
-    'pagos_por_revisar', (select count(*) from public.pagos where estado = 'en_revision'),
-    'ingresos_mes', (select coalesce(sum(monto), 0) from public.pagos where estado = 'aprobado' and revisado_at >= m)
-                    + (select coalesce(sum(price), 0) from public.licenses where redeemed_at >= m),
+    'pagos_por_revisar', (select count(*) from public.cfx_pagos where estado = 'pendiente'),
+    'ingresos_mes', (select coalesce(sum(monto), 0) from public.cfx_pagos where estado = 'aprobado' and resuelto >= m),
     'version', public.db_version(),
     'uso', jsonb_build_object('db_bytes', pg_database_size(current_database()), 'db_limite', 500 * 1024 * 1024,
       'tablas', (select jsonb_object_agg(c.relname, pg_total_relation_size(c.oid)) from pg_class c join pg_namespace s on s.oid = c.relnamespace
                  where s.nspname = 'public' and c.relkind = 'r'),
-      'comprobantes', (select count(*) from public.pedidos where comprobante is not null) + (select count(*) from public.pagos where comprobante is not null),
-      'comprobantes_bytes', (select coalesce(sum(length(comprobante)), 0) from public.pedidos) + (select coalesce(sum(length(comprobante)), 0) from public.pagos)));
+      'comprobantes', (select count(*) from public.pedidos where comprobante is not null) + (select count(*) from public.cfx_pagos where comprobante is not null),
+      'comprobantes_bytes', (select coalesce(sum(length(comprobante)), 0) from public.pedidos) + (select coalesce(sum(length(comprobante)), 0) from public.cfx_pagos)));
 end $$;
 
 -- Limpieza (diaria y con botones): comprobantes viejos, avisos y mensajes de 7 días, pedidos expirados de 60 días.
@@ -3856,8 +3594,6 @@ begin
   if p_que in ('comprobantes', 'todo') then
     update public.pedidos set comprobante = null where comprobante is not null and estado not in ('en_revision') and comprobante_at < now() - make_interval(days => d);
     get diagnostics k = row_count;
-    update public.pagos set comprobante = null where comprobante is not null and estado <> 'en_revision' and created_at < now() - make_interval(days => d);
-    get diagnostics c = row_count; k := k + c; c := 0;
   end if;
   if p_que in ('avisos', 'mensajes', 'todo') then
     r := public.limpiar_registros(); a := (r ->> 'avisos')::int + (r ->> 'campanas')::int; m := (r ->> 'mensajes')::int;
@@ -3928,15 +3664,13 @@ grant execute on function public.planes_publicos(), public.reglas(), public.prem
   public.ver_pedido(text), public.subir_comprobante(text, text), public.cancelar_pedido(text), public.calificar_pedido(text, int),
   public.stock_catalogo(uuid) to anon, authenticated;
 revoke all on function public.admin_plan_guardar(text, text, text, jsonb, int, jsonb), public.admin_set_regla(text, int), public.admin_auditoria(),
-  public.set_link_pago(text, int, text, text, int, boolean), public.mis_links_pago(), public.subir_pago_premium(text), public.mis_pagos(),
-  public.admin_pagos(text), public.admin_pago_comprobante(uuid), public.admin_revisar_pago(uuid, boolean, text), public.admin_premium(uuid, int),
+  public.set_link_pago(text, int, text, text, int, boolean), public.mis_links_pago(), public.admin_premium(uuid, int),
   public.admin_suspender(uuid, boolean), public.admin_eliminar_cuenta(uuid), public.mi_equipo(), public.quitar_equipo(uuid), public.set_stock(text, int),
   public.caja_descontar(jsonb), public.revisar_comprobante(uuid, boolean, text), public.comprobante_pedido(uuid), public.marcar_devuelto(uuid),
   public.pedidos_tienda(text), public.mis_pedidos(uuid), public.hoy_negocio(), public.admin_negocios(), public.admin_clientes(), public.admin_resumen(),
   public.admin_limpiar(text) from public, anon;
 grant execute on function public.admin_plan_guardar(text, text, text, jsonb, int, jsonb), public.admin_set_regla(text, int), public.admin_auditoria(),
-  public.set_link_pago(text, int, text, text, int, boolean), public.mis_links_pago(), public.subir_pago_premium(text), public.mis_pagos(),
-  public.admin_pagos(text), public.admin_pago_comprobante(uuid), public.admin_revisar_pago(uuid, boolean, text), public.admin_premium(uuid, int),
+  public.set_link_pago(text, int, text, text, int, boolean), public.mis_links_pago(), public.admin_premium(uuid, int),
   public.admin_suspender(uuid, boolean), public.admin_eliminar_cuenta(uuid), public.mi_equipo(), public.quitar_equipo(uuid), public.set_stock(text, int),
   public.caja_descontar(jsonb), public.revisar_comprobante(uuid, boolean, text), public.comprobante_pedido(uuid), public.marcar_devuelto(uuid),
   public.pedidos_tienda(text), public.mis_pedidos(uuid), public.hoy_negocio(), public.admin_negocios(), public.admin_clientes(), public.admin_resumen(),
@@ -3957,7 +3691,6 @@ language sql immutable as $$ select '5.1'::text $$;
 -- ---------- Columnas nuevas ----------
 alter table public.pedidos add column if not exists rechazos int not null default 0;
 alter table public.pedidos add column if not exists desc_premium numeric(12, 2) not null default 0;
-alter table public.pagos add column if not exists anual boolean not null default false;
 alter table public.profiles add column if not exists desc_premium int not null default 0;
 alter table public.profiles drop constraint if exists profiles_desc_premium_check;
 alter table public.profiles add constraint profiles_desc_premium_check check (desc_premium between 0 and 50);
@@ -4052,67 +3785,6 @@ language sql stable security definer set search_path = '' as $$
     'planes', public.planes_publicos())
 $$;
 
-drop function if exists public.subir_pago_premium(text);
-create or replace function public.subir_pago_premium(p_comprobante text, p_anual boolean default false) returns jsonb
-language plpgsql security definer set search_path = '' as $$
-declare me public.profiles; t text; l jsonb; anual boolean;
-begin
-  select * into me from public.profiles where id = auth.uid();
-  if me.id is null or me.role not in ('user', 'client') then return jsonb_build_object('ok', false, 'error', 'Solo negocios y clientes'); end if;
-  if not public.img_ok(p_comprobante, 400000) then return jsonb_build_object('ok', false, 'error', 'Sube una foto del comprobante'); end if;
-  if exists (select 1 from public.pagos where user_id = me.id and estado = 'en_revision') then
-    return jsonb_build_object('ok', false, 'error', 'Ya tienes un comprobante en revisión. Te avisamos apenas lo revisemos.');
-  end if;
-  t := case when me.role = 'client' then 'premium_cliente' else 'premium_negocio' end;
-  l := public.link_activo(public.admin_id(), case when me.role = 'client' then 'anual_cliente' else 'anual_negocio' end);
-  anual := coalesce(p_anual, false) and l is not null;
-  if not anual then l := public.link_activo(public.admin_id(), t); end if;
-  insert into public.pagos (user_id, tipo, monto, comprobante, anual) values (me.id, t, (l ->> 'precio')::int, p_comprobante, anual);
-  perform public.notify_user(public.admin_id(), '💰 Comprobante de ' || coalesce(nullif(me.empresa, ''), me.email) || case when anual then ' (anual)' else '' end,
-    'Revisa el pago Premium en Administración → Pagos', 'apps/admin/#pagos');
-  return jsonb_build_object('ok', true);
-end $$;
-drop function if exists public.mis_pagos();
-create or replace function public.mis_pagos() returns table (id uuid, tipo text, monto int, estado text, motivo text, fecha timestamptz, anual boolean, dias int)
-language sql stable security definer set search_path = '' as $$
-  select id, tipo, monto, estado, motivo, created_at, anual, dias from public.pagos where user_id = auth.uid() order by created_at desc limit 20
-$$;
-drop function if exists public.admin_pagos(text);
-create or replace function public.admin_pagos(p_estado text)
-returns table (id uuid, user_id uuid, nombre text, email text, rol text, tipo text, monto int, estado text, motivo text,
-               fecha timestamptz, revisado timestamptz, pro_until timestamptz, tiene_comprobante boolean, anual boolean, dias int)
-language plpgsql stable security definer set search_path = '' as $$
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  return query select x.id, x.user_id, coalesce(nullif(p.empresa, ''), p.email), p.email, p.role, x.tipo, x.monto, x.estado, x.motivo,
-    x.created_at, x.revisado_at, p.pro_until, x.comprobante is not null, x.anual, x.dias
-  from public.pagos x join public.profiles p on p.id = x.user_id
-  where p_estado is null or p_estado = '' or x.estado = p_estado order by x.created_at desc limit 200;
-end $$;
-drop function if exists public.admin_revisar_pago(uuid, boolean, text);
-create or replace function public.admin_revisar_pago(p_id uuid, p_aprobar boolean, p_motivo text, p_dias int default null) returns jsonb
-language plpgsql security definer set search_path = '' as $$
-declare x public.pagos; d int; hasta timestamptz;
-begin
-  if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  select * into x from public.pagos where id = p_id and estado = 'en_revision';
-  if x.id is null then raise exception 'Ese pago ya fue revisado'; end if;
-  if coalesce(p_aprobar, false) then
-    d := coalesce(nullif(p_dias, 0), case when x.anual then 365 end,
-                  (select duracion_dias from public.planes where codigo = case when x.tipo = 'premium_cliente' then 'cliente_pro' else 'negocio_pro' end), 30);
-    if d < 1 or d > 3650 then raise exception 'Días no válidos'; end if;
-    update public.profiles set plan = 'pro', pro_until = greatest(now(), coalesce(case when plan = 'pro' then pro_until end, now())) + make_interval(days => d),
-      aviso_venc_at = null
-    where id = x.user_id returning pro_until into hasta;
-    update public.pagos set estado = 'aprobado', dias = d, revisado_at = now() where id = x.id;
-    perform public.notify_user(x.user_id, '⭐ ¡Pago aprobado!', 'Tu plan Pro/Premium está activo hasta el ' || to_char(hasta at time zone 'America/Santiago', 'DD-MM-YYYY'), './#plan');
-  else
-    update public.pagos set estado = 'rechazado', motivo = nullif(left(trim(coalesce(p_motivo, '')), 200), ''), revisado_at = now() where id = x.id;
-    perform public.notify_user(x.user_id, '❌ Comprobante rechazado', coalesce(nullif(trim(p_motivo), ''), 'Revisa el comprobante y vuelve a subirlo.') || ' Puedes subir otro en Mi plan.', './#plan');
-  end if;
-  perform public.auditar(case when p_aprobar then 'Pago aprobado' || coalesce(' (' || d || ' días)', '') else 'Pago rechazado' end, x.tipo || ' · ' || x.user_id);
-  return jsonb_build_object('ok', true);
-end $$;
 
 -- ---------- Comprobante rechazado: el pedido vuelve a "Esperando pago" ----------
 create or replace function public.revisar_comprobante(p_id uuid, p_aprobar boolean, p_motivo text) returns jsonb
@@ -4469,8 +4141,6 @@ begin
   if p_que in ('comprobantes', 'todo') then
     update public.pedidos set comprobante = null where comprobante is not null and estado not in ('en_revision') and comprobante_at < now() - make_interval(days => d);
     get diagnostics k = row_count;
-    update public.pagos set comprobante = null where comprobante is not null and estado <> 'en_revision' and created_at < now() - make_interval(days => d);
-    get diagnostics c = row_count; k := k + c; c := 0;
   end if;
   if p_que in ('avisos', 'mensajes', 'todo') then
     r := public.limpiar_registros(); a := (r ->> 'avisos')::int + (r ->> 'campanas')::int; m := (r ->> 'mensajes')::int;
@@ -4563,7 +4233,7 @@ begin
     (select count(*)::int from public.catalog_items c where c.owner_id = p.id),
     (select count(*)::int from public.pedidos x where x.negocio_id = p.id and x.created_at >= date_trunc('month', now())),
     public.link_activo(p.id, 'pedido') is not null, (public.estrellas_tienda(p.id) ->> 'promedio')::numeric,
-    exists (select 1 from public.pagos g where g.user_id = p.id and g.estado = 'en_revision'), p.rubro, p.created_by is null
+    exists (select 1 from public.cfx_pagos g where g.cuenta = p.id and g.estado = 'pendiente'), p.rubro, p.created_by is null
   from public.profiles p where p.role = 'user' order by p.created_at desc;
 end $$;
 create or replace function public.tienda_info(p_negocio uuid) returns jsonb
@@ -4593,12 +4263,10 @@ where codigo = 'cliente_pro' and beneficios = '["Tu propia Caja con Finanzas", "
 -- Permisos 5.1
 revoke all on function public.regalo_nuevo_negocio(), public.es_cliente_premium(uuid), public.recordar_carritos(), public.reporte_semanal(),
   public.stock_avisos() from public, anon, authenticated;
-revoke all on function public.subir_pago_premium(text, boolean), public.mis_pagos(), public.admin_pagos(text), public.admin_revisar_pago(uuid, boolean, text, int),
-  public.pedidos_tienda(text), public.mis_pedidos(uuid), public.set_desc_premium(int), public.guardar_carrito(uuid, jsonb), public.avisame_stock(uuid, text, boolean),
+revoke all on function public.pedidos_tienda(text), public.mis_pedidos(uuid), public.set_desc_premium(int), public.guardar_carrito(uuid, jsonb), public.avisame_stock(uuid, text, boolean),
   public.mis_avisos_stock(uuid), public.kit_whatsapp(), public.crear_pedido(uuid, jsonb, text, text, text, text), public.revisar_comprobante(uuid, boolean, text)
   from public, anon;
-grant execute on function public.subir_pago_premium(text, boolean), public.mis_pagos(), public.admin_pagos(text), public.admin_revisar_pago(uuid, boolean, text, int),
-  public.pedidos_tienda(text), public.mis_pedidos(uuid), public.set_desc_premium(int), public.guardar_carrito(uuid, jsonb), public.avisame_stock(uuid, text, boolean),
+grant execute on function public.pedidos_tienda(text), public.mis_pedidos(uuid), public.set_desc_premium(int), public.guardar_carrito(uuid, jsonb), public.avisame_stock(uuid, text, boolean),
   public.mis_avisos_stock(uuid), public.kit_whatsapp(), public.crear_pedido(uuid, jsonb, text, text, text, text), public.revisar_comprobante(uuid, boolean, text)
   to authenticated;
 
@@ -4624,16 +4292,17 @@ end $$;
 -- 🧹 Cuentas de negocio que no se usan: sin Pro, sin productos, pedidos, clientes ni fichas,
 -- creadas y sin entrar hace p_dias o más. Nunca toca negocios Pro ni al administrador.
 create or replace function public.es_cuenta_inactiva(u uuid, p_dias int) returns boolean
-language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.profiles p where p.id = u and p.role = 'user' and not public.is_pro(p.id)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  return exists (select 1 from public.profiles p where p.id = u and p.role = 'user' and not public.is_pro(p.id)
     and p.created_at < now() - make_interval(days => p_dias)
     and coalesce(p.visto_at, p.created_at) < now() - make_interval(days => p_dias)
     and not exists (select 1 from public.catalog_items c where c.owner_id = p.id)
     and not exists (select 1 from public.pedidos x where x.negocio_id = p.id)
     and not exists (select 1 from public.profiles c where c.negocio_id = p.id and c.role = 'client')
     and not exists (select 1 from public.publicaciones f where f.owner_id = p.id)
-    and not exists (select 1 from public.pagos g where g.user_id = p.id and g.estado = 'en_revision'))
-$$;
+    and not exists (select 1 from public.cfx_pagos g where g.cuenta = p.id and g.estado = 'pendiente'));
+end $$;
 create or replace function public.admin_cuentas_inactivas(p_dias int)
 returns table (id uuid, empresa text, email text, rubro text, creado timestamptz, visto_at timestamptz, autoregistro boolean)
 language plpgsql stable security definer set search_path = '' as $$
@@ -4788,9 +4457,8 @@ begin
     'Clientes', (select coalesce(jsonb_agg(x order by x.nombre), '[]') from (select empresa as nombre, email as correo, telefono, plan, pro_until as premium_hasta,
         created_at as creado from public.profiles where negocio_id = n and role = 'client') x),
     'Fichas', (select coalesce(jsonb_agg(x order by x.creada), '[]') from (select titulo, detalle, precio, tipo, vip, created_at as creada from public.publicaciones where owner_id = n) x),
-    'Cupones', (select coalesce(jsonb_agg(x), '[]') from (select codigo, porcentaje, hasta, activo, usos from public.cupones where owner_id = n) x),
-    'Reseñas', (select coalesce(jsonb_agg(x order by x.fecha), '[]') from (select r.created_at as fecha, a.empresa as autor, r.estrellas, r.texto, r.respuesta
-        from public.resenas r left join public.profiles a on a.id = r.autor_id where r.negocio_id = n) x));
+    'Cupones', (select coalesce(jsonb_agg(x), '[]') from (select codigo, porcentaje, hasta, activo, usos from public.cupones where owner_id = n) x)
+  );
 end $$;
 
 -- ---------- Centro de Mando: respaldo, limpieza (común a las 6 apps) ----------
@@ -4802,9 +4470,9 @@ begin
     'Cuentas', (select coalesce(jsonb_agg(x order by x.creada), '[]') from (select p.email as correo, p.empresa as nombre, p.role as rol, p.plan, p.pro_until as pro_hasta,
         p.rubro, p.telefono, p.suspended as suspendida, t.empresa as tienda, p.visto_at as visto, p.created_at as creada
       from public.profiles p left join public.profiles t on t.id = p.negocio_id) x),
-    'Pagos', (select coalesce(jsonb_agg(x order by x.fecha), '[]') from (select g.created_at as fecha, p.email as correo, g.tipo, g.monto, g.estado, g.dias, g.motivo,
-        g.revisado_at as revisado, (g.comprobante is not null) as con_comprobante from public.pagos g left join public.profiles p on p.id = g.user_id) x),
-    'Keys', (select coalesce(jsonb_agg(to_jsonb(l) - 'code' - 'code_hash' - 'key'), '[]') from public.licenses l),
+    'Pagos', (select coalesce(jsonb_agg(x order by x.fecha), '[]') from (select g.creado as fecha, g.email as correo, g.rol, g.periodo, g.monto, g.medio, g.estado, g.dias, g.motivo,
+        g.resuelto as revisado, (g.comprobante is not null) as con_comprobante from public.cfx_pagos g) x),
+    'Keys', (select coalesce(jsonb_agg(to_jsonb(k) - 'hash'), '[]') from public.cfx_keys k),
     'Ajustes', (select coalesce(jsonb_agg(jsonb_build_object('clave', key, 'valor', value) order by key), '[]') from public.app_settings),
     'Registro', (select coalesce(jsonb_agg(to_jsonb(a) order by a.created_at), '[]') from public.auditoria a));
 end $$;
@@ -4816,8 +4484,7 @@ begin
   if not public.is_admin() then raise exception 'Solo el administrador'; end if;
   return jsonb_build_array(
     jsonb_build_object('clave', 'comprobantes', 'titulo', 'Comprobantes revisados', 'detalle', 'Más de ' || d || ' días (se borran solos cada día).',
-      'filas', (select count(*) from public.pedidos where comprobante is not null and estado not in ('en_revision') and comprobante_at < now() - make_interval(days => d))
-             + (select count(*) from public.pagos where comprobante is not null and estado <> 'en_revision' and created_at < now() - make_interval(days => d))),
+      'filas', (select count(*) from public.pedidos where comprobante is not null and estado not in ('en_revision') and comprobante_at < now() - make_interval(days => d))),
     jsonb_build_object('clave', 'mensajes', 'titulo', 'Avisos y mensajes', 'detalle', 'Más de 30 días (se borran solos cada día).',
       'filas', (select count(*) from public.messages where created_at < now() - interval '30 days')
              + (select count(*) from public.notifications where status in ('sent', 'failed', 'cancelled') and coalesce(sent_at, send_at) < now() - interval '30 days')),
@@ -5862,7 +5529,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.29'::text $$;
+language sql immutable as $$ select '5.30'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5925,6 +5592,12 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.30 · A5: sin tablas dobles. pagos → cfx_pagos, licenses → cfx_keys y resenas (sin pantalla desde 3.9) se borran.
+--  Los datos se copian ANTES de borrar (el bloque va después del núcleo, donde ya existen cfx_pagos y cfx_keys).
+--  Las keys se canjean igual (redeem_license llama a cfx_key_canjear) y los pagos Premium se revisan en el Centro de Mando → Pagos.
+-- =====================================================================
 
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------
@@ -7179,7 +6852,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.boleta_cuentas', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_brechas', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.licenses', 'public.links_pago', 'public.messages', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pagos', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.resenas', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.blocks', 'public.boleta_cuentas', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_brechas', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.messages', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.reports', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -7343,10 +7016,53 @@ revoke all on function public.cfx_seguridad() from public, anon;
 grant execute on function public.cfx_seguridad() to authenticated;
 -- <<< CFX núcleo
 
+-- ---------- VERSIÓN 5.30 · A5: copiar las tablas viejas a las del núcleo y borrarlas (se puede volver a correr) ----------
+drop function if exists public.admin_create_license(text, int, numeric, text), public.admin_revoke_license(uuid), public.admin_stats(),
+  public.puede_resenar(uuid, uuid), public.dejar_resena(uuid, int, text), public.ver_resenas(uuid), public.responder_resena(uuid, text),
+  public.destacar_resena(uuid, boolean), public.subir_pago_premium(text), public.subir_pago_premium(text, boolean), public.mis_pagos(),
+  public.admin_pagos(text), public.admin_pago_comprobante(uuid), public.admin_revisar_pago(uuid, boolean, text),
+  public.admin_revisar_pago(uuid, boolean, text, int);
+do $$
+declare n int; f int;
+begin
+  -- 🔑 Keys: las sin usar siguen sirviendo (mismo código); las usadas quedan como historial.
+  if to_regclass('public.licenses') is not null then
+    execute $q$ insert into public.cfx_keys (hash, ultimos, rol, dias, nota, creado, usada_por, usada_email, usada_at, revocada)
+      select encode(sha256(convert_to(upper(l.key), 'UTF8')), 'hex'), right(l.key, 4), 'negocio', least(3660, coalesce(l.months * 31, 3660)),
+        left('Key antigua · ' || l.empresa || coalesce(' · ' || l.note, ''), 300), l.created_at, l.redeemed_by, u.email, l.redeemed_at, l.revoked
+      from public.licenses l left join auth.users u on u.id = l.redeemed_by
+      on conflict (hash) do nothing $q$;
+    execute $q$ select count(*) from public.licenses l where not exists (select 1 from public.cfx_keys k where k.hash = encode(sha256(convert_to(upper(l.key), 'UTF8')), 'hex')) $q$ into f;
+    if f = 0 then drop table public.licenses; else raise notice 'licenses: % keys sin copiar, la tabla queda', f; end if;
+  end if;
+  -- 💰 Pagos Premium con comprobante: los "en revisión" quedan pendientes en el Centro de Mando → Pagos.
+  if to_regclass('public.pagos') is not null then
+    execute $q$ insert into public.cfx_pagos (id, cuenta, email, nombre, rol, periodo, monto, medio, nota, comprobante, estado, dias, motivo, creado, resuelto)
+      select g.id, g.user_id, coalesce(p.email, ''), coalesce(nullif(p.empresa, ''), p.email, ''), case when g.tipo = 'premium_cliente' then 'cliente' else 'negocio' end,
+        case when coalesce(to_jsonb(g) ->> 'anual', 'false')::boolean then 'anual' else 'mensual' end, least(100000000, greatest(1, coalesce(g.monto, 1))),
+        'transferencia', 'Pago anterior a Pagos del núcleo',
+        case when g.estado = 'en_revision' and g.comprobante ~ '^data:image/(jpeg|png|webp);base64,' and length(g.comprobante) <= 400000 then g.comprobante end,
+        case when g.estado = 'en_revision' then 'pendiente' else g.estado end, g.dias, coalesce(g.motivo, ''), g.created_at, g.revisado_at
+      from public.pagos g left join public.profiles p on p.id = g.user_id
+      on conflict (id) do nothing $q$;
+    execute $q$ select count(*) from public.pagos g where not exists (select 1 from public.cfx_pagos c where c.id = g.id) $q$ into f;
+    if f = 0 then drop table public.pagos; else raise notice 'pagos: % sin copiar, la tabla queda', f; end if;
+  end if;
+  -- ⭐ Reseñas viejas (sin pantalla): se guardan en el registro del Centro de Mando y se borra la tabla. Las estrellas siguen en calificaciones.
+  if to_regclass('public.resenas') is not null then
+    execute $q$ insert into public.cfx_registro (quien, accion, detalle)
+      select 'sistema', 'reseña archivada', left(jsonb_build_object('tienda', t.empresa, 'autor', a.empresa, 'estrellas', r.estrellas, 'texto', r.texto,
+        'respuesta', r.respuesta, 'fecha', r.created_at)::text, 400)
+      from public.resenas r left join public.profiles t on t.id = r.negocio_id left join public.profiles a on a.id = r.autor_id $q$;
+    get diagnostics n = row_count;
+    drop table public.resenas;
+    if n > 0 then raise notice 'resenas: % archivadas en cfx_registro', n; end if;
+  end if;
+end $$;
+
 -- =====================================================================
 --  Envío automático: cada minuto llama a la función "enviar".
---  Pega este archivo en Supabase → SQL Editor → Run (después de schema.sql
---  y de crear la Edge Function "enviar").
+--  (Viene incluido aquí: no hay que pegarlo aparte. Requiere la Edge Function "enviar".)
 -- =====================================================================
 create extension if not exists pg_cron with schema pg_catalog;
 create extension if not exists pg_net with schema extensions;

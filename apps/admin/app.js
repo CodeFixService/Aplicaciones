@@ -474,7 +474,7 @@
     ['registro_negocios', 'Registro abierto de negocios (1 = cualquiera crea su cuenta Gratis con el link/QR; 0 = solo tú los creas)']];
   async function cargarReglas() {
     const r = await Cuenta.rpc('reglas');
-    $('reglasBody').innerHTML = REGLAS.map(([k, t]) => '<label for="rg' + k + '">' + t + '</label><input id="rg' + k + '" inputmode="numeric" value="' + r[k] + '">').join('');
+    $('reglasBody').innerHTML = REGLAS.map(([k, t]) => '<label for="rg' + k + '">' + t + '</label><input id="rg' + k + '" inputmode="numeric" value="' + Core.esc(r[k]) + '">').join('');
   }
   $('bReglas').onclick = async () => {
     try {

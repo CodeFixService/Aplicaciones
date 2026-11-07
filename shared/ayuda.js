@@ -11,7 +11,7 @@
 (function () {
   'use strict';
   if (window.CFX_AYUDA) return;
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // seguro.js (núcleo)
   const yo = document.currentScript && document.currentScript.src;
   const RAIZ = yo ? yo.replace(/(shared|js)\/ayuda\.js.*$/, '') : location.origin + '/';
   const color = () => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || getComputedStyle(document.documentElement).getPropertyValue('--marca').trim() || (document.querySelector('meta[name="theme-color"]') || {}).content || '#2563eb';

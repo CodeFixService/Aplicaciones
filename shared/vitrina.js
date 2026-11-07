@@ -6,7 +6,7 @@
 //   CodeFixVitrina.editor(nodo, perfil)     dibuja los campos; CodeFixVitrina.leer(nodo) devuelve el objeto para guardar.
 (function () {
   if (window.CodeFixVitrina) return;
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // seguro.js (núcleo)
   const B = 'var(--brand, #2563eb)';
   let css = false;
   function estilos() {
@@ -37,7 +37,7 @@
     .pf-red a{font-size:13px;font-weight:600;padding:6px 10px;border-radius:99px;background:color-mix(in srgb,${B} 10%,var(--card));color:${B};text-decoration:none}`;
     document.head.appendChild(st);
   }
-  const red = (v, base) => /^https?:\/\//i.test(v) ? v : base + String(v).replace(/^@/, '');
+  const red = (v, base) => /^https?:\/\//i.test(v) ? v : base + String(v).replace(/^@/, '').replace(/[^\w.\-]/g, '');
   const fecha = (d, o) => new Date(d + 'T12:00').toLocaleDateString('es', o);
 
   function montar(nodo, t) {
@@ -65,7 +65,7 @@
     if (p.facebook) redes.push(['Facebook', red(p.facebook, 'https://facebook.com/')]);
     if (p.tiktok) redes.push(['TikTok', red(p.tiktok, 'https://www.tiktok.com/@')]);
     if (p.web) redes.push(['🌐 Sitio web', p.web]);
-    if (redes.length) partes.push('<div class="pf-red">' + redes.map(([n, u]) => '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(n) + '</a>').join('') + '</div>');
+    if (redes.length) partes.push('<div class="pf-red">' + redes.map(([n, u]) => '<a href="' + esc(window.CFX_URL(u)) + '" target="_blank" rel="noopener">' + esc(n) + '</a>').join('') + '</div>');
     const tel = String(t.telefono || '').replace(/\D/g, '');
     partes.push('<div class="pf-acc">' + (tel ? '<a class="btn ok" href="https://wa.me/' + tel + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '') +
       '<button type="button" class="alt" data-pf="compartir">🔗 Compartir tienda</button></div>');

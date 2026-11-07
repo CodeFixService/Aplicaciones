@@ -3,7 +3,7 @@
    CFX_COMPROBANTE.abrir({ negocio, fecha, numero, cliente, tel, items: [{ cant, nombre, opcion, precio }], descuento, total, medio, entrega }) */
 (function () {
   'use strict';
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const esc = (s) => window.CFX_ESC(s);  // shared/seguro.js (núcleo)
   const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 });
   const MEDIOS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', mercadopago: 'Mercado Pago' };
   const telDe = (v) => { const t = String(v || '').trim(); if (!t) return ''; const d = window.CodeFixDatos && window.CodeFixDatos.telefono(t); return d || t.replace(/\D/g, ''); };

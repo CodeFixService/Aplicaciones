@@ -7,7 +7,7 @@
   const MODAL = '.cfx-ayuda, .elegir, .cfx-hoja, .cfx-hoja-m, .cfx-pin, dialog[open]';
   const visto = (k) => { try { return !!localStorage.getItem('cfx:tour:' + k); } catch (e) { return false; } };
   const marcar = (k) => { try { localStorage.setItem('cfx:tour:' + k, '1'); } catch (e) { /* sin almacenamiento */ } };
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // shared/seguro.js (núcleo)
   const ve = (e) => e && e.offsetParent !== null && e.getClientRects().length;
   let abierto = false;
 

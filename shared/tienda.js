@@ -80,7 +80,7 @@
   grid.before(bar); poner(v);
 
   // Opciones como botones (si la pantalla aún no los dibujó)
-  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // shared/seguro.js (núcleo)
   const chips = () => grid.querySelectorAll('.item select').forEach((s) => {
     if (s.closest('.item').querySelector('.opc-chips')) return;
     const ops = [...s.options].filter((o) => o.value).map((o) => o.value); if (!ops.length) return;

@@ -10,6 +10,7 @@
 <link rel="icon" href="../../icons/icon-192.png">
 <link rel="stylesheet" href="../../shared/core.css">
 <link rel="stylesheet" href="../../shared/tema.css">
+<script src="../../shared/seguro.js"></script>
 <script src="../../shared/carga.js"></script>
 <script src="../../shared/humano.js"></script>
 <script src="../../shared/core.js"></script>
@@ -231,7 +232,7 @@
       if (b.dataset.comp) {
         const img = await Cuenta.rpc('comprobante_pedido', { p_id: b.dataset.comp });
         const box = $('lista').querySelector('[data-img="' + b.dataset.comp + '"]');
-        box.innerHTML = img ? '<img src="' + img + '" alt="Comprobante" style="max-width:100%;border-radius:12px;margin-top:8px;border:1px solid var(--line)">' +
+        box.innerHTML = img ? '<img src="' + Core.esc(window.CFX_URL(img)) + '" alt="Comprobante" style="max-width:100%;border-radius:12px;margin-top:8px;border:1px solid var(--line)">' +
           '<div class="btns"><button class="small alt" type="button" id="dl' + b.dataset.comp + '">⬇️ Descargar</button></div>' : '<p class="muted">El comprobante ya se borró.</p>';
         const dl = document.getElementById('dl' + b.dataset.comp);
         if (dl) dl.onclick = () => fetch(img).then((r) => r.blob()).then((bl) => Core.download('comprobante.jpg', bl));

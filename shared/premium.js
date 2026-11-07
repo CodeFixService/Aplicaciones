@@ -16,7 +16,7 @@
     '@media(min-width:600px){.cfx-hola>div{border-radius:20px}}.cfx-hola h2{margin:4px 0}.cfx-hola p{color:var(--cfx-texto-2,#5b6472);margin:6px 0}' +
     '.cfx-hola ul{text-align:left;margin:10px 0;padding-left:20px}.cfx-hola button{width:100%;min-height:46px;border:0;border-radius:12px;font:inherit;font-weight:800;margin-top:8px;cursor:pointer;background:linear-gradient(135deg,#f7d774,#d9a21b);color:#3b2a00}';
   document.head.appendChild(css);
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // seguro.js (núcleo)
   function hola(o) {
     if (window.CFX_SIN_HOLA || document.querySelector('dialog.cfx-pago')) return;  // primero va la pantalla de pago/activación (CFX_SIN_HOLA: pruebas)
     const k = 'cfx-premium-hola-' + o.id + '-' + String(o.hasta || '').slice(0, 10);

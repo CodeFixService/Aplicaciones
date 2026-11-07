@@ -9,7 +9,7 @@
     'Pudahuel', 'Quilicura', 'Quinta Normal', 'Recoleta', 'Renca', 'San Joaquín', 'San Miguel', 'San Ramón', 'Santiago', 'Vitacura', 'Puente Alto', 'Pirque',
     'San José de Maipo', 'Colina', 'Lampa', 'Tiltil', 'San Bernardo', 'Buin', 'Calera de Tango', 'Paine', 'Melipilla', 'Talagante', 'Peñaflor', 'Padre Hurtado',
     'Isla de Maipo', 'El Monte', 'Curacaví', 'María Pinto', 'Alhué', 'San Pedro'];
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // shared/seguro.js (núcleo)
   const pesos = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
   let C = {}, monto = () => 0;
   const $ = (id) => document.getElementById(id);

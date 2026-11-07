@@ -32,7 +32,7 @@
     '.cfx-pago .cp-ayuda{font-size:13px;background:var(--cfx-campo,#f7f9fb);border-radius:10px;padding:8px 10px;margin:8px 0}.cfx-pago select{width:100%;min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;padding:0 10px}';
   document.head.appendChild(css);
 
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // seguro.js (núcleo)
   const pesos = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
   const color = () => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || getComputedStyle(document.documentElement).getPropertyValue('--marca').trim() || '#2563eb';
   async function copiar(t) { try { await navigator.clipboard.writeText(t); } catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); } }

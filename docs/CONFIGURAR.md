@@ -11,8 +11,8 @@ Si aparece un aviso de operación destructiva, toca **Run this query** (es norma
 - **Authentication → Sign In / Providers → Email**: apaga **Confirm email** → Save.
 - **Authentication → Sign In / Providers**: deja encendido **Allow new users to sign up** (lo usa el registro abierto de negocios en `n/`;
   los clientes igual necesitan invitación, eso lo controla la base de datos).
-- **Authentication → URL Configuration**: Site URL `https://codefixservice.github.io/Aplicaciones/` →
-  Save. Redirect URLs → Add URL `https://codefixservice.github.io/Aplicaciones/**` → Save URLs.
+- **Authentication → URL Configuration**: Site URL `https://aplicaciones.juanjosuecastilloloyola.workers.dev/` →
+  Save. Redirect URLs → Add URL `https://aplicaciones.juanjosuecastilloloyola.workers.dev/**` (y `https://pruebas-aplicaciones.juanjosuecastilloloyola.workers.dev/**`) → Save URLs.
 
 ## 3. Crear la cuenta de administrador (después del paso 1)
 **Authentication → Users → Add user → Create new user**: email `juanjosuecastilloloyola@gmail.com`,
@@ -55,7 +55,7 @@ Hoy el repositorio es público. Para que nadie pueda ver ni copiar el proyecto:
 2. Configuración: *Framework preset* **None**, *Build command* vacío, *Build output directory* `/` → **Save and Deploy**.
    Te da una dirección gratis tipo `https://aplicaciones.pages.dev`.
 3. En GitHub: **Settings → General → Danger Zone → Change visibility → Private**.
-   (GitHub Pages deja de funcionar; Cloudflare sigue publicando cada cambio en `main`.)
+   (Cloudflare sigue publicando cada cambio en `main`.)
 4. En Supabase → **Authentication → URL Configuration**: cambia **Site URL** y **Redirect URLs** a la nueva dirección.
 5. Vuelve a compartir el enlace nuevo (Administración → Compartir la app ya lo muestra solo).
 

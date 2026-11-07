@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   if (window.CFX_VERIFICAR) return;
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = (s) => window.CFX_ESC(s);  // seguro.js (núcleo)
   const rutOk = (r) => {
     const s = String(r || '').replace(/[^0-9kK]/g, '').toUpperCase(); if (s.length < 2) return false;
     let suma = 0, m = 2; for (let i = s.length - 2; i >= 0; i--) { suma += Number(s[i]) * m; m = m === 7 ? 2 : m + 1; }

@@ -46,7 +46,7 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 ## Reglas del chat
 - Hasta **3 mensajes seguidos**; luego hay que esperar la respuesta. El administrador no tiene límite.
 - Máximo 100 mensajes por día. Estado ✓ Enviado / ✓✓ Visto. Bloquear y reportar.
-- Todo validado en el servidor (`supabase/schema.sql`).
+- Todo validado en el servidor (`supabase/instalar.sql`).
 
 ## Vender Pro / Premium
 - **Administración → Ajustes → Venta**: pega tu link de Mercado Pago y los precios. Se actualiza al instante para todos.
@@ -71,7 +71,7 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 | Caja: reportes 7 días / 30 días / mes, más vendidos, margen | — | ✅ |
 
 ## Cómo funciona la seguridad
-- El servidor es **Supabase** (plan gratis). Todas las reglas están en [`supabase/schema.sql`](supabase/schema.sql):
+- El servidor es **Supabase** (plan gratis). Todas las reglas están en [`supabase/instalar.sql`](supabase/instalar.sql) (el único instalador: se puede volver a correr y la base se actualiza sola cada 10 minutos):
   cada usuario solo puede leer sus datos; el plan y el rol solo los cambia el administrador.
 - **Solo el administrador** (`juanjosuecastilloloyola@gmail.com`, con el correo confirmado) puede crear keys,
   ver usuarios y avisar a todos. Las keys son aleatorias, de un solo uso y se bloquean 10 intentos fallidos por hora.
@@ -79,10 +79,12 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 - Las notificaciones las envía la Edge Function [`enviar`](supabase/functions/enviar/index.ts), cada minuto.
 
 ## Puesta en marcha
-Sigue [`docs/CONFIGURAR.md`](docs/CONFIGURAR.md) (una sola vez). Después, cada cambio en `main` se publica solo en
-`https://codefixservice.github.io/Aplicaciones/`.
+Sigue [`docs/CONFIGURAR.md`](docs/CONFIGURAR.md) (una sola vez). La app se publica en **Cloudflare Workers** (Workers Builds copia lo que está en GitHub):
+- `main` → `https://aplicaciones.juanjosuecastilloloyola.workers.dev/` (lo que ven los usuarios, después de 🚀 Liberar en el Centro de Mando).
+- `pruebas` → `https://pruebas-aplicaciones.juanjosuecastilloloyola.workers.dev/` (🧪 Probar en el Centro de Mando → Apps; la base es la real).
 
-Al cambiar archivos de la app, sube `VERSION` en `sw.js` para que los celulares descarguen la versión nueva.
+Al cambiar archivos de la app, sube `APP_VERSION` en `shared/core.js` y `version.json` (si cambia la base, también `DB_VERSION`
+y `db_version` en `supabase/instalar.sql`) para que los celulares descarguen la versión nueva.
 
 ## Versión 3.7
 - **Inicio limpio** y todo lo de configuración en **⚙️ Ajustes**: Mi perfil, Mi tienda (WhatsApp, datos de transferencia,
