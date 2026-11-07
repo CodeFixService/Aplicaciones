@@ -141,6 +141,7 @@
   function agregar(item) {
     const line = ticket.find((l) => l.id === item.id && l.precio === item.precio && (l.opcion || '') === (item.opcion || ''));
     if (line) line.cant++; else ticket.push(Object.assign({ cant: 1 }, item));
+    $('bComp').hidden = true;
     if (navigator.vibrate) navigator.vibrate(12);
     renderTicket();
   }
@@ -208,9 +209,19 @@
   }
   $('recibido').oninput = calcVuelto;
   $('bLimpiar').onclick = () => { ticket = []; $('recibido').value = ''; renderTicket(); };
+  /* ---------- 🧾 Comprobante de venta (no es boleta): se envía al cliente por WhatsApp ---------- */
+  let ultimaVenta = null;
+  function comprobante(id) {
+    const v = ventas.find((x) => x.id === id);
+    if (!v || !window.CFX_COMPROBANTE) return;
+    CFX_COMPROBANTE.abrir({ negocio: equipo ? cuenta.negocio : cuenta.empresa, fecha: v.t, numero: String(v.id).slice(-6).toUpperCase(),
+      items: v.items, total: v.items.reduce((s, l) => s + l.precio * l.cant, 0), medio: v.medio || 'efectivo' });
+  }
+  $('bComp').onclick = () => comprobante(ultimaVenta);
   $('bCobrar').onclick = () => {
     if (!ticket.length) return Core.toast('La venta está vacía');
-    ventas.push({ id: Core.uid(), t: Date.now(), medio, items: ticket.map((l) => Object.assign({}, l)) });
+    const venta = { id: Core.uid(), t: Date.now(), medio, items: ticket.map((l) => Object.assign({}, l)) };
+    ventas.push(venta); ultimaVenta = venta.id; $('bComp').hidden = false;
     ticket.forEach((l) => {
       const p = productos.find((x) => x.id === l.id);
       if (p && p.stock !== '') p.stock = Math.max(0, p.stock - l.cant);
@@ -489,10 +500,13 @@
       ' · ' + (MEDIOS[v.medio || 'efectivo'] || '') + '</b>' +
       '<div class="muted">' + v.items.map((l) => l.cant + '× ' + Core.esc(l.nombre)).join(', ') + '</div></div>' +
       '<b>' + money(v.items.reduce((s, l) => s + l.precio * l.cant, 0)) + '</b>' +
+      '<button class="small alt" data-comp="' + v.id + '" aria-label="Comprobante">🧾</button>' +
       '<button class="small danger" data-id="' + v.id + '" aria-label="Anular venta">✕</button></li>'
     ).join('') : '<li class="empty">Sin ventas en este período</li>';
   }
   $('r-lista').onclick = (e) => {
+    const c = e.target.closest('[data-comp]');
+    if (c) return comprobante(c.dataset.comp);
     const id = e.target.dataset.id;
     if (!id || !confirm('¿Anular esta venta?')) return;
     ventas = ventas.filter((v) => v.id !== id);

@@ -42,6 +42,20 @@ ${saludo}<h2 style="margin:0 0 10px;font-size:22px">${esc(n.title)}</h2>
 Si no quieres recibir más mensajes, responde a este correo con la palabra BAJA.</p></div></body></html>`;
 }
 
+// 🔔 Push potente: llega al tiro aunque el celular ahorre batería (urgency high), espera hasta 3 días si está apagado
+// y reintenta 2 veces si el servicio de push está ocupado (429) o falla (5xx).
+export async function pushConReintento(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: string, esperaMs = 800) {
+  for (let i = 0; ; i++) {
+    try {
+      return await webpush.sendNotification(sub, payload, { TTL: 259200, urgency: 'high' });
+    } catch (e) {
+      const code = (e as { statusCode?: number })?.statusCode || 0;
+      if (i >= 2 || !(code === 429 || code >= 500)) throw e;
+      await new Promise((r) => setTimeout(r, esperaMs * 2 ** i));
+    }
+  }
+}
+
 export async function deliver(
   n: Notif, targets: Target[], secrets: Secrets, emailsLeft: number,
   removeEndpoint: (e: string) => Promise<unknown>,
@@ -61,7 +75,7 @@ export async function deliver(
       for (let i = 0; i < subs.length; i += 50) {
         const chunk = subs.slice(i, i + 50).filter((t) => !seen.has(t.endpoint!) && seen.add(t.endpoint!));
         const res = await Promise.allSettled(chunk.map((t) =>
-          webpush.sendNotification({ endpoint: t.endpoint!, keys: { p256dh: t.p256dh!, auth: t.auth! } }, payload, { TTL: 86400 })
+          pushConReintento({ endpoint: t.endpoint!, keys: { p256dh: t.p256dh!, auth: t.auth! } }, payload)
         ));
         for (let j = 0; j < res.length; j++) {
           const r = res[j];

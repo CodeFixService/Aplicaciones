@@ -5862,7 +5862,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.28'::text $$;
+language sql immutable as $$ select '5.29'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5893,6 +5893,38 @@ begin
     'pro_dias', case when t.plan = 'pro' and t.pro_until is not null and t.pro_until > now() then ceil(extract(epoch from t.pro_until - now()) / 86400)::int end,
     'estrellas', (select round(avg(q.estrellas), 1) from public.calificaciones q join public.pedidos x on x.id = q.pedido_id where x.negocio_id = n and not q.de_negocio));
 end $$;
+
+-- =====================================================================
+--  VERSIÓN 5.29 · 🧾 Comprobante de venta: Pedidos sabe con qué pagó el cliente (Mercado Pago o transferencia).
+-- =====================================================================
+drop function if exists public.pedidos_tienda(text);
+create or replace function public.pedidos_tienda(p_estado text default null)
+returns table (id uuid, cliente_id uuid, cliente text, telefono text, lineas jsonb, subtotal numeric, descuento numeric,
+               total numeric, cupon text, entrega text, direccion text, nota text, estado text, fecha timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, invitado boolean, calificado boolean, cliente_estrellas numeric,
+               premium boolean, desc_premium numeric, rechazos int, motivo text, boleta jsonb, medio text)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.cliente_id, coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1), x.invitado_nombre, 'Cliente'),
+         coalesce(c.telefono, x.invitado_tel), x.lineas, x.subtotal, x.descuento, x.total, x.cupon, x.entrega, x.direccion, x.nota, x.estado,
+         x.created_at, x.retenido_hasta, x.comprobante is not null, x.devolucion, x.cliente_id is null,
+         exists (select 1 from public.calificaciones q where q.pedido_id = x.id and q.de_negocio),
+         (select round(avg(q.estrellas), 1) from public.calificaciones q join public.pedidos y on y.id = q.pedido_id
+          where q.de_negocio and ((x.cliente_id is not null and y.cliente_id = x.cliente_id) or (x.cliente_id is null and y.invitado_tel = x.invitado_tel))),
+         pr.premium, x.desc_premium, x.rechazos, x.motivo, public.boleta_de(x),
+         case when x.mp_pago is not null then 'mercadopago' when x.comprobante_at is not null then 'transferencia' end
+  from public.pedidos x left join public.profiles c on c.id = x.cliente_id
+  cross join lateral (select c.role = 'client' and public.is_pro(c.id) as premium) pr
+  where x.negocio_id = public.negocio_de(auth.uid())
+    and (p_estado is null or (p_estado = 'activos' and x.estado in ('recibido', 'preparando', 'listo', 'en_camino'))
+         or (p_estado = 'revisar' and x.estado = 'en_revision') or (p_estado = 'pagando' and x.estado = 'pagando')
+         or (p_estado = 'devolver' and x.devolucion = 'pendiente')
+         or (p_estado = 'historial' and x.estado in ('entregado', 'cancelado', 'rechazado', 'expirado')) or x.estado = p_estado)
+  -- ⭐ Los pedidos pendientes de clientes Premium van primero en la fila.
+  order by (coalesce(pr.premium, false) and x.estado in ('pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino')) desc, x.created_at desc
+  limit 300
+$$;
+revoke all on function public.pedidos_tienda(text) from public, anon;
+grant execute on function public.pedidos_tienda(text) to authenticated;
 
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------

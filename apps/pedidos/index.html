@@ -201,6 +201,7 @@
           : p.boleta && p.boleta.error && PAGADO.includes(p.estado) ? '<div class="aviso">🧾 Boleta no emitida: ' + Core.esc(p.boleta.error) + '</div>' : '') +
         '<div data-img="' + p.id + '"></div>' +
         '<div class="acc">' +
+        '<button class="alt small" data-recibo="' + p.id + '">🧾 Comprobante</button>' +
         (p.tiene_comprobante ? '<button class="alt small" data-comp="' + p.id + '">🧾 Ver comprobante</button>' : '') +
         (p.estado === 'en_revision' ? '<button class="ok small" data-rev="' + p.id + '" data-si="1">✅ Aprobar pago</button><button class="danger small" data-rev="' + p.id + '" data-si="0">Rechazar</button>' : '') +
         sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
@@ -219,6 +220,14 @@
     const b = e.target.closest('button');
     if (!b) return;
     try {
+      if (b.dataset.recibo) {
+        const p = pedidos.find((x) => x.id === b.dataset.recibo);
+        if (p && window.CFX_COMPROBANTE) CFX_COMPROBANTE.abrir({ negocio: yo.role === 'equipo' ? yo.negocio : yo.empresa, fecha: p.fecha,
+          numero: String(p.id).slice(0, 8).toUpperCase(), cliente: p.cliente, tel: p.telefono || '', total: p.total,
+          items: p.lineas.map((x) => ({ cant: x.cant, nombre: x.nombre, opcion: x.opcion, precio: x.subtotal / (x.cant || 1) })),
+          descuento: p.descuento, medio: p.medio, entrega: p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') : '🏪 Retiro en tienda' });
+        return;
+      }
       if (b.dataset.comp) {
         const img = await Cuenta.rpc('comprobante_pedido', { p_id: b.dataset.comp });
         const box = $('lista').querySelector('[data-img="' + b.dataset.comp + '"]');
@@ -336,5 +345,6 @@
 <script src="../../shared/ayuda.js"></script>
 <script src="../../shared/datos.js"></script>
 <script src="../../shared/vitrina.js"></script>
+<script src="../../shared/comprobante.js"></script>
 </body>
 </html>

@@ -1431,7 +1431,8 @@
     function verAvanzado(z) {
       zAct = z;
       z.innerHTML = '<div class="cfx-pf">' +
-        '<div class="cfx-pf-caja"><b>🔔 Notificaciones en este celular</b><div class="cfx-pf-fila"><span data-push>Revisando…</span><button type="button" data-pf="push">Activar</button></div></div>' +
+        '<div class="cfx-pf-caja"><b>🔔 Notificaciones en este celular</b><div class="cfx-pf-fila"><span data-push>Revisando…</span><button type="button" data-pf="push">Activar</button></div>' +
+          '<button type="button" data-pf="probar" hidden>🔔 Probar aviso</button></div>' +
         (P.clave ? '<div class="cfx-pf-caja"><b>🔑 Cambiar contraseña</b><input data-c1 type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 6)"><input data-c2 type="password" autocomplete="new-password" placeholder="Repítela">' +
           '<button type="button" data-pf="clave">Cambiar contraseña</button></div>' : '') +
         (R ? '<div class="cfx-pf-caja"><b>🔒 PIN de la app</b><small data-pin-txt>Pide 4 a 6 números al abrir la app.</small><div style="position:relative"><input data-pin type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="PIN nuevo (4 a 6 números)"></div>' +
@@ -1439,7 +1440,7 @@
         (P.eliminar && valor(P.puedeEliminar) !== false ? '<div class="cfx-pf-caja cfx-pf-peligro"><b>🗑️ Eliminar mi cuenta</b><small>' + esc(valor(P.eliminarTexto) || 'Se borran tu cuenta y tus datos. No se puede deshacer.') + '</small><button type="button" data-pf="eliminar">Eliminar mi cuenta</button></div>' : '') + '</div>';
       const q = (s) => z.querySelector(s);
       let on = false;
-      const estado = async () => { on = await Promise.resolve(P.pushActiva()).catch(() => false); q('[data-push]').textContent = on ? '✅ Activas' : 'Apagadas'; q('[data-pf=push]').textContent = on ? (P.desactivarPush ? 'Desactivar' : 'Reactivar') : 'Activar'; };
+      const estado = async () => { on = await Promise.resolve(P.pushActiva()).catch(() => false); q('[data-push]').textContent = on ? '✅ Activas' : 'Apagadas'; q('[data-pf=push]').textContent = on ? (P.desactivarPush ? 'Desactivar' : 'Reactivar') : 'Activar'; q('[data-pf=probar]').hidden = !on; };
       estado();
       const pinEst = () => R && R('cfx_pin_estado').then((t) => { const x = q('[data-pf=sinpin]'); if (x) x.hidden = !t; const m = q('[data-pin-txt]'); if (m) m.textContent = t ? '✅ Activo: se pide al abrir la app.' : 'Pide 4 a 6 números al abrir la app.'; }).catch(() => {});
       pinEst();
@@ -1449,6 +1450,13 @@
           if (await listo(() => R('cfx_pin_guardar', { p_pin: v }), '🔒 PIN guardado', b)) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } q('[data-pin]').value = ''; pinOk(); pinEst(); } }
         if (a === 'verpin') { const i = q('[data-pin]'); i.type = i.type === 'password' ? 'text' : 'password'; b.textContent = i.type === 'password' ? '👁️' : '🙈'; return; }
         if (a === 'sinpin' && await listo(() => R('cfx_pin_guardar', { p_pin: '' }), 'PIN quitado', b)) pinEst();
+        // Aviso de prueba: lo muestra el service worker del celular, igual que uno real (sonido, vibración y queda a la vista).
+        if (a === 'probar') await listo(async () => {
+          const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+          if (!reg || Notification.permission !== 'granted') throw new Error('Activa las notificaciones primero');
+          await reg.showNotification('🔔 Aviso de prueba', { body: 'Así te llegarán los avisos importantes (pedidos, reservas, mensajes).', tag: 'cfx-prueba',
+            renotify: true, vibrate: [200, 100, 200], icon: reg.scope + 'icons/icon-192.png', badge: reg.scope + 'icons/badge.png', data: { url: location.href } });
+        }, '🔔 Aviso enviado: revisa la barra del celular', b);
         if (a === 'push') await (on && P.desactivarPush ? listo(() => P.desactivarPush(), 'Notificaciones desactivadas', b) : listo(() => P.activarPush(), '🔔 Notificaciones activadas', b)).then(estado);
         if (a === 'clave') {
           const c1 = q('[data-c1]').value, c2 = q('[data-c2]').value;

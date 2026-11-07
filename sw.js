@@ -10,7 +10,7 @@ const FILES = [
   'icons/icon-512.png',
   'shared/core.css',
   'shared/core.js', 'shared/vitrina.js', 'shared/datos.js', 'shared/tienda.js', 'shared/carga.js', 'shared/ayuda.js', 'shared/despacho.js', 'shared/premium.js', 'shared/humano.js', 'shared/verificar.js', 'shared/pagos.js', 'shared/respaldo.js', 'shared/voz.js', 'shared/fotos.js', 'shared/auto.js', 'shared/barra.js', 'shared/tema.css',
-  'shared/iconos.js', 'shared/tour.js',
+  'shared/iconos.js', 'shared/tour.js', 'shared/comprobante.js',
   'shared/instalar.js',
   'shared/config.js',
   'shared/cuenta.js',
@@ -116,8 +116,12 @@ self.addEventListener('push', (e) => {
     icon: 'icons/icon-192.png',
     badge: 'icons/badge.png',
     tag: d.tag,
-    data: { url: d.url || './' }
+    data: { url: d.url || './' },
+    vibrate: [200, 100, 200]
   };
+  if (d.tag) opts.renotify = true; // un aviso nuevo con el mismo tag vuelve a sonar
+  // 📦 Pedido nuevo o comprobante para el negocio: queda a la vista hasta que lo toque y vibra más.
+  if (/apps\/pedidos\//.test(d.url || '')) { opts.requireInteraction = true; opts.vibrate = [300, 120, 300, 120, 300]; }
   if (d.image) opts.image = d.image;
   e.waitUntil(self.registration.showNotification(d.title || 'Nuevo aviso', opts));
 });
