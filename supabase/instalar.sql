@@ -5862,7 +5862,37 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.27'::text $$;
+language sql immutable as $$ select '5.28'::text $$;
+
+-- =====================================================================
+--  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
+-- =====================================================================
+create or replace function public.hoy_negocio() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); d timestamptz := public.hoy_cl()::timestamp at time zone 'America/Santiago';
+  t public.profiles;
+begin
+  if n is null then raise exception 'Sin permiso'; end if;
+  select * into t from public.profiles where id = n;
+  return jsonb_build_object(
+    'revisar', (select count(*) from public.pedidos where negocio_id = n and estado = 'en_revision'),
+    'activos', (select count(*) from public.pedidos where negocio_id = n and estado in ('recibido', 'preparando', 'listo', 'en_camino')),
+    'nuevos', (select count(*) from public.pedidos where negocio_id = n and estado = 'recibido'),
+    'preparando', (select count(*) from public.pedidos where negocio_id = n and estado = 'preparando'),
+    'listos', (select count(*) from public.pedidos where negocio_id = n and estado in ('listo', 'en_camino')),
+    'pagando', (select count(*) from public.pedidos where negocio_id = n and estado = 'pagando'),
+    'devolver', (select count(*) from public.pedidos where negocio_id = n and devolucion = 'pendiente'),
+    'boleta_error', (select count(*) from public.pedidos where negocio_id = n and boleta_folio is null and boleta_error is not null and created_at > now() - interval '3 days'),
+    'sin_leer', (select count(*) from public.messages where recipient = auth.uid() and read_at is null),
+    'hoy', (select count(*) from public.pedidos where negocio_id = n and created_at >= d),
+    'vendido_hoy', (select coalesce(sum(total), 0) from public.pedidos where negocio_id = n and pagado_at >= d or (negocio_id = n and estado = 'entregado' and updated_at >= d and pagado_at is null)),
+    'stock_bajo', (select coalesce(jsonb_agg(jsonb_build_object('nombre', nombre, 'stock', stock)), '[]') from public.catalog_items where owner_id = n and stock is not null and stock <= 3),
+    'slug', public.asegurar_slug(n), 'link_pago', public.link_activo(n, 'pedido') is not null,
+    'productos', (select count(*) from public.catalog_items where owner_id = n),
+    'abierto', coalesce(t.abierto, true), 'vacaciones', t.vacaciones_hasta is not null and t.vacaciones_hasta >= public.hoy_cl(),
+    'pro_dias', case when t.plan = 'pro' and t.pro_until is not null and t.pro_until > now() then ceil(extract(epoch from t.pro_until - now()) / 86400)::int end,
+    'estrellas', (select round(avg(q.estrellas), 1) from public.calificaciones q join public.pedidos x on x.id = q.pedido_id where x.negocio_id = n and not q.de_negocio));
+end $$;
 
 -- >>> CFX núcleo (no editar aquí: se copia de saas/nucleo/sql con sincronizar.py)
 -- ---------------------------------------------------------------------

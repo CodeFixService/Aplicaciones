@@ -166,6 +166,8 @@
     <a class="card mini hidden" id="cMiCaja" href="apps/caja/"><span style="font-size:26px">🧮</span><div class="grow"><b>Mi Caja</b><div class="muted">Tus ventas, productos y finanzas (Premium)</div></div><span style="font-size:22px">›</span></a>
     <!-- Hoy (negocio y equipo) -->
     <div id="hoy" class="hidden">
+      <div class="card" id="hoyHacer"><div class="row" style="align-items:center;margin-bottom:6px"><h2 style="flex:2;margin:0">✅ Qué hacer hoy</h2>
+        <button class="alt small" id="hoyAyuda" type="button" style="flex:none">❓ Ayuda</button></div><ul class="list" id="hoyHacerL"></ul></div>
       <div class="stats" id="hoyStats"></div>
       <div class="card hidden" id="hoyStock" style="border-color:#f59e0b"></div>
       <div class="card hidden" id="hoyFalta"><h2>🚀 Tu tienda en 5 minutos</h2><div class="t5"><div class="t5b"><i id="hoyFaltaB"></i></div><b id="hoyFaltaN"></b></div><ul class="list" id="hoyFaltaL"></ul></div>
@@ -635,11 +637,12 @@
     $('hoyStock').classList.toggle('hidden', !h.stock_bajo.length);
     $('hoyStock').innerHTML = '⚠️ <b>Stock bajo:</b> ' + h.stock_bajo.map((x) => Core.esc(x.nombre) + ' (' + x.stock + ')').join(', ') + ' · <a href="apps/caja/#productos">Reponer</a>';
     const dueno = acc.role === 'user';
+    hacerHoy(h, acc);
     hoyLink = Core.rootUrl() + 't/?s=' + encodeURIComponent(h.slug);
     $('hoyTienda').classList.toggle('hidden', !dueno);
     $('hoyVenderPro').classList.toggle('hidden', !!acc.is_pro);
     $('hoyLink').value = hoyLink; $('hoyVer').href = hoyLink;
-    if (!dueno) { $('hoyFalta').classList.add('hidden'); return; }
+    if (!dueno) { $('hoyFalta').classList.add('hidden'); tour(false); return; }
     let t = {};
     try { t = await Cuenta.rpc('tienda_info', { p_negocio: acc.id }) || {}; } catch (e) { /* sin red */ }
     // D20/D23 Tienda en 5 min: pasos con barra de progreso; los hechos quedan con ✅ y la tarjeta se va al completar todo.
@@ -654,6 +657,68 @@
     $('hoyFaltaB').style.width = pct + '%'; $('hoyFaltaN').textContent = hechos + ' de ' + pasos.length;
     $('hoyFaltaL').innerHTML = pasos.map(([ok, u, x]) => ok ? '<li class="muted" style="padding:6px 10px">✅ <s>' + x + '</s></li>'
       : '<li><a class="mini" href="' + u + '" style="width:100%"><span class="grow">◻️ ' + x + '</span><span>›</span></a></li>').join('');
+    tour(false);
+  }
+
+  /* ---------- ✅ Qué hacer hoy: las tareas del día en orden de urgencia (solo lo que el rol puede hacer) ---------- */
+  function hacerHoy(h, acc) {
+    const dueno = acc.role === 'user', rol = dueno ? 'dueno' : (acc.equipo_rol || 'vendedor');
+    const s = (n, uno, varios) => n === 1 ? uno : varios.replace('#', n);
+    const t = [
+      [h.revisar, 'apps/pedidos/?f=revisar', s(h.revisar, 'Revisa 1 comprobante de pago', 'Revisa # comprobantes de pago') + ' y aprueba el pedido'],
+      [h.devolver, 'apps/pedidos/?f=devolver', s(h.devolver, 'Devuelve el dinero de 1 pedido cancelado', 'Devuelve el dinero de # pedidos cancelados')],
+      [h.nuevos, 'apps/pedidos/?f=activos', s(h.nuevos, 'Confirma 1 pedido nuevo', 'Confirma # pedidos nuevos')],
+      [h.preparando, 'apps/pedidos/?f=activos', s(h.preparando, 'Termina de preparar 1 pedido', 'Termina de preparar # pedidos')],
+      [h.listos, 'apps/pedidos/?f=activos', s(h.listos, 'Entrega 1 pedido listo', 'Entrega # pedidos listos')],
+      [h.sin_leer, 'apps/mensajes/', s(h.sin_leer, 'Responde 1 mensaje', 'Responde # mensajes')],
+      [rol !== 'vendedor' && h.stock_bajo.length, 'apps/caja/#productos', s(h.stock_bajo.length, 'Repón 1 producto con poco stock', 'Repón # productos con poco stock')],
+      [h.boleta_error, 'apps/pedidos/?f=historial', s(h.boleta_error, '1 boleta no se pudo emitir: revísala', '# boletas no se pudieron emitir: revísalas')],
+      [h.pagando, 'apps/pedidos/?f=pagando', s(h.pagando, '1 pedido espera el pago del cliente', '# pedidos esperan el pago del cliente') + ' (escríbele si se demora)'],
+      [dueno && h.vacaciones, '#ajustes', 'Estás en modo vacaciones: apágalo al volver'],
+      [dueno && !h.vacaciones && h.abierto === false, '#ajustes', 'Tu tienda está cerrada: ábrela para recibir pedidos'],
+      [dueno && h.pro_dias != null && h.pro_dias <= 5, '#plan', 'Tu Premium vence en ' + s(h.pro_dias, '1 día', '# días') + ': renuévalo']
+    ].filter((x) => x[0]);
+    const n = (v) => typeof v === 'number' ? '<span class="n">' + v + '</span>' : '<span>•</span>';
+    $('hoyHacerL').innerHTML = t.length ? t.map(([v, u, x]) => '<li><a class="mini" href="' + u + '"><span class="grow">' + Core.esc(x) + '</span>' + n(v) + '<span>›</span></a></li>').join('')
+      : '<li class="muted" style="padding:6px 10px">🎉 ¡Todo al día!' + (dueno ? ' Comparte tu tienda para recibir más pedidos.' : '') + '</li>';
+  }
+
+  /* ---------- 🧭 Recorrido guiado (1ª vez) y ❓ Ayuda del negocio ---------- */
+  const PASOS = [
+    { el: '#hoyHacer', t: '✅ Qué hacer hoy', x: 'Tus tareas del día en orden: toca una y te lleva directo a resolverla.' },
+    { el: '#hoyStats', t: '📊 Tus números', x: 'Pedidos, pagos y calificación de un vistazo. Toca un número para ver el detalle.' },
+    { el: '#hoyFalta', t: '🚀 Tu tienda en 5 minutos', x: 'Completa estos pasos y tu tienda queda lista para vender.' },
+    { el: '#hoyTienda', t: '🔗 Tu tienda', x: 'Comparte tu link por WhatsApp o imprime el QR para que te pidan.' },
+    { el: '#cMiCaja', t: '🧮 Mi Caja', x: 'Tus productos, inventario, ventas en el local y finanzas.' },
+    { el: '#bAjustes', t: '⚙️ Ajustes', x: 'Logo, horario, links de pago, despacho, boleta y tu equipo.' },
+    { el: '#hoyAyuda', t: '❓ Ayuda', x: 'Vuelve a ver este recorrido, lee las preguntas frecuentes o escríbenos.' }
+  ];
+  function tour(forzar) {
+    if (!window.CFX_TOUR || !$('v-home') || $('v-home').classList.contains('hidden') || location.hash) return;
+    CFX_TOUR.iniciar(PASOS, { clave: 'orbita-inicio', forzar });
+  }
+  const FAQ = [
+    ['¿Cómo agrego un producto?', 'Mi Caja → Productos → ➕. Ponle foto, precio y stock; si tiene tallas o colores, usa "Precio y stock distinto por opción".'],
+    ['¿Cómo me pagan mis clientes?', 'Ajustes → Links de pago: pega tu link o conecta Mercado Pago automático. Sin link, el pedido llega igual y cobras al entregar o por transferencia.'],
+    ['¿Qué hago cuando llega un pedido?', 'Te llega un aviso. Si el cliente subió comprobante, revísalo y aprueba; luego cambia el estado: preparando → listo → entregado.'],
+    ['¿Cómo comparto mi tienda?', 'En el inicio, "Tu tienda": 📤 Compartir por WhatsApp o muestra el QR en tu local.'],
+    ['¿Cómo sumo a alguien de mi equipo?', 'Ajustes → Mi equipo: escribe su nombre y correo y elige su rol (vendedor, bodega o admin).'],
+    ['¿Cómo emito la boleta?', 'Ajustes → Boleta SII: manual (anotas el folio del SII) o automática con OpenFactura.'],
+    ['¿Cómo cierro la tienda o me voy de vacaciones?', 'Ajustes → Mi tienda: desmarca "Tienda abierta" o activa el modo vacaciones con la fecha de regreso.']
+  ];
+  function faq(chat) {
+    const d = document.createElement('div');
+    d.className = 'elegir';
+    d.innerHTML = '<div role="dialog" aria-label="Preguntas frecuentes" class="faq"><b>❓ Preguntas frecuentes</b>' +
+      FAQ.map(([q, a]) => '<details><summary>' + Core.esc(q) + '</summary><p>' + Core.esc(a) + '</p></details>').join('') +
+      (chat ? '<button type="button" class="alt" data-c="1">💬 No encontré mi respuesta: escribir a soporte</button>' : '') +
+      '<button type="button" class="small" data-x="1">Cerrar</button></div>';
+    d.onclick = (e) => {
+      const b = e.target.closest('button');
+      if (e.target === d || (b && b.dataset.x)) return d.remove();
+      if (b && b.dataset.c) location.href = chat;
+    };
+    document.body.appendChild(d);
   }
   function compartida() { try { localStorage.setItem('cfx:compartio', '1'); } catch (e) { /* sin almacenamiento */ } }
   function qrCanvas(text, px) {
@@ -867,8 +932,16 @@
     let con = null;
     if (acc.role === 'client') con = acc.negocio_id;
     else if (acc.role === 'user') { try { con = await Cuenta.rpc('admin_id'); } catch (e) { con = null; } }
-    $('bAyuda').classList.toggle('hidden', !con);
-    if (con) $('bAyuda').href = 'apps/mensajes/?con=' + con + '&txt=' + encodeURIComponent('Hola, necesito ayuda con ');
+    const chat = con ? 'apps/mensajes/?con=' + con + '&txt=' + encodeURIComponent('Hola, necesito ayuda con ') : '';
+    $('bAyuda').classList.toggle('hidden', !con && acc.role === 'client');
+    $('bAyuda').href = chat || '#';
+    // Negocio y equipo: menú con recorrido, preguntas frecuentes y chat. El cliente sigue yendo directo al chat de su tienda.
+    $('bAyuda').onclick = $('hoyAyuda').onclick = acc.role === 'client' ? null : async (e) => {
+      e.preventDefault();
+      const ops = ['🧭 Ver el recorrido', '❓ Preguntas frecuentes'].concat(chat ? ['💬 Escribir a soporte'] : []);
+      const r = await Core.elegir('Ayuda', ops);
+      if (r === ops[0]) tour(true); else if (r === ops[1]) faq(chat); else if (r) location.href = chat;
+    };
   }
 
   /* ---------- 🚀 Emprende (clientes): WhatsApp directo al administrador ---------- */
@@ -1033,6 +1106,7 @@
 <script src="shared/verificar.js"></script>
 <script src="shared/premium.js"></script>
 <script src="shared/ayuda.js"></script>
+<script src="shared/tour.js"></script>
 <script src="shared/datos.js"></script>
 <script src="shared/vitrina.js"></script>
 </body>

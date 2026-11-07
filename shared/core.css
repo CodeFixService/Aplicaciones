@@ -319,5 +319,18 @@ header.top h1::before { display: inline-block; vertical-align: middle; margin-ri
 @media (max-width: 420px) { header.top > a:not(.hidden) + h1::before { display: none; } }
 /* Tienda en 5 minutos: barra de progreso */
 .t5 { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
-.t5b { flex: 1; height: 10px; border-radius: 99px; background: var(--line, #e5e7eb); overflow: hidden; }
+.t5b { flex: 1; height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .t5b i { display: block; height: 100%; width: 0; background: var(--brand, #2563eb); border-radius: 99px; transition: width .5s; }
+/* ✅ Qué hacer hoy + 🧭 recorrido guiado (shared/tour.js) */
+#hoyHacerL li a { width: 100%; }
+#hoyHacerL .n { min-width: 28px; height: 28px; border-radius: 14px; display: inline-grid; place-items: center; padding: 0 8px; font-weight: 800; background: var(--brand); color: var(--brand-ink); }
+.cfx-tour { position: fixed; inset: 0; z-index: 70; }
+.cfx-tour-luz { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.6); outline: 3px solid #fff; transition: all .2s; pointer-events: none; }
+.cfx-tour-caja { position: fixed; left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 420px; padding: 16px; border-radius: 16px; background: var(--card, #fff); color: var(--text, #111); box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+.cfx-tour-caja small { color: var(--muted, #666); }
+.cfx-tour-caja b { display: block; font-size: 17px; margin: 2px 0 4px; }
+.cfx-tour-caja p { margin: 0 0 6px; }
+.cfx-tour-caja .btns { justify-content: flex-end; }
+.faq details { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.faq summary { cursor: pointer; font-weight: 700; }
+.faq p { margin: 6px 0 0; }

@@ -10,7 +10,7 @@ const FILES = [
   'icons/icon-512.png',
   'shared/core.css',
   'shared/core.js', 'shared/vitrina.js', 'shared/datos.js', 'shared/tienda.js', 'shared/carga.js', 'shared/ayuda.js', 'shared/despacho.js', 'shared/premium.js', 'shared/humano.js', 'shared/verificar.js', 'shared/pagos.js', 'shared/respaldo.js', 'shared/voz.js', 'shared/fotos.js', 'shared/auto.js', 'shared/barra.js', 'shared/tema.css',
-  'shared/iconos.js',
+  'shared/iconos.js', 'shared/tour.js',
   'shared/instalar.js',
   'shared/config.js',
   'shared/cuenta.js',
