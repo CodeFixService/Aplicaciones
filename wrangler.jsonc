@@ -1,0 +1,7 @@
+// Publicación en Cloudflare (Workers con archivos estáticos). No necesita compilación. "previews" = rama pruebas (CM → Apps → 🧪 Probar).
+{
+  "name": "aplicaciones",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./" },
+  "previews": {}
+}
