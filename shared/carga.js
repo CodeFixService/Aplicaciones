@@ -102,7 +102,29 @@
   };
   if (d.body) empezar(); else d.addEventListener('DOMContentLoaded', empezar);
 
+  // Monitoreo de errores (G8): cada error de JavaScript se anota en la base de esta app (cfx_error_anotar) y se ve en
+  // Centro de Mando → Control → 🩺 Salud. Hasta 5 por apertura, sin repetir; se ignora lo que no es de la app (extensiones, sin internet).
+  const RUIDO = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|aborted|cancelad|extension:\/\/|Non-Error promise rejection|Sin internet|offline/i;
+  const vistos = new Set();
+  const conf = () => { for (const k of Object.keys(window)) if (/_CONFIG$/.test(k) && window[k] && window[k].SUPABASE_URL && window[k].SUPABASE_ANON_KEY) return window[k]; return null; };
+  function anotarError(msg, donde) {
+    try {
+      msg = String(msg || '').trim(); donde = String(donde || '');
+      const cfg = conf(), k = msg + '|' + donde.split('\n')[0];
+      if (!cfg || !f0 || !msg || RUIDO.test(msg) || RUIDO.test(donde) || vistos.has(k) || vistos.size >= 5 || /^(localhost|127\.)/.test(location.hostname) && !window.CFX_ERRORES_LOCAL) return;
+      vistos.add(k);
+      f0.call(window, cfg.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/rpc/cfx_error_anotar', { method: 'POST', keepalive: true,
+        headers: { apikey: cfg.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + cfg.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_mensaje: msg.slice(0, 300), p_donde: donde.slice(0, 600), p_pagina: (location.pathname + location.hash.split('?')[0]).slice(0, 200),
+          p_navegador: (navigator.userAgent.match(/(Android|iPhone|iPad|Windows|Mac OS X|Linux)[^;)]*/) || [''])[0] + ' · ' + ((navigator.userAgent.match(/(Chrome|Firefox|Safari|Edg|SamsungBrowser)\/[\d]+/) || [''])[0]),
+          p_version: String(cfg.VERSION || '') }) }).catch(() => {});
+    } catch (e) { /* el monitoreo nunca rompe la app */ }
+  }
+  window.addEventListener('error', (e) => { if (e && e.message) anotarError(e.message, (e.filename || '').replace(location.origin, '') + ':' + (e.lineno || 0) + ':' + (e.colno || 0) + (e.error && e.error.stack ? '\n' + e.error.stack : '')); });
+  window.addEventListener('unhandledrejection', (e) => { const r = e && e.reason; anotarError(r && r.message ? r.message : (typeof r === 'string' ? r : ''), r && r.stack ? r.stack : 'promesa'); });
+
   window.CFX_CARGA = {
+    anotarError,
     esqueleto,
     barra: (on) => (on ? sube() : baja()),
     boton(b, prom) {
