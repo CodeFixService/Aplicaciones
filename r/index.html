@@ -149,7 +149,7 @@
   };
   $('calif').onclick = async (e) => {
     const n = e.target.dataset.n; if (!n) return;
-    try { const r = await Cuenta.rpc('calificar_pedido', { p_ref: tk, p_estrellas: +n }); if (!r.ok) throw new Error(r.error); Core.toast('⭐ ¡Gracias!'); cargar(); }
+    try { const r = await Cuenta.rpc('cfx_calificar', { p_ref: tk, p_estrellas: +n }); if (!r.ok) throw new Error(r.error); Core.toast('⭐ ¡Gracias!'); cargar(); }
     catch (err) { Core.toast(err.message); }
   };
   // Vuelve de Mercado Pago: confirma el pago (reintenta unos segundos por si Mercado Pago tarda en informarlo).

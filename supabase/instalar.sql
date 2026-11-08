@@ -1172,14 +1172,12 @@ create or replace function public.set_mi_tienda(p_datos_pago text, p_horario tex
 language plpgsql security definer set search_path = '' as $$
 begin
   if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
-  if p_sellos_meta is not null and not public.is_pro(auth.uid()) then raise exception 'La tarjeta de sellos es de la versión Pro'; end if;
-  if p_sellos_meta is not null and (p_sellos_meta < 2 or p_sellos_meta > 30) then raise exception 'La tarjeta debe tener entre 2 y 30 sellos'; end if;
+  -- 🎟️ La tarjeta de sellos vive en el núcleo (cfx_sellos_cfg). Con el módulo apagado no se toca.
+  if public.cfx_modulo('sellos') then perform public.cfx_sellos_guardar(p_sellos_meta, p_sellos_premio); end if;
   update public.profiles set
     datos_pago = nullif(left(trim(coalesce(p_datos_pago, '')), 400), ''),
     horario = nullif(left(trim(coalesce(p_horario, '')), 120), ''),
-    abierto = coalesce(p_abierto, true),
-    sellos_meta = p_sellos_meta,
-    sellos_premio = nullif(left(trim(coalesce(p_sellos_premio, '')), 80), '')
+    abierto = coalesce(p_abierto, true)
   where id = auth.uid();
   return public.my_account();
 end $$;
@@ -3223,7 +3221,7 @@ $$;
 
 create or replace function public.actualizar_pedido(p_id uuid, p_estado text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare ped public.pedidos; t public.profiles; s public.sellos; txt text;
+declare ped public.pedidos; t public.profiles; txt text;
 begin
   if p_estado not in ('preparando', 'listo', 'en_camino', 'entregado', 'cancelado') then raise exception 'Estado no válido'; end if;
   select * into ped from public.pedidos where id = p_id and negocio_id = public.negocio_de(auth.uid());
@@ -3241,14 +3239,10 @@ begin
            when 'en_camino' then '🚚 Tu pedido va en camino' when 'entregado' then '🎉 Pedido entregado. ¡Califica tu compra!'
            else '❌ Tu pedido fue cancelado' end;
   perform public.aviso_cliente(ped, txt, coalesce(nullif(t.empresa, ''), 'Tu tienda') || ' · Total $' || to_char(ped.total, 'FM999G999G999'));
-  if p_estado = 'entregado' and ped.cliente_id is not null and not ped.sellado and t.sellos_meta is not null and public.is_pro(t.id) then
+  -- 🎟️ Tarjeta de sellos (núcleo: módulo 'sellos'): una compra entregada = un sello.
+  if p_estado = 'entregado' and ped.cliente_id is not null and not ped.sellado and public.cfx_sellos_cfg_de(t.id) is not null then
     update public.pedidos set sellado = true where id = ped.id;
-    insert into public.sellos (negocio_id, cliente_id, cantidad) values (t.id, ped.cliente_id, 1)
-    on conflict (negocio_id, cliente_id) do update set cantidad = public.sellos.cantidad + 1 returning * into s;
-    if s.cantidad >= t.sellos_meta then
-      update public.sellos set cantidad = 0, premios = premios + 1 where negocio_id = t.id and cliente_id = ped.cliente_id;
-      perform public.notify_user(ped.cliente_id, '🎁 ¡Completaste tu tarjeta de sellos!', 'Premio: ' || coalesce(t.sellos_premio, 'pregunta en la tienda'), 'apps/catalogo/?v=pedidos');
-    end if;
+    perform public.cfx_sello_sumar(t.id, ped.cliente_id);
   end if;
   return jsonb_build_object('ok', true, 'estado', p_estado);
 end $$;
@@ -4278,7 +4272,7 @@ begin
     'Clientes', (select coalesce(jsonb_agg(x order by x.nombre), '[]') from (select empresa as nombre, email as correo, telefono, plan, pro_until as premium_hasta,
         created_at as creado from public.profiles where negocio_id = n and role = 'client') x),
     'Fichas', (select coalesce(jsonb_agg(x order by x.creada), '[]') from (select titulo, detalle, precio, tipo, vip, created_at as creada from public.publicaciones where owner_id = n) x),
-    'Cupones', (select coalesce(jsonb_agg(x), '[]') from (select codigo, porcentaje, hasta, activo, usos from public.cupones where owner_id = n) x)
+    'Cupones', (select coalesce(jsonb_agg(x), '[]') from (select codigo, porcentaje, hasta, activo, usos from public.cfx_descuentos where owner_id = n) x)
   );
 end $$;
 
@@ -4357,7 +4351,7 @@ language sql security definer set search_path = '' as $$ select public.notify_us
 
 -- Ganchos de los módulos del núcleo (C19 y C14): qué módulos tiene Órbita y las reglas propias del chat.
 create or replace function public.cfx_modulos_app() returns text[]
-language sql immutable as $$ select array['chat'] $$;
+language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos'] $$;
 create or replace function public.cfx_chat_puede(a uuid, b uuid) returns boolean
 language sql stable security definer set search_path = '' as $$ select public.can_message(a, b) $$;
 -- El admin escribe sin límite; entre clientes según su plan (mensajes_seguidos); con tiendas y soporte, 3.
@@ -4380,6 +4374,33 @@ create or replace function public.cfx_chat_suspender(u uuid) returns void
 language sql security definer set search_path = '' as $$ update public.profiles set suspended = true where id = u and role <> 'admin' $$;
 revoke all on function public.cfx_modulos_app(), public.cfx_chat_puede(uuid, uuid), public.cfx_chat_seguidos(uuid, uuid), public.cfx_chat_quien(uuid),
   public.cfx_chat_aviso(uuid, uuid, text), public.cfx_chat_suspender(uuid) from public, anon, authenticated;
+
+-- Ganchos de calificaciones (C15), cupones y sellos (C16) del núcleo: la ref es el pedido; cupones y sellos son del Pro.
+create or replace function public.cfx_calif_ref(p_ref text, u uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref); tienda boolean;
+begin
+  if x.id is null then return jsonb_build_object('error', 'Pedido no encontrado'); end if;
+  if x.estado <> 'entregado' then return jsonb_build_object('error', 'Podrás calificar cuando el pedido esté entregado'); end if;
+  tienda := coalesce(public.negocio_de(u) = x.negocio_id, false) and x.token is distinct from p_ref;
+  if not tienda and x.cliente_id is not null and x.cliente_id is distinct from u and x.token is distinct from p_ref then
+    return jsonb_build_object('error', 'Pedido no encontrado');
+  end if;
+  return jsonb_build_object('ref', x.id::text, 'negocio', x.negocio_id, 'cliente', x.cliente_id,
+    'cliente_ref', case when x.cliente_id is null then x.invitado_tel end, 'de_negocio', tienda);
+end $$;
+create or replace function public.cfx_fid_dueno(u uuid) returns uuid
+language sql stable security definer set search_path = '' as $$ select case when public.is_business(u) then u end $$;
+create or replace function public.cfx_fid_activo(n uuid, p_modulo text) returns boolean
+language sql stable security definer set search_path = '' as $$ select public.is_pro(n) $$;
+create or replace function public.cfx_fid_cliente(u uuid, n uuid) returns boolean
+language sql stable security definer set search_path = '' as $$ select public.puede_comprar(u, n) $$;
+create or replace function public.cfx_sellos_aviso(n uuid, c uuid, p_premio text) returns void
+language sql security definer set search_path = '' as $$
+  select public.notify_user(c, '🎁 ¡Completaste tu tarjeta de sellos!', 'Premio: ' || coalesce(p_premio, 'pregunta en la tienda'), 'apps/catalogo/?v=pedidos')
+$$;
+revoke all on function public.cfx_calif_ref(text, uuid), public.cfx_fid_dueno(uuid), public.cfx_fid_activo(uuid, text), public.cfx_fid_cliente(uuid, uuid),
+  public.cfx_sellos_aviso(uuid, uuid, text) from public, anon, authenticated;
 
 -- Ganchos de administración para el núcleo (planes, textos, a quién avisar y verificación).
 create or replace function public.cfx_planes_app() returns jsonb
@@ -4504,10 +4525,10 @@ begin
   if a ? 'error' then return jsonb_build_object('ok', false, 'error', a ->> 'error'); end if;
   sub := (a ->> 'sub')::numeric;
   if coalesce(trim(p_cupon), '') <> '' then
-    begin pct := public.validar_cupon(p_negocio, p_cupon);
-    exception when others then return jsonb_build_object('ok', false, 'error', 'Cupón no válido o vencido'); end;
+    -- 🏷️ Cupón del negocio (núcleo: módulo 'cupones'). El uso se suma cuando el pedido ya quedó guardado.
+    pct := public.cfx_desc_pct(p_negocio, p_cupon);
+    if pct is null then return jsonb_build_object('ok', false, 'error', 'Cupón no válido o vencido'); end if;
     desc_ := round(sub * pct / 100.0);
-    update public.cupones set usos = usos + 1 where owner_id = p_negocio and codigo = upper(regexp_replace(p_cupon, '[^A-Za-z0-9]', '', 'g'));
   end if;
   if prem then dp := round(sub * coalesce((select desc_premium from public.profiles where id = p_negocio), 0) / 100.0); end if;
   dp := least(dp, sub - desc_);
@@ -4527,6 +4548,7 @@ begin
           case when l is null then null else now() + make_interval(mins => public.regla('retencion_min', 30)) end,
           left(replace(gen_random_uuid()::text, '-', ''), 24), (dsp ->> 'costo')::numeric, dsp ->> 'comuna')
   returning * into ped;
+  if pct > 0 then perform public.cfx_desc_usar(p_negocio, p_cupon); end if;
   quien := coalesce(p_nombre, (select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = p_cliente));
   perform public.notify_user(p_negocio, case when prem then '⭐ ' else '' end || case when l is null then '📦 Nuevo pedido de ' else '⏳ Pedido por pagar de ' end || quien,
     'Total $' || to_char(ped.total, 'FM999G999G999') || ' · ' || case when p_entrega = 'despacho' then 'Despacho' else 'Retiro en tienda' end ||
@@ -5312,7 +5334,7 @@ begin
     'tienda', jsonb_build_object('nombre', t.empresa, 'slug', t.slug, 'logo', t.logo, 'color', t.color, 'telefono', t.telefono, 'datos_pago', t.datos_pago),
     'link', case when x.estado = 'pagando' then public.link_activo(x.negocio_id, 'pedido') end,
     'cancel_min', public.regla('cancel_min', 10),
-    'calificado', exists (select 1 from public.calificaciones c where c.pedido_id = x.id and not c.de_negocio),
+    'calificado', public.cfx_calif_hecha(x.id::text, false),
     'boleta', case when x.boleta_folio is not null then public.boleta_de(x) end);
 end $$;
 
@@ -5376,7 +5398,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.32'::text $$;
+language sql immutable as $$ select '5.33'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5405,7 +5427,7 @@ begin
     'productos', (select count(*) from public.catalog_items where owner_id = n),
     'abierto', coalesce(t.abierto, true), 'vacaciones', t.vacaciones_hasta is not null and t.vacaciones_hasta >= public.hoy_cl(),
     'pro_dias', case when t.plan = 'pro' and t.pro_until is not null and t.pro_until > now() then ceil(extract(epoch from t.pro_until - now()) / 86400)::int end,
-    'estrellas', (select round(avg(q.estrellas), 1) from public.calificaciones q join public.pedidos x on x.id = q.pedido_id where x.negocio_id = n and not q.de_negocio));
+    'estrellas', (public.cfx_calif_negocio(n) ->> 'promedio')::numeric);
 end $$;
 
 -- =====================================================================
@@ -5441,6 +5463,8 @@ revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
 -- =====================================================================
+--  VERSIÓN 5.33 · núcleo 2.50: C15 calificaciones en 2 direcciones y C16 cupones + tarjeta de sellos pasan al núcleo
+--  (cfx_calificaciones, cfx_descuentos, cfx_sellos, cfx_sellos_cfg). Módulos 'calificaciones', 'cupones' y 'sellos' (🧩 en el CM).
 --  VERSIÓN 5.32 · núcleo 2.49: C19 módulos que se prenden desde el CM (cfx_modulos) y C14 chat en el núcleo (cfx_mensajes/cfx_msg_*).
 --  VERSIÓN 5.31 · núcleo 2.48: una key mala ya no deshace su registro (cfx_key_canjear devuelve {error}); redeem_license lo respeta.
 --  VERSIÓN 5.30 · A5: sin tablas dobles. pagos → cfx_pagos, licenses → cfx_keys y resenas (sin pantalla desde 3.9) se borran.
@@ -6702,7 +6726,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.boleta_cuentas', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.auditoria', 'public.avisos_stock', 'public.boleta_cuentas', 'public.calificaciones', 'public.carritos', 'public.catalog_items', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -7067,6 +7091,280 @@ revoke all on function public.cfx_msg_restantes(uuid), public.cfx_msg_enviar(uui
 grant execute on function public.cfx_msg_restantes(uuid), public.cfx_msg_enviar(uuid, text), public.cfx_msg_lista(), public.cfx_msg_sin_leer(),
   public.cfx_msg_hilo(uuid), public.cfx_msg_bloquear(uuid, boolean), public.cfx_msg_reportar(uuid, text), public.cfx_msg_borrar(uuid),
   public.cfx_msg_reportes(), public.cfx_msg_resolver(uuid, boolean) to authenticated;
+-- ---------- Calificaciones en dos direcciones (C15): el cliente califica al negocio y el negocio al cliente (módulo 'calificaciones') ----------
+-- Una calificación por "ref" (pedido, reserva, arriendo…) y por lado. Estrellas 1-5 y comentario opcional (300).
+-- Gancho que pone cada app que las usa (y 'calificaciones' en cfx_modulos_app()):
+--   cfx_calif_ref(ref, u) jsonb   quién califica esa ref: {"ref": text, "negocio": uuid, "cliente": uuid|null, "cliente_ref": text|null, "de_negocio": bool}
+--                                 ("ref" = la referencia de verdad, p. ej. el id del pedido cuando llega su token)
+--                                 o {"error": "..."} (no existe, aún no se puede, no es tuyo). u puede ser null (invitado con token).
+-- Para mostrar: cfx_calif_negocio(n) y cfx_calif_cliente(c, ref) → {"promedio", "total"}; cfx_calif_hecha(ref, de_negocio).
+-- Si el módulo está apagado no se califica, los promedios vuelven null y cfx_calif_hecha dice true (no aparece "Califica").
+create table if not exists public.cfx_calificaciones (
+  ref          text not null,
+  de_negocio   boolean not null,
+  negocio_id   uuid not null,
+  cliente_id   uuid references auth.users (id) on delete set null,
+  cliente_ref  text,
+  estrellas    int not null check (estrellas between 1 and 5),
+  comentario   text not null default '' check (char_length(comentario) <= 300),
+  creado       timestamptz not null default now(),
+  primary key (ref, de_negocio)
+);
+create index if not exists cfx_calif_negocio_idx on public.cfx_calificaciones (negocio_id) where not de_negocio;
+create index if not exists cfx_calif_cliente_idx on public.cfx_calificaciones (cliente_id) where de_negocio;
+create index if not exists cfx_calif_cref_idx on public.cfx_calificaciones (cliente_ref) where de_negocio and cliente_ref is not null;
+alter table public.cfx_calificaciones enable row level security;
+revoke all on public.cfx_calificaciones from anon, authenticated;
+
+-- Calificar: {"ok": true} o {"ok": false, "error"}.
+create or replace function public.cfx_calificar(p_ref text, p_estrellas int, p_comentario text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r jsonb;
+begin
+  if not public.cfx_modulo('calificaciones') then return jsonb_build_object('ok', false, 'error', 'Las calificaciones no están disponibles'); end if;
+  if p_estrellas is null or p_estrellas < 1 or p_estrellas > 5 then return jsonb_build_object('ok', false, 'error', 'Elige de 1 a 5 estrellas'); end if;
+  if coalesce(trim(p_ref), '') = '' then return jsonb_build_object('ok', false, 'error', 'No encontrado'); end if;
+  r := public.cfx_calif_ref(p_ref, auth.uid());
+  if r is null or r ? 'error' or r ->> 'negocio' is null then return jsonb_build_object('ok', false, 'error', coalesce(r ->> 'error', 'No encontrado')); end if;
+  insert into public.cfx_calificaciones (ref, de_negocio, negocio_id, cliente_id, cliente_ref, estrellas, comentario)
+  values (coalesce(r ->> 'ref', p_ref), coalesce((r ->> 'de_negocio')::boolean, false), (r ->> 'negocio')::uuid, (r ->> 'cliente')::uuid,
+          nullif(left(r ->> 'cliente_ref', 60), ''), p_estrellas, left(trim(coalesce(p_comentario, '')), 300))
+  on conflict (ref, de_negocio) do nothing;
+  if not found then return jsonb_build_object('ok', false, 'error', 'Ya fue calificado'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ¿Ya calificó ese lado? (con el módulo apagado: true, para no pedirlo)
+create or replace function public.cfx_calif_hecha(p_ref text, p_de_negocio boolean) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.cfx_modulo('calificaciones') then return true; end if;
+  return exists (select 1 from public.cfx_calificaciones where ref = p_ref and de_negocio = p_de_negocio);
+end $$;
+
+-- Lo que los clientes dicen del negocio.
+create or replace function public.cfx_calif_negocio(p_negocio uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.cfx_modulo('calificaciones') then return null; end if;
+  return (select jsonb_build_object('promedio', round(avg(estrellas), 1), 'total', count(*))
+          from public.cfx_calificaciones where negocio_id = p_negocio and not de_negocio);
+end $$;
+
+-- Lo que los negocios dicen del cliente (por su cuenta o, si es invitado, por su referencia: teléfono…).
+create or replace function public.cfx_calif_cliente(p_cliente uuid, p_cliente_ref text default null) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.cfx_modulo('calificaciones') or (p_cliente is null and coalesce(p_cliente_ref, '') = '') then return null; end if;
+  return (select jsonb_build_object('promedio', round(avg(estrellas), 1), 'total', count(*))
+          from public.cfx_calificaciones where de_negocio
+            and ((p_cliente is not null and cliente_id = p_cliente) or (p_cliente is null and cliente_ref = p_cliente_ref)));
+end $$;
+
+-- Al borrar un negocio o una ref (lo llama la app).
+create or replace function public.cfx_calif_borrar(p_negocio uuid, p_ref text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.cfx_calificaciones where negocio_id = p_negocio and (p_ref is null or ref = p_ref);
+end $$;
+
+revoke all on function public.cfx_calif_hecha(text, boolean), public.cfx_calif_negocio(uuid), public.cfx_calif_cliente(uuid, text),
+  public.cfx_calif_borrar(uuid, text) from public, anon, authenticated;
+revoke all on function public.cfx_calificar(text, int, text) from public;
+grant execute on function public.cfx_calificar(text, int, text) to anon, authenticated;
+-- ---------- Cupones del negocio y tarjeta de sellos (C16): módulos 'cupones' y 'sellos' ----------
+-- OJO: no son los cupones del Premium (cfx_cupones / cfx_cupon_ver, los crea el admin). Estos los crea cada negocio para SUS clientes.
+-- Ganchos que pone cada app que los usa (y 'cupones' / 'sellos' en cfx_modulos_app()):
+--   cfx_fid_dueno(u) uuid                  negocio que administra la cuenta u (null = no es negocio)
+--   cfx_fid_activo(negocio, modulo) bool   ¿el plan del negocio incluye ese módulo? (p. ej. solo Pro)
+--   cfx_fid_cliente(u, negocio) bool       ¿u es cliente de ese negocio? (ve sus sellos y prueba cupones)
+--   cfx_sellos_aviso(negocio, cliente, premio) void   push al cliente que completó la tarjeta
+-- La app usa, dentro de sus funciones: cfx_desc_pct + cfx_desc_usar (al crear el pedido), cfx_sello_sumar (al entregar)
+-- y cfx_sellos_cfg_de (para mostrar la tarjeta). cfx_fid_borrar al borrar un negocio.
+create table if not exists public.cfx_descuentos (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null,
+  codigo      text not null check (codigo ~ '^[A-Z0-9]{3,20}$'),
+  porcentaje  int not null check (porcentaje between 1 and 90),
+  hasta       date,
+  activo      boolean not null default true,
+  usos        int not null default 0,
+  creado      timestamptz not null default now(),
+  unique (owner_id, codigo)
+);
+create table if not exists public.cfx_sellos_cfg (
+  owner_id  uuid primary key,
+  meta      int not null check (meta between 2 and 30),
+  premio    text check (char_length(premio) <= 80),
+  creado    timestamptz not null default now()
+);
+create table if not exists public.cfx_sellos (
+  negocio_id  uuid not null,
+  cliente_id  uuid not null references auth.users (id) on delete cascade,
+  cantidad    int not null default 0,
+  premios     int not null default 0,
+  actualizado timestamptz not null default now(),
+  primary key (negocio_id, cliente_id)
+);
+create index if not exists cfx_sellos_cliente_idx on public.cfx_sellos (cliente_id);
+alter table public.cfx_descuentos enable row level security;
+alter table public.cfx_sellos_cfg enable row level security;
+alter table public.cfx_sellos enable row level security;
+revoke all on public.cfx_descuentos, public.cfx_sellos_cfg, public.cfx_sellos from anon, authenticated;
+
+create or replace function public.cfx_desc_codigo(p_codigo text) returns text
+language sql immutable set search_path = '' as $$ select upper(regexp_replace(coalesce(p_codigo, ''), '[^A-Za-z0-9]', '', 'g')) $$;
+
+-- El negocio de la cuenta, si el módulo está prendido y su plan lo incluye.
+create or replace function public.cfx_fid_mio(p_modulo text) returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid;
+begin
+  if not public.cfx_modulo(p_modulo) then
+    raise exception '% no está disponible en esta app', case p_modulo when 'cupones' then 'Los cupones' else 'La tarjeta de sellos' end;
+  end if;
+  n := public.cfx_fid_dueno(auth.uid());
+  if n is null then raise exception 'Solo el negocio'; end if;
+  if not coalesce(public.cfx_fid_activo(n, p_modulo), false) then
+    raise exception '% de la versión Pro', case p_modulo when 'cupones' then 'Los cupones son' else 'La tarjeta de sellos es' end;
+  end if;
+  return n;
+end $$;
+
+-- ¿El negocio puede usar el módulo ahora? (prendido + su plan)
+create or replace function public.cfx_fid_ok(p_negocio uuid, p_modulo text) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if p_negocio is null or not public.cfx_modulo(p_modulo) then return false; end if;
+  return coalesce(public.cfx_fid_activo(p_negocio, p_modulo), false);
+end $$;
+
+-- ---------- Cupones ----------
+create or replace function public.cfx_desc_guardar(p_codigo text, p_porcentaje int, p_hasta date) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.cfx_fid_mio('cupones'); c text := public.cfx_desc_codigo(p_codigo);
+begin
+  if length(c) < 3 or length(c) > 20 then raise exception 'El código debe tener entre 3 y 20 letras o números'; end if;
+  if p_porcentaje is null or p_porcentaje < 1 or p_porcentaje > 90 then raise exception 'El descuento debe ser entre 1 y 90 por ciento'; end if;
+  if (select count(*) from public.cfx_descuentos where owner_id = n) >= 50
+     and not exists (select 1 from public.cfx_descuentos where owner_id = n and codigo = c) then raise exception 'Máximo 50 cupones'; end if;
+  insert into public.cfx_descuentos (owner_id, codigo, porcentaje, hasta) values (n, c, p_porcentaje, p_hasta)
+  on conflict (owner_id, codigo) do update set porcentaje = excluded.porcentaje, hasta = excluded.hasta, activo = true;
+end $$;
+
+create or replace function public.cfx_desc_borrar(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.cfx_descuentos where id = p_id and owner_id = public.cfx_fid_dueno(auth.uid());
+end $$;
+
+-- Mis cupones: [{id, codigo, porcentaje, hasta, activo, usos}]
+create or replace function public.cfx_desc_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.cfx_fid_mio('cupones');
+begin
+  return coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'codigo', c.codigo, 'porcentaje', c.porcentaje, 'hasta', c.hasta,
+    'activo', c.activo, 'usos', c.usos) order by c.creado desc) from public.cfx_descuentos c where c.owner_id = n), '[]');
+end $$;
+
+-- Porcentaje de un cupón vigente (null = no sirve). Interna: la app la usa al armar el pedido.
+create or replace function public.cfx_desc_pct(p_negocio uuid, p_codigo text) returns int
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.cfx_fid_ok(p_negocio, 'cupones') then return null; end if;
+  return (select c.porcentaje from public.cfx_descuentos c
+          where c.owner_id = p_negocio and c.codigo = public.cfx_desc_codigo(p_codigo) and c.activo and (c.hasta is null or c.hasta >= current_date));
+end $$;
+
+-- Suma un uso (la app la llama cuando el pedido ya quedó guardado).
+create or replace function public.cfx_desc_usar(p_negocio uuid, p_codigo text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.cfx_descuentos set usos = usos + 1 where owner_id = p_negocio and codigo = public.cfx_desc_codigo(p_codigo);
+end $$;
+
+-- El cliente prueba un cupón: devuelve el porcentaje o avisa que no sirve.
+create or replace function public.cfx_desc_validar(p_negocio uuid, p_codigo text) returns int
+language plpgsql stable security definer set search_path = '' as $$
+declare pct int;
+begin
+  if not public.cfx_modulo('cupones') then raise exception 'Cupón no válido o vencido'; end if;
+  if not coalesce(public.cfx_fid_cliente(auth.uid(), p_negocio), false) then raise exception 'Sin permiso'; end if;
+  pct := public.cfx_desc_pct(p_negocio, p_codigo);
+  if pct is null then raise exception 'Cupón no válido o vencido'; end if;
+  return pct;
+end $$;
+
+-- ---------- Tarjeta de sellos ----------
+-- El negocio la arma (meta 2-30 y premio) o la apaga (meta null).
+create or replace function public.cfx_sellos_guardar(p_meta int, p_premio text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid;
+begin
+  if p_meta is null then
+    n := public.cfx_fid_dueno(auth.uid());
+    if n is null then raise exception 'Solo el negocio'; end if;
+    delete from public.cfx_sellos_cfg where owner_id = n;
+    return null;
+  end if;
+  n := public.cfx_fid_mio('sellos');
+  if p_meta < 2 or p_meta > 30 then raise exception 'La tarjeta debe tener entre 2 y 30 sellos'; end if;
+  insert into public.cfx_sellos_cfg (owner_id, meta, premio) values (n, p_meta, nullif(left(trim(coalesce(p_premio, '')), 80), ''))
+  on conflict (owner_id) do update set meta = excluded.meta, premio = excluded.premio;
+  return public.cfx_sellos_cfg_de(n);
+end $$;
+
+-- La tarjeta del negocio {meta, premio} (null = no tiene, módulo apagado o su plan no la incluye).
+create or replace function public.cfx_sellos_cfg_de(p_negocio uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.cfx_fid_ok(p_negocio, 'sellos') then return null; end if;
+  return (select jsonb_build_object('meta', c.meta, 'premio', c.premio) from public.cfx_sellos_cfg c where c.owner_id = p_negocio);
+end $$;
+
+-- Mis sellos en un negocio: {cantidad, premios, meta, premio} o null.
+create or replace function public.cfx_sellos_mios(p_negocio uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare c jsonb := public.cfx_sellos_cfg_de(p_negocio);
+begin
+  if c is null then return null; end if;
+  if not coalesce(public.cfx_fid_cliente(auth.uid(), p_negocio), false) then return null; end if;
+  return c || coalesce((select jsonb_build_object('cantidad', s.cantidad, 'premios', s.premios) from public.cfx_sellos s
+                        where s.negocio_id = p_negocio and s.cliente_id = auth.uid()), jsonb_build_object('cantidad', 0, 'premios', 0));
+end $$;
+
+-- Suma un sello (al entregar una compra). Al llegar a la meta: vuelve a 0, suma un premio y avisa. Devuelve {cantidad, premio} o null.
+create or replace function public.cfx_sello_sumar(p_negocio uuid, p_cliente uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c jsonb := public.cfx_sellos_cfg_de(p_negocio); s public.cfx_sellos;
+begin
+  if c is null or p_cliente is null then return null; end if;
+  insert into public.cfx_sellos (negocio_id, cliente_id, cantidad) values (p_negocio, p_cliente, 1)
+  on conflict (negocio_id, cliente_id) do update set cantidad = public.cfx_sellos.cantidad + 1, actualizado = now() returning * into s;
+  if s.cantidad >= (c ->> 'meta')::int then
+    update public.cfx_sellos set cantidad = 0, premios = premios + 1 where negocio_id = p_negocio and cliente_id = p_cliente;
+    perform public.cfx_sellos_aviso(p_negocio, p_cliente, c ->> 'premio');
+    return jsonb_build_object('cantidad', 0, 'premio', true);
+  end if;
+  return jsonb_build_object('cantidad', s.cantidad, 'premio', false);
+end $$;
+
+-- Al borrar un negocio (lo llama la app): sus cupones, su tarjeta y los sellos de sus clientes.
+create or replace function public.cfx_fid_borrar(p_negocio uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.cfx_descuentos where owner_id = p_negocio;
+  delete from public.cfx_sellos_cfg where owner_id = p_negocio;
+  delete from public.cfx_sellos where negocio_id = p_negocio;
+end $$;
+
+revoke all on function public.cfx_desc_codigo(text), public.cfx_fid_mio(text), public.cfx_fid_ok(uuid, text), public.cfx_desc_pct(uuid, text),
+  public.cfx_desc_usar(uuid, text), public.cfx_sellos_cfg_de(uuid), public.cfx_sello_sumar(uuid, uuid), public.cfx_fid_borrar(uuid)
+  from public, anon, authenticated;
+revoke all on function public.cfx_desc_guardar(text, int, date), public.cfx_desc_borrar(uuid), public.cfx_desc_lista(), public.cfx_desc_validar(uuid, text),
+  public.cfx_sellos_guardar(int, text), public.cfx_sellos_mios(uuid) from public, anon;
+grant execute on function public.cfx_desc_guardar(text, int, date), public.cfx_desc_borrar(uuid), public.cfx_desc_lista(), public.cfx_desc_validar(uuid, text),
+  public.cfx_sellos_guardar(int, text), public.cfx_sellos_mios(uuid) to authenticated;
 
 -- ---------- Seguridad (A7): lo que puede hacer alguien sin cuenta (anon) y los buckets de archivos ----------
 -- Va al final del núcleo: así alcanza a todas las funciones de la app.
@@ -7113,6 +7411,118 @@ end $$;
 revoke all on function public.cfx_seguridad() from public, anon;
 grant execute on function public.cfx_seguridad() to authenticated;
 -- <<< CFX núcleo
+
+-- ---------- VERSIÓN 5.33 · C15 + C16: calificaciones, cupones y sellos pasan al núcleo (se puede volver a correr) ----------
+-- calificaciones → cfx_calificaciones (ref = id del pedido), cupones → cfx_descuentos, sellos → cfx_sellos, profiles.sellos_meta/premio → cfx_sellos_cfg.
+drop function if exists public.guardar_cupon(text, int, date), public.borrar_cupon(uuid), public.mis_cupones(), public.validar_cupon(uuid, text),
+  public.mis_sellos(uuid), public.calificar_pedido(text, int);
+do $$
+declare f int;
+begin
+  if to_regclass('public.calificaciones') is not null then
+    execute $q$ insert into public.cfx_calificaciones (ref, de_negocio, negocio_id, cliente_id, cliente_ref, estrellas, creado)
+      select q.pedido_id::text, q.de_negocio, x.negocio_id, (select u.id from auth.users u where u.id = x.cliente_id),
+        case when x.cliente_id is null then x.invitado_tel end, q.estrellas, q.created_at
+      from public.calificaciones q join public.pedidos x on x.id = q.pedido_id
+      on conflict (ref, de_negocio) do nothing $q$;
+    drop table public.calificaciones;
+  end if;
+  if to_regclass('public.cupones') is not null then
+    execute $q$ insert into public.cfx_descuentos (id, owner_id, codigo, porcentaje, hasta, activo, usos, creado)
+      select c.id, c.owner_id, c.codigo, c.porcentaje, c.hasta, c.activo, c.usos, c.created_at from public.cupones c
+      where c.codigo ~ '^[A-Z0-9]{3,20}$' on conflict do nothing $q$;
+    execute $q$ select count(*) from public.cupones c where not exists (select 1 from public.cfx_descuentos d where d.owner_id = c.owner_id and d.codigo = c.codigo) $q$ into f;
+    if f = 0 then drop table public.cupones; else raise notice 'cupones: % sin copiar, la tabla queda', f; end if;
+  end if;
+  if to_regclass('public.sellos') is not null then
+    execute $q$ insert into public.cfx_sellos (negocio_id, cliente_id, cantidad, premios)
+      select s.negocio_id, s.cliente_id, s.cantidad, s.premios from public.sellos s
+      where exists (select 1 from auth.users u where u.id = s.cliente_id) on conflict do nothing $q$;
+    drop table public.sellos;
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'sellos_meta') then
+    execute $q$ insert into public.cfx_sellos_cfg (owner_id, meta, premio)
+      select p.id, p.sellos_meta, nullif(left(trim(coalesce(p.sellos_premio, '')), 80), '') from public.profiles p
+      where p.sellos_meta between 2 and 30 on conflict do nothing $q$;
+    alter table public.profiles drop column sellos_meta, drop column if exists sellos_premio;
+  end if;
+end $$;
+
+-- Lo que leen las pantallas, ahora desde el núcleo (con el módulo apagado: sin estrellas, sin "Califica" y sin tarjeta).
+create or replace function public.estrellas_tienda(n uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$ select public.cfx_calif_negocio(n) $$;
+
+create or replace function public.tienda_info(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug,
+    'telefono', t.telefono, 'datos_pago', t.datos_pago, 'horario', t.horario, 'abierto', t.abierto,
+    'sellos_meta', (s.c ->> 'meta')::int, 'sellos_premio', s.c ->> 'premio',
+    'pro', public.is_pro(t.id), 'logo', t.logo, 'color', t.color,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'desc_premium', t.desc_premium, 'rubro', t.rubro, 'despacho', t.despacho, 'perfil', t.perfil, 'desde', t.created_at::date)
+  from public.profiles t cross join lateral (select public.cfx_sellos_cfg_de(t.id) as c) s
+  where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
+$$;
+
+create or replace function public.mis_pedidos(p_negocio uuid default null)
+returns table (id uuid, negocio text, lineas jsonb, subtotal numeric, descuento numeric, total numeric, cupon text,
+               entrega text, direccion text, nota text, estado text, fecha timestamptz, actualizado timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, calificado boolean, token text,
+               desc_premium numeric, motivo text, rechazos int, boleta jsonb)
+language sql stable security definer set search_path = '' as $$
+  select x.id, t.empresa, x.lineas, x.subtotal, x.descuento, x.total, x.cupon,
+         x.entrega, x.direccion, x.nota, x.estado, x.created_at, x.updated_at, x.retenido_hasta, x.comprobante is not null, x.devolucion,
+         public.cfx_calif_hecha(x.id::text, false), x.token, x.desc_premium, x.motivo, x.rechazos,
+         case when x.boleta_folio is not null then public.boleta_de(x) end
+  from public.pedidos x join public.profiles t on t.id = x.negocio_id
+  where x.cliente_id = auth.uid() and (p_negocio is null or x.negocio_id = p_negocio)
+  order by x.created_at desc limit 50
+$$;
+
+create or replace function public.pedidos_tienda(p_estado text default null)
+returns table (id uuid, cliente_id uuid, cliente text, telefono text, lineas jsonb, subtotal numeric, descuento numeric,
+               total numeric, cupon text, entrega text, direccion text, nota text, estado text, fecha timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, invitado boolean, calificado boolean, cliente_estrellas numeric,
+               premium boolean, desc_premium numeric, rechazos int, motivo text, boleta jsonb, medio text)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.cliente_id, coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1), x.invitado_nombre, 'Cliente'),
+         coalesce(c.telefono, x.invitado_tel), x.lineas, x.subtotal, x.descuento, x.total, x.cupon, x.entrega, x.direccion, x.nota, x.estado,
+         x.created_at, x.retenido_hasta, x.comprobante is not null, x.devolucion, x.cliente_id is null,
+         public.cfx_calif_hecha(x.id::text, true),
+         (public.cfx_calif_cliente(x.cliente_id, case when x.cliente_id is null then x.invitado_tel end) ->> 'promedio')::numeric,
+         pr.premium, x.desc_premium, x.rechazos, x.motivo, public.boleta_de(x),
+         case when x.mp_pago is not null then 'mercadopago' when x.comprobante_at is not null then 'transferencia' end
+  from public.pedidos x left join public.profiles c on c.id = x.cliente_id
+  cross join lateral (select c.role = 'client' and public.is_pro(c.id) as premium) pr
+  where x.negocio_id = public.negocio_de(auth.uid())
+    and (p_estado is null or (p_estado = 'activos' and x.estado in ('recibido', 'preparando', 'listo', 'en_camino'))
+         or (p_estado = 'revisar' and x.estado = 'en_revision') or (p_estado = 'pagando' and x.estado = 'pagando')
+         or (p_estado = 'devolver' and x.devolucion = 'pendiente')
+         or (p_estado = 'historial' and x.estado in ('entregado', 'cancelado', 'rechazado', 'expirado')) or x.estado = p_estado)
+  -- ⭐ Los pedidos pendientes de clientes Premium van primero en la fila.
+  order by (coalesce(pr.premium, false) and x.estado in ('pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino')) desc, x.created_at desc
+  limit 300
+$$;
+
+-- Al borrar una tienda o un pedido, se borra lo suyo en el núcleo (antes lo hacía la clave foránea).
+create or replace function public.borrar_fidelidad() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_table_name = 'profiles' then
+    perform public.cfx_fid_borrar(old.id);
+    perform public.cfx_calif_borrar(old.id);
+  else
+    perform public.cfx_calif_borrar(old.negocio_id, old.id::text);
+  end if;
+  return old;
+end $$;
+revoke all on function public.borrar_fidelidad() from public, anon, authenticated;
+drop trigger if exists borrar_fidelidad on public.profiles;
+create trigger borrar_fidelidad after delete on public.profiles for each row execute function public.borrar_fidelidad();
+drop trigger if exists borrar_fidelidad on public.pedidos;
+create trigger borrar_fidelidad after delete on public.pedidos for each row execute function public.borrar_fidelidad();
 
 -- ---------- VERSIÓN 5.32 · C14: el chat pasa al núcleo. messages/blocks/reports → cfx_mensajes/cfx_bloqueos/cfx_reportes (se puede volver a correr) ----------
 drop function if exists public.chat_remaining(uuid), public.send_message(uuid, text), public.chat_list(), public.chat_messages(uuid),

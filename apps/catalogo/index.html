@@ -170,9 +170,9 @@
         <p class="aviso">⚠️ El despacho tiene un <b>costo adicional según la distancia</b>, que paga el cliente. La tienda te confirmará el valor.</p>
         <label for="dir">Dirección de despacho</label><input id="dir" maxlength="200" placeholder="Calle, número, depto, comuna">
       </div>
-      <label for="cupon">Cupón de descuento (opcional)</label>
-      <div class="row"><input id="cupon" maxlength="20" autocapitalize="characters" placeholder="VERANO10" style="flex:2"><button class="alt small" id="bCupon" type="button" style="flex:none">Aplicar</button></div>
-      <p class="muted" id="cuponTxt" style="margin:4px 0 0"></p>
+      <label for="cupon" class="m-cupones">Cupón de descuento (opcional)</label>
+      <div class="row m-cupones"><input id="cupon" maxlength="20" autocapitalize="characters" placeholder="VERANO10" style="flex:2"><button class="alt small" id="bCupon" type="button" style="flex:none">Aplicar</button></div>
+      <p class="muted m-cupones" id="cuponTxt" style="margin:4px 0 0"></p>
       <label for="nota">Nota para la tienda (opcional)</label>
       <textarea id="nota" maxlength="200" placeholder="Ej: lo retiro el sábado en la mañana"></textarea>
       <div class="btns"><button id="bEnviarPed" style="flex:1">📨 Enviar pedido</button>
@@ -556,7 +556,7 @@
     const c = $('cupon').value.trim();
     if (!c) { cupon = null; $('cuponTxt').textContent = ''; pintarCarro(); return; }
     try {
-      const pct = await Cuenta.rpc('validar_cupon', { p_negocio: negocio, p_codigo: c });
+      const pct = await Cuenta.rpc('cfx_desc_validar', { p_negocio: negocio, p_codigo: c });
       cupon = { codigo: c, pct };
       $('cuponTxt').textContent = '✅ Cupón aplicado: ' + pct + '% de descuento';
     } catch (err) { cupon = null; $('cuponTxt').textContent = '❌ ' + err.message; }
@@ -646,7 +646,7 @@
       '<button class="small alt" data-rep="' + n + '">🔁 Repetir</button>' +
       '<a class="btn small alt" href="../mensajes/?con=' + negocio + '">💬 Chat</a></div></li>').join('')
       : '<li class="empty">' + vacio('pedidos', 'Aún no envías pedidos. Agrega productos u ofertas con 🛒 y envíalos desde aquí.') + '</li>';
-    const s = await traer('mis_sellos', { p_negocio: negocio }, 'sellos', null);
+    const s = await traer('cfx_sellos_mios', { p_negocio: negocio }, 'sellos', null);
     $('cSellos').classList.toggle('hidden', !s);
     if (s) {
       $('sellos').innerHTML = Array.from({ length: s.meta }, (_, i) => '<span class="' + (i < s.cantidad ? 'on' : '') + '">' + (i < s.cantidad ? '⭐' : '') + '</span>').join('');
@@ -686,7 +686,7 @@
         Core.toast(r.devolucion === 'pendiente' ? 'Pedido cancelado: la tienda te devolverá el pago' : r.devolucion === 'sin_devolucion' ? 'Pedido cancelado (fuera de plazo: sin devolución)' : 'Pedido cancelado');
       }
       if (b.dataset.cal) {
-        const r = await Cuenta.rpc('calificar_pedido', { p_ref: b.dataset.cal, p_estrellas: +b.dataset.n });
+        const r = await Cuenta.rpc('cfx_calificar', { p_ref: b.dataset.cal, p_estrellas: +b.dataset.n });
         if (!r.ok) throw new Error(r.error);
         Core.toast('⭐ ¡Gracias por calificar!');
       }

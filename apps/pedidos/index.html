@@ -267,7 +267,7 @@
       }
       if (b.dataset.dev) { await Cuenta.rpc('marcar_devuelto', { p_id: b.dataset.dev }); Core.toast('💸 Marcado como devuelto'); }
       if (b.dataset.cal) {
-        const r = await Cuenta.rpc('calificar_pedido', { p_ref: b.dataset.cal, p_estrellas: +b.dataset.n });
+        const r = await Cuenta.rpc('cfx_calificar', { p_ref: b.dataset.cal, p_estrellas: +b.dataset.n });
         if (!r.ok) throw new Error(r.error);
         Core.toast('⭐ Gracias por calificar');
       }
@@ -282,7 +282,7 @@
     $('cupPro').classList.toggle('hidden', !pro);
     if (!pro) return;
     try {
-      const l = await Cuenta.rpc('mis_cupones');
+      const l = await Cuenta.rpc('cfx_desc_lista');
       $('cupones').innerHTML = l.length ? l.map((c) => '<li><div class="grow"><b>' + Core.esc(c.codigo) + '</b> · −' + c.porcentaje + '%<div class="muted">' +
         (c.hasta ? 'Hasta el ' + new Date(c.hasta + 'T12:00').toLocaleDateString('es') : 'Sin vencimiento') + ' · usado ' + c.usos + ' vez/veces</div></div>' +
         '<button class="small danger" data-c="' + c.id + '" aria-label="Eliminar">✕</button></li>').join('') : '<li class="empty">Aún no creas cupones</li>';
@@ -290,7 +290,7 @@
   }
   $('bCupon').onclick = async () => {
     try {
-      await Cuenta.rpc('guardar_cupon', { p_codigo: $('cCodigo').value, p_porcentaje: parseInt($('cPct').value, 10), p_hasta: $('cHasta').value || null });
+      await Cuenta.rpc('cfx_desc_guardar', { p_codigo: $('cCodigo').value, p_porcentaje: parseInt($('cPct').value, 10), p_hasta: $('cHasta').value || null });
       $('cCodigo').value = ''; $('cPct').value = ''; $('cHasta').value = '';
       Core.toast('🎟️ Cupón guardado: compártelo con tus clientes'); cargarCupones();
     } catch (err) { Core.toast(err.message); }
@@ -298,7 +298,7 @@
   $('cupones').onclick = async (e) => {
     const id = e.target.dataset.c;
     if (!id || !confirm('¿Eliminar este cupón?')) return;
-    await Cuenta.rpc('borrar_cupon', { p_id: id }).catch(() => {});
+    await Cuenta.rpc('cfx_desc_borrar', { p_id: id }).catch(() => {});
     cargarCupones();
   };
 
@@ -329,7 +329,8 @@
     const c = document.querySelector('[data-ped="' + ir + '"]');
     if (c) { c.classList.add('nuevo'); c.scrollIntoView({ block: 'center' }); }
   })();
-  if (params.get('v') === 'cupones' || params.get('v') === 'stats') show(params.get('v'));
+  // 🧩 Promociones (cupones) se esconde si el módulo está apagado desde el Centro de Mando.
+  if ((params.get('v') === 'cupones' && (await Cuenta.modulos()).cupones !== false) || params.get('v') === 'stats') show(params.get('v'));
   setInterval(() => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); }, 20000);
 })();
 </script>

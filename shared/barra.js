@@ -182,7 +182,7 @@
     const padres = new Set([...document.querySelectorAll('.card, .tarjeta')].map((c) => c.parentElement).filter(Boolean));
     padres.forEach((p) => {
       // Se revisa cada vez: si la lista se volvió a dibujar, las tarjetas nuevas también se apilan (y si ya no sirve, se deshace).
-      if (p.closest('dialog, .modal, .sheet, .hoja, .cfx-mv, [data-sin-pila]') || (p.parentElement && p.parentElement.closest('.cfx-apilar'))) return;
+      if (p.closest('dialog, .modal, .sheet, .hoja, .cfx-mv, .cfx-hm-zona, [data-sin-pila]') || (p.parentElement && p.parentElement.closest('.cfx-apilar'))) return;
       if (!p.offsetParent && getComputedStyle(p).position !== 'fixed') return;  // escondida: se revisa cuando se muestre
       const L = [...p.querySelectorAll(TARJ)], alto = innerHeight * 0.42;
       const sirve = L.length >= 4 && getComputedStyle(p).display !== 'grid' &&
