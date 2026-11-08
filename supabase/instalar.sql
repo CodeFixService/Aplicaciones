@@ -157,8 +157,10 @@ end $$;
 -- Devuelve {ok, error|account}. Bloquea 1 hora tras 10 intentos fallidos.
 create or replace function public.redeem_license(p_key text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
+declare r jsonb;
 begin  -- A5 (bd 5.30): las keys viven en cfx_keys (núcleo; se crean en el Centro de Mando). Se mantiene el nombre que usan las pantallas.
-  perform public.cfx_key_canjear(p_key);
+  r := public.cfx_key_canjear(p_key);  -- bd 5.31: la key mala vuelve como {error} (sin raise) para que el intento fallido quede anotado.
+  if r ? 'error' then return jsonb_build_object('ok', false, 'error', r ->> 'error'); end if;
   return jsonb_build_object('ok', true, 'account', public.my_account());
 exception when others then
   return jsonb_build_object('ok', false, 'error', sqlerrm);
@@ -5529,7 +5531,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.30'::text $$;
+language sql immutable as $$ select '5.31'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5594,6 +5596,7 @@ revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
 -- =====================================================================
+--  VERSIÓN 5.31 · núcleo 2.48: una key mala ya no deshace su registro (cfx_key_canjear devuelve {error}); redeem_license lo respeta.
 --  VERSIÓN 5.30 · A5: sin tablas dobles. pagos → cfx_pagos, licenses → cfx_keys y resenas (sin pantalla desde 3.9) se borran.
 --  Los datos se copian ANTES de borrar (el bloque va después del núcleo, donde ya existen cfx_pagos y cfx_keys).
 --  Las keys se canjean igual (redeem_license llama a cfx_key_canjear) y los pagos Premium se revisan en el Centro de Mando → Pagos.
@@ -5999,8 +6002,9 @@ begin
   end if;
   select * into k from public.cfx_keys where hash = encode(sha256(convert_to(c, 'UTF8')), 'hex') for update;
   if k.id is null or k.revocada or k.usada_por is not null then
+    -- Sin raise: si no, el registro se deshace y el límite de 10 por hora nunca cuenta (núcleo 2.48).
     insert into public.cfx_registro (quien, accion, detalle) values (coalesce(y ->> 'email', ''), 'key fallida', y ->> 'id');
-    raise exception 'Key no válida o ya usada';
+    return jsonb_build_object('error', 'Key no válida o ya usada');
   end if;
   if k.rol <> coalesce(y ->> 'rol', '') then raise exception 'Esta key es para cuentas de %', case when k.rol = 'negocio' then 'negocio' else 'cliente' end; end if;
   h := public.cfx_dar_premium((y ->> 'id')::uuid, k.rol, k.dias);

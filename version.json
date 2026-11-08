@@ -1,1 +1,1 @@
-{"version": "5.82", "bd": "5.30", "notas": "🛡️ Más seguridad: un solo filtro para textos y links · 🧹 Base ordenada: pagos y keys antiguas pasan al Centro de Mando"}
+{"version": "5.83", "bd": "5.31", "notas": "🛡️ Más seguridad: tras 10 keys erróneas en una hora se bloquea el canje (antes no contaba)"}

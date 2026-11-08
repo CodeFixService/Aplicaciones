@@ -198,6 +198,7 @@
       if (ev.target.closest('[data-key]')) {
         try {
           const r = await o.rpc('cfx_key_canjear', { p_codigo: caja.querySelector('#cpKey').value });
+          if (r && r.error) throw new Error(r.error);
           caja.innerHTML = '<h2>🎉 ¡Listo!</h2><div class="cp-ok">Premium activo por ' + r.dias + ' días.</div><button type="button" data-x style="width:100%;margin-top:10px">Continuar</button>';
           obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar();
         } catch (x) { caja.querySelector('#cpKeyErr').textContent = (x && x.message) || String(x); }
