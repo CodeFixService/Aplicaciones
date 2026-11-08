@@ -332,8 +332,8 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.87';
-  const DB_VERSION = '5.34'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const APP_VERSION = '5.88';
+  const DB_VERSION = '5.35'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -354,6 +354,25 @@
     ['📚', 'Clases y cursos', 'Clase particular (1 h) · $10.000'], ['✨', 'Otro', 'Tu producto o servicio · $10.000']
   ];
 
+  // D22 · Plantilla por rubro: productos de ejemplo para partir (nombre | precio | categoría | opciones). Se revisan y editan antes de agregarlos.
+  const PLANTILLAS = {
+    'Comida y repostería': ['Torta de chocolate (15 personas)|15000|Tortas', 'Torta tres leches (15 personas)|16000|Tortas', 'Kuchen de manzana|8000|Kuchen', 'Pie de limón|9000|Kuchen', 'Alfajores (caja de 6)|4500|Dulces', 'Cupcakes (caja de 6)|6000|Dulces'],
+    'Restaurante y delivery': ['Completo italiano|3500|Completos', 'Churrasco italiano|5500|Sándwiches', 'Barros luco|5900|Sándwiches', 'Papas fritas|2500|Acompañamientos|Chicas, Grandes', 'Empanada de pino|2200|Empanadas', 'Bebida lata|1200|Bebidas|Coca-Cola, Fanta, Sprite'],
+    'Almacén y minimarket': ['Pan amasado (kg)|2200|Panadería', 'Marraqueta (kg)|1900|Panadería', 'Leche entera 1 L|1150|Lácteos', 'Huevos (bandeja de 30)|6500|Abarrotes', 'Arroz 1 kg|1500|Abarrotes', 'Bebida 3 L|2900|Bebidas'],
+    'Ropa y accesorios': ['Polerón con capucha|18990|Polerones|S, M, L, XL', 'Polera básica|7990|Poleras|S, M, L, XL', 'Jeans|19990|Pantalones|38, 40, 42, 44', 'Gorro de lana|5990|Accesorios', 'Bolso tote|9990|Accesorios', 'Calcetines (pack de 3)|4990|Accesorios'],
+    'Belleza y estética': ['Manicure semipermanente|12000|Uñas', 'Pedicure|14000|Uñas', 'Corte de pelo|10000|Peluquería', 'Tintura|25000|Peluquería', 'Limpieza facial|20000|Faciales', 'Perfilado de cejas|6000|Cejas y pestañas'],
+    'Salud y deporte': ['Clase de yoga|6000|Clases', 'Plan mensual|30000|Planes', 'Entrenamiento personal (1 h)|15000|Clases', 'Masaje descontracturante|25000|Masajes', 'Evaluación física|10000|Evaluaciones'],
+    'Servicios y oficios': ['Visita técnica|20000|Visitas', 'Instalación|35000|Trabajos', 'Mantención|25000|Trabajos', 'Reparación (desde)|15000|Trabajos', 'Hora de trabajo|12000|Por hora'],
+    'Tecnología': ['Cambio de pantalla|35000|Reparaciones', 'Cambio de batería|20000|Reparaciones', 'Formateo e instalación|15000|Computadores', 'Cargador USB-C|7990|Accesorios', 'Audífonos bluetooth|14990|Accesorios', 'Lámina de vidrio|4990|Accesorios'],
+    'Artesanía y regalos': ['Taza personalizada|7990|Personalizados', 'Polera estampada|12990|Personalizados|S, M, L', 'Llavero|2990|Accesorios', 'Caja de regalo|15990|Regalos', 'Vela aromática|6990|Hogar|Vainilla, Lavanda, Coco'],
+    'Mascotas': ['Baño y corte|14000|Peluquería', 'Corte de uñas|4000|Peluquería', 'Alimento perro adulto 15 kg|32990|Alimento', 'Alimento gato 3 kg|12990|Alimento', 'Collar|5990|Accesorios|S, M, L', 'Juguete|3990|Accesorios'],
+    'Hogar y decoración': ['Cojín decorativo|9990|Textil', 'Manta|19990|Textil', 'Cuadro|14990|Decoración', 'Florero|8990|Decoración', 'Lámpara de mesa|24990|Iluminación'],
+    'Plantas y jardín': ['Suculenta en macetero|4500|Plantas', 'Monstera|15000|Plantas', 'Cactus|3500|Plantas', 'Macetero de greda|5990|Maceteros|Chico, Mediano, Grande', 'Tierra de hoja 20 L|4990|Insumos'],
+    'Clases y cursos': ['Clase particular (1 h)|10000|Clases', 'Pack 4 clases|36000|Packs', 'Curso mensual|40000|Cursos', 'Taller grupal|15000|Talleres', 'Preparación de prueba|12000|Clases'],
+    'Otro': ['Tu producto o servicio|10000|General', 'Otro producto|5000|General', 'Servicio a domicilio|15000|Servicios']
+  };
+  const plantilla = (rubro) => (PLANTILLAS[rubro] || PLANTILLAS.Otro).map((l) => { const [nombre, precio, categoria, ops] = l.split('|'); return { nombre, precio: Number(precio), categoria, ops: ops || '' }; });
+
   // B11 · Carga diferida: un script pesado (p. ej. el QR) se baja solo cuando se usa, una vez.
   const cargados = {};
   function script(src) {
@@ -364,7 +383,7 @@
   }
 
   global.Core = {
-    RUBROS, script,
+    RUBROS, plantilla, script,
     store, uid, money, precioNum, precioTxt, esc, toast, registerSW, askNotify, notify, download,
     backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };

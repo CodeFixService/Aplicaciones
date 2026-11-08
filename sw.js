@@ -62,14 +62,33 @@ async function versionActual() {
   return r ? r.text() : null;
 }
 
-// Descarga todos los archivos de una versión y la deja como la actual.
+// B12 · Fotos guardadas ("cfx-imagenes", las guarda la tienda con ?v=<cuándo cambió>): queda solo la última de cada producto
+// y como máximo 400 (se van las más antiguas). Así el teléfono no se llena con fotos viejas.
+async function ordenarFotos() {
+  try {
+    const c = await caches.open('cfx-imagenes'), keys = await c.keys(), ultima = {};
+    const v = (r) => Number(new URL(r.url).searchParams.get('v')) || 0, base = (r) => r.url.split('?')[0];
+    keys.forEach((r) => { const b = base(r); if (!ultima[b] || v(r) > v(ultima[b])) ultima[b] = r; });
+    const viejas = keys.filter((r) => ultima[base(r)] !== r), quedan = keys.filter((r) => ultima[base(r)] === r);
+    await Promise.all(viejas.concat(quedan.slice(0, Math.max(0, quedan.length - 400))).map((r) => c.delete(r)));
+    await (await caches.open(META)).put('fotos', new Response(String(Date.now())));
+  } catch (e) { /* sin espacio o sin caché: no pasa nada */ }
+}
+async function ordenarFotosDiario() {
+  const r = await (await caches.open(META)).match('fotos');
+  if (!r || Date.now() - Number(await r.text()) > 864e5) await ordenarFotos();
+}
+
+// Descarga una versión y la deja como la actual. "no-cache" pregunta al servidor si cada archivo cambió:
+// lo que no cambió no se vuelve a bajar entero (responde 304), así actualizar gasta menos datos.
 async function instalarVersion(v) {
   const c = await caches.open('app-' + v);
-  await c.addAll(FILES.map((f) => new Request(f, { cache: 'reload' })));
+  await c.addAll(FILES.map((f) => new Request(f, { cache: 'no-cache' })));
   await (await caches.open(META)).put('actual', new Response(v));
   const keys = await caches.keys();
   // Borra versiones anteriores (y cachés viejos); conserva las imágenes ya vistas ("cfx-imagenes").
   await Promise.all(keys.filter((k) => k !== META && k !== 'app-' + v && k !== 'cfx-imagenes').map((k) => caches.delete(k)));
+  await ordenarFotos();
   return v;
 }
 
@@ -78,7 +97,7 @@ self.addEventListener('install', (e) => {
   e.waitUntil(versionActual().then((v) => v || pedirVersion().then(instalarVersion)).catch(() => {}).then(() => self.skipWaiting()));
 });
 
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim().then(ordenarFotosDiario)));
 
 // Botón "Actualizar": baja la versión nueva y responde cuando está lista.
 self.addEventListener('message', (e) => {
@@ -94,6 +113,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (/\/(version\.json|sw\.js)$/.test(url.pathname)) return; // siempre desde internet
+  if (e.request.mode === 'navigate') e.waitUntil(ordenarFotosDiario()); // 1 vez al día, sin frenar la apertura
   e.respondWith((async () => {
     const v = await versionActual();
     const c = v ? await caches.open('app-' + v) : null;

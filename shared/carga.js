@@ -120,11 +120,28 @@
           p_version: String(cfg.VERSION || '') }) }).catch(() => {});
     } catch (e) { /* el monitoreo nunca rompe la app */ }
   }
+  // B13 · Tiempo de carga real: cuánto demoró en abrirse esta página (hasta "load" y la imagen o texto principal, LCP) en el teléfono de verdad.
+  // 1 vez por página y sesión, sin datos de la persona; se ve en Centro de Mando → Control → 🩺 Salud ("⚡ Carga").
+  let lcp = 0;
+  try { new PerformanceObserver((l) => { const e = l.getEntries(); if (e.length) lcp = e[e.length - 1].startTime; }).observe({ type: 'largest-contentful-paint', buffered: true }); } catch (e) { /* Safari sin LCP */ }
+  function anotarCarga() {
+    try {
+      const n = performance.getEntriesByType && performance.getEntriesByType('navigation')[0], cfg = conf();
+      if (!n || !cfg || !f0 || !n.loadEventEnd || /^(localhost|127\.)/.test(location.hostname) && !window.CFX_ERRORES_LOCAL || d.visibilityState === 'hidden' && !lcp) return;
+      const pg = location.pathname.replace(/\/index\.html$/, '/').replace(/\/[0-9a-f-]{20,}/gi, '/:id') || '/', k = 'cfx-carga:' + pg;
+      if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1');
+      f0.call(window, cfg.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/rpc/cfx_carga_anotar', { method: 'POST', keepalive: true,
+        headers: { apikey: cfg.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + cfg.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_pagina: pg, p_ms: Math.round(n.loadEventEnd), p_lcp: Math.round(lcp) || null, p_cache: !!(navigator.serviceWorker && navigator.serviceWorker.controller) }) }).catch(() => {});
+    } catch (e) { /* medir nunca rompe la app */ }
+  }
+  window.addEventListener('load', () => setTimeout(anotarCarga, 3000));
+
   window.addEventListener('error', (e) => { if (e && e.message) anotarError(e.message, (e.filename || '').replace(location.origin, '') + ':' + (e.lineno || 0) + ':' + (e.colno || 0) + (e.error && e.error.stack ? '\n' + e.error.stack : '')); });
   window.addEventListener('unhandledrejection', (e) => { const r = e && e.reason; anotarError(r && r.message ? r.message : (typeof r === 'string' ? r : ''), r && r.stack ? r.stack : 'promesa'); });
 
   window.CFX_CARGA = {
-    anotarError,
+    anotarError, anotarCarga,
     esqueleto,
     barra: (on) => (on ? sube() : baja()),
     boton(b, prom) {

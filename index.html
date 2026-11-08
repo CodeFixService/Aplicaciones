@@ -650,7 +650,7 @@
     let compartio = false; try { compartio = !!localStorage.getItem('cfx:compartio'); } catch (e) { /* sin almacenamiento */ }
     const pasos = [[!!t.rubro, '#ajustes', 'Elige a qué se dedica tu negocio'], [!!acc.logo, '#ajustes', 'Sube tu logo y elige tu color'],
       [!!acc.telefono, '#ajustes', 'Escribe el WhatsApp de tu tienda'], [!!t.horario, '#ajustes', 'Escribe tu horario de atención'],
-      [!!h.productos, 'apps/caja/#productos', 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '')],
+      [!!h.productos, 'apps/caja/#productos', 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '') + ' o cárgalos de una vez con 📥 Excel, WhatsApp o ✨ plantilla'],
       [!!h.link_pago, '#links', 'Pega tu link de pago para cobrar pedidos online'], [compartio, '#hoyTienda', 'Comparte tu tienda por WhatsApp o con el QR']];
     const hechos = pasos.filter((x) => x[0]).length, pct = Math.round(hechos * 100 / pasos.length);
     $('hoyFalta').classList.toggle('hidden', hechos === pasos.length);

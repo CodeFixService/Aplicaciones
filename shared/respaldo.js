@@ -1,7 +1,9 @@
 /* CodeFix · Núcleo · Respaldo descargable (mismo archivo en cada repositorio).
    CFX_RESPALDO.excel('respaldo-mi-negocio', { Clientes: [{...}], Pedidos: [{...}] })  → descarga un .xlsx (una hoja por tabla).
    CFX_RESPALDO.json('respaldo-mi-negocio', datos)                                     → descarga el mismo contenido en .json.
-   El Excel se arma en el teléfono (sin servidor ni librerías): se abre en Excel, Google Sheets y Numbers. */
+   El Excel se arma en el teléfono (sin servidor ni librerías): se abre en Excel, Google Sheets y Numbers.
+   await CFX_RESPALDO.leer(archivo) → filas [[celda, …], …] de un .xlsx (primera hoja), .csv o .txt (D21: cargar productos o clientes de una vez).
+   CFX_RESPALDO.csv(texto)          → lo mismo desde texto pegado (separado por ; , o tabulación, como sale de Excel o Google Sheets). */
 (function () {
   'use strict';
   if (window.CFX_RESPALDO) return;
@@ -93,7 +95,64 @@
     '-' + new Date().toISOString().slice(0, 10);
   // Acepta { hoja: filas } o { tabla: { ... } } (objetos sueltos van como una fila).
   const hojasDe = (d) => { const o = {}; Object.keys(d || {}).forEach((k) => { o[k] = d[k] == null ? [] : d[k]; }); return o; };
+  // ---------- Leer Excel o CSV (D21) ----------
+  function csv(t) {
+    t = String(t || '').replace(/^\ufeff/, '').replace(/\r\n?/g, '\n');
+    const l1 = t.split('\n')[0], sep = ['\t', ';', ','].sort((a, b) => l1.split(b).length - l1.split(a).length)[0];
+    const filas = []; let f = [], c = '', q = false;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (q) { if (ch === '"') { if (t[i + 1] === '"') { c += '"'; i++; } else q = false; } else c += ch; continue; }
+      if (ch === '"' && c === '') q = true;
+      else if (ch === sep) { f.push(c.trim()); c = ''; }
+      else if (ch === '\n') { f.push(c.trim()); filas.push(f); f = []; c = ''; }
+      else c += ch;
+    }
+    f.push(c.trim()); filas.push(f);
+    return filas.filter((r) => r.some((x) => x !== ''));
+  }
+  // .xlsx = zip de XML: se abre con DecompressionStream (Chrome, Safari y Firefox de hoy), sin librerías.
+  async function xlsx(buf) {
+    const b = new Uint8Array(buf), dv = new DataView(buf), td = new TextDecoder();
+    let e = b.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    if (e < 0) throw new Error('El archivo no es un Excel (.xlsx)');
+    const zipA = {}; let p = dv.getUint32(e + 16, true);
+    for (let i = 0, n = dv.getUint16(e + 10, true); i < n && dv.getUint32(p, true) === 0x02014b50; i++) {
+      const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+      zipA[td.decode(b.subarray(p + 46, p + 46 + nl))] = { m: dv.getUint16(p + 10, true), t: dv.getUint32(p + 20, true), o: dv.getUint32(p + 42, true) };
+      p += 46 + nl + xl + cl;
+    }
+    const sacar = async (nombre) => {
+      const z = zipA[nombre]; if (!z) return null;
+      const ini = z.o + 30 + dv.getUint16(z.o + 26, true) + dv.getUint16(z.o + 28, true), datos = b.subarray(ini, ini + z.t);
+      if (z.m === 0) return td.decode(datos);
+      if (typeof DecompressionStream === 'undefined') throw new Error('Este teléfono no abre Excel: guárdalo como CSV');
+      return new Response(new Blob([datos]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    };
+    const xml = (t) => new DOMParser().parseFromString(t, 'application/xml');
+    const ss = await sacar('xl/sharedStrings.xml'), textos = ss ? [...xml(ss).getElementsByTagName('si')].map((x) => [...x.getElementsByTagName('t')].filter((t) => !t.closest || !t.closest('rPh')).map((t) => t.textContent).join('')) : [];
+    const hoja = Object.keys(zipA).filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort((a, c) => parseInt(a.replace(/\D/g, ''), 10) - parseInt(c.replace(/\D/g, ''), 10))[0];
+    if (!hoja) throw new Error('El Excel no tiene hojas');
+    const colN = (r) => { let n = 0; for (const ch of String(r).replace(/\d/g, '')) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+    return [...xml(await sacar(hoja)).getElementsByTagName('row')].map((row) => {
+      const f = [];
+      [...row.getElementsByTagName('c')].forEach((c, i) => {
+        const tipo = c.getAttribute('t'), v = c.getElementsByTagName('v')[0], k = c.getAttribute('r') ? colN(c.getAttribute('r')) : i;
+        f[k] = (tipo === 's' ? textos[Number(v && v.textContent)] : tipo === 'inlineStr' ? [...c.getElementsByTagName('t')].map((t) => t.textContent).join('') : v ? v.textContent : '') || '';
+      });
+      return Array.from(f, (x) => String(x == null ? '' : x).trim());
+    }).filter((r) => r.some((x) => x !== ''));
+  }
+  async function leer(archivo) {
+    if (!archivo) return [];
+    if (archivo.size > 5e6) throw new Error('El archivo es muy grande (máximo 5 MB)');
+    if (/\.xlsx$/i.test(archivo.name) || /spreadsheetml/.test(archivo.type)) return xlsx(await archivo.arrayBuffer());
+    if (/\.xls$/i.test(archivo.name)) throw new Error('Ese Excel es antiguo (.xls): ábrelo y guárdalo como .xlsx o CSV');
+    return csv(await archivo.text());
+  }
+
   window.CFX_RESPALDO = {
+    leer, csv,
     excel: (nombre, hojas) => bajar(libro(hojasDe(hojas)), limpio(nombre) + '.xlsx'),
     json: (nombre, datos) => bajar(new Blob([JSON.stringify(datos, null, 1)], { type: 'application/json' }), limpio(nombre) + '.json'),
     libro

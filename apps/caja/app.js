@@ -319,6 +319,130 @@
       if (n === l.length) Core.toast('✅ ' + n + ' producto(s) publicados: tus clientes ya los ven');
     } finally { $('bPublicarTodos').disabled = false; renderLista(); }
   };
+  /* ---------- 📥 D21 + D22 · Cargar muchos productos de una vez: Excel/CSV, lista pegada (WhatsApp), varias fotos o plantilla del rubro ---------- */
+  let imp = []; // { nombre, precio, categoria, ops, stock, costo, desc, foto, ok }
+  const precioDe = (t) => { // "$15.000" · "15000" · "15,990" (miles) · "2.500,50"
+    const m = String(t || '').replace(/\s/g, '').match(/\d{1,3}(?:[.,]\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?/);
+    if (!m) return NaN;
+    const x = /^\d{1,3}(,\d{3})+$/.test(m[0]) ? m[0].replace(/,/g, '') : m[0];
+    return Math.round(num(x));
+  };
+  const limpiar = (t) => String(t || '').replace(/https?:\/\/\S+/g, '').replace(/[*_~`]/g, '').replace(/^[\s•·\-–—>]+|^\d{1,3}[.)]\s+/, '').replace(/[\s:\-–—|·•,]+$/, '').trim();
+  // Lista pegada: "Nombre - $precio" por línea, o el nombre en una línea y el precio en la siguiente (así copia WhatsApp su catálogo).
+  function deTexto(t) {
+    const out = []; let nombre = '', cat = '';
+    String(t || '').split(/\r?\n/).map((l) => l.replace(/https?:\/\/\S+/g, '').trim()).filter(Boolean).forEach((l) => {
+      const pm = l.match(/\$\s?\d[\d.,]*|\b\d{1,3}(?:\.\d{3})+(?:,\d+)?\b|\b\d{3,7}\b(?!\s*(?:ml|cc|gr?|kg|cm|mm|personas|unid|u\b|x\b))/i);
+      const resto = pm ? limpiar(l.slice(0, pm.index) + ' ' + l.slice(pm.index + pm[0].length)) : limpiar(l);
+      const precio = pm ? precioDe(pm[0]) : NaN;
+      if (pm && resto && !/^(precio|valor)$/i.test(resto)) { out.push({ nombre: resto, precio, categoria: cat }); nombre = ''; }
+      else if (pm && nombre) { out.push({ nombre, precio, categoria: cat }); nombre = ''; }
+      else if (!pm) { if (/:$/.test(l.trim()) || (resto.length > 2 && resto === resto.toUpperCase() && /[A-ZÁÉÍÓÚÑ]/.test(resto))) { cat = resto.slice(0, 40); nombre = ''; } else nombre = resto; }
+    });
+    return out;
+  }
+  // Excel o CSV: busca la fila de títulos (Nombre, Precio, Categoría, Stock, Costo, Descripción, Opciones); si no hay, adivina las columnas.
+  function deFilas(filas) {
+    const T = { nombre: /^(nombre|producto|art[ií]culo|item|servicio|t[ií]tulo)/i, precio: /^(precio|valor|\$|monto|venta)/i, categoria: /^(categor|tipo|secci|familia|grupo)/i,
+      stock: /^(stock|cantidad|existencia|inventario)/i, costo: /^(costo|compra)/i, desc: /^(descrip|detalle)/i, ops: /^(opci|talla|color|variante)/i };
+    const ti = filas.findIndex((f) => f.some((c) => T.nombre.test(c)) && f.some((c) => T.precio.test(c)));
+    const col = {};
+    if (ti >= 0) filas[ti].forEach((c, i) => { const k = Object.keys(T).find((x) => T[x].test(String(c).trim()) && col[x] == null); if (k) col[k] = i; });
+    else {
+      const muestra = filas.slice(0, 20), ancho = Math.max(...muestra.map((f) => f.length));
+      for (let i = 0; i < ancho; i++) {
+        const nums = muestra.filter((f) => !isNaN(precioDe(f[i])) && /^[$\s\d.,]+$/.test(f[i] || '')).length;
+        if (col.precio == null && nums >= muestra.length / 2) col.precio = i; else if (col.nombre == null && nums < muestra.length / 2) col.nombre = i;
+      }
+    }
+    if (col.nombre == null || col.precio == null) throw new Error('No encontré las columnas Nombre y Precio');
+    return filas.slice(ti + 1).map((f) => ({ nombre: limpiar(f[col.nombre]).slice(0, 60), precio: precioDe(f[col.precio]), categoria: col.categoria != null ? String(f[col.categoria] || '').trim().slice(0, 40) : '',
+      stock: col.stock != null && /^\d+$/.test(String(f[col.stock] || '').trim()) ? parseInt(f[col.stock], 10) : '', costo: col.costo != null ? precioDe(f[col.costo]) || 0 : 0,
+      desc: col.desc != null ? String(f[col.desc] || '').trim().slice(0, 300) : '', ops: col.ops != null ? String(f[col.ops] || '').split(/[,;/]/).map((x) => x.trim()).filter(Boolean).slice(0, 20).join(', ') : '' }))
+      .filter((x) => x.nombre);
+  }
+  const ya = (n) => productos.some((p) => p.nombre.trim().toLowerCase() === n.trim().toLowerCase());
+  function verImp(lista, de) {
+    imp = lista.slice(0, 300).map((x) => Object.assign({ categoria: '', ops: '', stock: '', costo: 0, desc: '' }, x, { nombre: String(x.nombre || '').slice(0, 60), ok: !ya(x.nombre || '') }));
+    $('impVista').classList.toggle('hidden', !imp.length);
+    $('impPubW').classList.toggle('hidden', esCliente);
+    if (!imp.length) return Core.toast('No encontré productos con precio en ' + de);
+    pintarImp();
+    $('impVista').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function pintarImp() {
+    const n = imp.filter((x) => x.ok).length, libres = LIMITE - productos.length;
+    $('impRes').textContent = imp.length + ' encontrados · ' + n + ' marcados' + (imp.some((x) => !x.ok && ya(x.nombre)) ? ' · los que ya tienes van sin marcar' : '') + (n > libres ? ' · te caben ' + Math.max(0, libres) : '') + '. Corrige el nombre o el precio si hace falta.';
+    $('impLista').innerHTML = imp.map((x, i) => '<div class="impF' + (x.ok ? '' : ' no') + '" data-i="' + i + '"><input type="checkbox" data-k="ok"' + (x.ok ? ' checked' : '') + ' aria-label="Agregar">' +
+      (x.foto ? '<img src="' + Core.esc(CFX_URL(x.foto)) + '" alt="">' : '<span class="sinF"></span>') +
+      '<input data-k="nombre" value="' + Core.esc(x.nombre) + '" maxlength="60" aria-label="Nombre" placeholder="Nombre">' +
+      '<input data-k="precio" value="' + (isNaN(x.precio) ? '' : x.precio) + '" inputmode="decimal" aria-label="Precio" placeholder="Precio">' +
+      ((x.categoria || x.ops || x.stock !== '') ? '<small>' + Core.esc([x.categoria, x.ops && '🎨 ' + x.ops, x.stock !== '' && 'stock ' + x.stock].filter(Boolean).join(' · ')) + '</small>' : '') + '</div>').join('');
+    $('impAgregar').textContent = 'Agregar ' + n + ' producto' + (n === 1 ? '' : 's');
+    $('impAgregar').disabled = !n;
+  }
+  $('impLista').oninput = $('impLista').onchange = (e) => {
+    const f = e.target.closest('[data-i]'), k = e.target.dataset.k; if (!f || !k) return;
+    const x = imp[f.dataset.i];
+    if (k === 'ok') { x.ok = e.target.checked; f.classList.toggle('no', !x.ok); $('impAgregar').textContent = 'Agregar ' + imp.filter((y) => y.ok).length + ' productos'; $('impAgregar').disabled = !imp.some((y) => y.ok); }
+    else if (k === 'precio') x.precio = precioDe(e.target.value); else x.nombre = e.target.value.trim();
+  };
+  const cerrarImp = () => { imp = []; $('impLista').innerHTML = ''; ['impVista', 'impTexto', 'impRubroW'].forEach((id) => $(id).classList.add('hidden')); };
+  $('impCancelar').onclick = cerrarImp;
+  $('impArch').onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { verImp(deFilas(await CFX_RESPALDO.leer(f)), 'el archivo'); } catch (err) { Core.toast('📄 ' + err.message); }
+  };
+  $('impPegar').onclick = () => { $('impTexto').classList.toggle('hidden'); $('impRubroW').classList.add('hidden'); if (!$('impTexto').classList.contains('hidden')) $('impTxt').focus(); };
+  $('impLeer').onclick = () => verImp(deTexto($('impTxt').value), 'el texto');
+  $('impFotos').onchange = async (e) => {
+    const l = [...e.target.files].slice(0, 30); e.target.value = ''; if (!l.length) return;
+    if (esCliente) return Core.toast('📷 Las fotos son para los productos de tu catálogo');
+    const out = [];
+    for (const f of l) {
+      try { out.push({ nombre: limpiar(f.name.replace(/\.[a-z0-9]+$/i, '').replace(/^(img|dsc|pxl|photo|foto|image|screenshot|captura|wa)[\w -]*\d{4,}[\w -]*$/i, '').replace(/[_-]+/g, ' ')), precio: NaN, foto: await Core.fotoChica(f) }); }
+      catch (err) { Core.toast('📷 ' + f.name + ': ' + err.message); }
+    }
+    verImp(out, 'las fotos');
+    if (imp.length) Core.toast('Escribe el nombre y el precio de cada foto');
+  };
+  $('impPlant').onclick = async () => {
+    $('impTexto').classList.add('hidden');
+    let rubro = '';
+    try { rubro = (await Cuenta.rpc('tienda_info', { p_negocio: cuenta.id }) || {}).rubro || ''; } catch (e) { /* sin red: que elija */ }
+    if (!Core.RUBROS.some((x) => x[1] === rubro)) rubro = '';
+    if (!$('impRubro').options.length) $('impRubro').innerHTML = '<option value="">Elige tu rubro…</option>' + Core.RUBROS.map(([i, n]) => '<option value="' + Core.esc(n) + '">' + i + ' ' + Core.esc(n) + '</option>').join('');
+    $('impRubroW').classList.remove('hidden');
+    $('impRubro').value = rubro;
+    if (rubro) verImp(Core.plantilla(rubro), 'la plantilla'); else $('impRubro').focus();
+  };
+  $('impRubro').onchange = (e) => e.target.value && verImp(Core.plantilla(e.target.value), 'la plantilla');
+  $('impAgregar').onclick = async () => {
+    const l = imp.filter((x) => x.ok), malos = l.filter((x) => !x.nombre || isNaN(x.precio));
+    if (malos.length) return Core.toast('Falta nombre o precio en ' + malos.length + ' (ej: ' + (malos[0].nombre || 'sin nombre') + ')');
+    const libres = LIMITE - productos.length;
+    if (libres <= 0) return alLimite();
+    const pub = !esCliente && $('impPub').checked, nuevos = l.slice(0, libres).map((x) => ({ id: Core.uid(), nombre: x.nombre.slice(0, 60), precio: x.precio, costo: x.costo || 0, stock: x.stock,
+      categoria: x.categoria || '', publicado: false, premium: null, vip: false, desc: x.desc || '', ops: x.ops || '', vars: [], _foto: x.foto || null }));
+    productos.push(...nuevos); guardarProductos();
+    $('impAgregar').disabled = true;
+    let ok = 0, fotosOk = 0;
+    try {
+      if (pub) for (const p of nuevos) {
+        p.publicado = true;
+        if (!(await sincronizar(p))) { p.publicado = false; break; }
+        ok++;
+        if (p.stock !== '') Cuenta.rpc('set_stock', { p_key: p.id, p_stock: p.stock }).catch(() => {});
+        if (p._foto) { try { await Cuenta.rpc('set_foto_producto', { p_key: p.id, p_foto: p._foto }); p.foto = true; fotosOk++; } catch (err) { Core.toast('📷 ' + err.message); } }
+      }
+    } finally {
+      nuevos.forEach((p) => delete p._foto);
+      guardarProductos(); cerrarImp(); renderProds(); renderLista();
+      $('impAgregar').disabled = false;
+    }
+    Core.toast('✅ ' + nuevos.length + ' agregados' + (pub ? ' · ' + ok + ' en tu catálogo' + (fotosOk ? ' · ' + fotosOk + ' con foto' : '') : '') + (l.length > nuevos.length ? ' · llegaste al máximo de ' + LIMITE : ''));
+  };
+
   $('p-pub').onchange = (e) => $('rowPrem').classList.toggle('hidden', !e.target.checked);
 
   /* ---------- 📷 Foto del producto (1 por producto; se guarda en el servidor, liviana) ---------- */

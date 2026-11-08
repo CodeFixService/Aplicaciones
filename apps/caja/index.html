@@ -54,6 +54,16 @@
     border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px; font-size: 14px; }
   .barra { height: 14px; border-radius: 99px; background: var(--field); overflow: hidden; margin-top: 12px; }
   .barra div { height: 100%; width: 0; background: linear-gradient(90deg, var(--brand), var(--ok)); transition: width .4s; }
+  .impBtns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .impBtns > * { margin: 0; width: 100%; justify-content: center; text-align: center; }
+  @media (min-width: 700px) { .impBtns { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .impF { display: grid; grid-template-columns: auto auto minmax(0, 1fr) 96px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .impF input[type=checkbox] { width: 20px; height: 20px; margin: 0; }
+  .impF input:not([type]) { margin: 0; min-width: 0; padding: 8px; font-size: 14px; }
+  .impF img, .impF .sinF { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: var(--field); display: block; }
+  .impF .sinF { width: 0; }
+  .impF small { grid-column: 3 / -1; color: var(--muted); font-size: 12px; margin-top: -4px; }
+  .impF.no { opacity: .45; }
   .grupo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 4px; }
 </style>
 </head>
@@ -111,6 +121,28 @@
 
   <!-- PRODUCTOS -->
   <section class="view" id="v-productos">
+    <div class="card" id="impCard">
+      <h2>📥 Cargar muchos de una vez</h2>
+      <p class="muted" style="margin:0 0 10px;font-size:14px">Desde un Excel, tu lista de WhatsApp, tus fotos o una plantilla de tu rubro. Antes de agregarlos los revisas.</p>
+      <div class="impBtns">
+        <label class="btn alt small">📄 Excel o CSV<input type="file" id="impArch" accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+        <button type="button" class="alt small" id="impPegar">💬 Pegar lista</button>
+        <label class="btn alt small">📷 Varias fotos<input type="file" id="impFotos" accept="image/*" multiple hidden></label>
+        <button type="button" class="alt small" id="impPlant">✨ Plantilla</button>
+      </div>
+      <div id="impTexto" class="hidden" style="margin-top:10px">
+        <label for="impTxt">Pega tu lista o el catálogo de WhatsApp (una línea por producto, con su precio)</label>
+        <textarea id="impTxt" rows="6" placeholder="Torta de chocolate - $15.000&#10;Kuchen de manzana $8.000&#10;Alfajores (caja de 6) 4500"></textarea>
+        <div class="btns"><button type="button" class="small" id="impLeer">Revisar</button></div>
+      </div>
+      <div id="impRubroW" class="hidden" style="margin-top:10px"><label for="impRubro">¿A qué se dedica tu negocio?</label><select id="impRubro"></select></div>
+      <div id="impVista" class="hidden" style="margin-top:12px">
+        <p class="muted" id="impRes" style="margin:0 0 6px;font-size:14px"></p>
+        <div id="impLista"></div>
+        <label class="chk" id="impPubW"><input type="checkbox" id="impPub" checked> Mostrar en mi catálogo para clientes</label>
+        <div class="btns"><button type="button" class="ok" id="impAgregar">Agregar</button><button type="button" class="alt" id="impCancelar">Cancelar</button></div>
+      </div>
+    </div>
     <div class="card">
       <h2 id="formTitulo">Nuevo producto</h2>
       <label for="p-nombre">Nombre</label><input id="p-nombre" maxlength="60">
