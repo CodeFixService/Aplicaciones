@@ -48,7 +48,7 @@
 <nav class="tabs sub" id="subtabs">
   <button data-v="pedidos" class="on"><span data-ico="paquete"></span>Pedidos</button>
   <button data-v="cupones" class="dueno"><span data-ico="ticket"></span>Promociones</button>
-  <button data-v="stats" class="dueno stats"><span data-ico="grafico"></span>Estadísticas</button>
+  <button data-v="stats" class="dueno ver-stats"><span data-ico="grafico"></span>Estadísticas</button>
 </nav>
 <main>
   <!-- PEDIDOS -->
@@ -120,7 +120,7 @@
   const pro = !!yo.is_pro;
   // Admin del equipo también ve Estadísticas (Promociones, solo el dueño).
   const verStats = dueno || yo.equipo_rol === 'admin';
-  document.querySelectorAll('.dueno').forEach((b) => b.classList.toggle('hidden', b.classList.contains('stats') ? !verStats : !dueno));
+  document.querySelectorAll('.dueno').forEach((b) => b.classList.toggle('hidden', b.classList.contains('ver-stats') ? !verStats : !dueno));
   const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
   const params = new URLSearchParams(location.search);
 

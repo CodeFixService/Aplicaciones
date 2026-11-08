@@ -113,6 +113,15 @@
     return;
   }
   const admin = yo.is_admin;
+  // Alto del chat según lo que de verdad ocupa la cabecera y la barra de abajo (así la caja de escribir nunca queda cortada).
+  const ajustarAlto = () => {
+    const w = $('wrap'), nav = document.body.classList.contains('con-nav') && document.querySelector('nav.tabs.abajo');
+    const alto = (window.visualViewport ? visualViewport.height : innerHeight) - Math.max(0, w.getBoundingClientRect().top) - (nav ? nav.offsetHeight : 0);
+    w.style.height = Math.max(320, Math.round(alto)) + 'px';
+  };
+  ajustarAlto(); setTimeout(ajustarAlto, 400); setTimeout(ajustarAlto, 1500);
+  addEventListener('resize', ajustarAlto);
+  if (window.visualViewport) visualViewport.addEventListener('resize', ajustarAlto);
   let convs = [], actual = null, bloqueado = false, timer = null;
 
   const hora = (t) => new Date(t).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
