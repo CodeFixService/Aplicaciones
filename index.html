@@ -329,7 +329,6 @@
   <a class="ayuda hidden" id="bAyuda" href="#" aria-label="Ayuda">❓</a>
 </main>
 <script src="shared/config.js"></script>
-<script src="shared/vendor/qrcode.js"></script>
 <script src="shared/vendor/supabase.js"></script>
 <script src="shared/cuenta.js"></script>
 <script>
@@ -730,8 +729,9 @@
     for (let r = 0; r < n; r++) for (let j = 0; j < n; j++) if (q.isDark(r, j)) g.fillRect((j + m) * k, (r + m) * k, k, k);
     return c;
   }
-  $('hoyQR').onclick = () => { compartida(); $('hoyQRimg').src = qrCanvas(hoyLink, 440).toDataURL(); $('hoyQRbox').classList.toggle('hidden'); };
-  $('hoyQRdl').onclick = () => qrCanvas(hoyLink, 1000).toBlob((b) => Core.download('qr-mi-tienda.png', b));
+  const conQR = (f) => async () => { try { await Core.script('shared/vendor/qrcode.js'); f(); } catch (e) { Core.toast(e.message); } };  // B11: el QR se baja al usarlo
+  $('hoyQR').onclick = conQR(() => { compartida(); $('hoyQRimg').src = qrCanvas(hoyLink, 440).toDataURL(); $('hoyQRbox').classList.toggle('hidden'); });
+  $('hoyQRdl').onclick = conQR(() => qrCanvas(hoyLink, 1000).toBlob((b) => Core.download('qr-mi-tienda.png', b)));
   $('hoyCompartir').onclick = async () => {
     compartida();
     const txt = '🛍️ Pide en ' + (Cuenta.account.empresa || 'mi tienda') + ': ' + hoyLink;

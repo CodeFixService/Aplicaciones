@@ -1,4 +1,4 @@
-/* Órbita · Despacho por comuna.
+/* CodeFix · Núcleo (módulo opcional, C17) · Despacho por comuna (el costo lo calcula cfx_despacho_costo en la base).
    Despacho.montar({ cfg, monto })  → en el carrito: elige comuna, muestra el costo antes de pedir y oculta el retiro si la tienda no lo tiene.
    Despacho.direccion(texto)        → "calle 123, Ñuñoa" (la comuna va al final: el servidor calcula el costo con ella).
    Despacho.editor(el, rpc)          → en Ajustes de la tienda: retiro sí/no, despacho gratis desde, y precio por comuna. */

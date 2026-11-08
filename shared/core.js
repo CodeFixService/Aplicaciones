@@ -332,8 +332,8 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.86';
-  const DB_VERSION = '5.33'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const APP_VERSION = '5.87';
+  const DB_VERSION = '5.34'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -354,8 +354,17 @@
     ['📚', 'Clases y cursos', 'Clase particular (1 h) · $10.000'], ['✨', 'Otro', 'Tu producto o servicio · $10.000']
   ];
 
+  // B11 · Carga diferida: un script pesado (p. ej. el QR) se baja solo cuando se usa, una vez.
+  const cargados = {};
+  function script(src) {
+    return cargados[src] || (cargados[src] = new Promise((ok, mal) => {
+      const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => { delete cargados[src]; mal(new Error('Sin conexión: intenta de nuevo')); };
+      document.head.appendChild(s);
+    }));
+  }
+
   global.Core = {
-    RUBROS,
+    RUBROS, script,
     store, uid, money, precioNum, precioTxt, esc, toast, registerSW, askNotify, notify, download,
     backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };

@@ -1,4 +1,4 @@
-// Tienda (catálogo del cliente y página pública): tarjetas estilo tienda, vista de 1, 2 o 3 columnas con un botón,
+// CodeFix · Núcleo (módulo opcional, C17) · Tienda (catálogo del cliente y página pública): tarjetas estilo tienda, vista de 1, 2 o 3 columnas con un botón,
 // y las opciones (colores, tallas) como botones. No cambia cómo se arma el pedido: el <select> sigue guardando la opción.
 (function () {
   const d = document, grid = d.getElementById('grid');
