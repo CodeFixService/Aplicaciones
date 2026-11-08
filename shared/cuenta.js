@@ -413,13 +413,22 @@
       d.innerHTML = '<a href="' + r + (a.role === 'client' ? '#cuenta' : '') + '#avisos" aria-label="Avisos">' + ICO('campana') + '</a>';
       h.appendChild(d);
     }
+    modulos();
     contar();
+  }
+  // 🧩 Módulos apagados desde el Centro de Mando (núcleo: cfx_modulos): se esconden sus botones y links (core.css → body.sin-chat).
+  let MODS = null;
+  async function modulos() {
+    if (!sb) return {};
+    if (!MODS) MODS = sb.rpc('cfx_modulos').then((r) => r.data || {}).catch(() => ({}));
+    const m = await MODS;
+    Object.keys(m).forEach((k) => document.body.classList.toggle('sin-' + k, m[k] === false));
+    return m;
   }
   async function contar() {
     if (!sb || !account) return;
     try {
-      const { data } = await sb.rpc('chat_list');
-      const m = (data || []).reduce((s, c) => s + (c.no_leidos || 0), 0);
+      const { data: m } = await sb.rpc('cfx_msg_sin_leer');
       document.querySelectorAll('nav.tabs.abajo [data-k=chat] .badge, nav.tabs.abajo [data-k=mas] .badge').forEach((b) => { b.textContent = m; b.hidden = !m; });
     } catch (e) { /* sin red */ }
     if (account.role !== 'client') {
@@ -474,7 +483,7 @@
 
   global.Cuenta = {
     marca: () => marca, marcaLista, esLogo,
-    nav, contar, ofrecerPush,
+    nav, contar, modulos, ofrecerPush,
     configured, sb, refresh, require, cabecera, settings, signIn, crearUsuario, probarServidor, claveAleatoria, mensajeAcceso, signUp, signOut, resetPassword, setPassword, redeem, rpc,
     enablePush, syncPush, pushSubscription, pushSupported, friendly, revisarActualizacion, actualizarAhora, aplicarLogo,
     icono,

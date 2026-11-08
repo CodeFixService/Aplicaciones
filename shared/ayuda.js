@@ -7,7 +7,8 @@
        · Política de privacidad y aceptación con versión (CFX_LEGAL; cfx_legal_* en sql/legal.sql).
        · Mis datos y privacidad: consentimientos, copia de los datos y solicitudes de derechos (CFX_LEGAL.misDatos; cfx_consent_*, cfx_derecho_* en sql/legal.sql).
    CFX_AYUDA.chat({ rpc }) · CFX_AYUDA.terminos(app) · CFX_AYUDA.guia()  (también se pueden abrir sueltos).
-   CFX_AJUSTES.montar(el, secciones) → Ajustes en cuadrícula de tarjetas (igual en las 7 apps). */
+   CFX_AJUSTES.montar(el, secciones) → Ajustes en cuadrícula de tarjetas (igual en las 7 apps).
+   CFX_MODULOS.activo(clave, rpc) → si el módulo (chat, calificaciones, cupones, sellos) está prendido desde el Centro de Mando. */
 (function () {
   'use strict';
   if (window.CFX_AYUDA) return;
@@ -1499,6 +1500,13 @@
   window.CFX_MENU = { montar: (el, items, o) => perfil(el, (o || {}).perfil, { items, menu: true }), hoja, cerrar: cerrarHojas };
 
   window.CFX_AJUSTES = { montar: ajustes, registro };
+  // 🧩 Módulos que el Centro de Mando tiene prendidos en esta app (cfx_modulos). Si la base aún no lo tiene, todo queda prendido.
+  //    CFX_MODULOS.cargar(rpc) → { chat: true, … } · await CFX_MODULOS.activo('chat', rpc) → true/false
+  let MOD = null;
+  window.CFX_MODULOS = {
+    cargar(rpc) { if (!MOD) MOD = Promise.resolve().then(() => (rpc || R)('cfx_modulos')).then((m) => m || {}).catch(() => { MOD = null; return {}; }); return MOD; },
+    async activo(k, rpc) { return (await window.CFX_MODULOS.cargar(rpc))[k] !== false; }
+  };
   // La app pudo pedirlo antes de que este archivo cargara (CFX_AYUDA_PEND = { rpc, app }).
   if (window.CFX_AYUDA_PEND) iniciar(window.CFX_AYUDA_PEND);
 })();

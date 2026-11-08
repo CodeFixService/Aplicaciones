@@ -1040,8 +1040,7 @@
 
   async function contarMensajes() {
     try {
-      const l = await Cuenta.rpc('chat_list');
-      const n = l.reduce((s, c) => s + (c.no_leidos || 0), 0);
+      const n = await Cuenta.rpc('cfx_msg_sin_leer');
       const b = $('badgeMsg');
       if (b) { b.textContent = n; b.classList.toggle('hidden', !n); }
     } catch (e) { /* sin red */ }

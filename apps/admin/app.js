@@ -20,7 +20,6 @@
   // Arriba: tu logo en vez del escudo 🛡️ (si aún no lo subes, queda el escudo).
   const pintarLogoArriba = () => $('bInicio').classList.toggle('logo', !!Cuenta.aplicarLogo(Cuenta.account));
   pintarLogoArriba();
-  let perfiles = {};
   const DB_VERSION = Core.dbVersion; // una sola fuente: shared/core.js
 
   /* ---------- Navegación (5 pestañas, como el Taller) ---------- */
@@ -48,7 +47,7 @@
       item('⏳ Vencen en 7 días', r.por_vencer) + item('👥 Clientes', r.clientes) + item('⭐ Clientes Premium', r.clientes_pro) +
       item('🧑‍🍳 Equipo', r.equipo) + item('🛒 Pedidos del mes', r.pedidos_mes) + item('🛒 Pedidos hoy', r.pedidos_hoy) + item('💰 Ingresos del mes', Core.money(r.ingresos_mes));
     // El uso del servidor se ve en el Centro de Mando → Resumen (carrusel de servidores); aquí solo la limpieza.
-    await Promise.all([cargarPerfiles().then(cargarReportes), cargarIngresos(), cargarActividad()]);
+    await Promise.all([cargarReportes(), cargarIngresos(), cargarActividad()]);
   }
   $('cServidor').onclick = async (e) => {
     const b = e.target.closest('[data-l]');
@@ -277,21 +276,14 @@
       '<div class="ejes"><span>hace 2 semanas</span><span>hoy</span></div>';
   }
 
-  /* ---------- Nombres de las cuentas (para los reportes) ---------- */
-  async function cargarPerfiles() {
-    const users = await q(sb.from('profiles').select('id,email,empresa,role'));
-    perfiles = Object.fromEntries(users.map((u) => [u.id, u]));
-  }
-
   /* ---------- Reportes ---------- */
   async function cargarReportes() {
-    const reps = await q(sb.from('reports').select('*').eq('resolved', false).order('created_at', { ascending: false }));
+    const reps = await Cuenta.rpc('cfx_msg_reportes');  // núcleo (chat.sql)
     $('nRep').textContent = reps.length;
     $('cReportes').classList.toggle('hidden', !reps.length);
     $('reportes').innerHTML = reps.map((r) => {
-      const de = perfiles[r.reporter] || {}, a = perfiles[r.reported] || {};
-      return '<li><div class="grow"><b>' + Core.esc(a.empresa || a.email || 'Usuario') + '</b> reportado por ' + Core.esc(de.empresa || de.email || '') +
-        '<div class="muted">Motivo: ' + Core.esc(r.reason) + '</div><div class="muted">“' + Core.esc(r.excerpt || '') + '”</div></div>' +
+      return '<li><div class="grow"><b>' + Core.esc(r.a || r.a_email || 'Usuario') + '</b> reportado por ' + Core.esc(r.quien || r.quien_email || '') +
+        '<div class="muted">Motivo: ' + Core.esc(r.motivo) + '</div><div class="muted">“' + Core.esc(r.extracto || '') + '”</div></div>' +
         '<div class="acc"><button class="alt" data-a="ok" data-id="' + r.id + '">Descartar</button>' +
         '<button class="danger" data-a="susp" data-id="' + r.id + '">Suspender</button></div></li>';
     }).join('');
@@ -300,7 +292,7 @@
     const { a, id } = e.target.dataset;
     if (!a) return;
     if (a === 'susp' && !confirm('¿Suspender la cuenta reportada?')) return;
-    try { await Cuenta.rpc('admin_resolve_report', { p_id: id, p_suspend: a === 'susp' }); Core.toast('Listo'); cargarResumen().catch(fallo); }
+    try { await Cuenta.rpc('cfx_msg_resolver', { p_id: id, p_suspender: a === 'susp' }); Core.toast('Listo'); cargarResumen().catch(fallo); }
     catch (err) { fallo(err); }
   };
 

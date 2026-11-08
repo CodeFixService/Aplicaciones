@@ -108,6 +108,10 @@
   Core.registerSW('../../');
   const yo = await Cuenta.require('../../');
   Cuenta.nav('chat');
+  if ((await Cuenta.modulos()).chat === false) {
+    document.querySelector('main').innerHTML = '<p class="empty">💬 El chat no está disponible por ahora.</p>';
+    return;
+  }
   const admin = yo.is_admin;
   let convs = [], actual = null, bloqueado = false, timer = null;
 
@@ -116,7 +120,7 @@
   const ROL = { admin: 'Soporte CodeFix', user: 'Empresa', client: Cuenta.isClient() ? 'Contacto' : 'Cliente' };
 
   async function cargarLista() {
-    try { convs = await Cuenta.rpc('chat_list'); } catch (e) { return; }
+    try { convs = await Cuenta.rpc('cfx_msg_lista'); } catch (e) { return; }
     pintarLista();
   }
   $('buscar').oninput = pintarLista;
@@ -124,7 +128,7 @@
     const q = $('buscar').value.toLowerCase();
     const l = convs.filter((c) => !q || (c.nombre || '').toLowerCase().includes(q));
     $('convs').innerHTML = l.length ? l.map((c) =>
-      '<div class="conv' + (actual && actual.id === c.other ? ' on' : '') + '" data-id="' + c.other + '">' +
+      '<div class="conv' + (actual && actual.id === c.otro ? ' on' : '') + '" data-id="' + c.otro + '">' +
       '<div class="av">' + Core.esc((c.nombre || '?').charAt(0).toUpperCase()) + '</div>' +
       '<div class="grow"><b>' + Core.esc(c.nombre) + '</b><div class="last">' + (c.mio ? 'Tú: ' : '') + Core.esc(c.ultimo) + '</div></div>' +
       (c.no_leidos ? '<span class="n">' + c.no_leidos + '</span>' : '<small class="muted">' + hora(c.ultimo_at) + '</small>') + '</div>'
@@ -133,8 +137,8 @@
   $('convs').onclick = (e) => {
     const el = e.target.closest('.conv');
     if (!el) return;
-    const c = convs.find((x) => x.other === el.dataset.id);
-    abrir({ id: c.other, nombre: c.nombre, rol: c.rol, bloqueado: c.bloqueado });
+    const c = convs.find((x) => x.otro === el.dataset.id);
+    abrir({ id: c.otro, nombre: c.nombre, rol: c.rol, bloqueado: c.bloqueado });
   };
 
   $('bNuevo').onclick = async () => {
@@ -181,16 +185,16 @@
   async function cargarHilo(forzar) {
     if (!actual) return;
     let ms;
-    try { ms = await Cuenta.rpc('chat_messages', { p_other: actual.id }); } catch (e) { return; }
-    const last = ms.length ? ms[ms.length - 1].id + (ms[ms.length - 1].read_at || '') : '';
+    try { ms = await Cuenta.rpc('cfx_msg_hilo', { p_otro: actual.id }); } catch (e) { return; }
+    const last = ms.length ? ms[ms.length - 1].id + (ms[ms.length - 1].leido || '') : '';
     if (!forzar && last === ultimoId) return;
     ultimoId = last;
     let dia = '';
     $('msgs').innerHTML = ms.length ? ms.map((m) => {
-      const d = diaTxt(m.created_at);
+      const d = diaTxt(m.creado);
       const sep = d !== dia ? '<div class="dia">' + (dia = d) + '</div>' : '';
-      return sep + '<div class="b' + (m.mio ? ' mio' : '') + '">' + Core.esc(m.body) + '<small>' + hora(m.created_at) +
-        (m.mio ? (m.read_at ? ' · ✓✓ Visto' : ' · ✓ Enviado') : '<button class="rep" data-id="' + m.id + '" title="Reportar mensaje">🚩</button>') + '</small></div>';
+      return sep + '<div class="b' + (m.mio ? ' mio' : '') + '">' + Core.esc(m.texto) + '<small>' + hora(m.creado) +
+        (m.mio ? (m.leido ? ' · ✓✓ Visto' : ' · ✓ Enviado') : '<button class="rep" data-id="' + m.id + '" title="Reportar mensaje">🚩</button>') + '</small></div>';
     }).join('') : '<div class="vacio">Escribe el primer mensaje 👋</div>';
     $('msgs').scrollTop = $('msgs').scrollHeight;
     await pintarCupo();
@@ -200,15 +204,14 @@
   async function pintarCupo() {
     if (admin) { $('tip').innerHTML = 'Como administrador puedes enviar mensajes sin límite.'; $('bEnviar').disabled = false; return; }
     if (bloqueado) { $('tip').innerHTML = 'Bloqueaste esta conversación. Desbloquéala para escribir.'; $('bEnviar').disabled = true; return; }
-    // Entre contactos: Free 1 mensaje a la vez, Premium hasta 5. Con tiendas y soporte: 3.
-    const lim = actual.rol === 'client' && Cuenta.isClient() ? (Cuenta.isPro() ? 5 : 1) : 3;
-    let r = lim;
-    try { r = await Cuenta.rpc('chat_remaining', { p_other: actual.id }); } catch (e) { /* sin red */ }
+    // Entre contactos: Free 1 mensaje a la vez, Premium hasta 5. Con tiendas y soporte: 3 (lo decide el servidor).
+    let lim = actual.rol === 'client' && Cuenta.isClient() ? (Cuenta.isPro() ? 5 : 1) : 3, r = lim;
+    try { const x = await Cuenta.rpc('cfx_msg_restantes', { p_otro: actual.id }); if (x && x.limite != null) { lim = x.limite; r = x.restantes; } } catch (e) { /* sin red */ }
     $('bEnviar').disabled = r <= 0;
     $('texto').disabled = r <= 0;
     $('tip').innerHTML = r <= 0
       ? '⏳ ' + (lim === 1 ? 'Con Free envías 1 mensaje a la vez' : 'Ya enviaste ' + lim + ' mensajes seguidos') + '. Podrás escribir de nuevo cuando te respondan.' +
-        (lim === 1 ? ' <a href="../../#plan">⭐ Premium: hasta 5</a>' : '')
+        (lim === 1 && !Cuenta.isPro() ? ' <a href="../../#plan">⭐ Premium: hasta 5</a>' : '')
       : '💡 Envía tu mensaje completo: tienes <b>' + r + ' de ' + lim + '</b> mensaje' + (lim === 1 ? '' : 's') + ' antes de recibir respuesta.';
   }
 
@@ -217,7 +220,7 @@
     if (!txt || !actual) return;
     $('bEnviar').disabled = true;
     try {
-      const r = await Cuenta.rpc('send_message', { p_to: actual.id, p_body: txt });
+      const r = await Cuenta.rpc('cfx_msg_enviar', { p_para: actual.id, p_texto: txt });
       if (!r.ok) throw new Error(r.error);
       $('texto').value = '';
       Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato
@@ -276,7 +279,7 @@
     const motivo = prompt('¿Por qué reportas este mensaje? (spam, insultos, fraude…)');
     if (motivo === null) return;
     try {
-      const r = await Cuenta.rpc('report_message', { p_message: id, p_reason: motivo });
+      const r = await Cuenta.rpc('cfx_msg_reportar', { p_mensaje: id, p_motivo: motivo });
       if (!r.ok) throw new Error(r.error);
       Core.toast('Gracias. El administrador revisará el reporte.');
     } catch (err) { Core.toast(err.message); }
@@ -284,7 +287,7 @@
 
   $('bBorrarChat').onclick = async () => {
     if (!actual || !confirm('¿Borrar toda la conversación con ' + actual.nombre + '? Se borra para los dos.')) return;
-    try { await Cuenta.rpc('chat_borrar', { p_other: actual.id }); Core.toast('Chat borrado'); actual = null; $('wrap').classList.remove('abierto'); $('cab').classList.add('hidden'); $('comp').classList.add('hidden');
+    try { await Cuenta.rpc('cfx_msg_borrar', { p_otro: actual.id }); Core.toast('Chat borrado'); actual = null; $('wrap').classList.remove('abierto'); $('cab').classList.add('hidden'); $('comp').classList.add('hidden');
       $('msgs').innerHTML = '<div class="vacio">Elige una conversación o toca <b>＋ Nuevo</b>.</div>'; cargarLista(); }
     catch (err) { Core.toast(err.message); }
   };
@@ -292,7 +295,7 @@
     if (!actual) return;
     if (!bloqueado && !confirm('¿Bloquear a ' + actual.nombre + '? Ninguno de los dos podrá escribir hasta que desbloquees.')) return;
     try {
-      await Cuenta.rpc('block_contact', { p_other: actual.id, p_block: !bloqueado });
+      await Cuenta.rpc('cfx_msg_bloquear', { p_otro: actual.id, p_bloquear: !bloqueado });
       bloqueado = !bloqueado;
       $('bBloquear').textContent = bloqueado ? 'Desbloquear' : 'Bloquear';
       Core.toast(bloqueado ? 'Contacto bloqueado' : 'Contacto desbloqueado');
@@ -311,8 +314,8 @@
   const con = new URLSearchParams(location.search).get('con');
   const txt = (new URLSearchParams(location.search).get('txt') || '').slice(0, 300); // mensaje sugerido (desde una oferta o producto)
   if (/^[0-9a-f-]{36}$/i.test(con || '')) {
-    const c = convs.find((x) => x.other === con);
-    if (c) abrir({ id: c.other, nombre: c.nombre, rol: c.rol, bloqueado: c.bloqueado });
+    const c = convs.find((x) => x.otro === con);
+    if (c) abrir({ id: c.otro, nombre: c.nombre, rol: c.rol, bloqueado: c.bloqueado });
     else {
       try {
         const cs = await Cuenta.rpc('my_contacts');

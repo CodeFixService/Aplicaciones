@@ -334,3 +334,5 @@ header.top h1::before { display: inline-block; vertical-align: middle; margin-ri
 .faq details { border-bottom: 1px solid var(--line); padding: 10px 0; }
 .faq summary { cursor: pointer; font-weight: 700; }
 .faq p { margin: 6px 0 0; }
+/* 🧩 Módulo apagado desde el Centro de Mando (Cuenta.modulos): sin botones ni links al chat */
+body.sin-chat [data-k=chat], body.sin-chat a[href*="apps/mensajes/"] { display: none !important; }
