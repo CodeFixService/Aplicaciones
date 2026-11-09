@@ -31,6 +31,25 @@
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
   .kpis .card { margin: 0; text-align: center; }
   .kpis b { display: block; font-size: 22px; }
+  .kpis.sem { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis.sem b { font-size: 19px; white-space: nowrap; }
+  .vivo-n { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .vivo-n b { font-size: 28px; }
+  .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 4px; vertical-align: middle; animation: latido 2s infinite; }
+  @keyframes latido { 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { .punto { animation: none; } }
+  .graf svg { display: block; width: 100%; height: 120px; touch-action: pan-y; }
+  .graf rect.b { fill: var(--brand); opacity: .55; }
+  .graf rect.b.on, .graf rect.b.hoy { opacity: 1; }
+  .graf line { stroke: var(--line); }
+  .lee { min-height: 1.4em; margin: -4px 0 6px; }
+  .lee b { color: var(--text); }
+  .eje { justify-content: space-between; font-size: 12px; margin-top: 4px; }
+  .segs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+  .segs button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; min-height: 64px; padding: 10px 12px; }
+  .segs button b { font-size: 20px; }
+  .segs button.on { outline: 2px solid var(--brand); }
+  .camp { background: var(--brand-soft); border-radius: var(--radius-sm); padding: 10px 12px; margin: 8px 0; }
   .vip { color: #dc2626; font-weight: 700; }
   .est-pagando, .est-en_revision { background: color-mix(in srgb, #8b5cf6 16%, transparent); color: #7c3aed; border-color: transparent; }
   .est-rechazado, .est-expirado { background: var(--line); }
@@ -93,12 +112,21 @@
       <div class="btns"><a class="btn warn" href="../../#plan">⭐ Pásate a Pro</a></div>
     </div>
     <div id="stPro">
+      <div class="card vivo"><div class="row" style="align-items:center"><h2 class="grow" style="margin:0">Hoy</h2><span class="muted" id="sVivo"><i class="punto"></i> En vivo</span></div>
+        <div class="vivo-n"><b id="sHoyM">$0</b><span class="muted" id="sHoyP">0 pedidos pagados</span></div></div>
       <p class="muted">Últimos 30 días.</p>
       <div class="kpis">
         <div class="card"><span class="muted">Pedidos</span><b id="sPed">0</b></div>
         <div class="card"><span class="muted">Ventas entregadas</span><b id="sVen">$0</b></div>
         <div class="card"><span class="muted">Clientes</span><b id="sCli">0</b></div>
       </div>
+      <div class="card"><h2>📈 Ventas por día</h2><p class="muted lee" id="gDiasL">Toca una barra para ver el día.</p><div id="gDias" class="graf"></div>
+        <div class="row muted eje"><span>hace 30 días</span><span>hoy</span></div></div>
+      <div class="card"><h2>🕐 ¿A qué hora te compran?</h2><p class="muted lee" id="gHorasL">Toca una barra para ver la hora.</p><div id="gHoras" class="graf"></div>
+        <div class="row muted eje"><span>0 h</span><span>6 h</span><span>12 h</span><span>18 h</span><span>23 h</span></div></div>
+      <div class="card hidden" id="sSemana"><h2>🔮 Esta semana</h2><p class="muted" id="sSemanaC" style="margin-top:-4px"></p><div id="sSemanaL"></div></div>
+      <div class="card hidden" id="sSeg"><h2>👥 Tus clientes</h2><p class="muted" style="margin-top:-4px">Toca un grupo para ver a quiénes y qué mandarles.</p>
+        <div class="segs" id="sSegB"></div><div id="sSegL"></div></div>
       <div class="card"><h2>🏆 Productos más pedidos</h2><ul class="list" id="sTop"></ul></div>
       <div class="card"><h2>💎 Mejores clientes</h2><ul class="list" id="sMejores"></ul></div>
       <div class="card"><h2>👁️ Vistas de tus fichas</h2><ul class="list" id="sVistas"></ul></div>
@@ -302,19 +330,110 @@
     cargarCupones();
   };
 
-  /* ---------- Estadísticas (Pro) ---------- */
-  async function cargarStats() {
+  /* ---------- Estadísticas (Pro) · F30 en vivo: se refresca cada 30 s mientras está a la vista ---------- */
+  let statsT = null, an = undefined;
+  async function cargarStats(sola) {
     $('stLock').classList.toggle('hidden', pro);
     $('stPro').classList.toggle('hidden', !pro);
     if (!pro) return;
+    clearTimeout(statsT);
+    statsT = setTimeout(() => { if ($('v-stats').classList.contains('on')) cargarStats(true); }, 30000);
     try {
       const s = await Cuenta.rpc('estadisticas_tienda');
       $('sPed').textContent = s.pedidos; $('sVen').textContent = precio(s.ventas); $('sCli').textContent = s.clientes;
+      const h = s.hoy || { pedidos: 0, monto: 0 };
+      $('sHoyM').textContent = precio(h.monto); $('sHoyP').textContent = h.pedidos + (h.pedidos === 1 ? ' pedido pagado' : ' pedidos pagados');
+      $('sVivo').innerHTML = '<i class="punto"></i> En vivo · ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+      const dd = s.dias || [];
+      grafico('gDias', dd.map((d) => Number(d.monto)), (i) => {
+        const d = dd[i]; return '<b>' + new Date(d.f + 'T12:00').toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }) + '</b>: ' + precio(d.monto) + ' · ' + d.pedidos + (d.pedidos === 1 ? ' pedido' : ' pedidos');
+      }, dd.length - 1);
+      const hh = (s.horas || []).map(Number), max = Math.max(...hh, 0);
+      grafico('gHoras', hh, (i) => '<b>' + i + ':00 a ' + i + ':59</b>: ' + hh[i] + (hh[i] === 1 ? ' pedido' : ' pedidos') + ' en 30 días', -1,
+        max ? 'Tu mejor hora: <b>' + hh.indexOf(max) + ':00 a ' + hh.indexOf(max) + ':59</b>. Toca una barra para ver otra.' : 'Aún no hay ventas en 30 días.');
+      if (!sola) analisisStats();
       const fila = (a, b) => '<li><span class="grow">' + a + '</span><b>' + b + '</b></li>';
       $('sTop').innerHTML = s.top_productos.length ? s.top_productos.map((p) => fila(Core.esc(p.nombre), p.cant + ' · ' + precio(p.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
       $('sMejores').innerHTML = s.mejores_clientes.length ? s.mejores_clientes.map((c) => fila(Core.esc(c.nombre), c.pedidos + ' pedidos · ' + precio(c.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
       $('sVistas').innerHTML = s.vistas.length ? s.vistas.map((v) => fila(Core.esc(v.titulo), '👁️ ' + v.vistas)).join('') : '<li class="empty">Aún no publicas fichas</li>';
     } catch (e) { Core.toast(e.message); }
+  }
+
+  // Barras de una sola serie (el título de la tarjeta la nombra). Tocar o pasar el dedo muestra el valor arriba del gráfico.
+  function grafico(id, vals, leer, marcar, inicial) {
+    const W = 300, H = 110, n = vals.length || 1, max = Math.max(...vals, 0) || 1, aw = W / n, g = Math.min(2, aw * 0.2);
+    const el = $(id), lee = $(id + 'L');
+    el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="' + Core.esc(el.parentElement.querySelector('h2').textContent) + '">' +
+      '<line x1="0" x2="' + W + '" y1="' + (H - 0.5) + '" y2="' + (H - 0.5) + '"/>' +
+      vals.map((v, i) => { const h = v > 0 ? Math.max(3, v / max * (H - 4)) : 0;
+        return '<rect class="b' + (i === marcar ? ' hoy' : '') + '" data-i="' + i + '" x="' + (i * aw + g / 2).toFixed(2) + '" y="' + (H - 1 - h).toFixed(2) + '" width="' + (aw - g).toFixed(2) + '" height="' + h.toFixed(2) + '" rx="' + Math.min(4, (aw - g) / 2).toFixed(2) + '"/>' +
+          '<rect data-i="' + i + '" x="' + (i * aw).toFixed(2) + '" y="0" width="' + aw.toFixed(2) + '" height="' + H + '" fill="transparent"/>'; }).join('') + '</svg>';
+    const ver = (i) => { el.querySelectorAll('rect.b').forEach((r) => r.classList.toggle('on', +r.dataset.i === i)); lee.innerHTML = leer(i); };
+    const punto = (ev) => { const r = el.getBoundingClientRect(); const i = Math.max(0, Math.min(n - 1, Math.floor((ev.clientX - r.left) / r.width * n))); ver(i); };
+    el.onpointerdown = punto; el.onpointermove = (ev) => { if (ev.pointerType === 'mouse' || ev.buttons) punto(ev); };
+    if (inicial) lee.innerHTML = inicial; else if (marcar >= 0) lee.innerHTML = leer(marcar);
+  }
+
+  /* ---------- 🔮 E28 esta semana + 👥 E29 segmentos con campañas (lo calcula el análisis de cada noche: cfx_analisis_mio) ---------- */
+  const SEG = {
+    vip: ['💎', 'VIP', 'Tus mejores clientes', 10, 'GRACIAS', (n, t, c) => 'Hola ' + n + ' 💛 Eres de nuestros mejores clientes en ' + t + '. ' + (c ? 'Te regalamos ' + c + '.' : '¡Gracias por preferirnos!')],
+    frecuentes: ['🔁', 'Frecuentes', 'Compran seguido', 0, '', (n, t) => 'Hola ' + n + ' 🙌 Gracias por comprar siempre en ' + t + '. Mira lo nuevo que llegó'],
+    nuevos: ['🌱', 'Nuevos', 'Primera compra este mes', 10, 'SEGUNDA', (n, t, c) => 'Hola ' + n + ' 👋 ¡Gracias por tu primera compra en ' + t + '! ' + (c ? 'Para la próxima tienes ' + c + '.' : 'Te esperamos de vuelta.')],
+    riesgo: ['⚠️', 'En riesgo', 'Compraban seguido y no vuelven', 15, 'VUELVE', (n, t, c) => 'Hola ' + n + ' 👋 ¡Te extrañamos en ' + t + '! ' + (c ? 'Vuelve con ' + c + '.' : 'Tenemos novedades para ti.')],
+    perdidos: ['💤', 'Perdidos', 'Sin comprar hace meses', 20, 'VUELVE', (n, t, c) => 'Hola ' + n + ' 👋 Hace tiempo que no te vemos en ' + t + '. ' + (c ? 'Te dejamos ' + c + ' para volver.' : '¡Te esperamos!')]
+  };
+  const cuponesHechos = {};
+  const wa = (t) => { let d = String(t || '').replace(/\D/g, ''); if (d.length === 9 && d[0] === '9') d = '56' + d; else if (d.length === 8) d = '569' + d; return /^\d{10,15}$/.test(d) ? d : ''; };
+  async function analisisStats() {
+    if (an === undefined) { try { an = await Cuenta.rpc('cfx_analisis_mio'); } catch (e) { an = null; } }
+    const se = an && an.semana, ac = (an && an.acaba) || [];
+    $('sSemana').classList.toggle('hidden', !an || (!se && !ac.length));
+    if (an && (se || ac.length)) {
+      const dias = Math.round((Date.now() - new Date(an.calculado)) / 864e5);
+      $('sSemanaC').textContent = 'Estimado con tus ventas de las últimas 4 semanas · ' + (dias < 1 ? 'calculado anoche' : 'calculado hace ' + dias + (dias === 1 ? ' día' : ' días'));
+      $('sSemanaL').innerHTML = (se ? '<div class="kpis sem"><div class="card"><span class="muted">Venderías</span><b>~' + precio(se.monto) + '</b></div>' +
+          '<div class="card"><span class="muted">Semana pasada</span><b>' + precio(se.pasada) + '</b></div>' +
+          '<div class="card"><span class="muted">Tu mejor día</span><b>' + Core.esc(se.mejor_dia) + '</b></div></div>' : '') +
+        (ac.length ? '<h3 style="margin:8px 0 4px">⏳ Se acaba pronto</h3><ul class="list">' + ac.map((a) => '<li><span class="grow">' + Core.esc(a.nombre) +
+          '<br><small class="muted">Quedan ' + a.stock + ' · vendes ~' + String(a.semana).replace('.', ',') + ' por semana</small></span><b>' + (a.dias < 1 ? 'hoy' : a.dias + (a.dias === 1 ? ' día' : ' días')) + '</b></li>').join('') + '</ul>' +
+          '<div class="btns"><a class="btn small alt" href="../caja/#productos">📦 Reponer stock</a></div>' : '');
+    }
+    const sg = an && an.segmentos;
+    const hay = sg && Object.keys(SEG).some((k) => sg[k] && sg[k].total);
+    $('sSeg').classList.toggle('hidden', !hay);
+    if (!hay) return;
+    $('sSegB').innerHTML = Object.keys(SEG).map((k) => '<button type="button" class="alt" data-seg="' + k + '"><span>' + SEG[k][0] + ' ' + SEG[k][1] + '</span><b>' + ((sg[k] && sg[k].total) || 0) + '</b><small class="muted">' + SEG[k][2] + '</small></button>').join('');
+    $('sSegB').onclick = (ev) => { const b = ev.target.closest('[data-seg]'); if (b) verSeg(b.dataset.seg); };
+    const pri = ['riesgo', 'nuevos', 'vip', 'perdidos', 'frecuentes'].find((k) => sg[k] && sg[k].total);
+    verSeg(pri);
+  }
+  async function verSeg(k) {
+    const sg = an.segmentos[k] || { total: 0, lista: [] }, [, nom, , pct, pre, msg] = SEG[k];
+    $('sSegB').querySelectorAll('[data-seg]').forEach((b) => b.classList.toggle('on', b.dataset.seg === k));
+    const mods = await Cuenta.modulos();
+    const codigo = pct ? pre + pct : '', hecho = cuponesHechos[codigo];
+    const puedeCupon = pct && dueno && mods.cupones !== false;
+    const tienda = (dueno ? yo.empresa : yo.negocio) || yo.empresa || 'nuestra tienda', link = yo.slug ? Core.rootUrl() + 't/?s=' + encodeURIComponent(yo.slug) : '';
+    const regalo = hecho ? pct + '% de descuento con el código ' + codigo + ' (hasta el ' + hecho + ')' : '';
+    $('sSegL').innerHTML = !sg.total ? '<p class="empty">Nadie en este grupo por ahora.</p>' :
+      '<div class="camp"><b>💡 Campaña sugerida</b><p style="margin:4px 0">' + Core.esc(msg('{nombre}', tienda, pct ? pct + '% de descuento con el código ' + codigo : '')) + '</p>' +
+      (puedeCupon ? (hecho ? '<p class="muted" style="margin:0">✅ Cupón ' + codigo + ' listo: ya va en cada mensaje.</p>'
+        : '<button class="small" id="bCampCupon">🏷️ Crear cupón ' + codigo + ' (' + pct + '%, 14 días)</button>') : '') + '</div>' +
+      '<ul class="list">' + sg.lista.map((c) => {
+        const t = wa(c.tel), m = msg(c.nombre, tienda, regalo) + (link ? ' ' + link : '');
+        return '<li class="row" style="align-items:center;gap:8px"><div style="flex:3;min-width:0"><b>' + Core.esc(c.nombre) + '</b><br><small class="muted">' + c.compras + (c.compras === 1 ? ' compra' : ' compras') +
+          ', ' + precio(c.total) + ' · última hace ' + c.dias + (c.dias === 1 ? ' día' : ' días') + '</small></div>' +
+          (t ? '<a class="btn small ok" style="flex:none" target="_blank" rel="noopener" data-wa href="https://wa.me/' + t + '?text=' + encodeURIComponent(m) + '">💬 Escribir</a>' : '<small class="muted" style="flex:none">sin teléfono</small>') + '</li>';
+      }).join('') + '</ul>' + (sg.total > sg.lista.length ? '<p class="muted">y ' + (sg.total - sg.lista.length) + ' más</p>' : '');
+    const b = $('bCampCupon');
+    if (b) b.onclick = async () => {
+      const hasta = new Date(Date.now() + 14 * 864e5);
+      try {
+        await Cuenta.rpc('cfx_desc_guardar', { p_codigo: codigo, p_porcentaje: pct, p_hasta: hasta.toLocaleDateString('sv-SE') });
+        cuponesHechos[codigo] = hasta.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+        Core.toast('🏷️ Cupón ' + codigo + ' creado'); verSeg(k);
+      } catch (e) { Core.toast(e.message); }
+    };
   }
 
   // 🔔 Desde el aviso: ?p=<id> busca ese pedido en las pestañas, lo muestra y lo marca.

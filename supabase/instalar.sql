@@ -5329,7 +5329,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.36'::text $$;
+language sql immutable as $$ select '5.37'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5392,6 +5392,47 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.37 · G16 F30: Pedidos → Estadísticas en vivo. Suma hoy, ventas de cada día (30 días) y pedidos por hora,
+--  y la ve también el equipo con rol admin (antes leía la cuenta del que entraba, no la de la tienda).
+-- =====================================================================
+create or replace function public.estadisticas_tienda() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid(); n uuid; d0 date := public.hoy_cl();
+begin
+  select public.negocio_de(p.id) into n from public.profiles p
+  where p.id = me and (p.role in ('user', 'admin') or (p.role = 'equipo' and p.equipo_rol = 'admin'));
+  if n is null or not (public.is_business(n) and public.is_pro(n)) then raise exception 'Las estadísticas son de la versión Pro'; end if;
+  return (with v as (
+      select x.total, (x.created_at at time zone 'America/Santiago') t from public.pedidos x
+      where x.negocio_id = n and x.created_at > now() - interval '31 days'
+        and (x.estado = 'entregado' or (x.pagado_at is not null and x.estado not in ('cancelado', 'rechazado', 'expirado'))))
+    select jsonb_build_object(
+    'pedidos', (select count(*) from public.pedidos where negocio_id = n and created_at > now() - interval '30 days'),
+    'ventas', (select coalesce(sum(total), 0) from public.pedidos where negocio_id = n and estado = 'entregado' and created_at > now() - interval '30 days'),
+    'clientes', (select count(*) from public.profiles where negocio_id = n and role = 'client'),
+    'hoy', (select jsonb_build_object('pedidos', count(*), 'monto', coalesce(sum(v.total), 0)) from v where v.t::date = d0),
+    'dias', (select jsonb_agg(jsonb_build_object('f', g::date, 'pedidos', (select count(*) from v where v.t::date = g::date),
+        'monto', (select coalesce(sum(v.total), 0) from v where v.t::date = g::date)) order by g)
+      from generate_series(d0 - 29, d0, interval '1 day') g),
+    'horas', (select jsonb_agg((select count(*) from v where extract(hour from v.t) = h) order by h) from generate_series(0, 23) h),
+    'top_productos', (select coalesce(jsonb_agg(z), '[]') from (
+        select l ->> 'nombre' as nombre, sum((l ->> 'cant')::int) as cant, sum((l ->> 'subtotal')::numeric) as monto
+        from public.pedidos x, jsonb_array_elements(x.lineas) l
+        where x.negocio_id = n and x.estado <> 'cancelado' and x.created_at > now() - interval '30 days'
+        group by 1 order by 2 desc limit 5) z),
+    'mejores_clientes', (select coalesce(jsonb_agg(z), '[]') from (
+        select coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1)) as nombre, count(*) as pedidos, sum(x.total) as monto
+        from public.pedidos x join public.profiles c on c.id = x.cliente_id
+        where x.negocio_id = n and x.estado <> 'cancelado' and x.created_at > now() - interval '30 days'
+        group by 1 order by 3 desc limit 5) z),
+    'vistas', (select coalesce(jsonb_agg(z), '[]') from (
+        select p.titulo, p.vip, (select count(*) from public.publicacion_vistas w where w.publicacion_id = p.id) as vistas
+        from public.publicaciones p where p.owner_id = n order by 3 desc limit 10) z)));
+end $$;
+revoke all on function public.estadisticas_tienda() from public, anon;
+grant execute on function public.estadisticas_tienda() to authenticated;
 
 -- =====================================================================
 --  VERSIÓN 5.36 · núcleo 2.54: E24/E27 análisis nocturno (Python en GitHub Actions). Ganchos para el núcleo (analisis.sql):

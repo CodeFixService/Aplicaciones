@@ -668,7 +668,7 @@
     const c = $('hoyRecuperar');
     let an = null;
     try { an = await Cuenta.rpc('cfx_analisis_mio'); } catch (e) { /* base anterior o sin red */ }
-    if (!an || (!an.riesgo_total && !an.quietos_total)) { c.classList.add('hidden'); return; }
+    if (!an || (!an.riesgo_total && !an.quietos_total && !an.acaba_total)) { c.classList.add('hidden'); return; }
     const $$ = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL'), tienda = acc.empresa || 'nuestra tienda';
     const wa = (t) => { let d = String(t || '').replace(/\D/g, ''); if (d.length === 9 && d[0] === '9') d = '56' + d; else if (d.length === 8) d = '569' + d; return /^\d{10,15}$/.test(d) ? d : ''; };
     const mas = (n, vistos) => n > vistos ? '<p class="muted" style="margin:4px 0 0">y ' + (n - vistos) + ' más</p>' : '';
@@ -685,7 +685,12 @@
         '<li style="padding:6px 0"><b>' + Core.esc(q.nombre) + '</b> <small class="muted">· ' + (q.dias > 90 ? 'más de 90' : q.dias) + ' días' + (q.stock != null ? ' · stock ' + q.stock : '') + '</small></li>').join('') + '</ul>' +
         mas(an.quietos_total, an.quietos.length) +
         '<p class="muted" style="margin:6px 0 0">💡 Haz una promoción, cámbiale la foto o destácalo al compartir tu tienda.</p><div class="btns">' +
-        (acc.role === 'user' ? '<a class="btn small alt" href="apps/pedidos/?v=cupones">🏷️ Crear promoción</a>' : '') + '<a class="btn small alt" href="apps/caja/#productos">📦 Ver productos</a></div>' : '');
+        (acc.role === 'user' ? '<a class="btn small alt" href="apps/pedidos/?v=cupones">🏷️ Crear promoción</a>' : '') + '<a class="btn small alt" href="apps/caja/#productos">📦 Ver productos</a></div>' : '') +
+      // ⏳ E28: el stock que alcanza para 14 días o menos al ritmo de venta (online y Caja).
+      ((an.acaba || []).length ? '<h3 style="margin:12px 0 4px">⏳ Se acaba pronto</h3><ul class="list">' + an.acaba.map((a) =>
+        '<li style="padding:6px 0"><b>' + Core.esc(a.nombre) + '</b> <small class="muted">· quedan ' + a.stock + ', alcanza para ' + (a.dias < 1 ? 'hoy' : a.dias + (a.dias === 1 ? ' día' : ' días')) + '</small></li>').join('') + '</ul>' +
+        mas(an.acaba_total, an.acaba.length) + '<div class="btns"><a class="btn small alt" href="apps/caja/#productos">📦 Reponer stock</a>' +
+        '<a class="btn small alt" href="apps/pedidos/?v=stats">📊 Ver estadísticas</a></div>' : '');
     c.classList.remove('hidden');
     hacerHoy(h, acc, an);
   }
@@ -708,6 +713,7 @@
       [dueno && !h.vacaciones && h.abierto === false, '#ajustes', 'Tu tienda está cerrada: ábrela para recibir pedidos'],
       [dueno && h.pro_dias != null && h.pro_dias <= 5, '#plan', 'Tu Premium vence en ' + s(h.pro_dias, '1 día', '# días') + ': renuévalo'],
       [an && an.riesgo_total, '!hoyRecuperar', s(an && an.riesgo_total, 'Escríbele a 1 cliente que dejó de comprar', 'Escríbele a # clientes que dejaron de comprar')],
+      [rol !== 'vendedor' && an && an.acaba_total, '!hoyRecuperar', s(an && an.acaba_total, '1 producto se acaba en 2 semanas o menos: repón', '# productos se acaban en 2 semanas o menos: repón')],
       [an && an.quietos_total, '!hoyRecuperar', s(an && an.quietos_total, '1 producto no se vende hace un mes: haz una promo', '# productos no se venden hace un mes: haz una promo')]
     ].filter((x) => x[0]);
     const n = (v) => typeof v === 'number' ? '<span class="n">' + v + '</span>' : '<span>•</span>';
