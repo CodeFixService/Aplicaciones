@@ -438,19 +438,27 @@
     if (a === 'misdatos') return misDatos();
     if (a === 'premium' && window.CFX_PAGOS) return window.CFX_PAGOS.abrir({ rpc: R });
   }
+  // Núcleo 2.53: nunca se pega a <main> si hay una vista abierta (quedaba abajo de TODAS las pantallas, p. ej. Hoy del CM),
+  // y se quita sola al salir de Más o cuando aparece el menú común (CFX_MENU), que ya trae "Cuenta y ayuda".
   function cuentaEnMas() {
     if (!R || (CFG.admin && !CFG.socio)) return;
+    const vis = (x) => x.offsetParent && !x.closest('.cfx-cuenta-g, dialog, .cfx-oc, [hidden]');
+    const quitar = () => document.querySelectorAll('.cfx-cuenta-g').forEach((x) => x.remove());
     const on = document.querySelector('nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current]');
     const MAS = /^(más|mas|ajustes|cuenta|perfil)$/i;
-    if (!(on && MAS.test((on.getAttribute('aria-label') || on.textContent || '').replace(/[0-9+]/g, '').trim())) && !MAS.test(location.hash.replace(/^#\/?/, '').split(/[/?]/)[0])) return;
-    const vis = (x) => x.offsetParent && !x.closest('.cfx-cuenta-g, dialog, .cfx-oc, [hidden]');
+    if (!(on && MAS.test((on.getAttribute('aria-label') || on.textContent || '').replace(/[0-9+]/g, '').trim())) && !MAS.test(location.hash.replace(/^#\/?/, '').split(/[/?]/)[0])) return quitar();
+    // Si la pantalla ya tiene el menú común (CFX_MENU), "Cuenta y ayuda" ya viene adentro.
+    if ([...document.querySelectorAll('.cfx-mmas')].some(vis)) return quitar();
     const gs = [...document.querySelectorAll('.cfx-grilla')].filter(vis);
-    const ancla = gs[gs.length - 1] || [...document.querySelectorAll('.view.on, .vista.on, section.on, main')].find(vis);
+    const vistas = [...document.querySelectorAll('.view.on, .vista.on, section.on')].filter(vis);
+    const ancla = gs[gs.length - 1] || vistas[vistas.length - 1] || [...document.querySelectorAll('main')].find(vis);
     if (!ancla) return;
+    // Vista abierta pero todavía vacía (cargando): se espera a que pinte, para no adelantarse al menú de la app.
+    if (!gs.length && !ancla.textContent.trim()) return;
+    if (ancla.querySelector('[data-cfx-menu]')) return;  // la app va a montar ahí el menú común (CFX_MENU): se espera
     const caja = gs.length ? ancla.parentElement : ancla;
     if ([...caja.querySelectorAll(':scope > .cfx-cuenta-g')].length) return;
-    // Si la pantalla ya tiene el menú común (CFX_MENU), "Cuenta y ayuda" ya viene adentro.
-    if (document.querySelector('.cfx-mmas') && [...document.querySelectorAll('.cfx-mmas')].some(vis)) return;
+    document.querySelectorAll('.cfx-cuenta-g').forEach((x) => { if (x.parentElement !== caja) x.remove(); });
     const ya = [...document.querySelectorAll('[data-k]')].filter(vis).map((x) => x.dataset.k);
     const d = document.createElement('div'); d.className = 'cfx-cuenta-g';
     const L = cuentaItems(ya, true);

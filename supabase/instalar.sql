@@ -4304,7 +4304,7 @@ language sql security definer set search_path = '' as $$ select public.notify_us
 
 -- Ganchos de los módulos del núcleo (C19 y C14): qué módulos tiene Órbita y las reglas propias del chat.
 create or replace function public.cfx_modulos_app() returns text[]
-language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito'] $$;
+language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis'] $$;
 create or replace function public.cfx_chat_puede(a uuid, b uuid) returns boolean
 language sql stable security definer set search_path = '' as $$ select public.can_message(a, b) $$;
 -- El admin escribe sin límite; entre clientes según su plan (mensajes_seguidos); con tiendas y soporte, 3.
@@ -5329,7 +5329,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.35'::text $$;
+language sql immutable as $$ select '5.36'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5392,6 +5392,37 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.36 · núcleo 2.54: E24/E27 análisis nocturno (Python en GitHub Actions). Ganchos para el núcleo (analisis.sql):
+--  las ventas de la tienda (pedidos entregados o pagados del último año), sus productos y negocios. El dueño y el equipo
+--  con rol admin ven en Hoy los clientes que dejaron de comprar y los productos quietos (cfx_analisis_mio).
+-- =====================================================================
+create or replace function public.cfx_analisis_datos_app() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  with v as (
+    select x.negocio_id n, coalesce(x.cliente_id::text, 'tel:' || nullif(x.invitado_tel, '')) c, (x.created_at at time zone 'America/Santiago')::date f,
+           x.total m, x.lineas, x.cliente_id, x.invitado_nombre, x.invitado_tel
+    from public.pedidos x
+    where x.created_at > now() - interval '365 days' and (x.estado = 'entregado' or (x.pagado_at is not null and x.estado not in ('cancelado', 'rechazado', 'expirado')))
+    order by x.created_at desc limit 50000)
+  select jsonb_build_object(
+    'ventas', coalesce((select jsonb_agg(jsonb_build_object('n', v.n, 'c', v.c, 'f', v.f, 'm', v.m,
+        'l', (select coalesce(jsonb_agg(jsonb_build_array(l ->> 'clave', (l ->> 'cant')::int)), '[]') from jsonb_array_elements(v.lineas) l))) from v), '[]'),
+    'clientes', coalesce((select jsonb_object_agg(z.c, jsonb_build_object('nombre', z.nombre, 'tel', z.tel)) from (
+        select distinct on (v.c) v.c, coalesce(nullif(p.empresa, ''), split_part(p.email, '@', 1), v.invitado_nombre, 'Cliente') nombre, coalesce(p.telefono, v.invitado_tel, '') tel
+        from v left join public.profiles p on p.id = v.cliente_id where v.c is not null) z), '{}'),
+    'productos', coalesce((select jsonb_agg(jsonb_build_object('n', i.owner_id, 'k', i.client_key, 'nombre', i.nombre, 'stock', i.stock,
+        'creado', (i.created_at at time zone 'America/Santiago')::date)) from public.catalog_items i), '[]'),
+    'negocios', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'nombre', coalesce(nullif(p.empresa, ''), split_part(p.email, '@', 1)),
+        'creado', (p.created_at at time zone 'America/Santiago')::date, 'ingreso', (u.last_sign_in_at at time zone 'America/Santiago')::date))
+      from public.profiles p left join auth.users u on u.id = p.id where p.role = 'user' and not p.suspended), '[]'))
+$$;
+create or replace function public.cfx_analisis_negocio(u uuid) returns uuid
+language sql stable security definer set search_path = '' as $$
+  select public.negocio_de(u) from public.profiles p where p.id = u and (p.role in ('user', 'admin') or (p.role = 'equipo' and p.equipo_rol = 'admin'))
+$$;
+revoke all on function public.cfx_analisis_datos_app(), public.cfx_analisis_negocio(uuid) from public, anon, authenticated;
 
 -- =====================================================================
 --  VERSIÓN 5.35 · núcleo 2.52: B13 tiempo de carga real (cfx_cargas, cfx_carga_anotar; se ve en CM → Control → 🩺 Salud).
@@ -6660,7 +6691,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.calificaciones', 'public.catalog_items', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -6784,6 +6815,7 @@ begin
   return jsonb_build_object(
     'ping', (select cuando from public.cfx_salud where clave = 'ping'),
     'respaldo', (select valor || jsonb_build_object('cuando', cuando) from public.cfx_salud where clave = 'respaldo'),
+    'analisis', (select valor || jsonb_build_object('cuando', cuando) from public.cfx_salud where clave = 'analisis'),
     'carga', coalesce((select jsonb_agg(c order by c.veces desc) from (select pagina, sum(veces)::int veces, (sum(ms) / nullif(sum(veces), 0))::int ms,
         (sum(lcp) / nullif(sum(con_lcp), 0))::int lcp, sum(lentas)::int lentas, sum(cache)::int cache
       from public.cfx_cargas where dia > current_date - 7 group by pagina order by sum(veces) desc limit 20) c), '[]'),
@@ -6844,7 +6876,8 @@ begin
                       ('calificaciones', '⭐ Calificaciones', 'El cliente califica al negocio y el negocio al cliente.'),
                       ('cupones', '🏷️ Cupones', 'Códigos de descuento del negocio para sus clientes.'),
                       ('sellos', '🎟️ Tarjeta de sellos', 'Cada compra suma un sello; al completar la meta, premio.'),
-                      ('carrito', '🛒 Recordar carrito', 'Si el cliente deja productos en el carrito, al día siguiente le llega un aviso (una vez).')) c(clave, nombre, detalle) on c.clave = k), '[]');
+                      ('carrito', '🛒 Recordar carrito', 'Si el cliente deja productos en el carrito, al día siguiente le llega un aviso (una vez).'),
+                      ('analisis', '🔎 Clientes en riesgo y productos quietos', 'Cada noche se revisa quién dejó de comprar y qué no se vende; el negocio lo ve en Hoy.')) c(clave, nombre, detalle) on c.clave = k), '[]');
 end $$;
 
 create or replace function public.cfx_modulo_guardar(p_clave text, p_activo boolean) returns jsonb
@@ -7545,6 +7578,79 @@ begin
 exception when others then
   raise notice 'Limpieza automática no programada (%).', sqlerrm;
 end $$;
+
+-- ---------- Analítica (E24 · E25 · E27): el análisis nocturno lo hace Python en GitHub Actions (SaaS: analisis.yml + analisis/analisis.py) ----------
+-- 1) Python lee cfx_analisis_datos() con la conexión del respaldo (solo la base: nadie con cuenta puede llamarla).
+-- 2) Calcula tendencias de la app (CM → 📊 Analítica) y, por negocio, clientes que dejaron de comprar y productos quietos (E27).
+-- 3) Lo devuelve con cfx_analisis_guardar(): una fila 'app' y una por negocio en cfx_analisis.
+-- Ganchos de cada app (opcionales; sin ellos hay solo números generales):
+--   cfx_analisis_datos_app() → {ventas: [{n, c, f, m, l: [[clave, cant]]}], clientes: {c: {nombre, tel}}, productos: [{n, k, nombre, stock, creado}],
+--                               negocios: [{id, nombre, creado, ingreso}]}
+--   cfx_analisis_negocio(u) → uuid del negocio que ve ese usuario (null: ninguno). Módulo 'analisis' (🧩 en el CM).
+create table if not exists public.cfx_analisis (clave text primary key, datos jsonb not null default '{}', calculado timestamptz not null default now());
+alter table public.cfx_analisis enable row level security;
+revoke all on public.cfx_analisis from anon, authenticated;
+
+create or replace function public.cfx_analisis_datos() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare a jsonb; d date := (now() at time zone 'America/Santiago')::date;
+begin
+  if to_regprocedure('public.cfx_analisis_datos_app()') is not null then execute 'select public.cfx_analisis_datos_app()' into a; end if;
+  return jsonb_build_object('hoy', d, 'modulo', public.cfx_modulo('analisis'),
+    'usuarios', (select jsonb_build_object('total', count(*),
+        'activos7', count(*) filter (where last_sign_in_at > now() - interval '7 days'),
+        'activos30', count(*) filter (where last_sign_in_at > now() - interval '30 days'),
+        'dias', coalesce((select jsonb_object_agg(x.f, x.n) from (select (created_at at time zone 'America/Santiago')::date f, count(*) n from auth.users
+          where created_at > now() - interval '61 days' and deleted_at is null group by 1) x), '{}'))
+      from auth.users where deleted_at is null),
+    'ingresos', coalesce((select jsonb_object_agg(x.f, x.m) from (select (coalesce(resuelto, creado) at time zone 'America/Santiago')::date f, sum(monto) m
+      from public.cfx_pagos where estado = 'aprobado' and coalesce(resuelto, creado) > now() - interval '61 days' group by 1) x), '{}'),
+    'premium', (select count(distinct cuenta) from public.cfx_pagos where estado = 'aprobado' and coalesce(resuelto, creado) > now() - interval '30 days'),
+    'previo', coalesce((select jsonb_object_agg(clave, datos -> 'mov') from public.cfx_analisis where clave <> 'app' and datos ? 'mov'), '{}'),
+    'app', a);
+end $$;
+
+create or replace function public.cfx_analisis_guardar(p jsonb) returns int
+language plpgsql security definer set search_path = '' as $$
+declare n int := 0; k text; v jsonb;
+begin
+  if jsonb_typeof(p -> 'app') = 'object' then
+    insert into public.cfx_analisis (clave, datos, calculado) values ('app', p -> 'app', now())
+    on conflict (clave) do update set datos = excluded.datos, calculado = now();
+  end if;
+  delete from public.cfx_analisis where clave <> 'app' and not (coalesce(p -> 'negocios', '{}') ? clave);
+  for k, v in select * from jsonb_each(coalesce(p -> 'negocios', '{}')) loop
+    insert into public.cfx_analisis (clave, datos, calculado) values (k, v, now())
+    on conflict (clave) do update set datos = excluded.datos, calculado = now();
+    n := n + 1;
+  end loop;
+  perform public.cfx_salud_marca('analisis', jsonb_build_object('negocios', n, 'run', coalesce(p ->> 'run', '')));
+  return n;
+end $$;
+revoke all on function public.cfx_analisis_datos(), public.cfx_analisis_guardar(jsonb) from public, anon, authenticated;
+
+-- Centro de Mando → 📊 Analítica.
+create or replace function public.cfx_analisis_app() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select datos || jsonb_build_object('calculado', calculado) from public.cfx_analisis where clave = 'app');
+end $$;
+revoke all on function public.cfx_analisis_app() from public, anon;
+grant execute on function public.cfx_analisis_app() to authenticated;
+
+-- Para el negocio (E27): sus clientes en riesgo y productos quietos (sin la foto interna del stock).
+create or replace function public.cfx_analisis_mio() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid;
+begin
+  if auth.uid() is null or not public.cfx_modulo('analisis') or to_regprocedure('public.cfx_analisis_negocio(uuid)') is null then return null; end if;
+  execute 'select public.cfx_analisis_negocio($1)' into n using auth.uid();
+  if n is null then return null; end if;
+  return (select (datos - 'mov') || jsonb_build_object('calculado', calculado) from public.cfx_analisis where clave = n::text);
+end $$;
+revoke all on function public.cfx_analisis_mio() from public, anon;
+grant execute on function public.cfx_analisis_mio() to authenticated;
 
 -- ---------- Seguridad (A7): lo que puede hacer alguien sin cuenta (anon) y los buckets de archivos ----------
 -- Va al final del núcleo: así alcanza a todas las funciones de la app.

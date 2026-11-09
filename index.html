@@ -171,6 +171,7 @@
         <button class="alt small" id="hoyAyuda" type="button" style="flex:none">❓ Ayuda</button></div><ul class="list" id="hoyHacerL"></ul></div>
       <div class="stats" id="hoyStats"></div>
       <div class="card hidden" id="hoyStock" style="border-color:#f59e0b"></div>
+      <div class="card hidden" id="hoyRecuperar"><h2>🔎 Para vender más</h2><p class="muted" id="hoyRecuperarC" style="margin-top:-4px"></p><div id="hoyRecuperarL"></div></div>
       <div class="card hidden" id="hoyFalta"><h2>🚀 Tu tienda en 5 minutos</h2><div class="t5"><div class="t5b"><i id="hoyFaltaB"></i></div><b id="hoyFaltaN"></b></div><ul class="list" id="hoyFaltaL"></ul></div>
       <div class="card hidden" id="hoyTienda"><h2>🔗 Tu tienda</h2>
         <p class="muted" style="margin-top:0">Compártela en WhatsApp o Instagram, o imprime el QR. Sin cuenta piden desde ahí; con cuenta entran directo a su app.</p>
@@ -638,6 +639,7 @@
     $('hoyStock').innerHTML = '⚠️ <b>Stock bajo:</b> ' + h.stock_bajo.map((x) => Core.esc(x.nombre) + ' (' + x.stock + ')').join(', ') + ' · <a href="apps/caja/#productos">Reponer</a>';
     const dueno = acc.role === 'user';
     hacerHoy(h, acc);
+    recuperar(h, acc);
     hoyLink = Core.rootUrl() + 't/?s=' + encodeURIComponent(h.slug);
     $('hoyTienda').classList.toggle('hidden', !dueno);
     $('hoyVenderPro').classList.toggle('hidden', !!acc.is_pro);
@@ -660,8 +662,36 @@
     tour(false);
   }
 
+  /* ---------- 🔎 Para vender más (E27): lo que calculó el análisis de anoche (núcleo cfx_analisis_mio; dueño y equipo admin).
+     Clientes que compraban seguido y dejaron de venir (con 💬 WhatsApp listo) y productos sin ventas ni movimiento de stock en 30 días. ---------- */
+  async function recuperar(h, acc) {
+    const c = $('hoyRecuperar');
+    let an = null;
+    try { an = await Cuenta.rpc('cfx_analisis_mio'); } catch (e) { /* base anterior o sin red */ }
+    if (!an || (!an.riesgo_total && !an.quietos_total)) { c.classList.add('hidden'); return; }
+    const $$ = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL'), tienda = acc.empresa || 'nuestra tienda';
+    const wa = (t) => { let d = String(t || '').replace(/\D/g, ''); if (d.length === 9 && d[0] === '9') d = '56' + d; else if (d.length === 8) d = '569' + d; return /^\d{10,15}$/.test(d) ? d : ''; };
+    const mas = (n, vistos) => n > vistos ? '<p class="muted" style="margin:4px 0 0">y ' + (n - vistos) + ' más</p>' : '';
+    const dias = Math.round((Date.now() - new Date(an.calculado)) / 864e5);
+    $('hoyRecuperarC').textContent = dias < 1 ? 'Calculado anoche' : 'Calculado hace ' + dias + (dias === 1 ? ' día' : ' días');
+    $('hoyRecuperarL').innerHTML =
+      (an.riesgo.length ? '<h3 style="margin:8px 0 4px">👥 Clientes que dejaron de venir</h3><ul class="list">' + an.riesgo.map((r) => {
+        const t = wa(r.tel), msg = 'Hola ' + r.nombre + ' 👋 ¡Te extrañamos en ' + tienda + '! Tenemos novedades para ti: ' + hoyLink;
+        return '<li class="row" style="align-items:center;gap:8px;padding:6px 0"><div style="flex:3;min-width:0"><b>' + Core.esc(r.nombre) + '</b><br><small class="muted">Compraba cada ~' + r.cada +
+          ' días · no compra hace ' + r.dias + ' · ' + r.compras + ' compras, ' + $$(r.total) + '</small></div>' +
+          (t ? '<a class="btn small ok" style="flex:none" target="_blank" rel="noopener" data-wa href="https://wa.me/' + t + '?text=' + encodeURIComponent(msg) + '">💬 Escribir</a>' : '') + '</li>';
+      }).join('') + '</ul>' + mas(an.riesgo_total, an.riesgo.length) : '') +
+      (an.quietos.length ? '<h3 style="margin:12px 0 4px">📦 Productos quietos (30 días sin venderse)</h3><ul class="list">' + an.quietos.map((q) =>
+        '<li style="padding:6px 0"><b>' + Core.esc(q.nombre) + '</b> <small class="muted">· ' + (q.dias > 90 ? 'más de 90' : q.dias) + ' días' + (q.stock != null ? ' · stock ' + q.stock : '') + '</small></li>').join('') + '</ul>' +
+        mas(an.quietos_total, an.quietos.length) +
+        '<p class="muted" style="margin:6px 0 0">💡 Haz una promoción, cámbiale la foto o destácalo al compartir tu tienda.</p><div class="btns">' +
+        (acc.role === 'user' ? '<a class="btn small alt" href="apps/pedidos/?v=cupones">🏷️ Crear promoción</a>' : '') + '<a class="btn small alt" href="apps/caja/#productos">📦 Ver productos</a></div>' : '');
+    c.classList.remove('hidden');
+    hacerHoy(h, acc, an);
+  }
+
   /* ---------- ✅ Qué hacer hoy: las tareas del día en orden de urgencia (solo lo que el rol puede hacer) ---------- */
-  function hacerHoy(h, acc) {
+  function hacerHoy(h, acc, an) {
     const dueno = acc.role === 'user', rol = dueno ? 'dueno' : (acc.equipo_rol || 'vendedor');
     const s = (n, uno, varios) => n === 1 ? uno : varios.replace('#', n);
     const t = [
@@ -676,10 +706,13 @@
       [h.pagando, 'apps/pedidos/?f=pagando', s(h.pagando, '1 pedido espera el pago del cliente', '# pedidos esperan el pago del cliente') + ' (escríbele si se demora)'],
       [dueno && h.vacaciones, '#ajustes', 'Estás en modo vacaciones: apágalo al volver'],
       [dueno && !h.vacaciones && h.abierto === false, '#ajustes', 'Tu tienda está cerrada: ábrela para recibir pedidos'],
-      [dueno && h.pro_dias != null && h.pro_dias <= 5, '#plan', 'Tu Premium vence en ' + s(h.pro_dias, '1 día', '# días') + ': renuévalo']
+      [dueno && h.pro_dias != null && h.pro_dias <= 5, '#plan', 'Tu Premium vence en ' + s(h.pro_dias, '1 día', '# días') + ': renuévalo'],
+      [an && an.riesgo_total, '!hoyRecuperar', s(an && an.riesgo_total, 'Escríbele a 1 cliente que dejó de comprar', 'Escríbele a # clientes que dejaron de comprar')],
+      [an && an.quietos_total, '!hoyRecuperar', s(an && an.quietos_total, '1 producto no se vende hace un mes: haz una promo', '# productos no se venden hace un mes: haz una promo')]
     ].filter((x) => x[0]);
     const n = (v) => typeof v === 'number' ? '<span class="n">' + v + '</span>' : '<span>•</span>';
-    $('hoyHacerL').innerHTML = t.length ? t.map(([v, u, x]) => '<li><a class="mini" href="' + u + '"><span class="grow">' + Core.esc(x) + '</span>' + n(v) + '<span>›</span></a></li>').join('')
+    $('hoyHacerL').onclick = (ev) => { const b = ev.target.closest('[data-ir]'); if (!b) return; ev.preventDefault(); $(b.dataset.ir).scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    $('hoyHacerL').innerHTML = t.length ? t.map(([v, u, x]) => '<li><a class="mini" ' + (u[0] === '!' ? 'href="#" data-ir="' + u.slice(1) + '"' : 'href="' + u + '"') + '><span class="grow">' + Core.esc(x) + '</span>' + n(v) + '<span>›</span></a></li>').join('')
       : '<li class="muted" style="padding:6px 10px">🎉 ¡Todo al día!' + (dueno ? ' Comparte tu tienda para recibir más pedidos.' : '') + '</li>';
   }
 
