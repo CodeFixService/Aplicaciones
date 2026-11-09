@@ -29,7 +29,12 @@
   @keyframes tItem{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
   #grid .item .foto{width:100%!important;max-width:none;margin:0 0 6px!important;aspect-ratio:1;object-fit:cover;display:block;border-radius:0!important;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
   #grid .item:hover .foto{transform:scale(1.04)}
-  #grid .item:not(:has(.foto)){padding-top:12px!important}
+  #grid .item:not(:has(.foto,.foto-esq)){padding-top:12px!important}
+  #grid.t-visto .item{animation:none}
+  #grid .item .foto-esq,#grid .t-sk i{display:block;background:linear-gradient(90deg,rgba(127,127,127,.12) 25%,rgba(127,127,127,.24) 45%,rgba(127,127,127,.12) 65%);background-size:300% 100%;animation:cfxCesq 1.3s linear infinite}
+  #grid .item .foto-esq{width:100%;aspect-ratio:1;margin:0 0 6px}
+  #grid .t-sk{pointer-events:none;box-shadow:none}#grid .t-sk i{height:13px;border-radius:7px;width:70%}#grid .t-sk i.f{width:100%;height:auto;aspect-ratio:1;border-radius:0;margin:0 0 6px}#grid .t-sk i.c{width:45%;height:18px}
+  @keyframes cfxCesq{0%{background-position:100% 0}100%{background-position:-100% 0}}
   #grid .item .p{color:${B};font-size:19px;font-weight:800}
   #grid .item .p.tachado{color:var(--muted)}
   #grid .item select{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
@@ -66,7 +71,7 @@
   .t-mas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .t-mas button{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:6px;min-height:0;border-radius:14px;background:var(--field);color:inherit;box-shadow:none;text-align:left;font-weight:600;font-size:13px}
   .t-mas img,.t-mas i{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--card);display:grid;place-items:center;font-style:normal;font-size:28px} .t-mas span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .t-mas small{color:${B};font-weight:800}
   .t-barra button{flex:1;min-height:50px;font-size:16px;font-weight:800;border-radius:14px}
-  @media (prefers-reduced-motion:reduce){#grid .item,#grid .item .foto,.opc-ch{animation:none!important;transition:none!important}}`;
+  @media (prefers-reduced-motion:reduce){#grid .item,#grid .item .foto,.opc-ch,#grid .foto-esq,#grid .t-sk i{animation:none!important;transition:none!important}}`;
   d.head.appendChild(css);
 
   // Botones de vista (se recuerda en este equipo)
@@ -98,7 +103,10 @@
     s.closest('.item').querySelectorAll('[data-opc-v]').forEach((b) => { const x = varDe(s.dataset.opc, b.dataset.opcV); const ag = !!x && x.disponible === 0;
       b.classList.toggle('agot', ag); b.title = b.dataset.opcV + (ag ? ' · agotado' : x && x.precio != null ? ' · ' + plata(x.precio) : ''); });
   });
-  new MutationObserver(marcar).observe(grid, { childList: true });
+  // F31: mientras llega el catálogo, tarjetas "esqueleto"; las tarjetas entran con animación solo la primera vez (no parpadean cuando llegan las fotos).
+  if (!grid.children.length) grid.innerHTML = '<div class="item t-sk" aria-hidden="true"><i class="f"></i><i></i><i class="c"></i></div>'.repeat(4);
+  const visto = () => { if (!grid.classList.contains('t-visto') && grid.querySelector('.item:not(.t-sk)')) setTimeout(() => grid.classList.add('t-visto'), 700); };
+  new MutationObserver(() => { marcar(); visto(); }).observe(grid, { childList: true });
   window.CFX_FICHA = {
     async cargar(negocio, rpc) {
       try { (await rpc('variantes_de', { p_negocio: negocio })).forEach((x) => { (V[x.clave] = V[x.clave] || {})[x.nombre.toLowerCase()] = { precio: x.precio == null ? null : Number(x.precio), disponible: x.disponible }; }); } catch (e) { /* base anterior */ }
@@ -120,6 +128,10 @@
   const sugeridos = (it) => [...grid.querySelectorAll('.item:not(.gris)')].filter((x) => x !== it && x.querySelector(':scope>b') && !x.querySelector('[data-avisa],.pill.bad,.acc button[disabled]'))
     .map((x, i) => ({ x, s: (cat(x) && cat(x) === cat(it) ? 4 : 0) + (x.querySelector('.foto') ? 2 : 0) + ((i * 7 + (it.textContent.length % 5)) % 5) / 5 }))
     .sort((a, b) => b.s - a.s).slice(0, 4).map((o) => o.x);
+  async function compartir(title, url) {
+    try { if (navigator.share) return await navigator.share({ title, url }); } catch (e) { return; }
+    try { await navigator.clipboard.writeText(url); if (window.Core) Core.toast('🔗 Link copiado'); } catch (e) { prompt('Copia el link', url); }
+  }
   function ficha(it, H) {
     const s = it.querySelector('select[data-opc]'), add = it.querySelector('[data-add]');
     if (!window.CFX_MENU || !it.querySelector('.acc')) return false;
@@ -132,7 +144,7 @@
     const pintar = () => {
       const x = varDe(k, op), ag = !add || add.disabled || CFX_FICHA.agotada(k, op), pre = x && x.precio != null ? plata(x.precio) : base;
       z.innerHTML = '<div class="t-ficha">' + (foto ? '<img src="' + esc(foto.src) + '" alt="">' : '') + '<h3>' + esc(nombre) + '</h3><div class="t-p">' + esc(pre) + '</div>' +
-        (desc ? '<p class="t-d">' + esc(desc.textContent) + '</p>' : '') +
+        (desc ? '<p class="t-d">' + esc(desc.textContent) + '</p>' : '') + (window.CFX_LINK_PRODUCTO && it.dataset.k ? '<button type="button" class="alt small" data-f-comp style="align-self:flex-start">🔗 Compartir</button>' : '') +
         (ops.length ? '<b>Elige una opción</b><div class="opc-chips" role="group" aria-label="Opciones">' + ops.map((o) => { const c = window.colorDe(o), a = CFX_FICHA.agotada(k, o);
           return '<button type="button" class="opc-ch' + (c ? ' sw' : '') + (o === op ? ' on' : '') + (a ? ' agot' : '') + '" data-f-op="' + esc(o) + '" title="' + esc(o) + '"' + (c ? ' style="--sw:' + c + '"' : '') + '>' + (c ? '<i></i><span class="sr">' + esc(o) + '</span>' : esc(o)) + '</button>'; }).join('') + '</div>' + (c0(op) ? '<small class="muted">' + esc(op) + '</small>' : '') : '') +
         (ag ? '' : '<div class="t-q"><button type="button" class="alt" data-f-n="-1" aria-label="Uno menos">−</button><b>' + n + '</b><button type="button" class="alt" data-f-n="1" aria-label="Uno más">+</button></div>') +
@@ -142,7 +154,8 @@
     };
     const c0 = (o) => o && window.colorDe(o);
     z.onclick = (e) => {
-      const b = e.target.closest('[data-f-op],[data-f-n],[data-f-add],[data-f-mas],[data-f-avisa]'); if (!b) return;
+      const b = e.target.closest('[data-f-op],[data-f-n],[data-f-add],[data-f-mas],[data-f-avisa],[data-f-comp]'); if (!b) return;
+      if (b.dataset.fComp !== undefined) return compartir(nombre, window.CFX_LINK_PRODUCTO(it.dataset.k));
       if (b.dataset.fMas !== undefined) return ficha(mas[+b.dataset.fMas], H);
       if (b.dataset.fAvisa !== undefined) { avisa.click(); return H.cerrar(); }
       if (b.dataset.fOp !== undefined) { op = b.dataset.fOp; return pintar(); }

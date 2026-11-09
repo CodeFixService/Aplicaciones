@@ -300,16 +300,27 @@
     return l > 0.62 ? '#0f172a' : '#ffffff';
   }
 
+  // F33: en modo oscuro, una marca muy oscura (negro, grafito) se aclara para que precios, links y botones se lean.
+  let ultimoColor = '';
+  const oscuro = () => { const t = document.documentElement.dataset.theme; return t === 'dark' || (t !== 'light' && !!window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); };
+  const luz = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+  const aclarar = (hex, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.substr(i, 2), 16) * (1 - k) + 255 * k).toString(16).padStart(2, '0')).join('');
   function aplicarTema(color) {
     if (!/^#[0-9a-f]{6}$/i.test(color || '')) return;
-    const r = document.documentElement.style;
-    r.setProperty('--brand', color);
-    r.setProperty('--brand-ink', tinta(color));
+    ultimoColor = color;
+    const r = document.documentElement.style, c = oscuro() && luz(color) < 0.3 ? aclarar(color, 0.45) : color;
+    r.setProperty('--brand', c);
+    r.setProperty('--brand-ink', tinta(c));
     let m = document.querySelector('meta[name=theme-color]');
     if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
     m.content = color;
   }
 
+  try {
+    const otra = () => { if (ultimoColor) aplicarTema(ultimoColor); };
+    if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', otra);
+    new MutationObserver(otra).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  } catch (e) { /* navegador antiguo */ }
   const tema = {
     colores: COLORES,
     get(uid) {
@@ -332,7 +343,7 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '5.90';
+  const APP_VERSION = '5.91';
   const DB_VERSION = '5.37'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
@@ -371,6 +382,11 @@
     'Clases y cursos': ['Clase particular (1 h)|10000|Clases', 'Pack 4 clases|36000|Packs', 'Curso mensual|40000|Cursos', 'Taller grupal|15000|Talleres', 'Preparación de prueba|12000|Clases'],
     'Otro': ['Tu producto o servicio|10000|General', 'Otro producto|5000|General', 'Servicio a domicilio|15000|Servicios']
   };
+  // F33 · Tema por rubro: color de marca sugerido (se usa si el negocio aún no eligió uno: su app y su vitrina).
+  const COLOR_RUBRO = { 'Comida y repostería': '#db2777', 'Restaurante y delivery': '#dc2626', 'Almacén y minimarket': '#16a34a', 'Ropa y accesorios': '#111827',
+    'Belleza y estética': '#7c3aed', 'Salud y deporte': '#0891b2', 'Servicios y oficios': '#2563eb', 'Tecnología': '#4f46e5', 'Artesanía y regalos': '#d97706',
+    'Mascotas': '#ea580c', 'Hogar y decoración': '#334155', 'Plantas y jardín': '#059669', 'Clases y cursos': '#2563eb' };
+  const colorRubro = (rubro) => { const r = String(rubro || '').trim(), k = r && Object.keys(COLOR_RUBRO).find((x) => x.split(' ')[0] === r.split(' ')[0]); return COLOR_RUBRO[r] || (k ? COLOR_RUBRO[k] : ''); };
   const plantilla = (rubro) => (PLANTILLAS[rubro] || PLANTILLAS.Otro).map((l) => { const [nombre, precio, categoria, ops] = l.split('|'); return { nombre, precio: Number(precio), categoria, ops: ops || '' }; });
 
   // B11 · Carga diferida: un script pesado (p. ej. el QR) se baja solo cuando se usa, una vez.
@@ -383,7 +399,7 @@
   }
 
   global.Core = {
-    RUBROS, plantilla, script,
+    RUBROS, plantilla, colorRubro, script,
     store, uid, money, precioNum, precioTxt, esc, toast, registerSW, askNotify, notify, download,
     backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };

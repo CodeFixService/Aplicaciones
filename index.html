@@ -956,6 +956,9 @@
     try {
       await Cuenta.rpc('set_desc_premium', { p_pct: dp });
       await Cuenta.rpc('set_mi_rubro', { p_rubro: $('tRubro').value });
+      // F33: sin color elegido, la app y la vitrina toman el color del rubro.
+      const cr = Core.colorRubro($('tRubro').value), yo = Cuenta.account;
+      if (cr && yo && !yo.color && !Core.tema.propio(yo.id)) { Core.tema.set(yo.id, cr); await colorTienda(cr, true); yo.color = cr; }
       if ($('tPerfil').dataset.listo) await Cuenta.rpc('set_mi_perfil', { p_perfil: CodeFixVitrina.leer($('tPerfil')) });
       await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value });
       await Cuenta.rpc('set_vacaciones', { p_hasta: $('tVac').checked ? $('tVacHasta').value : null, p_msg: $('tVacMsg').value });

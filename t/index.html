@@ -115,7 +115,7 @@
   } catch (e) { /* sin sesión */ }
   document.title = t.empresa + ' · Órbita';
   $('titulo').textContent = t.empresa;
-  if (/^#[0-9a-f]{6}$/i.test(t.color || '')) Core.tema.aplicar(t.color);
+  if (/^#[0-9a-f]{6}$/i.test(t.color || '')) Core.tema.aplicar(t.color); else if (Core.colorRubro(t.rubro)) Core.tema.aplicar(Core.colorRubro(t.rubro));
   if (/^data:image\//.test(t.logo || '')) $('lg').style.backgroundImage = 'url("' + t.logo + '")'; else {
       // Tienda sin logo: el logo de la marca (si no hay, su inicial).
       $('lg').textContent = (t.empresa || '?').charAt(0).toUpperCase();
@@ -143,7 +143,7 @@
   function pintar() {
     const q = $('buscar').value.toLowerCase();
     const l = items.filter((i) => !q || i.nombre.toLowerCase().includes(q));
-    $('grid').innerHTML = l.length ? l.map((i) => '<div class="item">' + (fotos[i.clave] ? '<img class="foto" src="' + CFX_ESC(fotos[i.clave]) + '" alt="" loading="lazy">' : '') +
+    $('grid').innerHTML = l.length ? l.map((i) => '<div class="item" data-k="' + Core.esc(i.clave) + '">' + (fotos[i.clave] ? '<img class="foto" src="' + CFX_ESC(fotos[i.clave]) + '" alt="' + Core.esc(i.nombre) + '" loading="lazy">' : i.foto_v && !sinFotos ? '<div class="foto-esq" aria-hidden="true"></div>' : '') +
       (i.categoria ? '<span class="muted" style="font-size:12px">' + Core.esc(i.categoria) + '</span>' : '') + '<b>' + Core.esc(i.nombre) + '</b>' +
       (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
       (i.opciones ? '<select data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +
@@ -155,6 +155,7 @@
       : '<p class="empty" style="grid-column:1/-1">' + (items.length ? 'Sin resultados' : 'La tienda aún no publica productos.') + '</p>';
   }
   $('buscar').oninput = pintar;
+  let sinFotos = false; // si las fotos no llegan, se quita el marco con brillo
   async function cargarFotos() {
     const con = items.filter((i) => i.foto_v);
     if (!con.length) return;
@@ -171,8 +172,13 @@
         pintar();
       } catch (e) { break; }
     }
+    if (con.some((i) => !fotos[i.clave])) { sinFotos = true; pintar(); }
   }
-  pintar(); cargarFotos();
+  // F32: link directo a un producto (?p=clave): se abre su ficha. Desde la ficha se comparte con 🔗 (el Worker arma la vista previa con su foto).
+  window.CFX_LINK_PRODUCTO = (k) => Core.rootUrl() + 't/?s=' + encodeURIComponent(slug) + '&p=' + encodeURIComponent(k);
+  const pDirecto = new URLSearchParams(location.search).get('p');
+  const abrirDirecto = () => { const b = pDirecto && [...$('grid').querySelectorAll('.item[data-k]')].find((x) => x.dataset.k === pDirecto); if (b) (b.querySelector('.foto') || b.querySelector(':scope>b')).click(); };
+  pintar(); cargarFotos().then(() => { if (pDirecto) { if (window.CFX_MENU) abrirDirecto(); else addEventListener('load', abrirDirecto); } });
   // Precio y stock de cada opción (shared/tienda.js).
   const vars = () => CFX_FICHA.cargar(t.id, Cuenta.rpc).then(() => { try { pintar(); pintarCarro(); } catch (e) { /* aún cargando */ } });
   if (window.CFX_FICHA) vars(); else addEventListener('load', vars);
