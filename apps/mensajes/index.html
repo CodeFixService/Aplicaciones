@@ -110,7 +110,10 @@
   const yo = await Cuenta.require('../../');
   Cuenta.nav('chat');
   if ((await Cuenta.modulos()).chat === false) {
-    document.querySelector('main').innerHTML = '<p class="empty">💬 El chat no está disponible por ahora.</p>';
+    // G24: si la tienda no tiene el módulo → ▶️ Probar módulo (demo + prueba gratis + Comprar). Si está apagado para todos → no disponible.
+    const main = document.querySelector('main');
+    const lock = yo.role !== 'client' && window.CFX_MODULOS_TIENDA && await CFX_MODULOS_TIENDA.candado(main, 'chat', { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1200) });
+    if (!lock) main.innerHTML = '<p class="empty">💬 El chat no está disponible por ahora.</p>';
     return;
   }
   const admin = yo.is_admin;
@@ -346,6 +349,7 @@
 <script src="../../shared/voz.js"></script>
 <script src="../../shared/respaldo.js"></script>
 <script src="../../shared/pagos.js"></script>
+<script src="../../shared/modulos.js"></script>
 <script src="../../shared/verificar.js"></script>
 <script src="../../shared/premium.js"></script>
 <script src="../../shared/ayuda.js"></script>

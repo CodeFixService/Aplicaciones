@@ -714,7 +714,7 @@
     $(id).onchange = (e) => {
       if (!e.target.checked || Cuenta.puede('campanas')) return;
       e.target.checked = false;
-      if (Cuenta.conModulos()) Core.toast('🧩 El envío automático es un módulo (📣 Campañas). Actívalo en Ajustes → 🧩 Módulos.'); else soloPro('El envío automático');
+      if (Cuenta.conModulos() && window.CFX_MODULOS_TIENDA) CFX_MODULOS_TIENDA.probar('campanas', { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1200) }); else soloPro('El envío automático');
     };
   });
 

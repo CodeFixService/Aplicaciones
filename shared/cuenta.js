@@ -432,12 +432,16 @@
     contar();
   }
   // 🧩 Módulos apagados desde el Centro de Mando (núcleo: cfx_modulos): se esconden sus botones y links (core.css → body.sin-chat).
-  let MODS = null;
+  let MODS = null, VENDE = null;
   async function modulos() {
     if (!sb) return {};
     if (!MODS) MODS = sb.rpc('cfx_modulos').then((r) => r.data || {}).catch(() => ({}));
     const m = await MODS;
-    Object.keys(m).forEach((k) => document.body.classList.toggle('sin-' + k, m[k] === false));
+    // G24: al negocio no se le esconden los módulos que puede comprar (al entrar ve ▶️ Probar módulo); solo los apagados para todos.
+    if (!VENDE) VENDE = (account && account.mods && account.role !== 'client' && Object.keys(m).some((k) => m[k] === false))
+      ? sb.rpc('cfx_modulos_tienda').then((r) => ((r.data && r.data.modulos) || []).filter((x) => x.vende && ['chat', 'cupones', 'sellos'].includes(x.clave) && !/\/catalogo\//.test(location.pathname)).map((x) => x.clave)).catch(() => []) : Promise.resolve([]);
+    const v = await VENDE;
+    Object.keys(m).forEach((k) => document.body.classList.toggle('sin-' + k, m[k] === false && !v.includes(k)));
     return m;
   }
   async function contar() {

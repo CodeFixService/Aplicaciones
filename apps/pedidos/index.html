@@ -150,7 +150,13 @@
   const puedeCup = Cuenta.puede('cupones'), puedeSt = Cuenta.puede('estadisticas');
   if (yo.mods) document.querySelectorAll('#cupLock, #stLock').forEach((c) => {
     c.querySelector('.pill').textContent = '🧩 MÓDULO';
-    const b = c.querySelector('a.btn'); b.href = '../../#modulos'; b.textContent = '🧩 Probar gratis';
+    const b = c.querySelector('a.btn'); b.href = '../../#modulos'; b.textContent = '▶️ Probar módulo'; b.classList.remove('warn');
+    // G24: abre la demo animada (con prueba gratis y Comprar); si no se vende, va a 🧩 Módulos.
+    b.onclick = async (ev) => {
+      if (!window.CFX_MODULOS_TIENDA) return;
+      ev.preventDefault();
+      if (!await CFX_MODULOS_TIENDA.probar(c.id === 'cupLock' ? 'cupones' : 'estadisticas', { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1200) })) location.href = b.href;
+    };
   });
   // Admin del equipo también ve Estadísticas (Promociones, solo el dueño).
   const verStats = dueno || yo.equipo_rol === 'admin';
@@ -471,7 +477,7 @@
     if (c) { c.classList.add('nuevo'); c.scrollIntoView({ block: 'center' }); }
   })();
   // 🧩 Promociones (cupones) se esconde si el módulo está apagado desde el Centro de Mando.
-  if ((params.get('v') === 'cupones' && (await Cuenta.modulos()).cupones !== false) || params.get('v') === 'stats') show(params.get('v'));
+  if ((params.get('v') === 'cupones' && (await Cuenta.modulos(), !document.body.classList.contains('sin-cupones'))) || params.get('v') === 'stats') show(params.get('v'));
   setInterval(() => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); }, 20000);
 })();
 </script>
@@ -483,6 +489,7 @@
 <script src="../../shared/voz.js"></script>
 <script src="../../shared/respaldo.js"></script>
 <script src="../../shared/pagos.js"></script>
+<script src="../../shared/modulos.js"></script>
 <script src="../../shared/verificar.js"></script>
 <script src="../../shared/premium.js"></script>
 <script src="../../shared/ayuda.js"></script>

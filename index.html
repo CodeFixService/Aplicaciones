@@ -70,7 +70,9 @@
   .inbox .cuerpo { display: none; color: var(--text); font-size: 15px; margin: 8px 0 0; white-space: pre-line; }
   .inbox li.abierto .cuerpo { display: block; }
   .inbox img { width: 100%; max-width: 360px; border-radius: 12px; margin-top: 8px; display: block; }
-  .precio { font-size: 30px; font-weight: 800; letter-spacing: -.02em; margin: 2px 0; }
+  .precio { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 2px 0; display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; }
+  .precio > span { white-space: nowrap; }
+  .mod-probar { margin: 4px 0 8px; }
   .precio small { font-size: 14px; font-weight: 500; color: var(--muted); }
   ul.feat { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--muted); font-size: 14px; }
   ul.feat li::before { content: '✓'; color: var(--premium); font-weight: 800; margin-right: 8px; }
@@ -609,6 +611,15 @@
     $('cTienda').classList.toggle('hidden', cliente);
     $('eTel').value = acc.telefono || '';
     $('rowSellos').classList.toggle('bloqueado', !Cuenta.puede('sellos'));
+    // G24: módulo que no tiene → botón ▶️ Probar módulo (demo animada + prueba gratis + Comprar).
+    [[$('rowSellos'), 'sellos'], [$('cEquipo'), 'equipo']].forEach(([n, k]) => {
+      const sin = dueno && acc.mods && !Cuenta.puede(k), b = n.querySelector('.mod-probar');
+      const pill = n.querySelector('.pill.pro'); if (pill) pill.textContent = acc.mods ? '🧩 MÓDULO' : 'PRO';
+      if (b) b.hidden = !sin;
+      if (!sin || b) return;
+      const nb = document.createElement('button'); nb.type = 'button'; nb.className = 'small mod-probar'; nb.textContent = '▶️ Probar módulo';
+      nb.onclick = () => probarMod(k); (n.querySelector('h2,label') || n.firstChild).after(nb);
+    });
     $('cModulos').classList.toggle('hidden', !(dueno && acc.mods));
     if (dueno && acc.mods && window.CFX_MODULOS_TIENDA) {
       // Al probar o comprar, la app se recarga para prender los botones del módulo.
@@ -624,6 +635,7 @@
   }
 
   const cliente = (acc) => acc.role === 'client';
+  const probarMod = (k) => window.CFX_MODULOS_TIENDA && CFX_MODULOS_TIENDA.probar(k, { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1200) });
   function pintarPro(acc) {
     if (!acc) return;
     const cliente = acc.role === 'client';
@@ -639,7 +651,8 @@
     const plan = premium && premium.planes && premium.planes[cliente ? 'cliente_pro' : 'negocio_pro'];
     $('proPrecio').classList.toggle('hidden', !pr.mensual);
     const $$ = (n) => '$' + Number(n).toLocaleString('es-CL');
-    if (pr.mensual) $('proPrecio').innerHTML = $$(pr.mensual) + ' <small>al mes</small>' + (pr.anual ? ' · ' + $$(pr.anual) + ' <small>al año</small>' : '');
+    // Cada precio entero en su línea si no cabe (no se corta "al año").
+    if (pr.mensual) $('proPrecio').innerHTML = '<span>' + $$(pr.mensual) + ' <small>al mes</small></span>' + (pr.anual ? '<span>' + $$(pr.anual) + ' <small>al año</small></span>' : '');
     $('proFeat').innerHTML = (cliente
       ? [
          '⭐ El descuento Premium que da tu tienda en cada pedido', '⭐ Tus pedidos aparecen primero en la fila de la tienda',
@@ -815,6 +828,7 @@
   // 📣 Vender por WhatsApp (Pro): comparte la tienda con su foto y las ofertas en 1 toque.
   $('hoyVender').onclick = async () => {
     const b = $('hoyVender');
+    if (Cuenta.conModulos() && !Cuenta.puede('redes')) return probarMod('redes');
     if (!Cuenta.isPro()) { Core.toast('⭐ Vender por WhatsApp con foto y ofertas es de la versión Pro'); location.hash = 'plan'; return; }
     b.disabled = true;
     try {
