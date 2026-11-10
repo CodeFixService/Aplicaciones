@@ -23,6 +23,8 @@
   .seg { flex-wrap: nowrap; overflow: hidden; } /* los 3 botones siempre dentro del recuadro */
   .seg button { flex: 1 1 0; min-width: 0; padding: 10px 4px; gap: 5px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 99px; background: transparent; color: var(--muted); box-shadow: none; }
   .seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  /* 320 px: sin ícono para que "Productos" quepa entero. */
+  @media (max-width: 350px) { .seg button { font-size: 13.5px; } .seg button svg, .seg button img, .seg button .cfx-ic { display: none; } }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   .item { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .item .foto { width: calc(100% + 28px); max-width: none; margin: -14px -14px 4px; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius) var(--radius) 0 0; background: var(--field); }

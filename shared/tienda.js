@@ -22,7 +22,8 @@
     transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;animation:tItem .45s cubic-bezier(.2,.8,.2,1) both}
   #grid .item>:not(.foto):not(.fav):not(.cinta):not(.acc){margin-left:12px;margin-right:12px}
   #grid .item .acc{padding:4px 12px 0;display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
-  #grid .item .acc .btn,#grid .item .acc button{flex:1 1 100%;white-space:nowrap;min-height:40px;border-radius:12px}
+  #grid .item .acc .btn,#grid .item .acc button{flex:1 1 100%;white-space:nowrap;min-height:40px;border-radius:12px;min-width:0;padding-left:8px;padding-right:8px}
+  @media(max-width:360px){#grid.v2 .item .acc .ic-e,#grid.v2 .item .acc svg{display:none}#grid.v2 .item .acc .btn,#grid.v2 .item .acc button{font-size:14px}}
   #grid .item:hover{transform:translateY(-3px);box-shadow:0 2px 4px rgba(15,10,40,.06),0 14px 30px -12px color-mix(in srgb,${B} 60%,transparent)}
   #grid .item:active{transform:scale(.985)}
   #grid .item:nth-child(2){animation-delay:.04s}#grid .item:nth-child(3){animation-delay:.08s}#grid .item:nth-child(4){animation-delay:.12s}#grid .item:nth-child(n+5){animation-delay:.16s}

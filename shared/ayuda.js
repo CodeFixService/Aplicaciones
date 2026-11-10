@@ -150,7 +150,7 @@
     '.cfx-hm-c{display:flex;flex-direction:column;max-height:92dvh;border-radius:24px 24px 0 0;background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);box-shadow:0 -12px 40px rgba(0,0,0,.28);animation:cfxSube .22s cubic-bezier(.2,.8,.2,1) both;touch-action:pan-y}' +
     '.cfx-hm-cab{position:relative;display:flex;align-items:center;gap:10px;padding:18px 16px 12px;border-bottom:1px solid var(--cfx-borde,#e2e7ec);cursor:grab;flex:none}' +
     '.cfx-hm-tir{position:absolute;left:50%;top:7px;translate:-50% 0;width:42px;height:5px;border-radius:3px;background:var(--cfx-borde,#d6dbe3)}' +
-    '.cfx-hm-cab h2{flex:1;min-width:0;margin:0;font:800 18px/1.25 var(--cfx-letra,system-ui,sans-serif);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.cfx-hm-cab h2{flex:1;min-width:0;margin:0;font:800 18px/1.25 var(--cfx-letra,system-ui,sans-serif);white-space:normal;overflow-wrap:anywhere}' +
     '.cfx-hm-x{flex:none;width:40px!important;height:40px!important;min-height:0!important;padding:0!important;margin:0!important;display:grid!important;place-items:center;border-radius:12px!important;border:1.5px solid var(--cfx-borde,#e2e7ec)!important;background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;cursor:pointer}' +
     '.cfx-hm-zona{overflow:auto;overscroll-behavior:contain;padding:16px 16px calc(28px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}.cfx-hm-zona>.card:first-child,.cfx-hm-zona>.tarjeta:first-child{margin-top:0}' +
     '@media (min-width:700px){.cfx-hoja-m{align-items:center}.cfx-hm-c{border-radius:24px;max-height:86vh}}' +
@@ -1125,7 +1125,7 @@
       if (x.classList.contains('cfx-desliza')) return marcarTira(x);
       if (x.childElementCount < 2 || x.scrollWidth <= x.clientWidth + 4 || !x.clientWidth || x.closest('.cfx-barra, .cfx-cab, header, dialog')) return;
       const hijos = [...x.children], botones = hijos.filter((h) => /^(BUTTON|A)$/.test(h.tagName) || h.classList.contains('chip'));
-      if (botones.length < hijos.length * 0.7 || getComputedStyle(x).display.indexOf('flex') < 0) return;
+      if (botones.length < hijos.length * 0.7 || getComputedStyle(x).display.indexOf('flex') < 0 || getComputedStyle(x).flexWrap === 'wrap') return; // una fila que baja de línea no es tira (p. ej. Agregar / Preguntar en la vitrina)
       x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x);
     });
   }

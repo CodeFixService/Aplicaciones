@@ -177,6 +177,9 @@ nav.cfx-barra > .cfx-mas .cfx-ico svg { width: 28px !important; height: 28px !im
 /* Los textos siempre caben en su cuadro (palabras largas, correos y links se cortan bien) */
 .card, .tarjeta, .item, .cfx-grilla > *, .kpi, .stats > *, dialog, .modal-caja, .sheet, .hoja { overflow-wrap: anywhere; min-width: 0; }
 h1, h2, h3 { overflow-wrap: anywhere; }
+/* Botones: nunca partir una palabra a la mitad ("Efectiv-o"); en celular angosto, menos relleno para que quepa. */
+button, .btn, .chip, .pill { overflow-wrap: normal; word-break: normal; }
+@media (max-width: 360px) { .card button, .card .btn, .tarjeta button { padding-left: 10px; padding-right: 10px; gap: 4px; } }
 .cfx-grilla > button, .cfx-grilla > a { text-wrap: balance; }
 /* Tarjetas de menú (Ajustes / Más): el ícono en su cuadro con brillo de la marca */
 .cfx-aj > button > span:first-child { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; font-size: 22px !important;

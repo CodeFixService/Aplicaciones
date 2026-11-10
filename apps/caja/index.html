@@ -42,6 +42,8 @@
   .qty b { min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
   .pago { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
   .pago button { padding: 10px 4px; font-size: 13px; }
+  /* Celular angosto (320 px): ícono arriba del texto en los medios de pago y precio en su propia fila (placeholders enteros). */
+  @media (max-width: 360px) { .pago button { flex-direction: column; gap: 2px; padding: 8px 2px; } .fila-precio { flex-wrap: wrap; } .fila-precio > :first-child { flex-basis: 100%; } }
   .pago button:not(.on) { background: var(--brand-soft); color: var(--brand); box-shadow: none; }
   #bCobrar { width: 100%; padding: 16px; font-size: 18px; margin-top: 12px; }
   .vuelto { font-size: 14px; color: var(--muted); margin-top: 6px; }
@@ -146,7 +148,7 @@
     <div class="card">
       <h2 id="formTitulo">Nuevo producto</h2>
       <label for="p-nombre">Nombre</label><input id="p-nombre" maxlength="60">
-      <div class="row">
+      <div class="row fila-precio">
         <div><label for="p-precio">Precio</label><input id="p-precio" inputmode="decimal"></div>
         <div><label for="p-costo">Costo</label><input id="p-costo" inputmode="decimal" placeholder="opcional"></div>
         <div><label for="p-stock">Stock</label><input id="p-stock" inputmode="numeric" placeholder="opcional"></div>
