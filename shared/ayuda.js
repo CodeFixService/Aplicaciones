@@ -1381,7 +1381,7 @@
       if (b.closest('.cfx-barra, nav.tabs, .cfx-pnl, .prods, .cfx-mh-grid') || b.classList.contains('cfx-mas') || !b.offsetParent) return;
       const t = (b.textContent || '').trim(); if (!SOLO_IC.test(t) || (!t && !b.querySelector('svg, img, .ico-svg'))) return;
       const w = b.offsetWidth, h = b.offsetHeight; if (!w || w > 56 || Math.abs(w - h) > 6) return;
-      b.classList.add('cfx-redondo');
+      b.style.setProperty('--cfx-r', Math.max(w, h) + 'px'); b.classList.add('cfx-redondo'); // tamaño fijo: sin relleno no queda óvalo
     });
   }
   const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { separarBotones(); tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); archivos(); letraMinima(); redondos(); }, 120); };

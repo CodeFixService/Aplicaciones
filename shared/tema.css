@@ -304,7 +304,8 @@ nav.tabs.sub.cfx-desliza, main > .cfx-desliza, .view > .cfx-desliza, main > sect
 main > .cfx-desliza, .view > .cfx-desliza, main > section > .cfx-desliza { margin-left: calc(-1 * var(--cfx-orilla)) !important; margin-right: calc(-1 * var(--cfx-orilla)) !important; }
 @media (max-width: 360px) { main { padding-left: var(--cfx-orilla) !important; padding-right: var(--cfx-orilla) !important; } }
 /* Íconos solos (sin palabras): botón redondo (ayuda.js marca .cfx-redondo). */
-.cfx-redondo { border-radius: 50% !important; aspect-ratio: 1; padding: 0 !important; display: inline-grid !important; place-items: center; }
+.cfx-redondo { border-radius: 50% !important; padding: 0 !important; display: inline-grid !important; place-items: center;
+  width: var(--cfx-r, 40px) !important; height: var(--cfx-r, 40px) !important; min-width: 0 !important; min-height: 0 !important; flex: none !important; align-self: center; }
 /* Texto corto en el botón y la explicación abajo, sola y chica. */
 .cfx-nota-btn { display: block; margin: 6px 2px 0; font-size: 12.5px; line-height: 1.35; color: var(--cfx-texto-2, var(--muted, #5b6472)); }
 .cfx-nota-btn + button, .cfx-nota-btn + .btns { margin-top: 6px; }
