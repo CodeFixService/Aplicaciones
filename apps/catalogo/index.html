@@ -257,6 +257,7 @@
   pintarEstado();
   function pintarVitrina() {
     if (!tienda.empresa) return;
+    tienda.politicas = true; // 📄 cambios, retracto y garantía (Ley 19.496)
     CodeFixVitrina.montar($('perfil'), tienda);
     // Compartir: el link público de la tienda (este catálogo pide cuenta).
     const b = $('perfil').querySelector('[data-pf="compartir"]');
@@ -632,6 +633,9 @@
       (p.estado === 'pagando' ? '<p class="aviso">⏳ Tu pedido está apartado <b>' + quedan(p.retenido_hasta) + ' min</b>. Paga <b>' + precio(p.total) + '</b>' +
         (links[p.id] && links[p.id].mp ? ' con Mercado Pago y se confirma solo' + (links[p.id].url ? ', o con el link y sube la foto del comprobante.' : '.') : ' con el link de la tienda y sube la foto del comprobante.') + '</p>' : '') +
       (p.estado === 'rechazado' && p.motivo ? '<p class="muted" style="margin:6px 0 0">❌ ' + Core.esc(p.motivo) + '</p>' : '') +
+      (p.envio && p.envio.por_pagar ? '<p class="muted" style="margin:6px 0 0">📦 Envío por pagar: lo pagas al recibir.</p>' : '') +
+      (p.envio && (p.envio.codigo || p.envio.link) ? '<p class="muted" style="margin:6px 0 0">📍 ' + Core.esc(p.envio.nombre) + (p.envio.codigo ? ' · código <b>' + Core.esc(p.envio.codigo) + '</b>' : '') +
+        (p.envio.link ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.envio.link)) + '">Seguir mi envío</a>' : '') + '</p>' : '') +
       (p.estado === 'en_revision' ? '<p class="muted" style="margin:6px 0 0">🧾 La tienda está revisando tu comprobante.</p>' : '') +
       (p.devolucion === 'pendiente' ? '<p class="muted" style="margin:6px 0 0">💸 La tienda te devolverá el pago.</p>' : '') +
       (p.boleta && p.boleta.folio ? '<p class="muted" style="margin:6px 0 0">🧾 Boleta electrónica N° ' + Core.esc(p.boleta.folio) + (p.boleta.razon ? ' · ' + Core.esc(p.boleta.razon) + ' (' + Core.esc(p.boleta.rut || '') + ')' : '') +

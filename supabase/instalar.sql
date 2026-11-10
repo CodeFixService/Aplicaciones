@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.40'::text $$;
+language sql immutable as $$ select '5.41'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5423,6 +5423,12 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.41 · Lanzamiento (núcleo 2.58): 📄 políticas de la tienda (Ley 19.496), 📦 despacho al resto de Chile (precio fijo o por pagar),
+--  🚚 código de seguimiento por pedido (Starken, Chilexpress, Blue Express, Correos), ✉️ correo al comprador en cada estado,
+--  📊 medir anuncios (Meta Pixel + Google Analytics) y 🌐 dominio propio (módulos). El código va al final (después del núcleo).
+-- =====================================================================
 
 -- =====================================================================
 --  VERSIÓN 5.40 · G20 🏪 Negocios desde el Centro de Mando (núcleo cfx_negocios / cfx_premium_cuenta / cfx_key_aplicar).
@@ -7306,6 +7312,8 @@ language sql immutable as $$
          ('campanas', '📣 Campañas automáticas', 'Ofertas por notificación y correo a tus suscriptores.'),
          ('redes', '📲 Vender en redes', 'Pedir por WhatsApp, catálogo para Google e Instagram.'),
          ('webhooks', '🔗 Avisos a tu sistema', 'Cada pedido llega firmado a tu sistema o planilla (webhooks).'),
+         ('medicion', '📊 Medir anuncios', 'Meta Pixel y Google Analytics en tu tienda: mide qué anuncio te trae ventas.'),
+         ('dominio', '🌐 Dominio propio', 'Tu tienda en tu dirección (mitienda.cl) en vez del link de Órbita.'),
          ('reservas', '📅 Reservas', 'Agenda en línea para tus clientes.'),
          ('recordatorios', '⏰ Recordatorios', 'Avisos automáticos antes de cada cita o vencimiento.')
 $$;
@@ -8021,7 +8029,7 @@ revoke all on function public.cfx_desc_guardar(text, int, date), public.cfx_desc
 grant execute on function public.cfx_desc_guardar(text, int, date), public.cfx_desc_borrar(uuid), public.cfx_desc_lista(), public.cfx_desc_validar(uuid, text),
   public.cfx_sellos_guardar(int, text), public.cfx_sellos_mios(uuid) to authenticated;
 -- ---------- 🛒 Carrito y 🚚 despacho (C17) ----------
--- Carrito guardado en la nube (para recordarle al cliente lo que dejó) y el cálculo del despacho por comuna.
+-- Carrito guardado en la nube (para recordarle al cliente lo que dejó) y el cálculo del despacho por comuna y al resto de Chile (2.58).
 -- Ganchos que pone cada app que lo usa (y 'carrito' en cfx_modulos_app() para el recordatorio):
 --   cfx_carrito_puede(u, negocio) bool           ¿u puede guardar carrito en ese negocio? (es su cliente, puede comprar)
 --   cfx_carrito_aviso(cliente, negocio, n) bool  manda el recordatorio (push); false = no corresponde (plan, vacaciones…)
@@ -8090,7 +8098,7 @@ language sql immutable set search_path = '' as $$ select lower(trim(translate(co
 
 create or replace function public.cfx_despacho_limpio(p jsonb) returns jsonb
 language plpgsql immutable set search_path = '' as $$
-declare z jsonb; l jsonb := '[]'::jsonb; vistas text[] := '{}';
+declare z jsonb; l jsonb := '[]'::jsonb; vistas text[] := '{}'; rm text;
 begin
   if jsonb_typeof(p) is distinct from 'object' then raise exception 'Datos no válidos'; end if;
   for z in select * from jsonb_array_elements(case when jsonb_typeof(p -> 'zonas') = 'array' then p -> 'zonas' else '[]'::jsonb end) loop
@@ -8102,22 +8110,34 @@ begin
     l := l || jsonb_build_object('comuna', trim(z ->> 'comuna'), 'precio', round((z ->> 'precio')::numeric));
   end loop;
   if jsonb_array_length(l) > 80 then raise exception 'Máximo 80 comunas'; end if;
-  if not coalesce((p ->> 'retiro')::boolean, true) and jsonb_array_length(l) = 0 then raise exception 'Activa el retiro en tienda o agrega al menos una comuna de despacho'; end if;
+  -- Resto de Chile (regiones y comunas que no están en la lista): 'no' | 'fijo' (un precio) | 'por_pagar' (lo paga quien recibe al courier).
+  rm := coalesce(nullif(p #>> '{resto,modo}', ''), 'no');
+  if rm not in ('no', 'fijo', 'por_pagar') then raise exception 'Elige cómo despachas al resto de Chile'; end if;
+  if rm = 'fijo' and coalesce((p #>> '{resto,precio}')::numeric, -1) not between 0 and 200000 then raise exception 'El despacho al resto de Chile debe costar entre $0 y $200.000'; end if;
+  if not coalesce((p ->> 'retiro')::boolean, true) and jsonb_array_length(l) = 0 and rm = 'no' then raise exception 'Activa el retiro en tienda o agrega al menos una comuna de despacho'; end if;
   if coalesce((p ->> 'gratis_desde')::numeric, 0) not between 0 and 10000000 then raise exception 'Monto de despacho gratis no válido'; end if;
-  return jsonb_build_object('retiro', coalesce((p ->> 'retiro')::boolean, true), 'gratis_desde', round(coalesce((p ->> 'gratis_desde')::numeric, 0)), 'zonas', l);
+  return jsonb_build_object('retiro', coalesce((p ->> 'retiro')::boolean, true), 'gratis_desde', round(coalesce((p ->> 'gratis_desde')::numeric, 0)), 'zonas', l,
+    'resto', jsonb_build_object('modo', rm, 'precio', case when rm = 'fijo' then round((p #>> '{resto,precio}')::numeric) else 0 end));
 end $$;
 
--- La comuna va al final de la dirección ("…, Ñuñoa"). Sin zonas: se coordina con el negocio ($0 aquí).
+-- La comuna va al final de la dirección ("…, Ñuñoa"). Sin zonas ni resto de Chile: se coordina con el negocio ($0 aquí).
+-- Comuna fuera de la lista: con resto 'fijo' cobra ese precio; con 'por_pagar' $0 y por_pagar = true (lo paga quien recibe).
 create or replace function public.cfx_despacho_costo(p_cfg jsonb, p_entrega text, p_direccion text, p_monto numeric) returns jsonb
 language plpgsql immutable set search_path = '' as $$
-declare c jsonb := coalesce(p_cfg, '{}'::jsonb); com text; z jsonb;
+declare c jsonb := coalesce(p_cfg, '{}'::jsonb); com text; z jsonb; rm text := coalesce(nullif(p_cfg #>> '{resto,modo}', ''), 'no'); orig text;
+  gratis boolean := coalesce((p_cfg ->> 'gratis_desde')::numeric, 0) > 0 and p_monto >= (p_cfg ->> 'gratis_desde')::numeric;
 begin
-  if p_entrega is distinct from 'despacho' or jsonb_array_length(coalesce(c -> 'zonas', '[]'::jsonb)) = 0 then return jsonb_build_object('costo', 0, 'comuna', null); end if;
-  com := public.cfx_comuna_norm(regexp_replace(coalesce(p_direccion, ''), '^.*,', ''));
-  select e into z from jsonb_array_elements(c -> 'zonas') e where public.cfx_comuna_norm(e ->> 'comuna') = com limit 1;
-  if z is null then return jsonb_build_object('error', 'Esta tienda no despacha a esa comuna. Elige otra comuna o retiro en tienda.'); end if;
-  return jsonb_build_object('comuna', z ->> 'comuna', 'costo',
-    case when coalesce((c ->> 'gratis_desde')::numeric, 0) > 0 and p_monto >= (c ->> 'gratis_desde')::numeric then 0 else greatest(0, coalesce((z ->> 'precio')::numeric, 0)) end);
+  if p_entrega is distinct from 'despacho' or (jsonb_array_length(coalesce(c -> 'zonas', '[]'::jsonb)) = 0 and rm = 'no') then return jsonb_build_object('costo', 0, 'comuna', null); end if;
+  orig := left(trim(regexp_replace(coalesce(p_direccion, ''), '^.*,', '')), 60);
+  com := public.cfx_comuna_norm(orig);
+  select e into z from jsonb_array_elements(coalesce(c -> 'zonas', '[]'::jsonb)) e where public.cfx_comuna_norm(e ->> 'comuna') = com limit 1;
+  if z is null then
+    if com = '' or position(',' in coalesce(p_direccion, '')) = 0 then return jsonb_build_object('error', 'Escribe la dirección y la comuna de despacho'); end if;
+    if rm = 'fijo' then return jsonb_build_object('comuna', orig, 'costo', case when gratis then 0 else greatest(0, coalesce((c #>> '{resto,precio}')::numeric, 0)) end); end if;
+    if rm = 'por_pagar' then return jsonb_build_object('comuna', orig, 'costo', 0, 'por_pagar', true); end if;
+    return jsonb_build_object('error', 'Esta tienda no despacha a esa comuna. Elige otra comuna o retiro en tienda.');
+  end if;
+  return jsonb_build_object('comuna', z ->> 'comuna', 'costo', case when gratis then 0 else greatest(0, coalesce((z ->> 'precio')::numeric, 0)) end);
 end $$;
 
 revoke all on function public.cfx_carrito_vaciar(uuid, uuid), public.cfx_carrito_borrar(uuid), public.cfx_carritos_recordar(), public.cfx_comuna_norm(text),
@@ -8677,3 +8697,368 @@ exception when others then
 end $$;
 
 select cron.schedule('reporte-semanal', '7 12 * * 1', $$ select public.reporte_semanal(); $$);
+
+-- ---------- VERSIÓN 5.41 · Lanzamiento: 📄 políticas, 📦 despacho a todo Chile, 🚚 seguimiento, ✉️ correo al comprador, 📊 medir anuncios y 🌐 dominio propio (se puede volver a correr) ----------
+alter table public.pedidos add column if not exists invitado_correo text;
+alter table public.pedidos add column if not exists envio_courier text;
+alter table public.pedidos add column if not exists envio_codigo text;
+alter table public.pedidos add column if not exists envio_link text;
+alter table public.pedidos add column if not exists envio_por_pagar boolean not null default false;
+alter table public.profiles add column if not exists medicion jsonb not null default '{}'::jsonb;
+alter table public.profiles add column if not exists dominio text;
+create unique index if not exists profiles_dominio_idx on public.profiles (dominio) where dominio is not null;
+alter table public.notifications add column if not exists email_directo text;
+alter table public.notifications add column if not exists nombre_directo text;
+alter table public.notifications drop constraint if exists notifications_audience_check;
+alter table public.notifications add constraint notifications_audience_check
+  check (audience in ('all_users', 'all_businesses', 'pro_users', 'free_users', 'all_clients', 'my_subscribers', 'self', 'direct', 'correo'));
+
+-- ✉️ 'correo' = un correo a una persona (comprador sin cuenta o cliente): no sale en ninguna bandeja; la Edge Function "enviar" lo manda igual que los demás.
+create or replace function public.notification_targets(p_id uuid)
+returns table (endpoint text, p256dh text, auth text, email text, nombre text)
+language plpgsql stable security definer set search_path = '' as $$
+declare n public.notifications;
+begin
+  select * into n from public.notifications where id = p_id;
+  if n.audience = 'correo' then
+    return query select null::text, null::text, null::text, n.email_directo, n.nombre_directo where coalesce(n.email_directo, '') <> '';
+  elsif n.audience = 'my_subscribers' then
+    return query
+      select s.endpoint, s.p256dh, s.auth, s.email, s.nombre
+        from public.subscribers s where s.negocio_id = n.owner_id and not coalesce(n.solo_premium, false)
+      union all
+      select ps.endpoint, ps.p256dh, ps.auth, null::text, c.empresa
+        from public.profiles c join public.push_subscriptions ps on ps.user_id = c.id
+        where c.negocio_id = n.owner_id and c.role = 'client' and not c.suspended and not c.mute_offers
+          and (not coalesce(n.solo_premium, false) or public.is_pro(c.id))
+      union all
+      select null, null, null, c.email, c.empresa from public.profiles c
+        where c.negocio_id = n.owner_id and c.role = 'client' and not c.suspended and not c.mute_offers
+          and (not coalesce(n.solo_premium, false) or public.is_pro(c.id));
+  elsif n.audience = 'direct' then
+    return query select ps.endpoint, ps.p256dh, ps.auth, null::text, null::text
+      from public.push_subscriptions ps where ps.user_id = n.target_id;
+  elsif n.audience = 'self' then
+    return query
+      select ps.endpoint, ps.p256dh, ps.auth, null::text, null::text
+        from public.push_subscriptions ps where ps.user_id = n.owner_id
+      union all
+      select null, null, null, p.email, p.empresa from public.profiles p where p.id = n.owner_id;
+  else
+    return query
+      with users as (
+        select p.id, p.email, p.empresa from public.profiles p
+        where not p.suspended and p.role <> 'admin'
+          and (n.audience = 'all_users'
+               or (n.audience = 'all_businesses' and p.role = 'user')
+               or (n.audience = 'pro_users' and p.role = 'user' and public.is_pro(p.id))
+               or (n.audience = 'free_users' and p.role = 'user' and not public.is_pro(p.id))
+               or (n.audience = 'all_clients' and p.role = 'client'))
+      )
+      select ps.endpoint, ps.p256dh, ps.auth, null::text, u.empresa
+        from users u join public.push_subscriptions ps on ps.user_id = u.id
+      union all
+      select null, null, null, u.email, u.empresa from users u;
+  end if;
+end $$;
+revoke all on function public.notification_targets(uuid) from public, anon, authenticated;
+
+-- 🚚 Link del courier para seguir el envío (o el link que pegó la tienda).
+create or replace function public.envio_link(p_courier text, p_codigo text, p_link text) returns text
+language sql immutable set search_path = '' as $$
+  select case when coalesce(p_codigo, '') = '' and coalesce(p_link, '') = '' then null
+    when coalesce(p_link, '') <> '' then p_link
+    when p_courier = 'starken' then 'https://www.starken.cl/seguimiento?codigo=' || p_codigo
+    when p_courier = 'chilexpress' then 'https://centrodeayuda.chilexpress.cl/seguimiento/' || p_codigo
+    when p_courier = 'blue' then 'https://www.blue.cl/seguimiento/?n_seguimiento=' || p_codigo
+    when p_courier = 'correos' then 'https://www.correos.cl/web/guest/seguimiento-en-linea?codigos=' || p_codigo end
+$$;
+create or replace function public.envio_de(x public.pedidos) returns jsonb
+language sql stable set search_path = '' as $$
+  select case when x.envio_codigo is not null or x.envio_link is not null or x.envio_por_pagar then jsonb_build_object(
+    'courier', x.envio_courier, 'nombre', case x.envio_courier when 'starken' then 'Starken' when 'chilexpress' then 'Chilexpress' when 'blue' then 'Blue Express'
+      when 'correos' then 'Correos de Chile' when 'propio' then 'Reparto de la tienda' else 'Courier' end,
+    'codigo', x.envio_codigo, 'link', public.envio_link(x.envio_courier, x.envio_codigo, x.envio_link), 'por_pagar', x.envio_por_pagar) end
+$$;
+
+-- La tienda (o su equipo con Pedidos) anota el courier y el código. Si el pedido estaba preparándose o listo, pasa a "en camino" (avisa al cliente).
+create or replace function public.pedido_seguimiento(p_id uuid, p_courier text, p_codigo text, p_link text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; c text := lower(coalesce(nullif(trim(p_courier), ''), 'otro')); k text := nullif(upper(regexp_replace(coalesce(p_codigo, ''), '\s', '', 'g')), '');
+  l text := nullif(trim(coalesce(p_link, '')), ''); t text;
+begin
+  if not public.equipo_puede('pedidos') then raise exception 'Sin permiso'; end if;
+  select * into x from public.pedidos where id = p_id and negocio_id = public.negocio_de(auth.uid());
+  if x.id is null then raise exception 'Pedido no encontrado'; end if;
+  if x.entrega <> 'despacho' then raise exception 'Este pedido es con retiro en tienda'; end if;
+  if x.estado in ('cancelado', 'rechazado', 'expirado', 'pagando', 'en_revision') then raise exception 'Este pedido no está para enviar'; end if;
+  if c not in ('starken', 'chilexpress', 'blue', 'correos', 'propio', 'otro') then raise exception 'Courier no válido'; end if;
+  if k is not null and k !~ '^[A-Z0-9-]{4,40}$' then raise exception 'El código de seguimiento lleva solo letras, números y guiones (4 a 40)'; end if;
+  if l is not null and (l !~* '^https://[^\s<>"'']+$' or length(l) > 300) then raise exception 'El link debe empezar con https://'; end if;
+  if k is null and l is null and c <> 'propio' then raise exception 'Escribe el código de seguimiento'; end if;
+  update public.pedidos set envio_courier = c, envio_codigo = k, envio_link = l, updated_at = now() where id = x.id returning * into x;
+  if x.estado in ('recibido', 'preparando', 'listo') then
+    perform public.actualizar_pedido(x.id, 'en_camino');
+  else
+    select coalesce(nullif(empresa, ''), 'Tu tienda') into t from public.profiles where id = x.negocio_id;
+    perform public.aviso_cliente(x, '🚚 Sigue tu envío', t || ' · ' || coalesce((public.envio_de(x)) ->> 'nombre', '') || coalesce(' · ' || k, ''));
+  end if;
+  return public.envio_de((select p from public.pedidos p where p.id = x.id));
+end $$;
+revoke all on function public.envio_link(text, text, text), public.envio_de(public.pedidos) from public, anon, authenticated;
+revoke all on function public.pedido_seguimiento(uuid, text, text, text) from public, anon;
+grant execute on function public.pedido_seguimiento(uuid, text, text, text) to authenticated;
+
+-- 📦 Envío "por pagar": queda anotado en el pedido (la tienda lo ve y el cliente también).
+create or replace function public.pedido_por_pagar() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  begin
+    if new.entrega = 'despacho' and coalesce(new.costo_despacho, 0) = 0 then
+      new.envio_por_pagar := coalesce((public.cfx_despacho_costo((select despacho from public.profiles where id = new.negocio_id), new.entrega, new.direccion, new.subtotal) ->> 'por_pagar')::boolean, false);
+    end if;
+  exception when others then null;
+  end;
+  return new;
+end $$;
+revoke all on function public.pedido_por_pagar() from public, anon, authenticated;
+drop trigger if exists pedido_por_pagar on public.pedidos;
+create trigger pedido_por_pagar before insert on public.pedidos for each row execute function public.pedido_por_pagar();
+
+-- ✉️ Correo al comprador: al hacer el pedido y en cada cambio de estado (solo si el correo de la app está configurado). Nunca rompe el pedido.
+create or replace function public.pedido_correo() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare dest text; nom text; t public.profiles; tit text; cab text; res text; url text; env jsonb; resumen boolean := false;
+begin
+  begin
+    if not exists (select 1 from public.app_secrets where name = 'gmail_user' and coalesce(value, '') <> '') then return null; end if;
+    dest := coalesce(new.invitado_correo, (select c.email from public.profiles c where c.id = new.cliente_id and c.role = 'client'));
+    if coalesce(dest, '') = '' then return null; end if;
+    if tg_op = 'INSERT' then resumen := new.estado in ('pagando', 'recibido');
+    elsif new.invitado_correo is distinct from old.invitado_correo then resumen := true;
+    elsif new.envio_codigo is distinct from old.envio_codigo or new.envio_link is distinct from old.envio_link then
+      if not (old.estado = 'en_camino' and new.estado = 'en_camino') then return null; end if;
+    elsif new.estado is not distinct from old.estado then return null;
+    end if;
+    select * into t from public.profiles where id = new.negocio_id;
+    nom := coalesce(nullif(t.empresa, ''), 'La tienda');
+    env := public.envio_de(new);
+    tit := case when resumen and new.estado = 'pagando' then '🛒 Tu pedido en ' || nom || ' está apartado'
+      when resumen then '📦 ' || nom || ' recibió tu pedido'
+      else case new.estado when 'recibido' then '📦 ' || nom || ' recibió tu pedido' when 'preparando' then '👨‍🍳 ' || nom || ' está preparando tu pedido'
+        when 'listo' then '✅ Tu pedido está listo para retirar' when 'en_camino' then '🚚 Tu pedido va en camino'
+        when 'entregado' then '🎉 Pedido entregado. ¡Gracias por tu compra!' when 'cancelado' then '❌ Tu pedido fue cancelado'
+        when 'rechazado' then '❌ No pudimos confirmar tu pago' end end;
+    if tit is null then return null; end if;
+    cab := case when resumen and new.estado = 'pagando' then 'Paga antes de las ' || to_char(new.retenido_hasta at time zone 'America/Santiago', 'HH24:MI') || ' para confirmarlo.'
+      when new.estado = 'entregado' then 'Cuéntanos cómo te fue: califica tu compra en el link.'
+      when new.estado = 'rechazado' then coalesce('Motivo: ' || nullif(new.motivo, ''), 'Escríbele a la tienda para resolverlo.')
+      else '' end;
+    if env is not null and new.estado = 'en_camino' then
+      cab := trim(cab || E'\n' || (env ->> 'nombre') || coalesce(' · código ' || (env ->> 'codigo'), '') || coalesce(E'\nSigue tu envío: ' || (env ->> 'link'), ''));
+    end if;
+    if coalesce((env ->> 'por_pagar')::boolean, false) then cab := trim(cab || E'\n📦 Envío por pagar: lo pagas al recibir.'); end if;
+    res := (select string_agg((l ->> 'cant') || ' × ' || (l ->> 'nombre') || coalesce(' (' || nullif(l ->> 'opcion', '') || ')', ''), E'\n')
+            from (select l from jsonb_array_elements(new.lineas) l limit 8) z);
+    url := coalesce((select value from public.app_settings where key = 'app_url'), 'https://aplicaciones.juanjosuecastilloloyola.workers.dev/');
+    url := regexp_replace(url, '/?$', '/') || 'r/?t=' || new.token;
+    insert into public.notifications (owner_id, audience, channels, title, body, url, send_at, email_directo, nombre_directo)
+    values (new.negocio_id, 'correo', '{email}', left(tit, 80),
+      left(trim(cab || E'\n\n' || coalesce(res, '') || E'\nTotal: $' || to_char(new.total, 'FM999G999G999') || E'\n' ||
+        case when new.entrega = 'despacho' then '🚚 Despacho a ' || coalesce(new.direccion, '') else '🏪 Retiro en tienda' end), 1200),
+      url, now(), dest, coalesce(new.invitado_nombre, (select c.empresa from public.profiles c where c.id = new.cliente_id)));
+  exception when others then null;
+  end;
+  return null;
+end $$;
+revoke all on function public.pedido_correo() from public, anon, authenticated;
+drop trigger if exists pedido_correo on public.pedidos;
+create trigger pedido_correo after insert or update of estado, invitado_correo, envio_codigo, envio_link on public.pedidos for each row execute function public.pedido_correo();
+
+-- El comprador sin cuenta deja su correo después de pedir (con el enlace secreto del pedido). Una sola vez por pedido.
+create or replace function public.pedido_correo_guardar(p_ref text, p_correo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; c text := lower(trim(coalesce(p_correo, '')));
+begin
+  if length(coalesce(p_ref, '')) <> 24 then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
+  select * into x from public.pedidos where token = p_ref;
+  if x.id is null or x.cliente_id is not null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
+  if c !~ '^[^@\s<>"]+@[^@\s<>"]+\.[a-z]{2,}$' or length(c) > 120 then return jsonb_build_object('ok', false, 'error', 'Correo no válido'); end if;
+  if x.invitado_correo is not null then return jsonb_build_object('ok', true); end if;
+  update public.pedidos set invitado_correo = c where id = x.id;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function public.pedido_correo_guardar(text, text) from public;
+grant execute on function public.pedido_correo_guardar(text, text) to anon, authenticated;
+
+-- El pedido con su envío (cliente, comprador sin cuenta y tienda).
+create or replace function public.ver_pedido(p_ref text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref); t public.profiles;
+begin
+  if x.id is null then return null; end if;
+  select * into t from public.profiles where id = x.negocio_id;
+  return jsonb_build_object('id', x.id, 'token', x.token, 'estado', x.estado, 'lineas', x.lineas, 'subtotal', x.subtotal, 'descuento', x.descuento,
+    'desc_premium', x.desc_premium, 'total', x.total, 'entrega', x.entrega, 'direccion', x.direccion, 'nota', x.nota, 'fecha', x.created_at,
+    'retenido_hasta', x.retenido_hasta, 'rechazos', x.rechazos,
+    'tiene_comprobante', x.comprobante is not null, 'devolucion', x.devolucion, 'motivo', x.motivo, 'nombre', x.invitado_nombre,
+    'tienda', jsonb_build_object('nombre', t.empresa, 'slug', t.slug, 'logo', t.logo, 'color', t.color, 'telefono', t.telefono, 'datos_pago', t.datos_pago),
+    'link', case when x.estado = 'pagando' then public.link_activo(x.negocio_id, 'pedido') end,
+    'cancel_min', public.regla('cancel_min', 10),
+    'calificado', public.cfx_calif_hecha(x.id::text, false),
+    'boleta', case when x.boleta_folio is not null then public.boleta_de(x) end,
+    'envio', public.envio_de(x), 'con_correo', x.cliente_id is not null or x.invitado_correo is not null);
+end $$;
+
+drop function if exists public.mis_pedidos(uuid);
+create or replace function public.mis_pedidos(p_negocio uuid default null)
+returns table (id uuid, negocio text, lineas jsonb, subtotal numeric, descuento numeric, total numeric, cupon text,
+               entrega text, direccion text, nota text, estado text, fecha timestamptz, actualizado timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, calificado boolean, token text,
+               desc_premium numeric, motivo text, rechazos int, boleta jsonb, envio jsonb)
+language sql stable security definer set search_path = '' as $$
+  select x.id, t.empresa, x.lineas, x.subtotal, x.descuento, x.total, x.cupon,
+         x.entrega, x.direccion, x.nota, x.estado, x.created_at, x.updated_at, x.retenido_hasta, x.comprobante is not null, x.devolucion,
+         public.cfx_calif_hecha(x.id::text, false), x.token, x.desc_premium, x.motivo, x.rechazos,
+         case when x.boleta_folio is not null then public.boleta_de(x) end, public.envio_de(x)
+  from public.pedidos x join public.profiles t on t.id = x.negocio_id
+  where x.cliente_id = auth.uid() and (p_negocio is null or x.negocio_id = p_negocio)
+  order by x.created_at desc limit 50
+$$;
+revoke all on function public.mis_pedidos(uuid) from public, anon;
+grant execute on function public.mis_pedidos(uuid) to authenticated;
+
+drop function if exists public.pedidos_tienda(text);
+create or replace function public.pedidos_tienda(p_estado text default null)
+returns table (id uuid, cliente_id uuid, cliente text, telefono text, lineas jsonb, subtotal numeric, descuento numeric,
+               total numeric, cupon text, entrega text, direccion text, nota text, estado text, fecha timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, invitado boolean, calificado boolean, cliente_estrellas numeric,
+               premium boolean, desc_premium numeric, rechazos int, motivo text, boleta jsonb, medio text, envio jsonb)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.cliente_id, coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1), x.invitado_nombre, 'Cliente'),
+         coalesce(c.telefono, x.invitado_tel), x.lineas, x.subtotal, x.descuento, x.total, x.cupon, x.entrega, x.direccion, x.nota, x.estado,
+         x.created_at, x.retenido_hasta, x.comprobante is not null, x.devolucion, x.cliente_id is null,
+         public.cfx_calif_hecha(x.id::text, true),
+         (public.cfx_calif_cliente(x.cliente_id, case when x.cliente_id is null then x.invitado_tel end) ->> 'promedio')::numeric,
+         pr.premium, x.desc_premium, x.rechazos, x.motivo, public.boleta_de(x),
+         case when x.mp_pago is not null then 'mercadopago' when x.comprobante_at is not null then 'transferencia' end, public.envio_de(x)
+  from public.pedidos x left join public.profiles c on c.id = x.cliente_id
+  cross join lateral (select c.role = 'client' and public.is_pro(c.id) as premium) pr
+  where x.negocio_id = public.negocio_de(auth.uid())
+    and (p_estado is null or (p_estado = 'activos' and x.estado in ('recibido', 'preparando', 'listo', 'en_camino'))
+         or (p_estado = 'revisar' and x.estado = 'en_revision') or (p_estado = 'pagando' and x.estado = 'pagando')
+         or (p_estado = 'devolver' and x.devolucion = 'pendiente')
+         or (p_estado = 'historial' and x.estado in ('entregado', 'cancelado', 'rechazado', 'expirado')) or x.estado = p_estado)
+  order by (coalesce(pr.premium, false) and x.estado in ('pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino')) desc, x.created_at desc
+  limit 300
+$$;
+revoke all on function public.pedidos_tienda(text) from public, anon;
+grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- 📄 Perfil con las políticas de la tienda (Ley 19.496): vendedor, RUT, cambios y devoluciones, envíos y si excluye el retracto.
+create or replace function public.set_mi_perfil(p_perfil jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r jsonb := '{}'::jsonb; k text; v text;
+  lim constant jsonb := '{"descripcion":400,"direccion":150,"comuna":60,"instagram":100,"facebook":100,"tiktok":100,"web":150,"correo":120,"razon":120,"rut":12,"cambios":800,"envios":400,"sin_retracto":1}';
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  for k in select jsonb_object_keys(lim) loop
+    v := nullif(trim(regexp_replace(coalesce(p_perfil ->> k, ''), '[<>]', '', 'g')), '');
+    if v is null then continue; end if;
+    if k = 'rut' then v := public.rut_normal(v); if v is null then raise exception 'RUT no válido'; end if; end if;
+    if k = 'sin_retracto' then v := '1'; end if;
+    v := left(v, (lim ->> k)::int);
+    if k = 'web' and v !~* '^https?://' then v := 'https://' || v; end if;
+    if k = 'correo' and v !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'Correo no válido'; end if;
+    r := r || jsonb_build_object(k, v);
+  end loop;
+  update public.profiles set perfil = r where id = auth.uid();
+  return r;
+end $$;
+revoke all on function public.set_mi_perfil(jsonb) from public, anon;
+grant execute on function public.set_mi_perfil(jsonb) to authenticated;
+
+-- 📊 Medir anuncios (Meta Pixel y Google Analytics 4) y 🌐 dominio propio: módulos (sin venta de módulos: Pro).
+create or replace function public.mi_marca_web() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare p public.profiles;
+begin
+  select * into p from public.profiles where id = public.webhook_dueno();
+  return jsonb_build_object('slug', p.slug, 'meta', p.medicion ->> 'meta', 'ga', p.medicion ->> 'ga', 'dominio', p.dominio,
+    'medicion', public.pro_o_modulo(p.id, 'medicion'), 'con_dominio', public.pro_o_modulo(p.id, 'dominio'), 'modulos', public.mis_modulos(p.id) is not null);
+end $$;
+create or replace function public.medicion_guardar(p_meta text, p_ga text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := public.webhook_dueno(); m text := nullif(regexp_replace(coalesce(p_meta, ''), '\s', '', 'g'), ''); g text := nullif(upper(trim(coalesce(p_ga, ''))), '');
+begin
+  if not public.pro_o_modulo(me, 'medicion') then raise exception '📊 Medir anuncios es % ', case when public.mis_modulos(me) is not null then 'un módulo: actívalo en Ajustes → 🧩 Módulos' else 'de la versión Pro' end; end if;
+  if m is not null and m !~ '^[0-9]{8,20}$' then raise exception 'El ID del Pixel de Meta son solo números (8 a 20)'; end if;
+  if g is not null and g !~ '^G-[A-Z0-9]{4,15}$' then raise exception 'El ID de Google Analytics empieza con G- (ej: G-AB12CD34EF)'; end if;
+  update public.profiles set medicion = jsonb_strip_nulls(jsonb_build_object('meta', m, 'ga', g)) where id = me;
+  return public.mi_marca_web();
+end $$;
+create or replace function public.dominio_guardar(p_dominio text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := public.webhook_dueno(); d text := nullif(lower(trim(regexp_replace(coalesce(p_dominio, ''), '^https?://|/.*$', '', 'gi'))), ''); antes text;
+begin
+  if not public.pro_o_modulo(me, 'dominio') then raise exception '🌐 Dominio propio es % ', case when public.mis_modulos(me) is not null then 'un módulo: actívalo en Ajustes → 🧩 Módulos' else 'de la versión Pro' end; end if;
+  if d is not null and (d !~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$' or length(d) > 80 or d ~ '(workers\.dev|supabase\.|pages\.dev|codefix)') then
+    raise exception 'Escribe solo el dominio, ej: mitienda.cl';
+  end if;
+  if d is not null and exists (select 1 from public.profiles where dominio = d and id <> me) then raise exception 'Ese dominio ya lo usa otra tienda'; end if;
+  select dominio into antes from public.profiles where id = me;
+  update public.profiles set dominio = d where id = me;
+  if d is not null and d is distinct from antes then
+    perform public.cfx_al_cm('🌐 Dominio nuevo: ' || d, 'Tienda ' || coalesce((select slug from public.profiles where id = me), '') ||
+      '. Agrégalo en Cloudflare → Workers → aplicaciones → Settings → Domains & Routes → Add → Custom domain.');
+  end if;
+  return public.mi_marca_web();
+end $$;
+-- El Worker pregunta de qué tienda es un dominio (solo dominios con el módulo vigente).
+create or replace function public.tienda_por_dominio(p_host text) returns text
+language sql stable security definer set search_path = '' as $$
+  select p.slug from public.profiles p
+  where p.dominio = lower(regexp_replace(trim(coalesce(p_host, '')), '^www\.', '')) and p.role = 'user' and not p.suspended and public.pro_o_modulo(p.id, 'dominio')
+$$;
+revoke all on function public.mi_marca_web(), public.medicion_guardar(text, text), public.dominio_guardar(text) from public, anon;
+grant execute on function public.mi_marca_web(), public.medicion_guardar(text, text), public.dominio_guardar(text) to authenticated;
+revoke all on function public.tienda_por_dominio(text) from public;
+grant execute on function public.tienda_por_dominio(text) to anon, authenticated;
+
+-- La vitrina pública con la medición (solo si la tienda tiene el módulo) y las políticas (vienen en perfil).
+create or replace function public.tienda_publica(p_slug text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', t.id, 'empresa', t.empresa, 'slug', t.slug, 'telefono', t.telefono, 'horario', t.horario, 'abierto', t.abierto,
+    'logo', t.logo, 'color', t.color, 'datos_pago', t.datos_pago,
+    'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
+    'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
+    'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'retencion_min', public.regla('retencion_min', 30), 'pro', public.is_pro(t.id), 'desc_premium', t.desc_premium, 'despacho', t.despacho,
+    'perfil', t.perfil, 'rubro', t.rubro, 'desde', t.created_at::date,
+    'medicion', case when t.medicion <> '{}'::jsonb and public.pro_o_modulo(t.id, 'medicion') then t.medicion end)
+  from public.profiles t where t.slug = lower(trim(coalesce(p_slug, ''))) and t.role = 'user' and not t.suspended
+$$;
+
+-- Módulos de Órbita (+ 📊 medir anuncios y 🌐 dominio propio).
+create or replace function public.cfx_modulos_app() returns text[]
+language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio'] $$;
+revoke all on function public.cfx_modulos_app() from public, anon, authenticated;
+
+-- Guía para partir: + 📄 políticas de la tienda; el despacho cuenta también el resto de Chile.
+create or replace function public.cfx_guia_app() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select jsonb_build_array(
+    jsonb_build_object('k', 'perfil', 't', 'Nombre y logo de tu tienda', 'd', 'Así te ven tus clientes en el catálogo.', 'ir', '#ajustes', 'ok', p.empresa <> '' and p.logo is not null),
+    jsonb_build_object('k', 'whatsapp', 't', 'Tu WhatsApp', 'd', 'Para recibir y coordinar pedidos.', 'ir', '#ajustes', 'ok', coalesce(p.telefono, '') <> ''),
+    jsonb_build_object('k', 'productos', 't', 'Tus productos', 'd', 'Sube al menos un producto con foto y precio.', 'ir', 'apps/caja/',
+      'ok', exists (select 1 from public.catalog_items i where i.owner_id = p.id)),
+    jsonb_build_object('k', 'cobro', 't', 'Cómo te pagan los pedidos', 'd', 'Tu link de pago o tus datos de transferencia. Los pedidos se pagan completos.', 'ir', '#links',
+      'ok', coalesce(p.datos_pago, '') <> '' or exists (select 1 from public.links_pago l where l.owner_id = p.id and l.tipo = 'pedido' and l.activo and l.url <> '')),
+    jsonb_build_object('k', 'despacho', 't', 'Despacho o retiro', 'd', 'Retiro en tienda, precio por comuna y envío al resto de Chile.', 'ir', '#despacho',
+      'ok', coalesce((p.despacho ->> 'retiro')::boolean, false) or jsonb_array_length(coalesce(p.despacho -> 'zonas', '[]'::jsonb)) > 0
+        or coalesce(p.despacho #>> '{resto,modo}', 'no') <> 'no'),
+    jsonb_build_object('k', 'politicas', 't', 'Políticas de la tienda', 'd', 'Quién vende (RUT) y tu política de cambios: la ley las pide en la venta por internet.', 'ir', '#ajustes',
+      'ok', coalesce(p.perfil ->> 'rut', '') <> '' and coalesce(p.perfil ->> 'cambios', '') <> ''))
+  from public.profiles p where p.id = auth.uid()), '[]'::jsonb)
+$$;
+revoke all on function public.cfx_guia_app() from public, anon, authenticated;

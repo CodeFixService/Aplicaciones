@@ -67,6 +67,7 @@
         <div class="row" style="justify-content:space-between;font-size:20px;font-weight:800;margin:10px 0"><span>Total</span><span id="total">$0</span></div>
         <label for="nom">Tu nombre</label><input id="nom" maxlength="60" autocomplete="name">
         <label for="tel">Tu WhatsApp (con código de país)</label><input id="tel" inputmode="tel" placeholder="56912345678" autocomplete="tel">
+        <label for="mail">Tu correo (opcional)</label><input id="mail" type="email" maxlength="120" autocomplete="email" placeholder="para el comprobante y el seguimiento">
         <label>¿Cómo lo recibes?</label>
         <div class="entrega" id="entrega"><button class="on" data-e="retiro" type="button">🏪 Retiro</button><button data-e="despacho" type="button">🚚 Despacho</button></div>
         <div id="rowDir" class="hidden"><p class="muted" style="font-size:13px">⚠️ El despacho tiene un costo según la distancia; la tienda te lo confirma.</p>
@@ -74,6 +75,7 @@
         <label for="nota">Nota (opcional)</label><textarea id="nota" maxlength="200"></textarea>
         <p class="muted" id="pagoTip" style="font-size:13px"></p>
         <div class="btns"><button id="bPedir" style="flex:1">📨 Enviar pedido</button></div>
+        <p class="muted" style="font-size:12.5px;margin:8px 0 0">Al enviar aceptas las <a href="#politicas" id="lPol">políticas de la tienda</a> (cambios, retracto y garantía).</p>
       </div>
     </section>
     <div class="card hidden" id="cAvisos" style="margin-top:16px"><h2>🔔 Recibe las ofertas</h2>
@@ -132,7 +134,11 @@
   const tel = String(t.telefono || '').replace(/\D/g, '');
   if (tel.length >= 8) window.CFX_WA_PRODUCTO = (k, nombre, pre, op) => 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Hola 👋 Me interesa ' + nombre + (op ? ' (' + op + ')' : '') +
     (pre ? ' · ' + pre : '') + ' de ' + t.empresa + '. ¿Está disponible?\n' + window.CFX_LINK_PRODUCTO(k));
+  t.politicas = true; // 📄 cambios, retracto y garantía (Ley 19.496)
   const pf = () => CodeFixVitrina.montar($('perfil'), t);
+  $('lPol').onclick = (e) => { const d = document.getElementById('politicas'); if (!d) return; e.preventDefault(); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  // 📊 Medir anuncios (módulo): el Worker carga Meta Pixel / Google Analytics; aquí solo se marcan los eventos de compra.
+  const medir = (ev, d) => { try { if (window.fbq) fbq('track', ev, d); if (window.gtag) gtag('event', ({ AddToCart: 'add_to_cart', InitiateCheckout: 'begin_checkout' })[ev] || ev, d); } catch (e) { /* sin medición */ } };
   if (window.CodeFixVitrina) pf(); else addEventListener('load', pf);
   $('pagoTip').textContent = t.cobra_online ? '💳 Al enviar, tu pedido queda apartado ' + t.retencion_min + ' min para que pagues con el link de la tienda y subas el comprobante.'
     : 'La tienda te contactará por WhatsApp para coordinar el pago.';
@@ -231,6 +237,7 @@
     const l = carro.find((c) => c.clave === x.clave && (c.opcion || null) === (x.opcion || null));
     if (l) l.cant++; else carro.push(Object.assign({ cant: 1 }, x));
     pintarCarro(); Core.toast('🛒 Agregado');
+    const it = itemDe(x); if (it) medir('AddToCart', { content_ids: [x.clave], content_type: 'product', value: Number(it.precio) || 0, currency: 'CLP' });
   }
   $('grid').onclick = (e) => {
     const b = e.target.closest('[data-add]');
@@ -255,17 +262,21 @@
     $('rowDir').classList.toggle('hidden', entrega !== 'despacho');
   };
   Despacho.montar({ cfg: t.despacho, monto: () => lineas().reduce((a, x) => a + (Number(x.i.precio) || 0) * (Number(x.l.cant) || 0), 0) });
-  $('nom').value = mem.get('nom', ''); $('tel').value = mem.get('tel', '');
+  $('nom').value = mem.get('nom', ''); $('tel').value = mem.get('tel', ''); $('mail').value = mem.get('mail', '');
   $('bPedir').onclick = async () => {
     if (!lineas().length) return Core.toast('Tu pedido está vacío');
     let dirFinal = $('dir').value;
+    const correo = $('mail').value.trim();
+    if (correo && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(correo)) { $('mail').focus(); return Core.toast('✉️ Revisa tu correo (o déjalo vacío)'); }
     if (entrega === 'despacho') { try { dirFinal = Despacho.direccion($('dir').value); } catch (e) { return Core.toast(e.message); } }
     $('bPedir').disabled = true;
     try {
       const r = await Cuenta.rpc('crear_pedido_invitado', { p_slug: slug, p_nombre: $('nom').value, p_tel: $('tel').value,
         p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant, opcion: l.opcion || null })), p_entrega: entrega, p_direccion: dirFinal, p_nota: $('nota').value });
       if (!r.ok) throw new Error(r.error);
-      mem.set('nom', $('nom').value); mem.set('tel', $('tel').value);
+      mem.set('nom', $('nom').value); mem.set('tel', $('tel').value); mem.set('mail', correo);
+      if (correo) { try { await Cuenta.rpc('pedido_correo_guardar', { p_ref: r.token, p_correo: correo }); } catch (e) { /* el pedido ya quedó */ } }
+      medir('InitiateCheckout', { value: Number(r.total) || 0, currency: 'CLP' });
       tokens.push({ t: r.token, f: Date.now(), total: r.total }); mem.set('tokens', tokens.slice(-20));
       carro = []; mem.set('carro', []);
       Cuenta.sb.functions.invoke('enviar').catch(() => {});

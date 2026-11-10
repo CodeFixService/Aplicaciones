@@ -235,7 +235,7 @@
       <textarea id="tPago" maxlength="400" placeholder="Banco · Tipo de cuenta · N° de cuenta · RUT · Nombre · Correo"></textarea>
       <label for="tHorario">Horario de atención</label>
       <input id="tHorario" maxlength="120" placeholder="Lun a Vie 9:00 a 19:00 · Sáb 10:00 a 14:00">
-      <details id="dPerfil"><summary style="cursor:pointer;font-weight:700;margin:12px 0 4px">📇 Perfil de tu tienda (descripción, dirección y redes)</summary>
+      <details id="dPerfil"><summary style="cursor:pointer;font-weight:700;margin:12px 0 4px">📇 Perfil y políticas de tu tienda</summary>
         <p class="muted" style="font-size:13px;margin:4px 0">Se luce arriba en tu página de tienda.</p><div id="tPerfil"></div></details>
       <label class="terms"><input type="checkbox" id="tAbierto" checked> <span>Tienda abierta ahora (si la desmarcas, tus clientes ven "Cerrado: te responderemos al abrir")</span></label>
       <label class="terms"><input type="checkbox" id="tVac"> <span>🌴 <b>Modo vacaciones</b>: tus clientes ven el aviso y no pueden enviar pedidos hasta tu regreso (se apaga solo)</span></label>
@@ -596,7 +596,7 @@
         dueno && { k: 'links', ico: '💳', t: 'Links de pago', grupo: 'Tu tienda', nodo: $('cLinks') },
         dueno && { k: 'despacho', ico: '🚚', t: 'Despacho', grupo: 'Tu tienda', nodo: $('cDespacho') },
         dueno && { k: 'boleta', ico: '🧾', t: 'Boleta SII', d: 'Boleta electrónica de tus pedidos', grupo: 'Tu tienda', nodo: $('cBoleta') },
-        dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp Business, Google, Instagram y avisos a tu sistema', grupo: 'Tu tienda', nodo: $('cRedes') },
+        dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp, Google, Instagram, medir anuncios y dominio propio', grupo: 'Tu tienda', nodo: $('cRedes') },
         dueno && { k: 'equipo', ico: '🧑‍🍳', t: 'Mi equipo', dato: Cuenta.puede('equipo') ? '' : acc.mods ? '🧩' : 'PRO', grupo: 'Tu tienda', nodo: $('cEquipo') },
         dueno && acc.mods && { k: 'modulos', ico: '🧩', t: 'Módulos', d: 'Chat, cupones, estadísticas y más', grupo: 'Tu plan', nodo: $('cModulos') },
         !equipo && { k: 'premium', ico: '⭐', t: 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
@@ -882,7 +882,7 @@
       (b.conectado ? ' <b>' + (of ? '✅ Automática' + (b.auto ? '' : ' (al tocar 🧾 en Pedidos)') + (b.fin ? ' · key …' + Core.esc(b.fin) : '') : '✅ Manual') + '</b>' : '') + '</p>' +
       '<div class="row" style="flex-wrap:wrap;gap:6px">' +
       '<label class="terms"><input type="radio" name="bModo" value="manual"' + (of ? '' : ' checked') + '> <span><b>Manual</b>: la emites gratis en sii.cl y anotas el folio</span></label>' +
-      '<label class="terms"><input type="radio" name="bModo" value="openfactura"' + (of ? ' checked' : '') + '> <span><b>Automática</b> con OpenFactura</span></label></div>' +
+      '<label class="terms"><input type="radio" name="bModo" value="openfactura"' + (of ? ' checked' : '') + '> <span><b>Automática</b> con OpenFactura <span class="pill">beta</span></span></label></div>' +
       campo('bRut', 'RUT de la empresa', 'rut', '76.123.456-7', 12) + campo('bRazon', 'Razón social', 'razon', 'Mi Tienda SpA', 100) +
       campo('bGiro', 'Giro', 'giro', 'Venta al por menor de vestuario', 80) + campo('bDir', 'Dirección', 'direccion', 'Av. Siempre Viva 123', 70) +
       campo('bComuna', 'Comuna', 'comuna', 'Santiago', 20) +
@@ -905,9 +905,31 @@
   };
   /* ---------- 📲 G35-G37: vender en WhatsApp Business, Google e Instagram + 🔌 avisos a otro sistema (webhooks, Pro) ---------- */
   let redes = null;
+  let web = null; // 📊 medir anuncios y 🌐 dominio propio (módulos)
   async function cargarRedes() {
-    try { redes = await Cuenta.rpc('conexiones_estado'); } catch (e) { $('redesBody').innerHTML = '<p class="muted">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    try { [redes, web] = await Promise.all([Cuenta.rpc('conexiones_estado'), Cuenta.rpc('mi_marca_web').catch(() => null)]); } catch (e) { $('redesBody').innerHTML = '<p class="muted">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
     pintarRedes();
+  }
+  function pintarWeb() {
+    const w = web, e = Core.esc;
+    if (!w) return '';
+    const bloq = (k, txt) => '<p class="muted">' + txt + '</p><div class="btns"><button type="button" class="small" data-rd-ir="' + (w.modulos ? 'modulos' : 'premium') + '">' + (w.modulos ? '🧩 Ver módulo' : '⭐ Ver Pro') + '</button></div>';
+    const pill = (ok) => ok ? '' : ' <span class="pill pro">' + (w.modulos ? '🧩' : 'PRO') + '</span>';
+    let h = '<h3>📊 Medir anuncios' + pill(w.medicion) + '</h3>';
+    h += !w.medicion ? bloq('medicion', 'Conecta Meta Pixel (Facebook e Instagram) y Google Analytics: sabrás qué anuncio te trae ventas y podrás volver a mostrarles tus productos a quienes visitaron tu tienda.')
+      : '<p class="muted" style="margin:0 0 6px">Pega los ID y tu tienda empieza a medir visitas, productos agregados y pedidos.</p>' +
+        '<label for="mdMeta">ID del Pixel de Meta</label><input id="mdMeta" inputmode="numeric" maxlength="20" placeholder="Ej: 1234567890123456" value="' + e(w.meta || '') + '">' +
+        '<p class="cfx-nota-btn">business.facebook.com → Administrador de eventos → Orígenes de datos → tu píxel → ID.</p>' +
+        '<label for="mdGa">ID de Google Analytics 4</label><input id="mdGa" maxlength="20" placeholder="G-AB12CD34EF" value="' + e(w.ga || '') + '">' +
+        '<p class="cfx-nota-btn">analytics.google.com → Administrar → Flujos de datos → Web → ID de medición.</p>' +
+        '<div class="btns"><button type="button" class="small" data-rd="medir">Guardar</button></div>';
+    h += '<h3>🌐 Dominio propio' + pill(w.con_dominio) + '</h3>';
+    h += !w.con_dominio ? bloq('dominio', 'Tu tienda en tu propia dirección (mitienda.cl) en vez del link de Órbita: más confianza y más ventas.')
+      : '<p class="muted" style="margin:0 0 6px">' + (w.dominio ? '✅ <b>' + e(w.dominio) + '</b> abre tu tienda cuando CodeFix lo conecta (te avisamos por el chat).' : 'Escribe tu dominio y CodeFix lo conecta por ti.') + '</p>' +
+        '<label for="mdDom">Tu dominio</label><input id="mdDom" inputmode="url" maxlength="80" placeholder="mitienda.cl" value="' + e(w.dominio || '') + '">' +
+        '<p class="cfx-nota-btn">¿No tienes? Cómpralo en nic.cl (.cl) o en Cloudflare. Luego escríbenos por el chat de soporte.</p>' +
+        '<div class="btns"><button type="button" class="small" data-rd="dominio">Guardar</button>' + (w.dominio ? '<button type="button" class="small alt" data-rd="sin-dominio">Quitar</button>' : '') + '</div>';
+    return h;
   }
   function pintarRedes() {
     const r = redes, e = Core.esc, tienda = Core.rootUrl() + 't/?s=' + encodeURIComponent(r.slug), tel = String(r.telefono || '').replace(/\D/g, '');
@@ -942,7 +964,7 @@
           e(x.evento === 'ping' ? 'Prueba' : x.evento === 'pedido.creado' ? 'Pedido nuevo' : 'Pedido: ' + (x.pedido_estado || '')) + '</span><small class="muted">' +
           e(new Date(x.fecha).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })) + (x.status ? ' · ' + x.status : '') + (x.estado === 'pendiente' && x.intentos ? ' · reintento ' + x.intentos : '') + '</small></li>').join('') + '</ul>' : '');
     }
-    $('redesBody').innerHTML = h;
+    $('redesBody').innerHTML = h + pintarWeb();
   }
   $('redesBody').onclick = async (ev) => {
     const c = ev.target.closest('[data-rd-copiar]'), ir = ev.target.closest('[data-rd-ir]'), b = ev.target.closest('[data-rd]');
@@ -950,6 +972,16 @@
     if (ir) { ev.preventDefault(); return MENU_O && MENU_O.abrir(ir.dataset.rdIr); }
     if (!b) return;
     const a = b.dataset.rd;
+    if (a === 'medir' || a === 'dominio' || a === 'sin-dominio') {
+      b.disabled = true;
+      try {
+        web = a === 'medir' ? await Cuenta.rpc('medicion_guardar', { p_meta: $('mdMeta').value, p_ga: $('mdGa').value })
+          : await Cuenta.rpc('dominio_guardar', { p_dominio: a === 'dominio' ? $('mdDom').value : null });
+        Core.toast(a === 'medir' ? '📊 Medición guardada' : a === 'dominio' ? '🌐 Dominio guardado: CodeFix lo conecta y te avisa' : 'Dominio quitado');
+        pintarRedes();
+      } catch (err) { Core.toast(err.message); b.disabled = false; }
+      return;
+    }
     if (a === 'quitar' && !confirm('¿Quitar los avisos a tu sistema? Dejarán de llegar los pedidos a esa URL.')) return;
     if (a === 'secreto' && !confirm('¿Crear un secreto nuevo? El anterior deja de servir al tiro: cámbialo también en tu sistema.')) return;
     b.disabled = true;
@@ -1034,7 +1066,7 @@
       $('rowVac').classList.toggle('hidden', !t.vacaciones_hasta);
       $('tDescPrem').value = t.desc_premium ? t.desc_premium : '';
       $('tRubro').value = t.rubro || '';
-      CodeFixVitrina.editor($('tPerfil'), t.perfil); $('tPerfil').dataset.listo = '1';
+      CodeFixVitrina.editor($('tPerfil'), t.perfil, { politicas: true }); $('tPerfil').dataset.listo = '1';
     } catch (e) { /* sin red */ }
   }
   $('tRubro').innerHTML += Core.RUBROS.map(([i, n]) => '<option value="' + Core.esc(n) + '">' + i + ' ' + Core.esc(n) + '</option>').join('');

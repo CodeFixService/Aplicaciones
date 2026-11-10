@@ -7,6 +7,8 @@
 // /t/og y /t/feed quedan en la caché de Cloudflare (caches.default): miles de lecturas no llegan a Supabase.
 // WhatsApp y los buscadores no corren JavaScript: por eso las etiquetas se ponen aquí, antes de mandar la página.
 // Si Supabase no responde en 1,5 s, se manda la página tal cual (nunca queda más lenta ni rota).
+// · 📊 Medir anuncios (módulo): si la tienda tiene Meta Pixel / Google Analytics, se agregan aquí y la CSP de ESA página permite solo esos 2 dominios.
+// · 🌐 Dominio propio (módulo): mitienda.cl/ → /t/?s=tienda (el dominio se agrega a mano en Cloudflare → Workers → Domains & Routes).
 let CFG = null; // { url, key } leídos de shared/config.js (una vez por isolate)
 const MEM = new Map(); // caché corta en memoria: clave → { t, v }
 const MS = 120000;
@@ -129,6 +131,28 @@ async function conCache(req, ctx, hacer) {
   return r;
 }
 
+// 📊 Meta Pixel y Google Analytics 4. Los ID se revisan otra vez aquí (solo números / G-XXXX): nada del usuario entra al script sin validar.
+const CSP = "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://challenges.cloudflare.com https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net";
+export function medicion(m, producto) {
+  const meta = m && /^[0-9]{8,20}$/.test(m.meta || '') ? m.meta : null, ga = m && /^G-[A-Z0-9]{4,15}$/.test(m.ga || '') ? m.ga : null;
+  if (!meta && !ga) return null;
+  const p = producto ? JSON.stringify(String(producto).slice(0, 120)).replace(/</g, '\\u003c') : null;
+  let h = '', dom = [];
+  if (meta) {
+    dom.push('https://connect.facebook.net');
+    h += "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;" +
+      "n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}" +
+      "(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','" + meta + "');fbq('track','PageView');" +
+      (p ? "fbq('track','ViewContent',{content_ids:[" + p + "],content_type:'product'});" : '') + '</script>';
+  }
+  if (ga) {
+    dom.push('https://www.googletagmanager.com');
+    h += '<script async src="https://www.googletagmanager.com/gtag/js?id=' + ga + '"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}' +
+      "gtag('js',new Date());gtag('config','" + ga + "');" + (p ? "gtag('event','view_item',{items:[{item_id:" + p + '}]});' : '') + '</script>';
+  }
+  return { head: h, csp: CSP.replace("script-src 'self'", "script-src 'self' " + dom.join(' ')) };
+}
+
 async function pagina(req, url, env) {
   const base = await env.ASSETS.fetch(req);
   const s = limpio(url.searchParams.get('s')), p = String(url.searchParams.get('p') || '').slice(0, 120);
@@ -136,8 +160,10 @@ async function pagina(req, url, env) {
   try {
     const [t, items] = await Promise.all([rpc(env, url, 'tienda_publica', { p_slug: s }), rpc(env, url, 'catalogo_publico', { p_slug: s }).catch(() => [])]);
     if (!t || !t.slug) return base;
-    const html = armar(await base.clone().text(), etiquetas(url.origin, t, items, p));
+    let html = armar(await base.clone().text(), etiquetas(url.origin, t, items, p));
     const h = new Headers(base.headers); h.delete('content-length'); h.delete('etag');
+    const m = medicion(t.medicion, p);
+    if (m) { html = html.replace('</head>', m.head + '</head>'); h.set('Content-Security-Policy', m.csp); h.set('Cache-Control', 'no-cache'); }
     return new Response(html, { status: 200, headers: h });
   } catch (e) { return base; }
 }
@@ -161,9 +187,21 @@ async function imagen(url, env) {
   return [new Response(img.bytes, { headers: { 'Content-Type': img.tipo, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' } }), true];
 }
 
+// 🌐 Dominio propio: la raíz del dominio de la tienda lleva a su vitrina. Cualquier otro host (workers.dev, pruebas) sigue igual.
+async function dominio(req, url, env) {
+  const host = url.hostname.toLowerCase();
+  if (req.method !== 'GET' || /(^|\.)workers\.dev$|^localhost$|^127\.|^\[/.test(host)) return null;
+  try {
+    const slug = await rpc(env, url, 'tienda_por_dominio', { p_host: host });
+    if (typeof slug !== 'string' || !/^[a-z0-9-]{2,60}$/.test(slug)) return null;
+    return Response.redirect(url.origin + '/t/?s=' + encodeURIComponent(slug), 302);
+  } catch (e) { return null; }
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    if (url.pathname === '/') { const r = await dominio(req, url, env); if (r) return r; }
     if (url.pathname === '/t/og') return conCache(req, ctx, () => imagen(url, env));
     if (url.pathname === '/t/feed') return conCache(req, ctx, () => catalogo(url, env));
     if (url.pathname === '/t/' || url.pathname === '/t/index.html') return pagina(req, url, env);

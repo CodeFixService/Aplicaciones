@@ -226,7 +226,9 @@
         (p.descuento - (p.desc_premium || 0) > 0 ? '<div class="muted">Cupón ' + Core.esc(p.cupon || '') + ': −' + precio(p.descuento - (p.desc_premium || 0)) + '</div>' : '') +
         (p.desc_premium > 0 ? '<div class="muted">⭐ Descuento Premium: −' + precio(p.desc_premium) + '</div>' : '') +
         '<div class="total">Total ' + precio(p.total) + '</div>' +
-        '<div class="muted">' + (p.entrega === 'despacho' ? '🚚 Despacho a ' + Core.esc(p.direccion || '') + ' (cobrar despacho según distancia)' : '🏪 Retiro en tienda') + '</div>' +
+        '<div class="muted">' + (p.entrega === 'despacho' ? '🚚 Despacho a ' + Core.esc(p.direccion || '') + (p.envio && p.envio.por_pagar ? ' · <b>📦 envío por pagar</b> (lo paga el cliente al courier)' : '') : '🏪 Retiro en tienda') + '</div>' +
+        (p.envio && (p.envio.codigo || p.envio.link) ? '<div class="muted">📍 ' + Core.esc(p.envio.nombre) + (p.envio.codigo ? ' · ' + Core.esc(p.envio.codigo) : '') +
+          (p.envio.link ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.envio.link)) + '">Seguir</a>' : '') + '</div>' : '') +
         (p.nota ? '<div class="muted">📝 ' + Core.esc(p.nota) + '</div>' : '') +
         (p.rechazos > 0 && ['pagando', 'en_revision'].includes(p.estado) ? '<div class="aviso">🔁 Comprobante rechazado ' + p.rechazos + (p.rechazos === 1 ? ' vez' : ' veces') +
           (p.estado === 'pagando' && p.motivo ? ' (' + Core.esc(p.motivo) + ')' : '') + (p.estado === 'en_revision' ? ': este es el reintento' : ': esperando otro comprobante') + '</div>' : '') +
@@ -243,6 +245,7 @@
         (abierto && p.estado !== 'en_revision' ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
         (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir boleta' : 'Anotar boleta') + '</button>' : '') +
         (p.devolucion === 'pendiente' ? '<button class="small" data-dev="' + p.id + '">💸 Ya devolví</button>' : '') +
+        (p.entrega === 'despacho' && ['recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado) ? '<button class="small alt" data-env="' + p.id + '">🚚 ' + (p.envio && p.envio.codigo ? 'Cambiar seguimiento' : 'Seguimiento') + '</button>' : '') +
         (p.cliente_id ? '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' : '') +
         (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div>' +
         (p.estado === 'entregado' && !p.calificado ? '<div class="row" style="align-items:center;margin-top:10px"><span class="muted" style="flex:none">Califica al cliente:</span><span class="califica">' +
@@ -300,6 +303,19 @@
         }
       }
       if (b.dataset.dev) { await Cuenta.rpc('marcar_devuelto', { p_id: b.dataset.dev }); Core.toast('💸 Marcado como devuelto'); }
+      if (b.dataset.env) {
+        // 🚚 Courier + código: el cliente lo ve en su pedido y le llega por correo; si estaba preparándose, pasa a "En camino".
+        const C = [['starken', 'Starken'], ['chilexpress', 'Chilexpress'], ['blue', 'Blue Express'], ['correos', 'Correos de Chile'], ['propio', 'Reparto propio'], ['otro', 'Otro courier (con link)']];
+        const n = await Core.elegir('¿Con qué courier lo envías?', C.map((x) => x[1]));
+        const c = n && C.find((x) => x[1] === n); if (!c) return;
+        const cod = c[0] === 'propio' ? '' : prompt('Código de seguimiento (número de envío):', '');
+        if (cod === null) return;
+        const link = c[0] === 'otro' ? prompt('Link para seguir el envío (https://…):', '') : null;
+        if (link === null && c[0] === 'otro') return;
+        await Cuenta.rpc('pedido_seguimiento', { p_id: b.dataset.env, p_courier: c[0], p_codigo: cod || null, p_link: link || null });
+        Cuenta.sb.functions.invoke('enviar').catch(() => {});
+        Core.toast('🚚 Seguimiento guardado: le avisamos al cliente');
+      }
       if (b.dataset.cal) {
         const r = await Cuenta.rpc('cfx_calificar', { p_ref: b.dataset.cal, p_estrellas: +b.dataset.n });
         if (!r.ok) throw new Error(r.error);

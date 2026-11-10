@@ -3,7 +3,9 @@
 //   CodeFixVitrina.montar(nodo, t)          t = { empresa, logo, color, rubro, horario, abierto, vacaciones_hasta, vacaciones_msg,
 //                                               estrellas: {promedio,total}, telefono, wa_texto (mensaje listo, opcional), desde, perfil: {descripcion, direccion, comuna,
 //                                               instagram, facebook, tiktok, web, correo} }
-//   CodeFixVitrina.editor(nodo, perfil)     dibuja los campos; CodeFixVitrina.leer(nodo) devuelve el objeto para guardar.
+//                                               t.politicas = true → tienda online: muestra 📄 Cambios, devoluciones y garantía (Ley 19.496) con
+//                                               perfil.razon, rut, cambios, envios, sin_retracto (2.58; las apps que no lo pasan quedan igual).
+//   CodeFixVitrina.editor(nodo, perfil, { politicas })  dibuja los campos; CodeFixVitrina.leer(nodo) devuelve el objeto para guardar.
 (function () {
   if (window.CodeFixVitrina) return;
   const esc = (s) => window.CFX_ESC(s);  // seguro.js (núcleo)
@@ -34,6 +36,13 @@
     .pf-acc{display:flex;flex-wrap:wrap;gap:8px}
     .pf-acc .btn,.pf-acc button{flex:1 1 140px;min-height:42px;border-radius:12px}
     .pf-red{display:flex;flex-wrap:wrap;gap:6px}
+    .pf-pol{border-top:1px solid var(--line);padding-top:10px;font-size:14px}
+    .pf-pol summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:8px}
+    .pf-pol summary::-webkit-details-marker{display:none}
+    .pf-pol summary::after{content:'›';transition:transform .2s}
+    .pf-pol[open] summary::after{transform:rotate(90deg)}
+    .pf-pol h4{margin:12px 0 4px;font-size:14px}
+    .pf-pol p{margin:0;white-space:pre-line;overflow-wrap:anywhere;color:var(--muted)}
     .pf-red a{font-size:13px;font-weight:600;padding:6px 10px;border-radius:99px;background:color-mix(in srgb,${B} 10%,var(--card));color:${B};text-decoration:none}`;
     document.head.appendChild(st);
   }
@@ -66,6 +75,7 @@
     if (p.tiktok) redes.push(['TikTok', red(p.tiktok, 'https://www.tiktok.com/@')]);
     if (p.web) redes.push(['🌐 Sitio web', p.web]);
     if (redes.length) partes.push('<div class="pf-red">' + redes.map(([n, u]) => '<a href="' + esc(window.CFX_URL(u)) + '" target="_blank" rel="noopener">' + esc(n) + '</a>').join('') + '</div>');
+    if (t.politicas) partes.push(politicas(t, p, dir));
     const tel = String(t.telefono || '').replace(/\D/g, '');
     const wa = 'https://wa.me/' + tel + (t.wa_texto ? '?text=' + encodeURIComponent(t.wa_texto) : '');
     partes.push('<div class="pf-acc">' + (tel ? '<a class="btn ok" href="' + esc(wa) + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '') +
@@ -80,19 +90,41 @@
     };
   }
 
+  // Ley 19.496 (consumidor): identidad del vendedor, retracto de 10 días en compras a distancia (art. 3 bis, salvo que la tienda
+  // lo excluya antes de la compra) y garantía legal de 6 meses (art. 21). La tienda puede sumar su propia política de cambios y envíos.
+  function politicas(t, p, dir) {
+    const sec = (h, x) => '<h4>' + h + '</h4><p>' + x + '</p>';
+    const quien = [p.razon || t.empresa, p.rut ? 'RUT ' + p.rut : '', dir].filter(Boolean).map(esc).join(' · ');
+    return '<details class="pf-pol" id="politicas"><summary>📄 Cambios, devoluciones y garantía</summary>' +
+      sec('🏪 Quién vende', quien + (p.correo ? '<br>' + esc(p.correo) : '')) +
+      (p.cambios ? sec('🔁 Cambios y devoluciones', esc(p.cambios)) : '') +
+      (p.envios ? sec('🚚 Envíos', esc(p.envios)) : '') +
+      sec('↩️ Derecho a retracto', p.sin_retracto ? 'En compras por internet esta tienda no acepta el retracto (Ley 19.496, art. 3 bis).'
+        : 'Si compras por internet tienes 10 días desde que recibes el producto para arrepentirte: lo devuelves sin uso y con su embalaje, y te devuelven el dinero (Ley 19.496, art. 3 bis).') +
+      sec('🛡️ Garantía legal', 'Si el producto viene con falla tienes 6 meses desde que lo recibes para elegir cambio, reparación o devolución del dinero (Ley 19.496, art. 21).') +
+      '</details>';
+  }
+
+  const POL = [['razon', 'Razón social o nombre del vendedor', 'Como aparece en el SII', 120], ['rut', 'RUT', '12.345.678-9', 12],
+    ['cambios', 'Tu política de cambios y devoluciones', 'Ej: Cambios hasta 30 días con boleta y etiqueta. Escríbenos por WhatsApp.', 800],
+    ['envios', 'Envíos (opcional)', 'Ej: Despachamos en 24 a 48 h hábiles. A regiones por Starken.', 400]];
   const CAMPOS = [['descripcion', 'Sobre tu negocio', 'Qué vendes, qué te hace distinto…', 400], ['direccion', 'Dirección', 'Calle y número (opcional)', 150],
     ['comuna', 'Comuna', 'Ej: Ñuñoa', 60], ['instagram', 'Instagram', '@tutienda', 100], ['facebook', 'Facebook', 'tutienda o link', 100],
     ['tiktok', 'TikTok', '@tutienda', 100], ['web', 'Sitio web', 'tutienda.cl', 150], ['correo', 'Correo de contacto', 'hola@tutienda.cl', 120]];
-  function editor(nodo, perfil) {
+  function editor(nodo, perfil, o) {
     if (!nodo) return;
     const p = perfil || {};
-    nodo.innerHTML = CAMPOS.map(([k, l, ph, m]) => '<label for="pf-' + k + '">' + l + '</label>' + (k === 'descripcion'
+    const campo = ([k, l, ph, m]) => '<label for="pf-' + k + '">' + l + '</label>' + (k === 'descripcion' || k === 'cambios' || k === 'envios'
       ? '<textarea id="pf-' + k + '" data-pf="' + k + '" maxlength="' + m + '" placeholder="' + ph + '">' + esc(p[k]) + '</textarea>'
-      : '<input id="pf-' + k + '" data-pf="' + k + '" maxlength="' + m + '" placeholder="' + ph + '" value="' + esc(p[k]) + '"' + (k === 'correo' ? ' type="email"' : '') + '>')).join('');
+      : '<input id="pf-' + k + '" data-pf="' + k + '" maxlength="' + m + '" placeholder="' + ph + '" value="' + esc(p[k]) + '"' + (k === 'correo' ? ' type="email"' : '') + '>');
+    nodo.innerHTML = CAMPOS.map(campo).join('') + (o && o.politicas ? '<h3 style="margin:18px 0 0">📄 Políticas de la tienda</h3>' +
+      '<p class="muted" style="margin:4px 0 0;font-size:13px">La ley pide mostrarlas en la venta por internet. El retracto y la garantía legal ya salen solos.</p>' +
+      POL.map(campo).join('') + '<label class="row" style="gap:8px;align-items:center"><input type="checkbox" data-pf="sin_retracto" style="width:auto"' + (p.sin_retracto ? ' checked' : '') +
+      '> No acepto retracto en compras por internet</label>' : '');
   }
   function leer(nodo) {
     const r = {};
-    nodo.querySelectorAll('[data-pf]').forEach((x) => { const v = x.value.trim(); if (v) r[x.dataset.pf] = v; });
+    nodo.querySelectorAll('[data-pf]').forEach((x) => { const v = x.type === 'checkbox' ? (x.checked ? '1' : '') : x.value.trim(); if (v) r[x.dataset.pf] = v; });
     return r;
   }
   window.CodeFixVitrina = { montar, editor, leer };

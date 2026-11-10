@@ -1,9 +1,9 @@
 // Publicación en Cloudflare (Workers con archivos estáticos). No necesita compilación. "previews" = rama pruebas (CM → Apps → 🧪 Probar).
-// F32: worker.js corre solo en /t/* (vitrina pública: etiquetas para Google y la vista previa de WhatsApp); lo demás sale directo de los archivos.
+// F32: worker.js corre solo en /t/* (vitrina pública: etiquetas para Google y la vista previa de WhatsApp) y en / (🌐 dominio propio → su vitrina); lo demás sale directo de los archivos.
 {
   "name": "aplicaciones",
   "compatibility_date": "2026-10-01",
   "main": "worker.js",
-  "assets": { "directory": "./", "binding": "ASSETS", "run_worker_first": ["/t/*"] },
+  "assets": { "directory": "./", "binding": "ASSETS", "run_worker_first": ["/", "/t/*"] },
   "previews": {}
 }
