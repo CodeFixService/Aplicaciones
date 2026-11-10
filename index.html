@@ -9,6 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="shared/vendor/bootstrap-utilities.min.css">
 <link rel="stylesheet" href="shared/core.css">
 <link rel="stylesheet" href="shared/tema.css">
 <script src="shared/seguro.js"></script>
@@ -325,7 +326,7 @@
       <h2>💾 Respaldo de mi tienda</h2>
       <p class="muted">Descarga en Excel tus productos, pedidos, clientes, fichas, cupones y reseñas. Guárdalo donde quieras.
         Los avisos y mensajes se borran solos a los 30 días (te avisamos antes); tus pedidos y productos no.</p>
-      <div class="btns"><button class="alt" id="bRespaldo">⬇️ Descargar respaldo (Excel)</button></div>
+      <div class="btns"><button class="alt" id="bRespaldo">⬇️ Descargar respaldo</button></div><small class="cfx-nota-btn">En Excel: se abre en el computador o en el teléfono.</small>
     </div>
 
     <div class="card cfx-oc" id="cLegal">
@@ -783,7 +784,7 @@
     d.className = 'elegir';
     d.innerHTML = '<div role="dialog" aria-label="Preguntas frecuentes" class="faq"><b>❓ Preguntas frecuentes</b>' +
       FAQ.map(([q, a]) => '<details><summary>' + Core.esc(q) + '</summary><p>' + Core.esc(a) + '</p></details>').join('') +
-      (chat ? '<button type="button" class="alt" data-c="1">💬 No encontré mi respuesta: escribir a soporte</button>' : '') +
+      (chat ? '<small class="cfx-nota-btn">¿No encontraste tu respuesta?</small><button type="button" class="alt" data-c="1">💬 Escribir a soporte</button>' : '') +
       '<button type="button" class="small" data-x="1">Cerrar</button></div>';
     d.onclick = (e) => {
       const b = e.target.closest('button');

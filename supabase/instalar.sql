@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.39'::text $$;
+language sql immutable as $$ select '5.40'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5423,6 +5423,26 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.40 · G20 🏪 Negocios desde el Centro de Mando (núcleo cfx_negocios / cfx_premium_cuenta / cfx_key_aplicar).
+--  Ganchos: la lista de cuentas (negocios = dueños de tienda; clientes) y quitar Premium. Sin tablas nuevas.
+-- =====================================================================
+create or replace function public.cfx_cuentas_app(p_rol text, p_q text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'email', p.email, 'nombre', p.empresa, 'rol', p_rol,
+    'premium_hasta', case when p.plan = 'pro' and (p.pro_until is null or p.pro_until > now()) then coalesce(p.pro_until, 'infinity'::timestamptz) end,
+    'creado', p.created_at, 'suspendido', p.suspended) order by p.created_at desc), '[]'::jsonb)
+  from (select * from public.profiles x
+        where x.role = case when p_rol = 'cliente' then 'client' else 'user' end
+          and (coalesce(p_q, '') = '' or x.email ilike '%' || p_q || '%' or coalesce(x.empresa, '') ilike '%' || p_q || '%')
+        order by x.created_at desc limit 300) p
+$$;
+create or replace function public.cfx_quitar_premium(p_cuenta uuid) returns void
+language sql security definer set search_path = '' as $$
+  update public.profiles set plan = 'free', pro_until = null where id = p_cuenta and role in ('user', 'client')
+$$;
+revoke all on function public.cfx_cuentas_app(text, text), public.cfx_quitar_premium(uuid) from public, anon, authenticated;
 
 -- =====================================================================
 --  VERSIÓN 5.39 · G19 🧩 Módulos de pago por negocio (núcleo modulos_venta.sql). Ganchos: quién es el negocio de una cuenta
@@ -6368,6 +6388,57 @@ begin
 end $$;
 revoke all on function public.cfx_actualizar_ahora(boolean) from public, anon;
 grant execute on function public.cfx_actualizar_ahora(boolean) to authenticated;
+
+-- ---------- G20 · 🏪 Negocios desde el Centro de Mando (Control → app → Negocios) ----------
+-- Lista de cuentas de la app, Premium 1 mes / 3 meses / 1 año o quitarlo, e ingresar una key a nombre de esa cuenta.
+-- Ganchos de cada app (opcionales: sin ellos se avisa que llega en su turno):
+--   cfx_cuentas_app(p_rol text, p_q text) → jsonb [{ id, email, nombre, rol, premium_hasta, creado }] · cfx_quitar_premium(p_cuenta uuid)
+create or replace function public.cfx_negocios(p_q text default '', p_rol text default 'negocio') returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare r jsonb;
+begin
+  perform public.cfx_es_admin();
+  if to_regprocedure('public.cfx_cuentas_app(text,text)') is null then return jsonb_build_object('error', 'Esta app aún no tiene la lista de negocios: llega cuando le toque su turno.'); end if;
+  execute 'select public.cfx_cuentas_app($1, $2)' into r using case when p_rol = 'cliente' then 'cliente' else 'negocio' end, left(coalesce(p_q, ''), 80);
+  return coalesce(r, '[]'::jsonb);
+end $$;
+create or replace function public.cfx_premium_cuenta(p_cuenta uuid, p_rol text, p_dias int) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare h timestamptz;
+begin
+  perform public.cfx_es_admin();
+  if p_cuenta is null or coalesce(p_rol, '') not in ('negocio', 'cliente') or p_dias is null or p_dias > 3660 then return jsonb_build_object('error', 'Datos no válidos'); end if;
+  if p_dias > 0 then
+    h := public.cfx_dar_premium(p_cuenta, p_rol, p_dias);
+    if h is null then return jsonb_build_object('error', 'No se encontró la cuenta'); end if;
+    perform public.cfx_avisar(p_cuenta, '⭐ Premium activado', 'Tienes Premium hasta el ' || to_char(h at time zone 'America/Santiago', 'DD-MM-YYYY') || '.');
+    perform public.cfx_anotar('premium', p_dias || ' días a ' || p_cuenta);
+    return jsonb_build_object('hasta', h);
+  end if;
+  if to_regprocedure('public.cfx_quitar_premium(uuid)') is null then return jsonb_build_object('error', 'Esta app aún no permite quitar Premium desde aquí.'); end if;
+  execute 'select public.cfx_quitar_premium($1)' using p_cuenta;
+  perform public.cfx_anotar('premium quitado', p_cuenta::text);
+  return jsonb_build_object('hasta', null);
+end $$;
+create or replace function public.cfx_key_aplicar(p_cuenta uuid, p_rol text, p_email text, p_codigo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare k public.cfx_keys; h timestamptz; c text := upper(trim(coalesce(p_codigo, '')));
+begin
+  perform public.cfx_es_admin();
+  if p_cuenta is null or coalesce(p_rol, '') not in ('negocio', 'cliente') then return jsonb_build_object('error', 'Datos no válidos'); end if;
+  select * into k from public.cfx_keys where hash = encode(sha256(convert_to(c, 'UTF8')), 'hex') for update;
+  if k.id is null or k.revocada or k.usada_por is not null then return jsonb_build_object('error', 'Key no válida o ya usada'); end if;
+  if k.rol <> p_rol then return jsonb_build_object('error', 'Esta key es para cuentas de ' || k.rol); end if;
+  h := public.cfx_dar_premium(p_cuenta, k.rol, k.dias);
+  if h is null then return jsonb_build_object('error', 'No se encontró la cuenta'); end if;
+  update public.cfx_keys set usada_por = p_cuenta, usada_email = left(coalesce(p_email, ''), 200), usada_at = now() where id = k.id;
+  insert into public.cfx_exentos (cuenta, nota) values (p_cuenta, 'Key ' || k.ultimos) on conflict (cuenta) do nothing;
+  perform public.cfx_avisar(p_cuenta, '🔑 Premium activado', 'Tienes Premium por ' || k.dias || ' días.');
+  perform public.cfx_anotar('key aplicada', '…' || k.ultimos || ' a ' || coalesce(p_email, p_cuenta::text));
+  return jsonb_build_object('hasta', h, 'dias', k.dias);
+end $$;
+revoke all on function public.cfx_negocios(text, text), public.cfx_premium_cuenta(uuid, text, int), public.cfx_key_aplicar(uuid, text, text, text) from public, anon;
+grant execute on function public.cfx_negocios(text, text), public.cfx_premium_cuenta(uuid, text, int), public.cfx_key_aplicar(uuid, text, text, text) to authenticated;
 -- ---------------------------------------------------------------------
 -- CodeFix · Ayuda (igual en las 6 apps; lo reparte nucleo/sincronizar.py).
 --   1) Puente al Centro de Mando: los avisos importantes (pagos por revisar, mensajes de soporte) le llegan al tiro

@@ -8,6 +8,7 @@
 <title>Caja · Órbita</title>
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/vendor/bootstrap-utilities.min.css">
 <link rel="stylesheet" href="../../shared/core.css">
 <link rel="stylesheet" href="../../shared/tema.css">
 <script src="../../shared/seguro.js"></script>
@@ -23,6 +24,17 @@
   .vender > * { min-width: 0; }
   .buscar { display: flex; gap: 8px; margin-bottom: 10px; }
   .buscar input { flex: 1; min-width: 0; }
+  .vozBtn { flex: none; width: 46px; height: 46px; min-height: 0; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+  .vozBtn.on { animation: vozLate 1s ease-in-out infinite; background: #dc2626; border-color: #dc2626; color: #fff; }
+  @keyframes vozLate { 50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, .18); } }
+  .vozCard { border: 1px solid var(--brand-line); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px; background: var(--card); }
+  .vozCab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .vozCab button { flex: none; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; }
+  .vozCard > p { margin: 6px 0 8px; font-size: 14px; }
+  .vozFrase { display: flex; gap: 8px; margin-bottom: 8px; } .vozFrase input { flex: 1; min-width: 0; } .vozFrase button { flex: none; }
+  .vozL { display: grid; grid-template-columns: 64px 1fr; gap: 6px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .vozL input { text-align: center; } .vozL select { min-width: 0; width: 100%; } .vozL .vozOp { grid-column: 2; }
+  .vozL small { grid-column: 1 / -1; color: var(--muted); } .vozL small.mal { color: #dc2626; }
   .cats { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
   .cats button { flex: none; }
   .prods { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
@@ -84,6 +96,14 @@
       <div>
         <div class="buscar">
           <input id="q" placeholder="Buscar producto…" aria-label="Buscar producto" autocomplete="off">
+          <button type="button" class="vozBtn" id="bVoz" aria-label="Venta por voz" title="Venta por voz"><span data-ico="microfono"></span></button>
+        </div>
+        <div class="vozCard hidden" id="vozCard" aria-live="polite">
+          <div class="vozCab"><b>🎤 Venta por voz</b><button type="button" class="alt small" id="vozX" aria-label="Cerrar venta por voz">✕</button></div>
+          <p class="muted" id="vozEstado">Di o escribe el pedido. Ej: 2 cortinas rojas, 50 globos rojos de 9 pulgadas</p>
+          <div class="vozFrase"><input id="vozTxt" placeholder="Lo que dijo el cliente" aria-label="Pedido en palabras" autocomplete="off" data-sin-voz><button type="button" class="alt small" id="vozLeer">Armar</button></div>
+          <div id="vozLista"></div>
+          <div class="btns hidden" id="vozBtns"><button id="vozAgregar">Agregar a la venta</button><button class="alt" id="vozOtra">🎤 Otra vez</button></div>
         </div>
         <div class="stockBajo hidden" id="stockBajo"></div>
         <div class="cats" id="cats"></div>
@@ -184,7 +204,7 @@
     <div class="card">
       <div class="hidden" id="rowPublicar" style="margin-bottom:12px">
         <p class="muted" id="txtPublicar" style="margin:0 0 8px"></p>
-        <div class="btns" style="margin:0"><button class="ok small" id="bPublicarTodos">🛍️ Publicar todos en mi catálogo</button></div>
+        <div class="btns" style="margin:0"><button class="ok small" id="bPublicarTodos">🛍️ Publicar todos</button></div><small class="cfx-nota-btn">Quedan a la vista en tu catálogo.</small>
       </div>
       <input id="pq" placeholder="Buscar en mis productos…" aria-label="Buscar en mis productos">
       <div id="listaProds"></div>

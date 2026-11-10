@@ -251,9 +251,9 @@ input::placeholder, textarea::placeholder { text-overflow: ellipsis; opacity: .7
 .cfx-desliza { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none; scroll-snap-type: x proximity; }
 .cfx-desliza::-webkit-scrollbar { display: none; }
 .cfx-desliza > * { flex: none !important; scroll-snap-align: start; }
-.cfx-desliza.cfx-d-der { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
-.cfx-desliza.cfx-d-izq { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px); mask-image: linear-gradient(90deg, transparent, #000 36px); }
-.cfx-desliza.cfx-d-izq.cfx-d-der { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+.cfx-desliza.cfx-d-der { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); }
+.cfx-desliza.cfx-d-izq { -webkit-mask-image: linear-gradient(90deg, transparent, #000 22px); mask-image: linear-gradient(90deg, transparent, #000 22px); }
+.cfx-desliza.cfx-d-izq.cfx-d-der { -webkit-mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); }
 /* Botones: el texto en una línea y el ícono al centro con el texto. */
 button, .btn, a.btn, .chip { align-items: center; }
 .chip, .seg > button, .tabs > button, .cp-tabs > button { white-space: nowrap; }
@@ -293,3 +293,22 @@ button.chip, a.chip, [role="button"].chip { min-height: 40px; }
 .cfx-cifras i svg, .cfx-cifras i .ic-e { width: 22px !important; height: 22px !important; margin: 0 !important; }
 .cfx-cifras b { font-size: 20px; line-height: 1.2; }
 .cfx-cifras span { font-size: 12px; line-height: 1.25; color: var(--cfx-texto-2, #5b6472); overflow-wrap: anywhere; }
+
+/* ---------- G20 · H1 Ultra responsivo (núcleo 2.57). Bootstrap 5.3.8 (solo utilidades: d-flex, gap-2, text-truncate, rounded-circle…) va en vendor/. ----------
+   Orilla pareja a los lados (16 px; 12 px en teléfonos de 360 o menos). Las tiras que se deslizan de lado empiezan y terminan en la orilla:
+   el difuminado cae sobre ese margen y no tapa la primera ni la última pestaña. */
+:root { --cfx-orilla: 16px; }
+@media (max-width: 360px) { :root { --cfx-orilla: 12px; } }
+.cfx-desliza { scroll-padding-inline: var(--cfx-orilla); }
+nav.tabs.sub.cfx-desliza, main > .cfx-desliza, .view > .cfx-desliza, main > section > .cfx-desliza { padding-left: var(--cfx-orilla) !important; padding-right: var(--cfx-orilla) !important; }
+main > .cfx-desliza, .view > .cfx-desliza, main > section > .cfx-desliza { margin-left: calc(-1 * var(--cfx-orilla)) !important; margin-right: calc(-1 * var(--cfx-orilla)) !important; }
+@media (max-width: 360px) { main { padding-left: var(--cfx-orilla) !important; padding-right: var(--cfx-orilla) !important; } }
+/* Íconos solos (sin palabras): botón redondo (ayuda.js marca .cfx-redondo). */
+.cfx-redondo { border-radius: 50% !important; aspect-ratio: 1; padding: 0 !important; display: inline-grid !important; place-items: center; }
+/* Texto corto en el botón y la explicación abajo, sola y chica. */
+.cfx-nota-btn { display: block; margin: 6px 2px 0; font-size: 12.5px; line-height: 1.35; color: var(--cfx-texto-2, var(--muted, #5b6472)); }
+.cfx-nota-btn + button, .cfx-nota-btn + .btns { margin-top: 6px; }
+/* Nada se sale del ancho: imágenes, tablas y textos largos (correos, links) se ajustan. */
+img, video, canvas, svg { max-width: 100%; }
+.card, .tarjeta, .cfx-hm-zona { min-width: 0; overflow-wrap: anywhere; }
+.card button, .card .btn, .tarjeta button { overflow-wrap: normal; }

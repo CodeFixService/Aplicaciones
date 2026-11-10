@@ -146,6 +146,89 @@
     renderTicket();
   }
 
+  /* ---------- 🎤 G20: venta por voz en la misma pantalla ----------
+     "2 cortinas rojas, 50 globos rojos de 9 pulgadas" → busca cada producto (aproximado, núcleo CFX_PEDIDO), arma las líneas y las
+     agrega a la venta; al Cobrar se descuenta el stock y queda el comprobante, como siempre. Elige mejor entre parecidos con lo más
+     vendido: ventas de esta Caja + lo que calculó el análisis de anoche (analisis.py → voz). */
+  let vozL = [], vozFrec = null, vozRec = null;
+  async function frecuentes() {
+    if (vozFrec) return vozFrec;
+    const f = {}, lin = {}, desde = Date.now() - 90 * 864e5;
+    ventas.filter((v) => (v.fecha || v.t || 0) >= desde || !(v.fecha || v.t)).forEach((v) => (v.items || []).forEach((l) => {
+      const k = l.id; if (!k) return; (f[k] = f[k] || { u: 0, cant: 1 }).u += l.cant || 1; (lin[k] = lin[k] || []).push(l.cant || 1);
+    }));
+    try {
+      const an = await Cuenta.rpc('cfx_analisis_mio');
+      ((an && an.voz) || []).forEach((x) => { (f[x.k] = f[x.k] || { u: 0, cant: x.cant || 1 }).u += x.u || 0; if (!lin[x.k]) f[x.k].cant = x.cant || 1; });
+    } catch (e) { /* sin módulo de análisis o sin red */ }
+    Object.keys(lin).forEach((k) => { const a = lin[k].slice().sort((x, y) => x - y); f[k].cant = a[a.length >> 1]; });
+    return (vozFrec = f);
+  }
+  const vozCat = () => productos.map((p) => ({ id: p.id, nombre: p.nombre, ops: opsDe(p), alias: p.categoria || '' }));
+  const stockDe = (p, o) => { const v = o ? varDe(p, o) : null; return v && v.stock != null ? +v.stock : p.stock === '' || p.stock == null ? null : +p.stock; };
+  async function vozArmar(txt) {
+    $('vozTxt').value = txt;
+    if (!txt.trim()) { $('vozEstado').textContent = 'No se escuchó nada. Toca 🎤 Otra vez o escríbelo.'; return; }
+    const r = window.CFX_PEDIDO.leer(txt, vozCat(), await frecuentes());
+    vozL = r.lineas.map((l) => ({ id: l.prod.id, opcion: l.opcion || (opsDe(productos.find((p) => p.id === l.prod.id)).length ? null : ''), cant: l.cant, texto: l.texto, dicha: l.dicha,
+      otros: [{ prod: l.prod, opcion: l.opcion }].concat(l.otros) }));
+    $('vozEstado').textContent = vozL.length ? 'Revisa y toca "Agregar a la venta".' + (r.sin.length ? ' No encontré: ' + r.sin.join(', ') + '.' : '')
+      : 'No encontré esos productos' + (r.sin.length ? ': ' + r.sin.join(', ') : '') + '. Usa ➕ Otro o búscalo.';
+    vozPintar();
+  }
+  function vozPintar() {
+    $('vozBtns').classList.toggle('hidden', !vozL.length);
+    $('vozLista').innerHTML = vozL.map((l, i) => {
+      const p = productos.find((x) => x.id === l.id), ops = p ? opsDe(p) : [], st = p ? stockDe(p, l.opcion) : null;
+      const prods = [...new Map(l.otros.map((o) => [o.prod.id, o.prod])).values()];
+      return '<div class="vozL" data-i="' + i + '"><input inputmode="numeric" data-c="' + i + '" value="' + l.cant + '" aria-label="Cantidad">' +
+        '<select data-p="' + i + '" aria-label="Producto">' + prods.map((x) => '<option value="' + Core.esc(x.id) + '"' + (x.id === l.id ? ' selected' : '') + '>' + Core.esc(x.nombre) + '</option>').join('') +
+        '<option value="">— No agregar</option></select>' +
+        (ops.length ? '<select class="vozOp" data-o="' + i + '" aria-label="Opción">' + (l.opcion ? '' : '<option value="">¿Qué opción?</option>') +
+          ops.map((o) => '<option' + (o === l.opcion ? ' selected' : '') + '>' + Core.esc(o) + '</option>').join('') + '</select>' : '') +
+        '<small' + (st != null && l.cant > st ? ' class="mal"' : '') + '>"' + Core.esc(l.texto) + '"' + (p ? ' · ' + money(precioVoz(p, l.opcion)) + ' c/u' : '') +
+        (st != null ? ' · stock ' + st + (l.cant > st ? ' ⚠️ no alcanza' : '') : '') + (!l.dicha ? ' · cantidad de siempre' : '') + '</small></div>';
+    }).join('');
+  }
+  const precioVoz = (p, o) => { const v = o ? varDe(p, o) : null; return v && v.precio != null ? +v.precio : +p.precio; };
+  $('vozLista').onchange = (e) => {
+    const t = e.target, i = +(t.dataset.c ?? t.dataset.p ?? t.dataset.o); const l = vozL[i]; if (!l) return;
+    if (t.dataset.c !== undefined) l.cant = Math.max(0, Math.round(num(t.value)) || 0);
+    if (t.dataset.p !== undefined) { if (!t.value) { vozL.splice(i, 1); } else { l.id = t.value; const o = l.otros.find((x) => x.prod.id === t.value); l.opcion = o && o.opcion || ''; } }
+    if (t.dataset.o !== undefined) l.opcion = t.value || null;
+    vozPintar(); $('vozBtns').classList.toggle('hidden', !vozL.length);
+  };
+  function vozEscuchar() {
+    if (!window.CodeFixVoz || !CodeFixVoz.escuchar) { $('vozEstado').textContent = 'Este navegador no permite dictar: escribe el pedido y toca Armar.'; $('vozTxt').focus(); return; }
+    if (vozRec) { vozRec.parar && vozRec.parar(); return; }
+    vozRec = { parcial: (t) => { $('vozTxt').value = t; } };
+    $('bVoz').classList.add('on'); $('vozEstado').textContent = '🎙️ Escuchando… habla y espera 2 segundos.';
+    CodeFixVoz.escuchar(vozRec).then(vozArmar).catch((e) => { $('vozEstado').textContent = e.message + ' También puedes escribirlo.'; })
+      .finally(() => { vozRec = null; $('bVoz').classList.remove('on'); });
+  }
+  $('bVoz').onclick = () => { $('vozCard').classList.remove('hidden'); $('otroForm').classList.add('hidden'); vozEscuchar(); };
+  $('vozOtra').onclick = vozEscuchar;
+  $('vozLeer').onclick = () => { if (vozRec && vozRec.parar) vozRec.parar(); vozArmar($('vozTxt').value); };
+  $('vozTxt').addEventListener('keydown', (e) => { if (e.key === 'Enter') vozArmar($('vozTxt').value); });
+  $('vozX').onclick = () => { if (vozRec && vozRec.parar) vozRec.parar(); vozL = []; $('vozCard').classList.add('hidden'); $('vozLista').innerHTML = ''; $('vozTxt').value = ''; $('vozBtns').classList.add('hidden'); };
+  $('vozAgregar').onclick = () => {
+    const falta = vozL.find((l) => l.cant > 0 && l.opcion === null);
+    if (falta) { Core.toast('Elige la opción de ' + (productos.find((p) => p.id === falta.id) || {}).nombre); return; }
+    let n = 0;
+    vozL.forEach((l) => {
+      const p = productos.find((x) => x.id === l.id); if (!p || !(l.cant > 0)) return;
+      const item = { id: p.id, nombre: p.nombre + (l.opcion ? ' (' + l.opcion + ')' : ''), precio: precioVoz(p, l.opcion), costo: +p.costo || 0 };
+      if (l.opcion) item.opcion = l.opcion;
+      const line = ticket.find((x) => x.id === item.id && x.precio === item.precio && (x.opcion || '') === (item.opcion || ''));
+      if (line) line.cant += l.cant; else ticket.push(Object.assign({ cant: l.cant }, item));
+      n++;
+    });
+    if (!n) return;
+    $('bComp').hidden = true; renderTicket(); $('vozX').click();
+    Core.toast('🎤 ' + n + ' producto(s) en la venta. Revisa y toca Cobrar.');
+    const c = document.querySelector('.ticketCard'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   /* "Otro": producto sin registrar, con nombre y precio en el momento */
   function abrirOtro() {
     $('otroForm').classList.remove('hidden');

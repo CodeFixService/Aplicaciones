@@ -61,6 +61,13 @@
     '.cfx-srv-det h4{margin:12px 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472)}.cfx-srv-res{margin:10px 0 0;font-size:13px;color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-srv-f{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:4px 0;border-top:1px dashed var(--cfx-borde,#e2e7ec)}.cfx-srv-f span{min-width:0;overflow-wrap:anywhere}.cfx-srv-f small{color:var(--cfx-texto-2,#5b6472);flex:none}.cfx-srv-err{display:block;color:var(--cfx-aviso,#ea580c);font-size:12px;margin:2px 0 4px}' +
     '.cfx-srv-puntos{display:flex;justify-content:center;gap:6px}.cfx-srv-puntos i{width:7px;height:7px;border-radius:4px;background:var(--cfx-borde,#d4dae1);cursor:pointer;transition:width .2s,background .2s}.cfx-srv-puntos i.on{width:18px;background:var(--brand,var(--marca,#2563eb))}' +
+    '.cfx-av-vacio,.cfx-av-pista{margin:6px 0 12px;color:var(--cfx-texto-2,#5b6472);font-size:14px}.cfx-av-lista{display:flex;flex-direction:column;gap:8px}' +
+    '.cfx-av-f{position:relative;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:var(--cfx-campo,#f3f5f8);border:1px solid var(--cfx-borde,#e2e7ec);cursor:pointer;min-width:0}' +
+    '.cfx-av-f.nuevo{border-left:4px solid var(--brand,var(--marca,#2563eb))}.cfx-av-f b{font-size:15px;overflow-wrap:anywhere}.cfx-av-f small{color:var(--cfx-texto-2,#5b6472);font-size:12px}.cfx-av-f span{font-size:14px;color:var(--cfx-texto-2,#5b6472);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.cfx-av-todos{width:100%;margin:14px 0 4px;min-height:44px;border-radius:12px;border:1.5px solid var(--cfx-borde,#e2e7ec);background:transparent;color:#dc2626;font:700 15px/1 inherit;cursor:pointer}' +
+    '.cfx-av-tit{margin:0 0 4px;font-size:18px;line-height:1.3;overflow-wrap:anywhere}.cfx-av-de{margin:0 0 8px;color:var(--cfx-texto-2,#5b6472);font-size:13px}.cfx-av-txt{margin:0 0 12px;font-size:16px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}.cfx-av-img{display:block;max-width:100%;border-radius:12px;margin:0 0 12px}' +
+    '.cfx-av-ir{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;background:var(--brand,var(--marca,#2563eb));color:#fff!important;font-weight:700;text-decoration:none;margin:0 0 12px}' +
+    '.cfx-av-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}.cfx-av-nav button{min-height:44px;padding:0 14px;border-radius:12px;border:1.5px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f3f5f8);color:var(--cfx-texto,#111827);font:700 14px/1 inherit;cursor:pointer;white-space:nowrap}.cfx-av-nav button:disabled{opacity:.4}.cfx-av-nav small{color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-x-oculta{display:none!important}.cfx-aviso-desl{touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;will-change:transform}.cfx-aviso-desl *{-webkit-user-drag:none}' +
     '@keyframes cfxPista{0%,100%{transform:none}35%{transform:translateX(-42px)}60%{transform:translateX(-42px)}}.cfx-pista{animation:cfxPista 1.1s cubic-bezier(.2,.8,.2,1)}' +
     '.cfx-emerg{position:fixed;inset:auto;width:auto;height:fit-content;box-sizing:border-box;top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;margin:0 auto;max-width:460px;z-index:2147483600;display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:18px;border:1px solid var(--cfx-borde,#e2e7ec);' +
@@ -312,7 +319,9 @@
     const rol = CFG.admin ? (CFG.socio ? 'SOCIO' : 'ADMIN') : '';
     plan.textContent = rol || (esPro() ? 'PRO' : 'FREE'); plan.classList.toggle('pro', !rol && esPro()); plan.classList.toggle('rol', !!rol);
     plan.setAttribute('aria-label', rol ? (rol === 'ADMIN' ? 'Administrador' : 'Socio') : esPro() ? 'Plan PRO' : 'Plan FREE: ver Premium');
-    const n = (CFG.admin ? 0 : pend().length + (estado.sin_leer || 0));
+    // Globito de la campana (G20): solo avisos sin leer + chat de soporte. Antes sumaba también "Lo que me falta" (tareas de la guía),
+    // por eso seguía marcando aunque se borraran todos los avisos; esas tareas se ven en la guía, no en la campana.
+    const n = CFG.admin && !CFG.avisos ? 0 : (avN || 0) + (CFG.admin ? 0 : estado.sin_leer || 0);
     av.innerHTML = (CFG.foto ? '<img src="' + esc(CFG.foto) + '" alt="">' : iniciales()) + (n ? '<i>' + n + '</i>' : '');
     pest.innerHTML = CHEV_ABAJO;
     // El número va solo en la campana (no junto a la flechita), como atributo: la app puede rehacer el contenido de su campana sin borrarlo.
@@ -380,6 +389,67 @@
       if (a === 'atajo') location.href = at.href; else if (a === 'salir') confirmarSalir(); else if (a === 'perfil') abrirPerfil(); else accion(a);
     };
   }
+  // ---------- 🔔 Ventana de avisos (G20) ----------
+  // CFX_AYUDA.iniciar({ …, avisos: { lista, borrar, leer, limpiar } }): la campana abre una hoja con los avisos (deslizar = borrar);
+  // tocar uno abre otra hoja con el texto completo y ‹ › para pasar uno por uno. lista() → [{ id, titulo, cuerpo, de, fecha, leido, url, imagen }].
+  let avN = 0, avL = [];
+  const fechaAv = (f) => { try { return f ? new Date(f).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : ''; } catch (e) { return ''; } };
+  async function contarAvisos() {
+    if (!CFG.avisos || typeof CFG.avisos.lista !== 'function') return;
+    try { avL = (await CFG.avisos.lista()) || []; avN = avL.filter((x) => !x.leido).length; pintarBoya(); } catch (e) { /* sin red */ }
+  }
+  async function ventanaAvisos() {
+    const A = CFG.avisos, h = hoja('<span class="cfx-hm-ic no-ico">' + SVG_CAMPANA + '</span><span class="cfx-hm-tx">Avisos</span>', contarAvisos);
+    h.zona.innerHTML = '<p class="cfx-av-vacio">Cargando…</p>';
+    try { avL = (await A.lista()) || []; } catch (e) { h.zona.innerHTML = '<p class="cfx-av-vacio">Sin conexión.</p>'; return; }
+    const pintar = () => {
+      avN = avL.filter((x) => !x.leido).length; pintarBoya();
+      if (!avL.length) { h.zona.innerHTML = '<p class="cfx-av-vacio">Sin avisos por ahora.</p>'; return; }
+      h.zona.innerHTML = '<p class="cfx-av-pista">Desliza un aviso hacia el lado para borrarlo.</p><div class="cfx-av-lista">' + avL.map((x, i) =>
+        '<div class="cfx-av-f' + (x.leido ? '' : ' nuevo') + '" data-i="' + i + '" role="button" tabindex="0"><b>' + esc(x.titulo || 'Aviso') + '</b>' +
+        '<small>' + esc([x.de, fechaAv(x.fecha)].filter(Boolean).join(' · ')) + '</small><span>' + esc(String(x.cuerpo || '').slice(0, 90)) + '</span>' +
+        '<button type="button" aria-label="Borrar aviso" data-b="' + i + '"></button></div>').join('') + '</div>' +
+        (A.limpiar ? '<button type="button" class="cfx-av-todos">Borrar todos</button>' : '');
+      avisosDeslizar();
+    };
+    pintar();
+    h.zona.onclick = async (ev) => {
+      const b = ev.target.closest('[data-b]');
+      if (b) { const x = avL[+b.dataset.b]; avL = avL.filter((y) => y !== x); try { await A.borrar(x.id); } catch (e) { /* se reintenta al abrir */ } return pintar(); }
+      if (ev.target.closest('.cfx-av-todos')) {
+        if (!confirm('¿Borrar todos tus avisos? Solo verás los que lleguen desde ahora.')) return;
+        await salirTodos(); try { await A.limpiar(); avL = []; } catch (e) { aviso((e && e.message) || 'No se pudo borrar.'); } return pintar();
+      }
+      const f = ev.target.closest('.cfx-av-f'); if (f) unAviso(+f.dataset.i, pintar);
+    };
+    h.zona.onkeydown = (ev) => { const f = ev.target.closest && ev.target.closest('.cfx-av-f'); if (f && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); unAviso(+f.dataset.i, pintar); } };
+  }
+  function unAviso(i, repintar) {
+    const A = CFG.avisos, h = hoja('<span class="cfx-hm-tx">Aviso</span>', repintar);
+    const ver = (j) => {
+      i = j; const x = avL[i]; if (!x) return h.cerrar();
+      if (!x.leido) { x.leido = true; if (A.leer) Promise.resolve(A.leer(x.id)).catch(() => {}); avN = avL.filter((y) => !y.leido).length; pintarBoya(); }
+      const url = String(x.url || ''), ext = /^https?:\/\//i.test(url), int = /^(apps\/[a-z]+\/|\.\/|#)/.test(url);
+      h.zona.innerHTML = '<h3 class="cfx-av-tit"></h3><p class="cfx-av-de">' + esc([x.de, fechaAv(x.fecha)].filter(Boolean).join(' · ')) + '</p><p class="cfx-av-txt"></p>' +
+        (/^https?:\/\//i.test(x.imagen || '') ? '<img class="cfx-av-img" src="' + esc(x.imagen) + '" alt="" loading="lazy">' : '') +
+        (ext || int ? '<a class="cfx-av-ir" href="' + esc(url) + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + (ext ? 'Ver más' : 'Abrir') + '</a>' : '') +
+        (avL.length > 1 ? '<div class="cfx-av-nav"><button type="button" data-n="-1" aria-label="Aviso anterior"' + (i ? '' : ' disabled') + '>‹ Anterior</button><small>' + (i + 1) + ' de ' + avL.length + '</small>' +
+          '<button type="button" data-n="1" aria-label="Aviso siguiente"' + (i < avL.length - 1 ? '' : ' disabled') + '>Siguiente ›</button></div>' : '');
+      h.zona.querySelector('.cfx-av-txt').textContent = x.cuerpo || '';
+      h.zona.querySelector('.cfx-av-tit').textContent = x.titulo || 'Aviso';
+    };
+    h.zona.onclick = (ev) => { const b = ev.target.closest('[data-n]'); if (b) ver(i + +b.dataset.n); else if (ev.target.closest('.cfx-av-ir')) h.cerrar(); };
+    // Deslizar de lado sobre el texto también pasa al siguiente/anterior.
+    let x0 = null; h.zona.addEventListener('pointerdown', (e) => { x0 = e.clientX; });
+    h.zona.addEventListener('pointerup', (e) => { if (x0 === null) return; const dx = e.clientX - x0; x0 = null; if (Math.abs(dx) > 60) { const j = i + (dx < 0 ? 1 : -1); if (avL[j]) ver(j); } });
+    ver(i);
+  }
+  // La campana de la app (link o botón) abre la ventana del núcleo cuando la app le pasa sus avisos.
+  document.addEventListener('click', (ev) => {
+    if (!CFG.avisos || !boya) return;
+    const c = ev.target.closest && ev.target.closest('[data-cfx-campana]'); if (!c || !boya.contains(c)) return;
+    ev.preventDefault(); ev.stopPropagation(); ventanaAvisos();
+  }, true);
   // Campana del núcleo (cuando la pantalla no trae una): muestra si los avisos al teléfono están activos y permite activarlos.
   async function avisosNucleo() {
     const I = window.CodeFixInstalar, h = hoja('<span class="cfx-hm-ic no-ico">' + SVG_CAMPANA + '</span><span class="cfx-hm-tx">Avisos</span>');
@@ -913,6 +983,7 @@
   // ---------- Inicio ----------
   async function revisar() {
     if (!R) return;
+    contarAvisos();
     try { estado = await R('cfx_guia') || estado; } catch (e) { return; }
     estado.items = estado.items || [];
     pintarBoya();
@@ -998,6 +1069,7 @@
     R = o.rpc; APP = o.app || APP;
     if (primera) pinRevisar();
     Object.assign(CFG, o);
+    contarAvisos();
     if (!CFG.foto && !(window.CFX_PERFIL_APP || {}).foto) CFG.foto = lsL(fotoKey()) || null;  // foto guardada por BASE (este celular)
     try { if (!sessionStorage.getItem('cfx-inicio')) sessionStorage.setItem('cfx-inicio', location.pathname + location.search); } catch (e) { /* nada */ }
     if (window.CFX_PREMIUM && 'premium' in o) window.CFX_PREMIUM.marcar({ premium: !CFG.admin && !!CFG.premium, id: CFG.id, hasta: CFG.hasta, beneficios: CFG.beneficios });
@@ -1096,7 +1168,7 @@
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } else if (boya && boya.parentNode && boya.parentNode !== document.body) marcarExtras(boya.parentNode); }, 1500);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM };
+  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM, avisos: contarAvisos, ventanaAvisos };
   window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad, misDatos };
   // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
   function marcarTira(x) {
@@ -1302,7 +1374,17 @@
   // Fechas y textos del navegador en español de Chile (el selector de fecha muestra dd-mm-aaaa).
   if (!/^es-CL$/i.test(document.documentElement.lang)) document.documentElement.lang = 'es-CL';
   let tTiras = 0;
-  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { separarBotones(); tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); archivos(); letraMinima(); }, 120); };
+  // G20: botones de un solo ícono (sin palabras) y casi cuadrados → redondos (.cfx-redondo en tema.css). La barra de abajo y el + no se tocan.
+  const SOLO_IC = /^[\p{Extended_Pictographic}\u{FE0F}\u{200D}\s‹›←→✕×+−]*$/u;
+  function redondos() {
+    document.querySelectorAll('button:not(.cfx-redondo):not([data-cfx-cuadrado]), a.icon-btn:not(.cfx-redondo), header a:not(.cfx-redondo)').forEach((b) => {
+      if (b.closest('.cfx-barra, nav.tabs, .cfx-pnl, .prods, .cfx-mh-grid') || b.classList.contains('cfx-mas') || !b.offsetParent) return;
+      const t = (b.textContent || '').trim(); if (!SOLO_IC.test(t) || (!t && !b.querySelector('svg, img, .ico-svg'))) return;
+      const w = b.offsetWidth, h = b.offsetHeight; if (!w || w > 56 || Math.abs(w - h) > 6) return;
+      b.classList.add('cfx-redondo');
+    });
+  }
+  const pedirTiras = () => { clearTimeout(tTiras); tTiras = setTimeout(() => { separarBotones(); tiras(); avisosDeslizar(); selAccion(); cuentaEnMas(); archivos(); letraMinima(); redondos(); }, 120); };
   new MutationObserver(pedirTiras).observe(document.documentElement, { childList: true, subtree: true });
   addEventListener('resize', pedirTiras); addEventListener('hashchange', pedirTiras); pedirTiras();
 

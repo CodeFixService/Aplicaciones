@@ -251,7 +251,56 @@
   addEventListener('click', (e) => { if (e.target.closest && e.target.closest('nav.cfx-barra')) verBarra(); }, { capture: true, passive: true });
   addEventListener('resize', () => { if (innerWidth >= 900) verBarra(); });
 
-  window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra };
+  // ---------- G20: deslizar el dedo a la izquierda/derecha cambia de pestaña ----------
+  // Primero las pestañas de la página (nav.tabs.sub, [role=tablist], .seg…) que estén a la vista; si no hay, la barra de abajo.
+  // No actúa sobre campos, hojas/ventanas abiertas, tiras que se deslizan de lado, carruseles ni avisos deslizables.
+  const GRUPOS = 'nav.tabs.sub, [role=tablist], .seg, .segs, .seg2, .tabs2, [data-cfx-pestanas]';
+  const esActiva = (b) => b.matches('.on, .active, .activo, [aria-selected=true], [aria-current=page], [aria-current=true]');
+  const visibles = (g) => Array.from(g.children).filter((b) => /^(A|BUTTON)$/.test(b.tagName) && !b.disabled && !b.hidden && b.offsetParent && !b.classList.contains('cfx-oculto') && !b.classList.contains('cfx-oc'));
+  function correLado(el) {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      if (e.scrollWidth > e.clientWidth + 4 && /auto|scroll/.test(getComputedStyle(e).overflowX)) return true;
+    }
+    return false;
+  }
+  function grupoPagina(y) {
+    const L = Array.from(document.querySelectorAll(GRUPOS)).filter((g) => {
+      if (g.closest('.cfx-barra, .cfx-hoja-m, dialog, [hidden]') || !g.offsetParent) return false;
+      const r = g.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && visibles(g).some(esActiva);
+    });
+    // El grupo más cercano por encima del dedo (o el primero que se vea).
+    return L.filter((g) => g.getBoundingClientRect().top <= y).pop() || L[0] || null;
+  }
+  function pasar(dir, y) {
+    const g = grupoPagina(y) || barraNav();
+    if (!g) return false;
+    let L = visibles(g);
+    if (g.classList.contains('cfx-barra')) L = L.filter((b) => !b.classList.contains('cfx-mas') && b.dataset.k !== '+' && (b.tagName === 'A' ? !!b.getAttribute('href') : true));
+    const i = L.findIndex(esActiva), b = i < 0 ? null : L[i + dir];
+    if (!b) return false;
+    b.click();
+    try { b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }); } catch (e) { /* nada */ }
+    return true;
+  }
+  let dz = null;
+  addEventListener('touchstart', (e) => {
+    dz = null;
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0], el = e.target;
+    if (!el || !el.closest || el.closest('input, textarea, select, [contenteditable], canvas, video, iframe, dialog, .cfx-hoja-m, .cfx-pnl, .cfx-mv, .cfx-aviso-desl, .cfx-emerg, [data-cfx-sin-deslizar]')) return;
+    if (document.documentElement.classList.contains('cfx-hoja-on') || document.querySelector('dialog[open]')) return;
+    if (t.clientX < 18 || t.clientX > innerWidth - 18) return;  // la orilla es del gesto "atrás" del teléfono
+    if (correLado(el)) return;
+    dz = { x: t.clientX, y: t.clientY, t: Date.now() };
+  }, { passive: true });
+  addEventListener('touchend', (e) => {
+    if (!dz) return; const t = e.changedTouches[0], dx = t.clientX - dz.x, dy = t.clientY - dz.y, dt = Date.now() - dz.t, y = dz.y; dz = null;
+    if (dt > 700 || Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2.2) return;
+    const sel = window.getSelection && String(window.getSelection()); if (sel) return;
+    pasar(dx < 0 ? 1 : -1, y);
+  }, { passive: true });
+
+  window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra, pasar };
   const iniciar = () => setTimeout(() => { montar(); setTimeout(() => document.documentElement.classList.add('cfx-barra-lista'), 1200); }, 0);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
   // Barras que la app dibuja después (al iniciar sesión).

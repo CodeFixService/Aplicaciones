@@ -8,6 +8,7 @@
 <title>Pedidos · Órbita</title>
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="icon" href="../../icons/icon-192.png">
+<link rel="stylesheet" href="../../shared/vendor/bootstrap-utilities.min.css">
 <link rel="stylesheet" href="../../shared/core.css">
 <link rel="stylesheet" href="../../shared/tema.css">
 <script src="../../shared/seguro.js"></script>
@@ -423,7 +424,7 @@
     $('sSegL').innerHTML = !sg.total ? '<p class="empty">Nadie en este grupo por ahora.</p>' :
       '<div class="camp"><b>💡 Campaña sugerida</b><p style="margin:4px 0">' + Core.esc(msg('{nombre}', tienda, pct ? pct + '% de descuento con el código ' + codigo : '')) + '</p>' +
       (puedeCupon ? (hecho ? '<p class="muted" style="margin:0">✅ Cupón ' + codigo + ' listo: ya va en cada mensaje.</p>'
-        : '<button class="small" id="bCampCupon">🏷️ Crear cupón ' + codigo + ' (' + pct + '%, 14 días)</button>') : '') + '</div>' +
+        : '<button class="small" id="bCampCupon">🏷️ Crear cupón ' + codigo + '</button><small class="cfx-nota-btn">' + pct + '% de descuento, dura 14 días.</small>') : '') + '</div>' +
       '<ul class="list">' + sg.lista.map((c) => {
         const t = wa(c.tel), m = msg(c.nombre, tienda, regalo) + (link ? ' ' + link : '');
         return '<li class="row" style="align-items:center;gap:8px"><div style="flex:3;min-width:0"><b>' + Core.esc(c.nombre) + '</b><br><small class="muted">' + c.compras + (c.compras === 1 ? ' compra' : ' compras') +

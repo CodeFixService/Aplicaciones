@@ -112,7 +112,22 @@
     window.CFX_AYUDA_PEND = Object.assign(window.CFX_AYUDA_PEND || {}, { rpc, app: 'orbita', admin: !!a.is_admin, premium: !!a.is_pro, id: a.id, hasta: a.pro_until,
       nombre: a.empresa || a.nombre || '', email: a.email, foto: null, quitar: '.pill.admin, #licTag',
       cuenta: rootPath + '#ajustes', panel: a.is_admin && !/\/apps\/admin\//.test(location.pathname) ? rootPath + 'apps/admin/' : null,
-      salir: async () => { await signOut(); location.replace(rootPath); } });
+      salir: async () => { await signOut(); location.replace(rootPath); },
+      // 🔔 G20: la campana abre la ventana de avisos del núcleo (deslizar = borrar; tocar = texto completo).
+      avisos: {
+        lista: async () => {
+          const d = account && account.avisos_limpios_at ? new Date(account.avisos_limpios_at) : null;
+          return ((await rpc('my_inbox')) || []).filter((n) => !d || new Date(n.sent_at) > d)
+            .map((n) => ({ id: n.id, titulo: n.title, cuerpo: n.body, de: n.de, fecha: n.sent_at, leido: !!n.leido, url: n.url, imagen: n.image }));
+        },
+        leer: (id) => rpc('mark_notification_read', { p_id: id }),
+        borrar: (id) => rpc('ocultar_aviso', { p_id: id }),
+        limpiar: async () => {
+          const t = await rpc('limpiar_mis_avisos');
+          account.avisos_limpios_at = t || new Date().toISOString();
+          try { localStorage.setItem('cfx:cuenta', JSON.stringify(account)); } catch (e) { /* sin espacio */ }
+        }
+      } });
     if (window.CFX_AYUDA) window.CFX_AYUDA.iniciar(window.CFX_AYUDA_PEND);
   }
   // Perfil común del núcleo (ayuda.js → CFX_PERFIL), en todas las páginas: aquí solo cómo guarda Órbita.
