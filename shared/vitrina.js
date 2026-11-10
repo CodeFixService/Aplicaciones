@@ -1,7 +1,7 @@
 // CodeFix · Núcleo · Vitrina (perfil del negocio): tarjeta de portada para la página pública (logo, nombre, rubro, estado, estrellas,
 // descripción, dirección con mapa, horario, WhatsApp, redes y compartir) y los campos para editarlo en Ajustes.
 //   CodeFixVitrina.montar(nodo, t)          t = { empresa, logo, color, rubro, horario, abierto, vacaciones_hasta, vacaciones_msg,
-//                                               estrellas: {promedio,total}, telefono, desde, perfil: {descripcion, direccion, comuna,
+//                                               estrellas: {promedio,total}, telefono, wa_texto (mensaje listo, opcional), desde, perfil: {descripcion, direccion, comuna,
 //                                               instagram, facebook, tiktok, web, correo} }
 //   CodeFixVitrina.editor(nodo, perfil)     dibuja los campos; CodeFixVitrina.leer(nodo) devuelve el objeto para guardar.
 (function () {
@@ -67,7 +67,8 @@
     if (p.web) redes.push(['🌐 Sitio web', p.web]);
     if (redes.length) partes.push('<div class="pf-red">' + redes.map(([n, u]) => '<a href="' + esc(window.CFX_URL(u)) + '" target="_blank" rel="noopener">' + esc(n) + '</a>').join('') + '</div>');
     const tel = String(t.telefono || '').replace(/\D/g, '');
-    partes.push('<div class="pf-acc">' + (tel ? '<a class="btn ok" href="https://wa.me/' + tel + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '') +
+    const wa = 'https://wa.me/' + tel + (t.wa_texto ? '?text=' + encodeURIComponent(t.wa_texto) : '');
+    partes.push('<div class="pf-acc">' + (tel ? '<a class="btn ok" href="' + esc(wa) + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '') +
       '<button type="button" class="alt" data-pf="compartir">🔗 Compartir tienda</button></div>');
     nodo.innerHTML = '<section class="pf"><div class="pf-ban"></div><div class="pf-cab"><div class="pf-logo"' + logo + '>' + (logo ? '' : esc((t.empresa || '?').charAt(0).toUpperCase())) +
       '</div><div class="pf-nom"><h2>' + esc(t.empresa || 'Tienda') + '</h2>' + (t.rubro ? '<div class="muted">' + esc(t.rubro) + '</div>' : '') + '</div></div>' +

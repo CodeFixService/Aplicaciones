@@ -5329,7 +5329,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.37'::text $$;
+language sql immutable as $$ select '5.38'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5392,6 +5392,202 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.38 · G37 🔌 Avisos a otro sistema (webhooks). La tienda Pro pega una URL https y Órbita le manda (POST JSON firmado)
+--  cada pedido nuevo y cada cambio de estado. Cola con reintentos (1, 5, 30 min, 2 h y 12 h); 20 fallos seguidos lo pausan y avisan.
+--  Encabezados: X-CodeFix-Evento, X-CodeFix-Id (id del evento: sirve para no procesarlo dos veces) y
+--  X-CodeFix-Firma: t=<segundos unix>,v1=<hex de HMAC-SHA256(secreto, t || '.' || cuerpo)>. Guía: docs/webhooks.md.
+--  Un pedido nunca falla por esto (el gancho no lanza errores) y los envíos se borran a los 7 días.
+-- =====================================================================
+create table if not exists public.webhooks (
+  owner_id      uuid primary key references public.profiles (id) on delete cascade,
+  url           text not null check (length(url) <= 300),
+  secreto       text not null,
+  activo        boolean not null default true,
+  fallos        int not null default 0,
+  ultimo_at     timestamptz,
+  ultimo_status int,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+alter table public.webhooks enable row level security;
+revoke all on public.webhooks from anon, authenticated;
+
+create table if not exists public.webhook_envios (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null references public.profiles (id) on delete cascade,
+  evento      text not null,
+  pedido_id   uuid,
+  cuerpo      jsonb not null,
+  intentos    int not null default 0,
+  proximo     timestamptz not null default now(),
+  estado      text not null default 'pendiente' check (estado in ('pendiente', 'ok', 'error')),
+  status      int,
+  respuesta   text,
+  enviado_at  timestamptz,
+  created_at  timestamptz not null default now()
+);
+create index if not exists webhook_envios_pend_idx on public.webhook_envios (proximo) where estado = 'pendiente';
+create index if not exists webhook_envios_owner_idx on public.webhook_envios (owner_id, created_at desc);
+alter table public.webhook_envios enable row level security;
+revoke all on public.webhook_envios from anon, authenticated;
+
+-- Solo https a un nombre de dominio público (sin IPs, localhost ni redes internas) y sin usuario:clave en la URL.
+create or replace function public.webhook_url_ok(p_url text) returns boolean
+language sql immutable set search_path = '' as $$
+  select coalesce(length(p_url) <= 300
+    and lower(p_url) ~ '^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(:443)?(/[^[:space:]]*)?$'
+    and lower(substring(p_url from '^https://([^/:]+)')) !~ '(^|\.)(localhost|local|internal|intranet|lan|home|corp|arpa|test|invalid|example)$', false)
+$$;
+
+-- Lo que recibe el sistema de la tienda: el pedido con sus líneas y el contacto del cliente (datos que el dueño ya ve en Pedidos).
+create or replace function public.webhook_cuerpo(p_id uuid, p_evento text, x public.pedidos, p_antes text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', p_id, 'evento', p_evento, 'creado', now(),
+    'tienda', jsonb_build_object('slug', t.slug, 'nombre', t.empresa),
+    'pedido', jsonb_build_object('id', x.id, 'estado', x.estado, 'estado_anterior', p_antes,
+      'fecha', x.created_at, 'pagado', x.pagado_at is not null, 'total', x.total, 'subtotal', x.subtotal, 'descuento', x.descuento,
+      'costo_despacho', x.costo_despacho, 'cupon', x.cupon, 'entrega', x.entrega, 'direccion', x.direccion, 'comuna', x.comuna, 'nota', x.nota,
+      'lineas', (select coalesce(jsonb_agg(jsonb_build_object('clave', l ->> 'clave', 'nombre', l ->> 'nombre', 'opcion', l ->> 'opcion',
+          'cantidad', (l ->> 'cant')::numeric, 'precio', (l ->> 'precio')::numeric, 'subtotal', (l ->> 'subtotal')::numeric)), '[]')
+        from jsonb_array_elements(case when jsonb_typeof(x.lineas) = 'array' then x.lineas else '[]' end) l),
+      'cliente', jsonb_build_object('nombre', coalesce(nullif(c.empresa, ''), x.invitado_nombre, 'Cliente'), 'telefono', coalesce(c.telefono, x.invitado_tel))))
+  from public.profiles t left join public.profiles c on c.id = x.cliente_id
+  where t.id = x.negocio_id
+$$;
+
+-- Gancho: pedido nuevo o cambio de estado → a la cola (si la tienda es Pro y tiene la URL activa).
+create or replace function public.webhook_pedido() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v uuid := gen_random_uuid(); ev text := case when tg_op = 'INSERT' then 'pedido.creado' else 'pedido.estado' end;
+begin
+  if tg_op = 'UPDATE' and new.estado is not distinct from old.estado then return null; end if;
+  if not exists (select 1 from public.webhooks w where w.owner_id = new.negocio_id and w.activo) or not public.is_pro(new.negocio_id) then return null; end if;
+  insert into public.webhook_envios (id, owner_id, evento, pedido_id, cuerpo)
+  values (v, new.negocio_id, ev, new.id, public.webhook_cuerpo(v, ev, new, case when tg_op = 'UPDATE' then old.estado end));
+  return null;
+exception when others then
+  return null; -- el pedido sigue igual aunque falle el aviso
+end $$;
+drop trigger if exists pedidos_webhook on public.pedidos;
+create trigger pedidos_webhook after insert or update of estado on public.pedidos for each row execute function public.webhook_pedido();
+
+-- Envía lo que toca (cron cada minuto; o uno solo con p_id para la prueba). Respuesta 2xx = entregado.
+create or replace function public.webhook_enviar(p_id uuid default null) returns int
+language plpgsql security definer set search_path = '' as $$
+declare e record; ts text; cuerpo text; st int; c text; ok boolean; n int := 0; pausa boolean;
+begin
+  for e in select v.id, v.owner_id, v.evento, v.cuerpo, v.intentos, w.url, w.secreto
+           from public.webhook_envios v join public.webhooks w on w.owner_id = v.owner_id
+           where v.estado = 'pendiente' and (p_id is null or v.id = p_id) and (p_id is not null or (v.proximo <= now() and w.activo))
+           order by v.proximo limit 25 for update of v skip locked loop
+    ts := extract(epoch from now())::bigint::text; cuerpo := e.cuerpo::text;
+    begin
+      if not public.webhook_url_ok(e.url) then raise exception 'URL no permitida'; end if;
+      perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '5');
+      execute 'select status, left(content, 300) from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+        using 'POST', e.url, array[row('X-CodeFix-Evento', e.evento)::extensions.http_header, row('X-CodeFix-Id', e.id::text)::extensions.http_header,
+          row('X-CodeFix-Firma', 't=' || ts || ',v1=' || encode(extensions.hmac(ts || '.' || cuerpo, e.secreto, 'sha256'), 'hex'))::extensions.http_header,
+          row('User-Agent', 'CodeFix-Webhooks/1')::extensions.http_header], 'application/json', cuerpo;
+    exception when others then st := 0; c := left(sqlerrm, 300);
+    end;
+    ok := coalesce(st between 200 and 299, false);
+    update public.webhook_envios set intentos = intentos + 1, status = st, respuesta = c, enviado_at = now(),
+      estado = case when ok then 'ok' when intentos + 1 >= 6 or evento = 'ping' then 'error' else 'pendiente' end,
+      proximo = now() + (array[1, 5, 30, 120, 720])[least(intentos + 1, 5)] * interval '1 minute'
+    where id = e.id;
+    update public.webhooks set ultimo_at = now(), ultimo_status = st, fallos = case when ok then 0 else fallos + 1 end,
+      activo = activo and (ok or fallos + 1 < 20), updated_at = now()
+    where owner_id = e.owner_id returning fallos = 20 and not activo into pausa;
+    if pausa then
+      perform public.notify_user(e.owner_id, '🔌 Avisos a tu sistema en pausa', 'Tu URL no respondió 20 veces seguidas. Revísala en Ajustes → Vender en redes.', './#redes');
+    end if;
+    n := n + 1;
+  end loop;
+  if p_id is null then delete from public.webhook_envios where created_at < now() - interval '7 days'; end if;
+  return n;
+end $$;
+
+create or replace function public.webhook_dueno() returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if not exists (select 1 from public.profiles p where p.id = me and p.role in ('user', 'admin')) then raise exception 'Solo el dueño de la tienda'; end if;
+  return me;
+end $$;
+
+-- Ajustes → Vender en redes: datos de la tienda + estado de los avisos (el secreto lo ve solo el dueño).
+create or replace function public.conexiones_estado() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := public.webhook_dueno(); w public.webhooks;
+begin
+  select * into w from public.webhooks where owner_id = me;
+  return (select jsonb_build_object('slug', public.asegurar_slug(me), 'empresa', t.empresa, 'telefono', t.telefono, 'pro', public.is_pro(me),
+    'webhook', case when w.owner_id is not null then jsonb_build_object('url', w.url, 'activo', w.activo, 'secreto', w.secreto, 'fallos', w.fallos,
+      'ultimo_at', w.ultimo_at, 'ultimo_status', w.ultimo_status,
+      'envios', (select coalesce(jsonb_agg(z order by z.fecha desc), '[]') from (select v.evento, v.estado, v.status, v.intentos, v.created_at as fecha,
+          v.cuerpo #>> '{pedido,estado}' as pedido_estado from public.webhook_envios v where v.owner_id = me order by v.created_at desc limit 10) z)) end)
+    from public.profiles t where t.id = me);
+end $$;
+
+-- Guardar la URL (null = quitar los avisos). El secreto se crea la primera vez.
+create or replace function public.webhook_guardar(p_url text, p_activo boolean default true) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := public.webhook_dueno(); u text := nullif(trim(coalesce(p_url, '')), '');
+begin
+  if u is null then
+    delete from public.webhooks where owner_id = me;
+    delete from public.webhook_envios where owner_id = me;
+    return public.conexiones_estado();
+  end if;
+  if not public.is_pro(me) then raise exception 'Los avisos a otro sistema son de la versión Pro'; end if;
+  if not public.webhook_url_ok(u) then raise exception 'La URL debe empezar con https:// y ser un dominio público (sin IP ni localhost)'; end if;
+  insert into public.webhooks (owner_id, url, secreto, activo)
+  values (me, u, 'whsec_' || encode(extensions.gen_random_bytes(24), 'hex'), coalesce(p_activo, true))
+  on conflict (owner_id) do update set url = excluded.url, activo = excluded.activo, updated_at = now(),
+    fallos = case when (excluded.activo and not public.webhooks.activo) or excluded.url <> public.webhooks.url then 0 else public.webhooks.fallos end;
+  return public.conexiones_estado();
+end $$;
+
+-- Secreto nuevo (si se filtró): el anterior deja de servir al tiro.
+create or replace function public.webhook_secreto_nuevo() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := public.webhook_dueno();
+begin
+  update public.webhooks set secreto = 'whsec_' || encode(extensions.gen_random_bytes(24), 'hex'), updated_at = now() where owner_id = me;
+  if not found then raise exception 'Primero guarda la URL'; end if;
+  return public.conexiones_estado();
+end $$;
+
+-- 🧪 Probar: manda un aviso "ping" ahora mismo y devuelve lo que respondió la URL (máx. 10 por hora).
+create or replace function public.webhook_probar() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := public.webhook_dueno(); v uuid := gen_random_uuid(); r public.webhook_envios;
+begin
+  if not exists (select 1 from public.webhooks where owner_id = me) then raise exception 'Primero guarda la URL'; end if;
+  if not public.is_pro(me) then raise exception 'Los avisos a otro sistema son de la versión Pro'; end if;
+  if (select count(*) from public.webhook_envios where owner_id = me and evento = 'ping' and created_at > now() - interval '1 hour') >= 10 then
+    raise exception 'Ya probaste 10 veces en esta hora. Espera un rato.'; end if;
+  insert into public.webhook_envios (id, owner_id, evento, cuerpo)
+  values (v, me, 'ping', jsonb_build_object('id', v, 'evento', 'ping', 'creado', now(),
+    'tienda', (select jsonb_build_object('slug', slug, 'nombre', empresa) from public.profiles where id = me)));
+  perform public.webhook_enviar(v);
+  select * into r from public.webhook_envios where id = v;
+  return jsonb_build_object('ok', r.estado = 'ok', 'status', r.status, 'respuesta', r.respuesta);
+end $$;
+
+revoke all on function public.webhook_url_ok(text), public.webhook_cuerpo(uuid, text, public.pedidos, text), public.webhook_pedido(),
+  public.webhook_enviar(uuid), public.webhook_dueno() from public, anon, authenticated;
+revoke all on function public.conexiones_estado(), public.webhook_guardar(text, boolean), public.webhook_secreto_nuevo(), public.webhook_probar() from public, anon;
+grant execute on function public.conexiones_estado(), public.webhook_guardar(text, boolean), public.webhook_secreto_nuevo(), public.webhook_probar() to authenticated;
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'webhooks';
+  perform cron.schedule('webhooks', '* * * * *', 'select public.webhook_enviar()');
+exception when others then
+  raise notice 'Envío de webhooks no programado (%).', sqlerrm;
+end $$;
 
 -- =====================================================================
 --  VERSIÓN 5.37 · G16 F30: Pedidos → Estadísticas en vivo. Suma hoy, ventas de cada día (30 días) y pedidos por hora,
@@ -6732,7 +6928,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;

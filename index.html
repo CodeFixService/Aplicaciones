@@ -17,6 +17,14 @@
 <script src="shared/core.js"></script>
 <script src="shared/despacho.js"></script>
 <style>
+  #redesBody h3{margin:16px 0 4px;font-size:16px}
+  #redesBody h3:first-child{margin-top:0}
+  .rd-item{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
+  .rd-item textarea{resize:none}
+  .rd-pie{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+  .rd-pie small{flex:1;min-width:0;overflow-wrap:anywhere}
+  .rd-pie button{flex:none}
+  .rd-env li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
   .app {
     position: relative; display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--text);
@@ -264,6 +272,11 @@
       <div id="boletaBody"></div>
     </div>
 
+    <div class="card hidden" id="cRedes"><span id="redes"></span>
+      <h2>📲 Vender en redes</h2>
+      <div id="redesBody"></div>
+    </div>
+
     <div class="card hidden" id="cEquipo"><span id="equipo"></span>
       <h2>🧑‍🍳 Mi equipo <span class="pill pro">PRO</span></h2>
       <p class="muted">Cada persona tiene un rol: <b>Vendedor</b> (Caja y Pedidos), <b>Bodega</b> (Inventario y Pedidos) o <b>Admin</b> (Caja, Inventario, Pedidos y Estadísticas). Nadie del equipo ve tus links de pago, tu plan ni tus ajustes.</p>
@@ -346,13 +359,13 @@
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta)$/.test(location.hash);
-  let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho y #boleta abren su hoja
+  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta|redes)$/.test(location.hash);
+  let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta y #redes abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta)$/.test(location.hash) ? location.hash.slice(1) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta|redes)$/.test(location.hash) ? location.hash.slice(1) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -482,7 +495,7 @@
     Cuenta.revisarActualizacion();
     if (acc.role === 'user') cargarTienda(acc);
     if (acc.role !== 'client') cargarHoy(acc);
-    if (acc.role === 'user') { cargarLinks(); cargarMp(); cargarBoleta(); cargarEquipo(); }
+    if (acc.role === 'user') { cargarLinks(); cargarMp(); cargarBoleta(); cargarEquipo(); cargarRedes(); }
     cargarPagos();
     // Núcleo (pagos.js): tienda nueva que debe su primer pago → pantalla de activación.
     // Núcleo (ayuda.js): cabecera común, guía para partir, chat con soporte y términos.
@@ -575,6 +588,7 @@
         dueno && { k: 'links', ico: '💳', t: 'Links de pago', grupo: 'Tu tienda', nodo: $('cLinks') },
         dueno && { k: 'despacho', ico: '🚚', t: 'Despacho', grupo: 'Tu tienda', nodo: $('cDespacho') },
         dueno && { k: 'boleta', ico: '🧾', t: 'Boleta SII', d: 'Boleta electrónica de tus pedidos', grupo: 'Tu tienda', nodo: $('cBoleta') },
+        dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp Business, Google, Instagram y avisos a tu sistema', grupo: 'Tu tienda', nodo: $('cRedes') },
         dueno && { k: 'equipo', ico: '🧑‍🍳', t: 'Mi equipo', dato: acc.is_pro ? '' : 'PRO', grupo: 'Tu tienda', nodo: $('cEquipo') },
         !equipo && { k: 'premium', ico: '⭐', t: 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
         cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
@@ -868,6 +882,66 @@
         giro: $('bGiro').value, direccion: $('bDir').value, comuna: $('bComuna').value, apikey: $('bKey').value, auto: $('bAuto').checked } });
       Core.toast(a === 'quitar' ? 'Boleta quitada' : '🧾 Datos de boleta guardados'); cargarBoleta();
     } catch (err) { Core.toast(err.message); e.target.disabled = false; }
+  };
+  /* ---------- 📲 G35-G37: vender en WhatsApp Business, Google e Instagram + 🔌 avisos a otro sistema (webhooks, Pro) ---------- */
+  let redes = null;
+  async function cargarRedes() {
+    try { redes = await Cuenta.rpc('conexiones_estado'); } catch (e) { $('redesBody').innerHTML = '<p class="muted">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
+    pintarRedes();
+  }
+  function pintarRedes() {
+    const r = redes, e = Core.esc, tienda = Core.rootUrl() + 't/?s=' + encodeURIComponent(r.slug), tel = String(r.telefono || '').replace(/\D/g, '');
+    const feedUrl = Core.rootUrl() + 't/feed?s=' + encodeURIComponent(r.slug);
+    const caja = (t, v, donde, n) => '<div class="rd-item"><b>' + t + '</b>' + (n > 1 ? '<textarea readonly rows="' + Math.max(n, Math.ceil(v.length / 28) + 1) + '">' + e(v) + '</textarea>' : '<input readonly value="' + e(v) + '">') +
+      '<div class="rd-pie"><small class="muted">' + donde + '</small><button type="button" class="small alt" data-rd-copiar="' + e(v) + '">📋 Copiar</button></div></div>';
+    const bienvenida = '¡Hola! 👋 Gracias por escribir a ' + r.empresa + '. Mira el catálogo y haz tu pedido aquí: ' + tienda;
+    let h = '<h3>💬 WhatsApp Business</h3><p class="muted" style="margin:0 0 8px">Copia y pega en tu WhatsApp Business. Todo lleva a tu tienda, donde el cliente ve precios y stock al día.</p>' +
+      caja('🔗 Link de tu tienda', tienda, 'WhatsApp Business → ⚙️ Herramientas para la empresa → Perfil de empresa → Sitio web.', 1) +
+      caja('👋 Mensaje de bienvenida', bienvenida, 'Herramientas para la empresa → Mensaje de bienvenida (y Mensaje de ausencia).', 3) +
+      caja('⚡ Respuesta rápida', '🛍️ Nuestro catálogo con precios: ' + tienda, 'Herramientas para la empresa → Respuestas rápidas → ➕ · atajo: catalogo', 2) +
+      (tel.length >= 8 ? caja('📱 Link para que te escriban', 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Hola 👋 Quiero hacer un pedido'), 'Pégalo en la bio de Instagram, Facebook o TikTok: abre tu WhatsApp con el mensaje listo.', 1)
+        : '<p class="muted">📱 Agrega tu WhatsApp en <a href="#" data-rd-ir="tienda">Mi tienda</a> para tener el link directo a tu chat.</p>');
+    h += '<h3>🛍️ Catálogo para Google e Instagram</h3><p class="muted" style="margin:0 0 8px">Un link con todos tus productos (nombre, precio, foto, stock). Se actualiza solo cada hora; los productos sin precio no salen.</p>' +
+      caja('📦 Link del catálogo', feedUrl, '<b>Google</b>: merchants.google.com → Productos → Agregar productos → Archivo → Link (URL) → pega → cada día.<br>' +
+        '<b>Instagram y Facebook</b>: business.facebook.com/commerce → tu catálogo → Orígenes de datos → Feed de datos → Programado → pega → cada día.', 1);
+    const w = r.webhook;
+    h += '<h3>🔌 Avisos a tu sistema <span class="pill pro">PRO</span></h3>';
+    if (!r.pro) h += '<p class="muted">Con Pro, cada pedido nuevo y cada cambio de estado llega solo a tu planilla, tu sistema o Zapier/Make (webhook firmado).</p><div class="btns"><button type="button" class="small" data-rd-ir="premium">⭐ Ver Pro</button></div>';
+    else {
+      const est = !w ? '' : !w.activo ? '⏸️ En pausa' + (w.fallos >= 20 ? ' (la URL falló ' + w.fallos + ' veces)' : '') : w.ultimo_at ? (w.ultimo_status >= 200 && w.ultimo_status < 300 ? '✅ Funcionando' : '⚠️ Último intento falló (' + (w.ultimo_status || 'sin respuesta') + ')') : '✅ Listo, esperando el primer pedido';
+      h += '<p class="muted" style="margin:0 0 6px">Para tu programador o para Zapier/Make: cada pedido nuevo y cada cambio de estado llega como POST JSON a tu URL, firmado con tu secreto. ' +
+        '<a href="docs/webhooks.md" target="_blank" rel="noopener">📄 Cómo conectarlo</a></p>' + (est ? '<p style="margin:0 0 6px"><b>' + e(est) + '</b></p>' : '') +
+        '<label for="whUrl">URL (https)</label><input id="whUrl" type="url" inputmode="url" maxlength="300" placeholder="https://hooks.zapier.com/…" value="' + e(w ? w.url : '') + '">' +
+        '<label class="terms"><input type="checkbox" id="whOn"' + (!w || w.activo ? ' checked' : '') + '> <span>Activo</span></label>' +
+        (w ? '<label for="whSec">Secreto para revisar la firma</label><div class="row" style="gap:6px"><input id="whSec" type="password" readonly value="' + e(w.secreto) + '" style="flex:1;min-width:0">' +
+          '<button type="button" class="small alt" style="flex:none" aria-label="Copiar secreto" data-rd-copiar="' + e(w.secreto) + '">📋</button></div>' : '') +
+        '<div class="btns"><button type="button" class="small" data-rd="guardar">Guardar</button>' + (w ? '<button type="button" class="small alt" data-rd="probar">🧪 Probar</button>' +
+          '<button type="button" class="small alt" data-rd="secreto">🔄 Secreto nuevo</button><button type="button" class="small alt" data-rd="quitar">Quitar</button>' : '') + '</div>' +
+        (w && w.envios && w.envios.length ? '<b>Últimos envíos</b><ul class="list rd-env">' + w.envios.map((x) => '<li><span class="grow">' + (x.estado === 'ok' ? '✅' : x.estado === 'error' ? '❌' : '⏳') + ' ' +
+          e(x.evento === 'ping' ? 'Prueba' : x.evento === 'pedido.creado' ? 'Pedido nuevo' : 'Pedido: ' + (x.pedido_estado || '')) + '</span><small class="muted">' +
+          e(new Date(x.fecha).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })) + (x.status ? ' · ' + x.status : '') + (x.estado === 'pendiente' && x.intentos ? ' · reintento ' + x.intentos : '') + '</small></li>').join('') + '</ul>' : '');
+    }
+    $('redesBody').innerHTML = h;
+  }
+  $('redesBody').onclick = async (ev) => {
+    const c = ev.target.closest('[data-rd-copiar]'), ir = ev.target.closest('[data-rd-ir]'), b = ev.target.closest('[data-rd]');
+    if (c) return Core.copiar(c.dataset.rdCopiar);
+    if (ir) { ev.preventDefault(); return MENU_O && MENU_O.abrir(ir.dataset.rdIr); }
+    if (!b) return;
+    const a = b.dataset.rd;
+    if (a === 'quitar' && !confirm('¿Quitar los avisos a tu sistema? Dejarán de llegar los pedidos a esa URL.')) return;
+    if (a === 'secreto' && !confirm('¿Crear un secreto nuevo? El anterior deja de servir al tiro: cámbialo también en tu sistema.')) return;
+    b.disabled = true;
+    try {
+      if (a === 'probar') {
+        const x = await Cuenta.rpc('webhook_probar');
+        Core.toast(x.ok ? '✅ Tu URL respondió ' + x.status : '❌ Tu URL no respondió bien (' + (x.status || 'sin respuesta') + ')');
+        return cargarRedes();
+      }
+      redes = await Cuenta.rpc(a === 'secreto' ? 'webhook_secreto_nuevo' : 'webhook_guardar', a === 'secreto' ? {} : { p_url: a === 'quitar' ? null : $('whUrl').value, p_activo: $('whOn').checked });
+      Core.toast(a === 'quitar' ? 'Avisos quitados' : a === 'secreto' ? '🔄 Secreto nuevo listo' : '🔌 Guardado');
+      pintarRedes();
+    } catch (err) { Core.toast(err.message); b.disabled = false; }
   };
   $('linksBody').onclick = async (e) => {
     const n = e.target.dataset.gl;

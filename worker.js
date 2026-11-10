@@ -2,6 +2,9 @@
 // Cloudflare corre este Worker SOLO para /t/* (wrangler.jsonc → run_worker_first). Todo lo demás son archivos estáticos.
 // · /t/?s=tienda[&p=producto] → la misma página, con título, descripción, og:* y datos estructurados (schema.org) de esa tienda o producto.
 // · /t/og?s=tienda[&p=producto] → la imagen de la vista previa (logo o foto del producto; si no hay, el ícono de Órbita).
+// · /t/feed?s=tienda → G36 catálogo para Google Merchant Center y Meta (Facebook/Instagram): RSS 2.0 con g:* (se actualiza cada hora).
+//   &f=json → el mismo catálogo en JSON (API pública de solo lectura, para conectar otros sistemas).
+// /t/og y /t/feed quedan en la caché de Cloudflare (caches.default): miles de lecturas no llegan a Supabase.
 // WhatsApp y los buscadores no corren JavaScript: por eso las etiquetas se ponen aquí, antes de mandar la página.
 // Si Supabase no responde en 1,5 s, se manda la página tal cual (nunca queda más lenta ni rota).
 let CFG = null; // { url, key } leídos de shared/config.js (una vez por isolate)
@@ -38,6 +41,7 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':
 const corto = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
 const pesos = (n) => '$' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const limpio = (s) => String(s || '').toLowerCase().trim().slice(0, 80);
+const xml = (s) => esc(String(s == null ? '' : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, ''));
 const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 
 // Etiquetas de la tienda (o del producto) para el <head>.
@@ -88,6 +92,43 @@ export function armar(html, e) {
   return h;
 }
 
+// G36: feed de productos. Solo los que tienen precio; sin foto usa el logo. id = clave del producto (estable).
+export function feed(origen, t, items, f) {
+  const link = (i) => origen + '/t/?s=' + encodeURIComponent(t.slug) + '&p=' + encodeURIComponent(i.clave);
+  const foto = (i) => origen + '/t/og?s=' + encodeURIComponent(t.slug) + (i.foto_v ? '&p=' + encodeURIComponent(i.clave) + '&v=' + i.foto_v : '&v=' + hash(String(t.logo || '').slice(-64)));
+  const l = (items || []).filter((i) => i && i.clave && Number(i.precio) > 0).slice(0, 5000).map((i) => ({
+    id: String(i.clave).slice(0, 50), titulo: corto(i.nombre, 150), descripcion: corto(i.descripcion || i.nombre + ' de ' + t.empresa, 5000),
+    precio: Math.round(Number(i.precio)), moneda: 'CLP', disponible: i.disponible !== 0, stock: i.disponible == null ? null : i.disponible,
+    categoria: i.categoria || null, link: link(i), imagen: foto(i) }));
+  if (f === 'json') return JSON.stringify({ tienda: { slug: t.slug, nombre: t.empresa, link: origen + '/t/?s=' + encodeURIComponent(t.slug) }, actualizado: new Date().toISOString(), productos: l });
+  const g = (k, v) => v == null || v === '' ? '' : '<g:' + k + '>' + xml(v) + '</g:' + k + '>';
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>' +
+    '<title>' + xml(t.empresa) + '</title><link>' + xml(origen + '/t/?s=' + encodeURIComponent(t.slug)) + '</link><description>' + xml('Productos de ' + t.empresa) + '</description>' +
+    l.map((i) => '\n<item>' + g('id', i.id) + g('title', i.titulo) + g('description', i.descripcion) + g('link', i.link) + g('image_link', i.imagen) +
+      g('availability', i.disponible ? 'in_stock' : 'out_of_stock') + g('price', i.precio + ' CLP') + g('condition', 'new') + g('brand', corto(t.empresa, 70)) +
+      g('identifier_exists', 'no') + g('product_type', i.categoria) + '</item>').join('') + '\n</channel></rss>';
+}
+
+async function catalogo(url, env) {
+  const s = limpio(url.searchParams.get('s')), f = url.searchParams.get('f') === 'json' ? 'json' : 'xml';
+  const err = (n, m) => [new Response(m, { status: n, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...(n === 503 ? { 'Retry-After': '300' } : {}) } }), false];
+  if (!s) return err(400, 'Falta ?s=tienda');
+  let t, items;
+  try { [t, items] = await Promise.all([rpc(env, url, 'tienda_publica', { p_slug: s }), rpc(env, url, 'catalogo_publico', { p_slug: s })]); } catch (e) { return err(503, 'Intenta de nuevo en unos minutos'); }
+  if (!t || !t.slug) return err(404, 'Tienda no encontrada');
+  return [new Response(feed(url.origin, t, items, f), { headers: { 'Content-Type': f === 'json' ? 'application/json; charset=utf-8' : 'application/xml; charset=utf-8',
+    'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff' } }), true];
+}
+
+// Caché de Cloudflare por URL: solo se guarda lo que salió bien (un corte de Supabase no queda pegado).
+async function conCache(req, ctx, hacer) {
+  const c = typeof caches !== 'undefined' && caches.default, k = new Request(req.url, { method: 'GET' });
+  if (c && req.method === 'GET') { try { const r = await c.match(k); if (r) return r; } catch (e) { /* sin caché */ } }
+  const [r, guardar] = await hacer();
+  if (c && guardar && req.method === 'GET' && r.status === 200) { const p = c.put(k, r.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
+  return r;
+}
+
 async function pagina(req, url, env) {
   const base = await env.ASSETS.fetch(req);
   const s = limpio(url.searchParams.get('s')), p = String(url.searchParams.get('p') || '').slice(0, 120);
@@ -116,14 +157,15 @@ async function imagen(url, env) {
     if (s && p) { const f = await rpc(env, url, 'fotos_publicas', { p_slug: s, p_claves: [p] }); img = deDataUrl(f && f[0] && f[0].foto); }
     if (s && !img) { const t = await rpc(env, url, 'tienda_publica', { p_slug: s }); img = deDataUrl(t && t.logo); }
   } catch (e) { img = null; }
-  if (!img) return env.ASSETS.fetch(new Request(new URL('/icons/icon-512.png', url)));
-  return new Response(img.bytes, { headers: { 'Content-Type': img.tipo, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' } });
+  if (!img) return [await env.ASSETS.fetch(new Request(new URL('/icons/icon-512.png', url))), false];
+  return [new Response(img.bytes, { headers: { 'Content-Type': img.tipo, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' } }), true];
 }
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
-    if (url.pathname === '/t/og') return imagen(url, env);
+    if (url.pathname === '/t/og') return conCache(req, ctx, () => imagen(url, env));
+    if (url.pathname === '/t/feed') return conCache(req, ctx, () => catalogo(url, env));
     if (url.pathname === '/t/' || url.pathname === '/t/index.html') return pagina(req, url, env);
     return env.ASSETS.fetch(req);
   }

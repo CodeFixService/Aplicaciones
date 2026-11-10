@@ -124,6 +124,11 @@
   $('bIngresar').href = '../?volver=' + encodeURIComponent('/apps/catalogo/');
   $('tienda').classList.remove('hidden');
   // Portada con el perfil del negocio (núcleo: perfil.js).
+  // G35: el botón de WhatsApp de la portada y la ficha de cada producto llegan con el mensaje listo.
+  t.wa_texto = 'Hola 👋 Vi tu tienda ' + t.empresa + ' y tengo una consulta.';
+  const tel = String(t.telefono || '').replace(/\D/g, '');
+  if (tel.length >= 8) window.CFX_WA_PRODUCTO = (k, nombre, pre, op) => 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Hola 👋 Me interesa ' + nombre + (op ? ' (' + op + ')' : '') +
+    (pre ? ' · ' + pre : '') + ' de ' + t.empresa + '. ¿Está disponible?\n' + window.CFX_LINK_PRODUCTO(k));
   const pf = () => CodeFixVitrina.montar($('perfil'), t);
   if (window.CodeFixVitrina) pf(); else addEventListener('load', pf);
   $('pagoTip').textContent = t.cobra_online ? '💳 Al enviar, tu pedido queda apartado ' + t.retencion_min + ' min para que pagues con el link de la tienda y subas el comprobante.'
