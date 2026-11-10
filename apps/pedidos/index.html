@@ -145,7 +145,12 @@
   const yo = await Cuenta.require('../../', { empresa: true });
   Cuenta.nav('pedidos');
   const dueno = yo.role !== 'equipo';
-  const pro = !!yo.is_pro;
+  // G19: cupones y estadísticas pueden ser módulos; el aviso de bloqueo lleva a 🧩 Módulos.
+  const puedeCup = Cuenta.puede('cupones'), puedeSt = Cuenta.puede('estadisticas');
+  if (yo.mods) document.querySelectorAll('#cupLock, #stLock').forEach((c) => {
+    c.querySelector('.pill').textContent = '🧩 MÓDULO';
+    const b = c.querySelector('a.btn'); b.href = '../../#modulos'; b.textContent = '🧩 Probar gratis';
+  });
   // Admin del equipo también ve Estadísticas (Promociones, solo el dueño).
   const verStats = dueno || yo.equipo_rol === 'admin';
   document.querySelectorAll('.dueno').forEach((b) => b.classList.toggle('hidden', b.classList.contains('ver-stats') ? !verStats : !dueno));
@@ -306,9 +311,9 @@
 
   /* ---------- Cupones (Pro) ---------- */
   async function cargarCupones() {
-    $('cupLock').classList.toggle('hidden', pro);
-    $('cupPro').classList.toggle('hidden', !pro);
-    if (!pro) return;
+    $('cupLock').classList.toggle('hidden', puedeCup);
+    $('cupPro').classList.toggle('hidden', !puedeCup);
+    if (!puedeCup) return;
     try {
       const l = await Cuenta.rpc('cfx_desc_lista');
       $('cupones').innerHTML = l.length ? l.map((c) => '<li><div class="grow"><b>' + Core.esc(c.codigo) + '</b> · −' + c.porcentaje + '%<div class="muted">' +
@@ -333,9 +338,9 @@
   /* ---------- Estadísticas (Pro) · F30 en vivo: se refresca cada 30 s mientras está a la vista ---------- */
   let statsT = null, an = undefined;
   async function cargarStats(sola) {
-    $('stLock').classList.toggle('hidden', pro);
-    $('stPro').classList.toggle('hidden', !pro);
-    if (!pro) return;
+    $('stLock').classList.toggle('hidden', puedeSt);
+    $('stPro').classList.toggle('hidden', !puedeSt);
+    if (!puedeSt) return;
     clearTimeout(statsT);
     statsT = setTimeout(() => { if ($('v-stats').classList.contains('on')) cargarStats(true); }, 30000);
     try {

@@ -315,6 +315,12 @@
       </details>
     </div>
 
+    <div class="card hidden" id="cModulos"><span id="modulos"></span>
+      <h2>🧩 Módulos</h2>
+      <p class="muted">Suma solo lo que tu tienda necesita, aparte de tu plan. Cada uno se prueba gratis.</p>
+      <div id="modTienda"></div>
+    </div>
+
     <div class="card hidden" id="cRespaldo">
       <h2>💾 Respaldo de mi tienda</h2>
       <p class="muted">Descarga en Excel tus productos, pedidos, clientes, fichas, cupones y reseñas. Guárdalo donde quieras.
@@ -359,13 +365,13 @@
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta|redes)$/.test(location.hash);
-  let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta y #redes abren su hoja
+  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta|redes|modulos)$/.test(location.hash);
+  let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta, #redes y #modulos abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta|redes)$/.test(location.hash) ? location.hash.slice(1) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta|redes|modulos)$/.test(location.hash) ? location.hash.slice(1) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -541,6 +547,7 @@
     admin: ['apps/admin/', 'escudo', 'Administración', 'Usuarios, ventas de Pro, avisos y ajustes']
   };
 
+  let MODT = null;
   function pintar(acc) {
     const cliente = acc.role === 'client';
     $('hola').textContent = 'Hola' + (acc.empresa ? ', ' + acc.empresa : '') + ' 👋';
@@ -589,7 +596,8 @@
         dueno && { k: 'despacho', ico: '🚚', t: 'Despacho', grupo: 'Tu tienda', nodo: $('cDespacho') },
         dueno && { k: 'boleta', ico: '🧾', t: 'Boleta SII', d: 'Boleta electrónica de tus pedidos', grupo: 'Tu tienda', nodo: $('cBoleta') },
         dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp Business, Google, Instagram y avisos a tu sistema', grupo: 'Tu tienda', nodo: $('cRedes') },
-        dueno && { k: 'equipo', ico: '🧑‍🍳', t: 'Mi equipo', dato: acc.is_pro ? '' : 'PRO', grupo: 'Tu tienda', nodo: $('cEquipo') },
+        dueno && { k: 'equipo', ico: '🧑‍🍳', t: 'Mi equipo', dato: Cuenta.puede('equipo') ? '' : acc.mods ? '🧩' : 'PRO', grupo: 'Tu tienda', nodo: $('cEquipo') },
+        dueno && acc.mods && { k: 'modulos', ico: '🧩', t: 'Módulos', d: 'Chat, cupones, estadísticas y más', grupo: 'Tu plan', nodo: $('cModulos') },
         !equipo && { k: 'premium', ico: '⭐', t: 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
         cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
         dueno && { k: 'respaldo', ico: '💾', t: 'Respaldo de mi tienda', d: 'Excel con todo', grupo: 'Configuración', nodo: $('cRespaldo') }
@@ -599,7 +607,13 @@
     }
     $('cTienda').classList.toggle('hidden', cliente);
     $('eTel').value = acc.telefono || '';
-    $('rowSellos').classList.toggle('bloqueado', !acc.is_pro);
+    $('rowSellos').classList.toggle('bloqueado', !Cuenta.puede('sellos'));
+    $('cModulos').classList.toggle('hidden', !(dueno && acc.mods));
+    if (dueno && acc.mods && window.CFX_MODULOS_TIENDA) {
+      // Al probar o comprar, la app se recarga para prender los botones del módulo.
+      if (!MODT) MODT = CFX_MODULOS_TIENDA.montar($('modTienda'), { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1500) });
+      MODT.cargar();
+    }
     $('planActual').textContent = acc.is_admin ? 'Administrador general: tienes todo activado.'
       : acc.is_pro ? '⭐ ' + plan + '. ¡Gracias por tu apoyo!' : 'Tu plan actual: ' + plan + '.';
     $('cMute').classList.toggle('hidden', !cliente);
@@ -637,6 +651,10 @@
          'Push y correos automáticos, y respaldo diario en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
     if (plan && plan.beneficios && plan.beneficios.length) $('proFeat').innerHTML = plan.beneficios.map((t) => '<li>' + Core.esc(t) + '</li>').join('');
+    // G19: con módulos a la venta, el Pro es capacidad y extras; las funciones van en 🧩 Módulos (con descuento para Premium).
+    if (!cliente && acc.mods) $('proFeat').innerHTML = ['⭐ Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10)', '📊 Reporte semanal automático y ⚠️ aviso de stock bajo',
+      '🎨 Todas las plantillas, tus colores y respaldo diario en la nube', '🧩 Pagas menos en todos los módulos (chat, cupones, estadísticas, equipo…)']
+      .map((t) => '<li>' + t + '</li>').join('');
   }
 
 
@@ -656,7 +674,8 @@
     recuperar(h, acc);
     hoyLink = Core.rootUrl() + 't/?s=' + encodeURIComponent(h.slug);
     $('hoyTienda').classList.toggle('hidden', !dueno);
-    $('hoyVenderPro').classList.toggle('hidden', !!acc.is_pro);
+    $('hoyVenderPro').classList.toggle('hidden', Cuenta.puede('redes'));
+    $('hoyVenderPro').textContent = acc.mods ? '🧩' : 'PRO';
     $('hoyLink').value = hoyLink; $('hoyVer').href = hoyLink;
     if (!dueno) { $('hoyFalta').classList.add('hidden'); tour(false); return; }
     let t = {};
@@ -905,8 +924,9 @@
       caja('📦 Link del catálogo', feedUrl, '<b>Google</b>: merchants.google.com → Productos → Agregar productos → Archivo → Link (URL) → pega → cada día.<br>' +
         '<b>Instagram y Facebook</b>: business.facebook.com/commerce → tu catálogo → Orígenes de datos → Feed de datos → Programado → pega → cada día.', 1);
     const w = r.webhook;
-    h += '<h3>🔌 Avisos a tu sistema <span class="pill pro">PRO</span></h3>';
-    if (!r.pro) h += '<p class="muted">Con Pro, cada pedido nuevo y cada cambio de estado llega solo a tu planilla, tu sistema o Zapier/Make (webhook firmado).</p><div class="btns"><button type="button" class="small" data-rd-ir="premium">⭐ Ver Pro</button></div>';
+    h += '<h3>🔌 Avisos a tu sistema' + (r.pro ? '' : ' <span class="pill pro">' + (r.modulo ? '🧩' : 'PRO') + '</span>') + '</h3>';
+    if (!r.pro) h += r.modulo ? '<p class="muted">Es un módulo: cada pedido nuevo y cada cambio de estado llega solo a tu planilla, tu sistema o Zapier/Make (webhook firmado).</p><div class="btns"><button type="button" class="small" data-rd-ir="modulos">🧩 Ver módulo</button></div>'
+      : '<p class="muted">Con Pro, cada pedido nuevo y cada cambio de estado llega solo a tu planilla, tu sistema o Zapier/Make (webhook firmado).</p><div class="btns"><button type="button" class="small" data-rd-ir="premium">⭐ Ver Pro</button></div>';
     else {
       const est = !w ? '' : !w.activo ? '⏸️ En pausa' + (w.fallos >= 20 ? ' (la URL falló ' + w.fallos + ' veces)' : '') : w.ultimo_at ? (w.ultimo_status >= 200 && w.ultimo_status < 300 ? '✅ Funcionando' : '⚠️ Último intento falló (' + (w.ultimo_status || 'sin respuesta') + ')') : '✅ Listo, esperando el primer pedido';
       h += '<p class="muted" style="margin:0 0 6px">Para tu programador o para Zapier/Make: cada pedido nuevo y cada cambio de estado llega como POST JSON a tu URL, firmado con tu secreto. ' +
@@ -1219,6 +1239,7 @@
 <script src="shared/voz.js"></script>
 <script src="shared/respaldo.js"></script>
 <script src="shared/pagos.js"></script>
+<script src="shared/modulos.js"></script>
 <script src="shared/verificar.js"></script>
 <script src="shared/premium.js"></script>
 <script src="shared/ayuda.js"></script>

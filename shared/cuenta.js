@@ -489,6 +489,9 @@
     icono,
     get account() { return account; },
     isPro: () => !!(account && account.is_pro),
+    // G19: ¿puede usar esta función? Con la venta de módulos prendida mira el módulo del negocio; si no, el Pro (como antes).
+    puede: (k) => !!(account && (account.mods ? account.mods[k] : (account.is_pro || account.is_admin))),
+    conModulos: () => !!(account && account.mods),
     isAdmin: () => !!(account && account.is_admin),
     isClient: () => !!(account && account.role === 'client'),
     uid: () => account && account.id

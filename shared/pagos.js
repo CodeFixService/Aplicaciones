@@ -3,6 +3,8 @@
    CFX_PAGOS.abrir({ rpc })            → elegir plan (1 mes, 3 meses o 1 año), pagar y subir el comprobante, paso a paso:
                                           1) paga el total  2) saca pantallazo  3) súbelo  4) espera 5–10 min (te avisamos).
                                           Transferencia = precio exacto. Link o tarjeta = precio + "cargo por pago online (X %)" en una línea aparte.
+   CFX_PAGOS.abrir({ rpc, producto })  → G19: comprar un módulo o pack. producto = { clave, nombre, mensual, anual, links: { m, a } } (1 mes o 1 año;
+                                          links = link de pago con el monto fijo, si el administrador lo puso). Al aprobarlo se activa solo ese módulo.
    CFX_PAGOS.revisar({ rpc, salir })   → si es un negocio nuevo que debe su primer pago, muestra la pantalla de activación (no se cierra).
    rpc(nombre, args) debe devolver una promesa con los datos (cada app pasa su propia función). */
 (function () {
@@ -62,7 +64,9 @@
     });
   }
 
-  function planes(e) {
+  function planes(e, pr) {
+    if (pr) return [{ k: 'mensual', t: '1 mes', d: '30 días de ' + pr.nombre, p: pr.mensual },
+      pr.anual && { k: 'anual', t: '1 año', d: '365 días' + (pr.mensual && pr.anual < pr.mensual * 12 ? ' · ahorras ' + Math.round(100 - pr.anual * 100 / (pr.mensual * 12)) + '%' : ''), p: pr.anual }].filter(Boolean);
     const c = e.config || {}, n = c.negocio || {}, cl = c.cliente || {}, rol = e.yo && e.yo.rol;
     const ahorro = (m, a) => (m && a && a < m * 12) ? ' · ahorras ' + Math.round(100 - a * 100 / (m * 12)) + '%' : '';
     // Solo 3 planes (igual que los links de pago): 1 mes, 3 meses y 1 año. El primer pago es el de 1 mes y da 30 días.
@@ -98,14 +102,15 @@
     try { e = await o.rpc('cfx_pago_estado'); } catch (x) { caja.innerHTML = '<p class="cp-err">' + esc(x.message || x) + '</p><button type="button" data-x>Cerrar</button>'; caja.querySelector('[data-x]').onclick = cerrar; return; }
     // comoNegocio: la app pide el pago de negocio aunque la cuenta aún no lo sea (Estaciona: al publicar el primer estacionamiento).
     if (o.comoNegocio && e.yo && e.yo.rol === 'cliente') e.yo.rol = 'negocio';
-    let obligatorio = !!(o.obligatorio || e.bloqueado || (o.comoNegocio && e.debe_inicio));
+    const pr = o.producto || null;  // G19: módulo o pack (nunca obligatorio)
+    let obligatorio = !pr && !!(o.obligatorio || e.bloqueado || (o.comoNegocio && e.debe_inicio));
     const c = e.config || {}, t = c.transferencia || {}, tj = c.tarjeta || {};
     const PCT = { link: Number(c.comision_pct) || 0, tarjeta: Number(tj.comision_pct) || 0, transferencia: 0 };
     const grupo = (e.yo && e.yo.rol === 'cliente') ? (c.cliente || {}) : (c.negocio || {});
     // Link propio del plan (monto fijo = precio + cargo online), si el administrador lo puso; si no, el link general.
-    const linkPlan = (pl) => (!pl || cupon_ || pl.k === 'otro') ? '' : (pl.k === 'anual' ? grupo.link_anual : pl.k === 'meses' ? grupo.link_3meses : grupo.link_mensual) || '';
+    const linkPlan = (pl) => (!pl || cupon_ || pl.k === 'otro') ? '' : pr ? ((pr.links || {})[pl.k === 'anual' ? 'a' : 'm'] || '') : (pl.k === 'anual' ? grupo.link_anual : pl.k === 'meses' ? grupo.link_3meses : grupo.link_mensual) || '';
     let cupon_ = null;
-    const L = planes(e), medios = [t.numero ? 'transferencia' : null, (c.link || grupo.link_mensual || grupo.link_3meses || grupo.link_anual) ? 'link' : null, tj.link ? 'tarjeta' : null].filter(Boolean);
+    const L = planes(e, pr), medios = [t.numero ? 'transferencia' : null, (c.link || (pr ? (pr.links || {}).m || (pr.links || {}).a : '') || grupo.link_mensual || grupo.link_3meses || grupo.link_anual) ? 'link' : null, tj.link ? 'tarjeta' : null].filter(Boolean);
     const NOMBRE_MEDIO = { transferencia: '🏦 Transferencia', link: '🔗 Link de pago', tarjeta: '💳 Tarjeta' };
     let plan = L[0], medio = medios[0], foto = null;
     const ayudaChat = window.CFX_AYUDA ? '<p style="text-align:center"><a href="#" data-chat>💬 ¿Dudas? Escríbenos por el chat</a></p>' : '';
@@ -118,7 +123,7 @@
     if (u && u.estado === 'pendiente') {
       caja.innerHTML = '<h2>⏳ Pago en revisión</h2><div class="cp-ok">Recibimos tu comprobante de <b>' + pesos(u.monto) + '</b>. Normalmente lo revisamos en 5 a 10 minutos y te llega un aviso apenas se active.</div>' + pie;
     } else if (!medios.length) {
-      caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : '⭐ Hazte Premium') + '</h2>' + lib + '<p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + keyHtml + pie;
+      caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + '<p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + keyHtml + pie;
     } else {
       let cupon = null;  // { codigo, pct }: descuento sobre el precio del plan (no sobre "otro monto")
       const base = () => {
@@ -134,7 +139,7 @@
         cupon_ = cupon;
         const pc = PCT[medio], fijo = medio === 'link' ? linkPlan(plan) : '', url = medio === 'tarjeta' ? tj.link : (fijo || c.link);
         if (medio === 'link' && !url && medios.some((m) => m !== 'link')) { medio = medios.find((m) => m !== 'link'); return pintar(); }
-        caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : '⭐ Hazte Premium') + '</h2>' + lib +
+        caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib +
           (obligatorio ? '<p>Para empezar a usar la app haz tu primer pago. Te da ' + esc(plan.d) + '; después puedes seguir en Premium o quedar en la versión gratis.</p>' : '') +
           '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>' +
           (u && u.estado === 'rechazado' ? '<div class="cp-err">Tu último comprobante fue rechazado: ' + esc(u.motivo || '') + '</div>' : '') +
@@ -151,9 +156,8 @@
           '<label for="cpFoto">Pantallazo del comprobante</label><input id="cpFoto" type="file" accept="image/*">' + (foto ? '<img class="cp-vista" alt="Comprobante" src="' + foto + '">' : '') +
           '<label for="cpPagado">Monto que pagaste</label><input id="cpPagado" type="number" inputmode="numeric" value="' + (monto() || '') + '">' +
           '<p class="cp-err" id="cpErr"></p><button type="button" class="cp-si" data-enviar style="width:100%">Enviar comprobante</button>' +
-          '<details style="margin-top:12px"><summary>🏷️ Tengo un cupón</summary><div class="cp-fila"><input id="cpCupon" placeholder="CUPÓN" autocapitalize="characters" value="' + esc(cupon ? cupon.codigo : '') + '"><button type="button" data-cupon>Aplicar</button></div>' +
-            (cupon ? '<p>Cupón ' + esc(cupon.codigo) + ': ' + cupon.pct + '% de descuento.</p>' : '') + '</details>' +
-          keyHtml + pie;
+          (pr ? '' : '<details style="margin-top:12px"><summary>🏷️ Tengo un cupón</summary><div class="cp-fila"><input id="cpCupon" placeholder="CUPÓN" autocapitalize="characters" value="' + esc(cupon ? cupon.codigo : '') + '"><button type="button" data-cupon>Aplicar</button></div>' +
+            (cupon ? '<p>Cupón ' + esc(cupon.codigo) + ': ' + cupon.pct + '% de descuento.</p>' : '') + '</details>' + keyHtml) + pie;
         if (plan.k === 'otro') { const i = caja.querySelector('#cpOtro'); i.value = o._otro || ''; i.oninput = () => { o._otro = i.value; refrescar(); }; }
         if (o._pagado) caja.querySelector('#cpPagado').value = o._pagado;
         caja.querySelector('#cpPagado').oninput = (ev) => { o._pagado = ev.target.value; };
@@ -187,7 +191,7 @@
           if (plan.k !== 'otro' && monto() && pagado < monto() && !o._menosOk) { o._menosOk = true; err.textContent = 'Pagaste menos que el total (' + pesos(monto()) + '). Si es correcto, toca Enviar otra vez.'; return; }
           b.disabled = true; b.textContent = 'Enviando…';
           try {
-            await o.rpc('cfx_pago_pedir', { p_periodo: plan.k, p_monto: pagado, p_medio: medio, p_comprobante: foto, p_nota: plan.k === 'otro' ? 'Otro monto' : plan.k === 'meses' ? plan.m + ' meses' : '', p_cupon: cupon ? cupon.codigo : null, p_meses: plan.k === 'meses' ? plan.m : null });
+            await o.rpc('cfx_pago_pedir', { p_periodo: plan.k, p_monto: pagado, p_medio: medio, p_comprobante: foto, p_nota: plan.k === 'otro' ? 'Otro monto' : plan.k === 'meses' ? plan.m + ' meses' : '', p_cupon: cupon ? cupon.codigo : null, p_meses: plan.k === 'meses' ? plan.m : null, ...(pr ? { p_producto: pr.clave } : {}) });
             caja.innerHTML = '<h2>✅ ¡Recibido!</h2><div class="cp-ok">Ya nos llegó tu comprobante. Lo revisamos en 5 a 10 minutos y te llega un aviso apenas se active. Puedes cerrar esta ventana.</div>' + pie;
             if (o.alPagar) o.alPagar();
           } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = 'Enviar comprobante'; }

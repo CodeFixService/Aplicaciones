@@ -711,7 +711,11 @@
   const destinatarios = (k) => todos().filter((c) => c.tel && (!k.tag || c.tag === k.tag));
 
   ['k-push', 'k-mail'].forEach((id) => {
-    $(id).onchange = (e) => { if (e.target.checked && !licensed()) { e.target.checked = false; soloPro('El envío automático'); } };
+    $(id).onchange = (e) => {
+      if (!e.target.checked || Cuenta.puede('campanas')) return;
+      e.target.checked = false;
+      if (Cuenta.conModulos()) Core.toast('🧩 El envío automático es un módulo (📣 Campañas). Actívalo en Ajustes → 🧩 Módulos.'); else soloPro('El envío automático');
+    };
   });
 
   $('bAddCampana').onclick = async () => {
