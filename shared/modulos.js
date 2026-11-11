@@ -1,7 +1,7 @@
 /* CodeFix · Núcleo (módulo opcional, G19) · 🧩 Módulos del negocio: packs y módulos sueltos con precio, prueba gratis y compra.
    CFX_MODULOS_TIENDA.montar(el, { rpc, alCambiar })  → pinta la tienda de módulos dentro de el (datos: cfx_modulos_tienda).
    Comprar abre CFX_PAGOS (pagos.js) con el producto; al aprobar el pago se activa solo. Probar: cfx_modulo_probar (7 días, una vez).
-   G24: CFX_MODULOS_TIENDA.probar(clave, { rpc, alCambiar })  → hoja con DEMO animada (datos de ejemplo, no toca el negocio) + 🎁 prueba gratis + Comprar + Cerrar.
+   G24: CFX_MODULOS_TIENDA.probar(clave, { rpc, alCambiar })  → hoja con DEMO animada (datos de ejemplo, no toca el negocio) + Comprar + Cerrar (G25: sin 🎁 prueba gratis).
         CFX_MODULOS_TIENDA.candado(el, clave, { rpc, alCambiar }) → en la pantalla de un módulo que no tiene: aviso "Probar módulo" (devuelve false si el módulo no se vende). */
 (function () {
   'use strict';
@@ -163,7 +163,7 @@
     const x = pack || mod; if (!x) return;
     const lista = pack ? pack.modulos.map((k) => D.modulos.find((m) => m.clave === k) || { clave: k, nombre: k, detalle: '' }) : [mod];
     const activo = pack ? lista.every((m) => m.activo) : mod.activo;
-    const puedeProbar = D.dueno && !activo && D.prueba_dias && (pack ? !D.prueba_pack : !mod.prueba_usada);
+    const puedeProbar = false;  // G25: sin prueba gratis; ▶️ Probar = solo la demo con datos de ejemplo
     const d = document.createElement('dialog'); d.className = 'cfxd';
     d.innerHTML = '<div><button type="button" class="cfxd-x" data-x aria-label="Cerrar">✕</button><h2>' + esc(x.nombre) + '</h2><p class="cfxd-sub">' + esc(x.detalle) + '</p>' +
       (pack ? '<div class="cfxd-chips">' + lista.map((m, i) => '<button type="button" data-i="' + i + '">' + esc(m.nombre) + '</button>').join('') + '</div>' : '') +

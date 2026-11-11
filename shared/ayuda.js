@@ -1005,7 +1005,8 @@
       '<div class="ca-pie"><button type="button" data-cerrar>Cerrar</button></div>');
     try {
       const r = await R('cfx_ref_mio'); if (!r || !r.codigo) throw new Error('Tu cuenta no tiene código.');
-      const link = RAIZ + '?ref=' + r.codigo, z = caja.querySelector('#caRef');
+      // G25: CFX_REF_RUTA (config de la app, ej. 'n/') = página donde el invitado SÍ puede crear su cuenta (la raíz solo deja ingresar).
+      const link = RAIZ + (/^[a-z0-9/_-]*$/i.test(window.CFX_REF_RUTA || '') ? window.CFX_REF_RUTA || '' : '') + '?ref=' + r.codigo, z = caja.querySelector('#caRef');
       z.innerHTML = '<p style="text-align:center;margin:6px 0"><b style="font-size:24px;letter-spacing:.06em">' + esc(r.codigo) + '</b></p><p style="word-break:break-all;font-size:13px;opacity:.8">' + esc(link) + '</p>' +
         '<p>Invitaste a <b>' + r.invitados + '</b> persona' + (r.invitados === 1 ? '' : 's') + (r.pagaron ? ' · ' + r.pagaron + ' ya pagaron' : '') + (r.invitados >= 3 ? ' 🏆' : '') + '</p>' +
         '<button type="button" class="ca-op" data-a="share"><span>📤</span><b>Compartir mi link</b></button><button type="button" class="ca-op" data-a="copiar"><span>📋</span><b>Copiar link</b></button>';

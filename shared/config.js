@@ -6,3 +6,4 @@ window.CFX_CONFIG = {
   ADMIN_EMAIL: 'juanjosuecastilloloyola@gmail.com',
   MARCA: 'CodeFix'
 };
+window.CFX_REF_RUTA = 'n/';  // 🎁 Invita y gana: el invitado llega a "Crea tu tienda" (G25)

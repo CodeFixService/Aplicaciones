@@ -648,6 +648,7 @@
       (p.estado === 'pagando' && links[p.id] && links[p.id].url ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(links[p.id].url) + '">💳 Pagar ' + precio(p.total) + '</a>' : '') +
       (p.estado === 'pagando' && !(links[p.id] && links[p.id].mp && !links[p.id].url) ? '<button class="small" data-comp="' + p.id + '">📷 Subir comprobante</button>' : '') +
       (['pagando', 'en_revision', 'recibido', 'preparando'].includes(p.estado) ? '<button class="small alt" data-can="' + p.id + '">Cancelar</button>' : '') +
+      (['recibido', 'preparando', 'listo', 'en_camino', 'entregado'].includes(p.estado) ? '<button class="small alt" data-det="' + n + '">🧾 Detalle de compra</button>' : '') +
       '<button class="small alt" data-rep="' + n + '">🔁 Repetir</button>' +
       '<a class="btn small alt" href="../mensajes/?con=' + negocio + '">💬 Chat</a></div></li>').join('')
       : '<li class="empty">' + vacio('pedidos', 'Aún no envías pedidos. Agrega productos u ofertas con 🛒 y envíalos desde aquí.') + '</li>';
@@ -700,6 +701,13 @@
     } catch (err) { Core.toast(err.message); }
   });
   $('pedidos').onclick = (e) => {
+    const det = e.target.dataset.det;
+    if (det !== undefined && window.CFX_COMPROBANTE) {  // G25: el detalle de compra queda en Mis pedidos (y la boleta SII si la tienda la emitió)
+      const p = pedidos[det];
+      return CFX_COMPROBANTE.abrir({ negocio: p.negocio || tienda.empresa, fecha: p.fecha, numero: String(p.id).slice(0, 8).toUpperCase(), total: p.total, descuento: p.descuento,
+        items: p.lineas.map((x) => ({ cant: x.cant, nombre: x.nombre, opcion: x.opcion, precio: (x.subtotal || x.precio * x.cant) / (x.cant || 1) })),
+        entrega: p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') : '🏪 Retiro en tienda', compra: true, boleta: p.boleta, cliente_ve: true });
+    }
     const n = e.target.dataset.rep;
     if (n === undefined) return;
     carro = pedidos[n].lineas.map((l) => /^pub:/.test(l.clave) ? { clave: l.clave, cant: l.cant, nombre: l.nombre, precio: Number(l.precio) }
@@ -723,6 +731,7 @@
 <script src="../../shared/voz.js"></script>
 <script src="../../shared/respaldo.js"></script>
 <script src="../../shared/pagos.js"></script>
+<script src="../../shared/comprobante.js"></script>
 <script src="../../shared/verificar.js"></script>
 <script src="../../shared/premium.js"></script>
 <script src="../../shared/ayuda.js"></script>

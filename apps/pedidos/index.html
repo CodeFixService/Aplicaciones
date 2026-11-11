@@ -182,6 +182,7 @@
   let BOL = {};
   const bolP = Cuenta.rpc('boleta_estado').then((b) => { BOL = b || {}; }).catch(() => {});
   const PAGADO = ['preparando', 'listo', 'en_camino', 'entregado'];
+  const COMPRADO = ['recibido'].concat(PAGADO);  // G25: 🧾 Detalle de compra apenas se confirma el pago
   const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
   async function cargar() {
     document.querySelectorAll('#filtros button').forEach((x) => { x.classList.toggle('on', x.dataset.f === filtro); x.classList.toggle('alt', x.dataset.f !== filtro); });
@@ -244,12 +245,12 @@
           : p.boleta && p.boleta.error && PAGADO.includes(p.estado) ? '<div class="aviso">🧾 Boleta no emitida: ' + Core.esc(p.boleta.error) + '</div>' : '') +
         '<div data-img="' + p.id + '"></div>' +
         '<div class="acc">' +
-        '<button class="alt small" data-recibo="' + p.id + '">🧾 Comprobante</button>' +
-        (p.tiene_comprobante ? '<button class="alt small" data-comp="' + p.id + '">🧾 Ver comprobante</button>' : '') +
+        (COMPRADO.includes(p.estado) ? '<button class="alt small" data-recibo="' + p.id + '">🧾 Detalle de compra</button>' : '') +
+        (p.tiene_comprobante ? '<button class="alt small" data-comp="' + p.id + '">📷 Foto del pago</button>' : '') +
         (p.estado === 'en_revision' ? '<button class="ok small" data-rev="' + p.id + '" data-si="1">✅ Aprobar pago</button><button class="danger small" data-rev="' + p.id + '" data-si="0">Rechazar</button>' : '') +
         sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
         (abierto && p.estado !== 'en_revision' ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
-        (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir boleta' : 'Anotar boleta') + '</button>' : '') +
+        (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir boleta SII' : 'Anotar N° boleta SII') + '</button>' : '') +
         (p.devolucion === 'pendiente' ? '<button class="small" data-dev="' + p.id + '">💸 Ya devolví</button>' : '') +
         (p.entrega === 'despacho' && ['recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado) ? '<button class="small alt" data-env="' + p.id + '">🚚 ' + (p.envio && p.envio.codigo ? 'Cambiar seguimiento' : 'Seguimiento') + '</button>' : '') +
         (p.cliente_id ? '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' : '') +
@@ -269,7 +270,7 @@
         if (p && window.CFX_COMPROBANTE) CFX_COMPROBANTE.abrir({ negocio: yo.role === 'equipo' ? yo.negocio : yo.empresa, fecha: p.fecha,
           numero: String(p.id).slice(0, 8).toUpperCase(), cliente: p.cliente, tel: p.telefono || '', total: p.total,
           items: p.lineas.map((x) => ({ cant: x.cant, nombre: x.nombre, opcion: x.opcion, precio: x.subtotal / (x.cant || 1) })),
-          descuento: p.descuento, medio: p.medio, entrega: p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') : '🏪 Retiro en tienda' });
+          descuento: p.descuento, medio: p.medio, entrega: p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') : '🏪 Retiro en tienda', compra: true, boleta: p.boleta });
         return;
       }
       if (b.dataset.comp) {

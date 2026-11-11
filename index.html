@@ -268,16 +268,22 @@
       <div id="linksBody"></div>
     </div>
 
-    <div class="card hidden" id="cDespacho"><span id="despacho"></span><div id="despachoBody"></div></div>
+    <div class="card hidden" id="cDespacho"><span id="despacho"></span><div id="despachoBody"></div>
+      <p class="cfx-nota-btn">🚚 El código de seguimiento se pone en Pedidos → pedido con despacho → 🚚 Seguimiento.</p></div>
 
     <div class="card hidden" id="cBoleta"><span id="boleta"></span>
-      <h2>🧾 Boleta SII</h2>
+      <h2>🧾 Boletas</h2>
       <div id="boletaBody"></div>
     </div>
 
     <div class="card hidden" id="cRedes"><span id="redes"></span>
       <h2>📲 Vender en redes</h2>
       <div id="redesBody"></div>
+    </div>
+
+    <div class="card hidden" id="cDominio"><span id="dominio"></span>
+      <h2>🌐 Mi dominio</h2>
+      <div id="dominioBody"></div>
     </div>
 
     <div class="card hidden" id="cEquipo"><span id="equipo"></span>
@@ -303,6 +309,7 @@
     <div class="card upsell" id="cPlan"><span id="plan"></span>
       <h2>💳 Mi plan</h2>
       <p class="muted" id="planActual"></p>
+      <p class="muted hidden" id="planFree" style="font-size:14px">✅ <b>Free</b> incluye lo básico: tienda online, Caja, productos y stock, pedidos, links de pago, despacho y boletas.</p>
       <div class="hidden" id="cPro"><span id="premium"></span>
         <h2 id="proTitulo">⭐ Versión Pro</h2>
         <div class="precio hidden" id="proPrecio"></div>
@@ -320,7 +327,7 @@
 
     <div class="card hidden" id="cModulos"><span id="modulos"></span>
       <h2>🧩 Módulos</h2>
-      <p class="muted">Suma solo lo que tu tienda necesita, aparte de tu plan. Cada uno se prueba gratis.</p>
+      <p class="muted">Aparte de tu plan: suma solo lo que tu tienda necesita. Toca <b>▶️ Probar</b> para ver un ejemplo.</p>
       <div id="modTienda"></div>
     </div>
 
@@ -368,13 +375,13 @@
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta|redes|modulos)$/.test(location.hash);
+  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta|redes|dominio|modulos)$/.test(location.hash);
   let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta, #redes y #modulos abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta|redes|modulos)$/.test(location.hash) ? location.hash.slice(1) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta|redes|dominio|modulos)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -576,7 +583,7 @@
     $('hoy').classList.toggle('hidden', cliente);
     $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Órbita') : (acc.empresa || 'Órbita'));
     const dueno = acc.role === 'user';
-    ['cTienda', 'cLinks', 'cDespacho', 'cBoleta', 'cEquipo', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
+    ['cTienda', 'cLinks', 'cDespacho', 'cBoleta', 'cDominio', 'cEquipo', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
     if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x)); }
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
@@ -595,13 +602,13 @@
           ['apps/pedidos/?v=stats', 'grafico', 'Estadísticas'], ['apps/catalogo/?v=ofertas', 'ojo', 'Ver mi tienda como cliente'], ['apps/mensajes/', 'chat', 'Mensajes']]
           .map(([u, i, t]) => Object.assign({ k: 'n-' + i, ico: Core.ico(i), t, grupo: 'Tu negocio' }, ir(u))) : []),
         dueno && { k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario y pagos', grupo: 'Tu tienda', nodo: $('cTienda') },
-        dueno && { k: 'links', ico: '💳', t: 'Links de pago', grupo: 'Tu tienda', nodo: $('cLinks') },
+        dueno && { k: 'links', ico: '💳', t: 'Pagos', d: 'Links de pago del cliente', grupo: 'Tu tienda', nodo: $('cLinks') },
         dueno && { k: 'despacho', ico: '🚚', t: 'Despacho', grupo: 'Tu tienda', nodo: $('cDespacho') },
-        dueno && { k: 'boleta', ico: '🧾', t: 'Boleta SII', d: 'Boleta electrónica de tus pedidos', grupo: 'Tu tienda', nodo: $('cBoleta') },
-        dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp, Google, Instagram, medir anuncios y dominio propio', grupo: 'Tu tienda', nodo: $('cRedes') },
+        dueno && { k: 'boleta', ico: '🧾', t: 'Boletas', d: 'Boleta SII de tus pedidos', grupo: 'Tu tienda', nodo: $('cBoleta') },
+        dueno && { k: 'dominio', ico: '🌐', t: 'Mi dominio', d: 'Tu tienda en mitienda.cl', grupo: 'Tu tienda', nodo: $('cDominio') },
         dueno && { k: 'equipo', ico: '🧑‍🍳', t: 'Mi equipo', dato: Cuenta.puede('equipo') ? '' : acc.mods ? '🧩' : 'PRO', grupo: 'Tu tienda', nodo: $('cEquipo') },
-        dueno && acc.mods && { k: 'modulos', ico: '🧩', t: 'Módulos', d: 'Chat, cupones, estadísticas y más', grupo: 'Tu plan', nodo: $('cModulos') },
-        !equipo && { k: 'premium', ico: '⭐', t: 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
+        dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp, Google, Instagram y medir anuncios', grupo: 'Vender más', nodo: $('cRedes') },
+        !equipo && { k: 'premium', ico: '⭐', t: dueno && acc.mods ? 'Mi plan y módulos' : 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
         cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
         dueno && { k: 'respaldo', ico: '💾', t: 'Respaldo de mi tienda', d: 'Excel con todo', grupo: 'Configuración', nodo: $('cRespaldo') }
       ];
@@ -621,6 +628,8 @@
       nb.onclick = () => probarMod(k); (n.querySelector('h2,label') || n.firstChild).after(nb);
     });
     $('cModulos').classList.toggle('hidden', !(dueno && acc.mods));
+    if (dueno && acc.mods && $('cModulos').parentNode !== $('cPlan')) { $('cModulos').classList.remove('card'); $('cPlan').appendChild($('cModulos')); }  // G25: Mi plan (Free/Pro) arriba y 🧩 Módulos aparte, en la misma hoja
+    $('planFree').classList.toggle('hidden', !dueno || !acc.mods);
     if (dueno && acc.mods && window.CFX_MODULOS_TIENDA) {
       // Al probar o comprar, la app se recarga para prender los botones del módulo.
       if (!MODT) MODT = CFX_MODULOS_TIENDA.montar($('modTienda'), { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1500) });
@@ -789,7 +798,9 @@
     ['¿Qué hago cuando llega un pedido?', 'Te llega un aviso. Si el cliente subió comprobante, revísalo y aprueba; luego cambia el estado: preparando → listo → entregado.'],
     ['¿Cómo comparto mi tienda?', 'En el inicio, "Tu tienda": 📤 Compartir por WhatsApp o muestra el QR en tu local.'],
     ['¿Cómo sumo a alguien de mi equipo?', 'Ajustes → Mi equipo: escribe su nombre y correo y elige su rol (vendedor, bodega o admin).'],
-    ['¿Cómo emito la boleta?', 'Ajustes → Boleta SII: manual (anotas el folio del SII) o automática con OpenFactura.'],
+    ['¿Dónde pongo el seguimiento del envío?', 'Pedidos → un pedido con 🚚 Despacho (ya pagado) → botón 🚚 Seguimiento: eliges el courier y pegas el código. Tu cliente lo ve en Mis pedidos con "Seguir mi envío". Los pedidos con retiro en tienda no lo tienen.'],
+    ['¿Qué le llega al cliente cuando compra?', 'Al confirmar el pago, el pedido queda con 🧾 Detalle de compra en Mis pedidos (puede compartirlo). Si emites la boleta SII (Ajustes → 🧾 Boletas), su N° aparece en ese mismo detalle.'],
+    ['¿Cómo emito la boleta?', 'Ajustes → 🧾 Boletas: manual (anotas el folio del SII) o automática con OpenFactura.'],
     ['¿Cómo cierro la tienda o me voy de vacaciones?', 'Ajustes → Mi tienda: desmarca "Tienda abierta" o activa el modo vacaciones con la fecha de regreso.']
   ];
   function faq(chat) {
@@ -927,7 +938,7 @@
   function pintarWeb() {
     const w = web, e = Core.esc;
     if (!w) return '';
-    const bloq = (k, txt) => '<p class="muted">' + txt + '</p><div class="btns"><button type="button" class="small" data-rd-ir="' + (w.modulos ? 'modulos' : 'premium') + '">' + (w.modulos ? '🧩 Ver módulo' : '⭐ Ver Pro') + '</button></div>';
+    const bloq = (k, txt) => '<p class="muted">' + txt + '</p><div class="btns"><button type="button" class="small" data-rd-ir="premium">' + (w.modulos ? '🧩 Ver módulo' : '⭐ Ver Pro') + '</button></div>';
     const pill = (ok) => ok ? '' : ' <span class="pill pro">' + (w.modulos ? '🧩' : 'PRO') + '</span>';
     let h = '<h3>📊 Medir anuncios' + pill(w.medicion) + '</h3>';
     h += !w.medicion ? bloq('medicion', 'Conecta Meta Pixel (Facebook e Instagram) y Google Analytics: sabrás qué anuncio te trae ventas y podrás volver a mostrarles tus productos a quienes visitaron tu tienda.')
@@ -937,13 +948,22 @@
         '<label for="mdGa">ID de Google Analytics 4</label><input id="mdGa" maxlength="20" placeholder="G-AB12CD34EF" value="' + e(w.ga || '') + '">' +
         '<p class="cfx-nota-btn">analytics.google.com → Administrar → Flujos de datos → Web → ID de medición.</p>' +
         '<div class="btns"><button type="button" class="small" data-rd="medir">Guardar</button></div>';
-    h += '<h3>🌐 Dominio propio' + pill(w.con_dominio) + '</h3>';
-    h += !w.con_dominio ? bloq('dominio', 'Tu tienda en tu propia dirección (mitienda.cl) en vez del link de Órbita: más confianza y más ventas.')
-      : '<p class="muted" style="margin:0 0 6px">' + (w.dominio ? '✅ <b>' + e(w.dominio) + '</b> abre tu tienda cuando CodeFix lo conecta (te avisamos por el chat).' : 'Escribe tu dominio y CodeFix lo conecta por ti.') + '</p>' +
-        '<label for="mdDom">Tu dominio</label><input id="mdDom" inputmode="url" maxlength="80" placeholder="mitienda.cl" value="' + e(w.dominio || '') + '">' +
-        '<p class="cfx-nota-btn">¿No tienes? Cómpralo en nic.cl (.cl) o en Cloudflare. Luego escríbenos por el chat de soporte.</p>' +
-        '<div class="btns"><button type="button" class="small" data-rd="dominio">Guardar</button>' + (w.dominio ? '<button type="button" class="small alt" data-rd="sin-dominio">Quitar</button>' : '') + '</div>';
     return h;
+  }
+  // 🌐 Mi dominio (G25: fila propia en Ajustes → Tu tienda)
+  function pintarDominio() {
+    const w = web, e = Core.esc, b = $('dominioBody');
+    if (!w) { b.innerHTML = '<p class="muted">No disponible por ahora: recarga en un rato.</p>'; return; }
+    const tienda = redes ? Core.rootUrl() + 't/?s=' + encodeURIComponent(redes.slug) : '';
+    let h = tienda ? '<p class="muted" style="margin:0 0 6px">Hoy tu tienda está en:<br><b style="overflow-wrap:anywhere">' + e(tienda) + '</b></p>' : '';
+    h += !w.con_dominio ? '<p class="muted">Con el módulo, tu tienda abre en tu propia dirección (mitienda.cl): más confianza y más ventas.</p>' +
+        '<div class="btns"><button type="button" class="small" data-rd-ir="premium">' + (w.modulos ? '🧩 Ver módulo' : '⭐ Ver Pro') + '</button></div>'
+      : '<ol class="muted" style="margin:0 0 6px;padding-left:20px"><li>Compra tu dominio en nic.cl (.cl) o en Cloudflare.</li><li>Escríbelo aquí y toca <b>Guardar</b>.</li>' +
+        '<li>CodeFix te manda por el chat el dato para pegar en tu dominio (DNS). Al conectarlo, te avisamos.</li></ol>' +
+        (w.dominio ? '<p style="margin:0 0 6px">✅ <b>' + e(w.dominio) + '</b> guardado.</p>' : '');
+    if (w.con_dominio) h += '<label for="mdDom">Tu dominio</label><input id="mdDom" inputmode="url" maxlength="80" placeholder="mitienda.cl" value="' + e(w.dominio || '') + '">' +
+        '<div class="btns"><button type="button" class="small" data-rd="dominio">Guardar</button>' + (w.dominio ? '<button type="button" class="small alt" data-rd="sin-dominio">Quitar</button>' : '') + '</div>';
+    b.innerHTML = h;
   }
   function pintarRedes() {
     const r = redes, e = Core.esc, tienda = Core.rootUrl() + 't/?s=' + encodeURIComponent(r.slug), tel = String(r.telefono || '').replace(/\D/g, '');
@@ -962,7 +982,7 @@
         '<b>Instagram y Facebook</b>: business.facebook.com/commerce → tu catálogo → Orígenes de datos → Feed de datos → Programado → pega → cada día.', 1);
     const w = r.webhook;
     h += '<h3>🔌 Avisos a tu sistema' + (r.pro ? '' : ' <span class="pill pro">' + (r.modulo ? '🧩' : 'PRO') + '</span>') + '</h3>';
-    if (!r.pro) h += r.modulo ? '<p class="muted">Es un módulo: cada pedido nuevo y cada cambio de estado llega solo a tu planilla, tu sistema o Zapier/Make (webhook firmado).</p><div class="btns"><button type="button" class="small" data-rd-ir="modulos">🧩 Ver módulo</button></div>'
+    if (!r.pro) h += r.modulo ? '<p class="muted">Es un módulo: cada pedido nuevo y cada cambio de estado llega solo a tu planilla, tu sistema o Zapier/Make (webhook firmado).</p><div class="btns"><button type="button" class="small" data-rd-ir="premium">🧩 Ver módulo</button></div>'
       : '<p class="muted">Con Pro, cada pedido nuevo y cada cambio de estado llega solo a tu planilla, tu sistema o Zapier/Make (webhook firmado).</p><div class="btns"><button type="button" class="small" data-rd-ir="premium">⭐ Ver Pro</button></div>';
     else {
       const est = !w ? '' : !w.activo ? '⏸️ En pausa' + (w.fallos >= 20 ? ' (la URL falló ' + w.fallos + ' veces)' : '') : w.ultimo_at ? (w.ultimo_status >= 200 && w.ultimo_status < 300 ? '✅ Funcionando' : '⚠️ Último intento falló (' + (w.ultimo_status || 'sin respuesta') + ')') : '✅ Listo, esperando el primer pedido';
@@ -979,8 +999,9 @@
           e(new Date(x.fecha).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })) + (x.status ? ' · ' + x.status : '') + (x.estado === 'pendiente' && x.intentos ? ' · reintento ' + x.intentos : '') + '</small></li>').join('') + '</ul>' : '');
     }
     $('redesBody').innerHTML = h + pintarWeb();
+    pintarDominio();
   }
-  $('redesBody').onclick = async (ev) => {
+  $('redesBody').onclick = $('dominioBody').onclick = async (ev) => {
     const c = ev.target.closest('[data-rd-copiar]'), ir = ev.target.closest('[data-rd-ir]'), b = ev.target.closest('[data-rd]');
     if (c) return Core.copiar(c.dataset.rdCopiar);
     if (ir) { ev.preventDefault(); return MENU_O && MENU_O.abrir(ir.dataset.rdIr); }
