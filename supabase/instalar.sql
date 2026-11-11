@@ -734,12 +734,11 @@ begin
   if p_approve then
     update public.profiles
       set plan = 'pro',
-          pro_until = case when p_days is null then null
-                           else greatest(coalesce(pro_until, now()), now()) + make_interval(days => p_days) end,
+          pro_until = greatest(coalesce(pro_until, now()), now()) + make_interval(days => coalesce(p_days, 30)),  -- G25: nunca permanente
           trial_used = trial_used or r.kind = 'trial'
       where id = r.user_id and role <> 'admin';
     perform public.notify_user(r.user_id, '⭐ ¡Pro activado!',
-      case when p_days is null then 'Tu versión Pro es permanente.' else 'Tu versión Pro está activa por ' || p_days || ' días.' end, './');
+      'Tu versión Pro está activa por ' || coalesce(p_days, 30) || ' días. Al vencer, se renueva pagando en Mi plan.', './');
   else
     update public.profiles set trial_used = trial_used or r.kind = 'trial' where id = r.user_id;
   end if;
@@ -5360,7 +5359,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.41'::text $$;
+language sql immutable as $$ select '5.42'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5424,6 +5423,9 @@ $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
+-- =====================================================================
+--  VERSIÓN 5.42 · G25 ⏰ Renovación obligatoria: todo plan Pro/Premium tiene fecha de término (mensual 30 días, anual 365, regalo los días
+--  que se den) y se corta solo al vencer; nunca queda "permanente" (solo el administrador). Los módulos ya vencían solos (hasta).
 -- =====================================================================
 --  VERSIÓN 5.41 · Lanzamiento (núcleo 2.58): 📄 políticas de la tienda (Ley 19.496), 📦 despacho al resto de Chile (precio fijo o por pagar),
 --  🚚 código de seguimiento por pedido (Starken, Chilexpress, Blue Express, Correos), ✉️ correo al comprador en cada estado,
@@ -9062,3 +9064,16 @@ language sql stable security definer set search_path = '' as $$
   from public.profiles p where p.id = auth.uid()), '[]'::jsonb)
 $$;
 revoke all on function public.cfx_guia_app() from public, anon, authenticated;
+
+-- ---------- VERSIÓN 5.42 · G25 ⏰ Renovación obligatoria (se puede volver a correr) ----------
+-- Pro/Premium sin fecha de término → 30 días desde hoy (o desde que se activó). Al vencer, is_pro() deja de valer solo: hay que renovar.
+create or replace function public.pro_con_fecha() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.plan = 'pro' and new.pro_until is null and new.role <> 'admin' then new.pro_until := now() + interval '30 days'; end if;
+  return new;
+end $$;
+revoke all on function public.pro_con_fecha() from public, anon, authenticated;
+drop trigger if exists profiles_vence on public.profiles;
+create trigger profiles_vence before insert or update of plan, pro_until, role on public.profiles for each row execute function public.pro_con_fecha();
+update public.profiles set pro_until = now() + interval '30 days' where plan = 'pro' and pro_until is null and role <> 'admin';
