@@ -79,6 +79,12 @@
     !e.dataset.cfxOjo && !e.hasAttribute('data-pin') && !/numeric|decimal|tel|email|none/i.test(e.inputMode || e.getAttribute('inputmode') || '') &&
     !/email|tel|password|one-time-code|cc-|bday|postal/i.test(e.autocomplete || '') && !/^\[?\\?d|^\[0-9/.test(e.getAttribute('pattern') || '') &&
     !NO.test([e.name, e.id, e.getAttribute('placeholder'), e.getAttribute('aria-label')].join(' ')));
+  // G27: el micrófono va DENTRO de la página, junto a su campo (no fijo en la pantalla): al bajar se va con el campo
+  // y queda debajo de la cabecera y de la barra de abajo, nunca flotando encima. Al esconderse sale de la página.
+  function caja(c) {
+    const op = c.offsetParent;
+    return op && op !== document.body && op !== document.documentElement && getComputedStyle(op).position !== 'static' ? op : document.body;
+  }
   function ubicar() {
     if (!campo || !campo.isConnected || (!rec && document.activeElement !== campo)) return ocultar(true);
     const r = campo.getBoundingClientRect();
@@ -86,22 +92,24 @@
     // Tamaño según el campo (en campos chicos el botón se achica) y el texto no queda debajo del micrófono.
     const alto = Math.round(Math.max(18, Math.min(campo.tagName === 'TEXTAREA' ? 30 : 28, r.height * 0.62, r.width / 6)));
     if (!campo.dataset.cfxPad) { campo.dataset.cfxPad = campo.style.paddingRight || '-'; campo.style.paddingRight = (alto + 12) + 'px'; }
-    b.style.cssText = 'position:fixed;z-index:2147483000;width:' + alto + 'px;height:' + alto + 'px;left:' + Math.round(r.right - alto - Math.max(4, (r.height - alto) / 2.4)) + 'px;top:' + Math.round(campo.tagName === 'TEXTAREA' ? r.bottom - alto - 7 : r.top + (r.height - alto) / 2) + 'px';
-    b.hidden = false;
+    const k = caja(campo); if (b.parentNode !== k) k.appendChild(b);
+    const fijo = 'position:absolute!important;z-index:2!important;margin:0!important;min-width:0!important;max-width:none!important;width:' + alto + 'px!important;height:' + alto + 'px!important;';
+    b.style.cssText = fijo + 'left:0;top:0'; b.hidden = false;
+    const o = b.getBoundingClientRect();  // dónde queda el (0,0) de su caja, con lo que se haya bajado
+    const x = r.right - alto - Math.max(4, (r.height - alto) / 2.4), y = campo.tagName === 'TEXTAREA' ? r.bottom - alto - 7 : r.top + (r.height - alto) / 2;
+    b.style.cssText = fijo + 'left:' + Math.round(x - o.left) + 'px;top:' + Math.round(y - o.top) + 'px';
   }
   // forzar: también si estaba dictando (el campo desapareció, otra pantalla, la app pasó a segundo plano).
   function ocultar(forzar) {
     if (rec) { if (!forzar) return; parar(); }
     clearTimeout(tQuieto);
-    b.hidden = true; b.classList.remove('on');
+    b.hidden = true; b.classList.remove('on'); b.remove();
     document.querySelectorAll('[data-cfx-pad]').forEach((c) => { c.style.paddingRight = c.dataset.cfxPad === '-' ? '' : c.dataset.cfxPad; delete c.dataset.cfxPad; });
   }
   // Sin usarlo un rato (no habla ni escribe), el micrófono se esconde; tocar el campo lo vuelve a mostrar.
   const esperar = () => { clearTimeout(tQuieto); tQuieto = setTimeout(() => { if (!rec) ocultar(); }, QUIETO); };
   function mostrar(c) {
-    campo = c; const cont = c.closest('dialog[open]') || document.body;  // dentro de una ventana va en la ventana: si no, quedaría detrás
-    if (b.parentNode !== cont) cont.appendChild(b);
-    ubicar(); esperar();
+    campo = c; ubicar(); esperar();  // G27: va dentro de la caja del campo (también en ventanas), ver ubicar()
   }
   function terminar() {
     clearTimeout(tCallado); clearTimeout(tMax); clearTimeout(tForzar);

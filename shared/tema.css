@@ -313,3 +313,5 @@ main > .cfx-desliza, .view > .cfx-desliza, main > section > .cfx-desliza { margi
 img, video, canvas, svg { max-width: 100%; }
 .card, .tarjeta, .cfx-hm-zona { min-width: 0; overflow-wrap: anywhere; }
 .card button, .card .btn, .tarjeta button { overflow-wrap: normal; }
+/* G27: deslizar un menú de pestañas mueve solo ese menú (el gesto no pasa a la página ni a otro menú). */
+nav.tabs.sub, [role=tablist], [data-cfx-pestanas], .seg, .segs, .seg2, .tabs2, nav.cfx-barra { overscroll-behavior-x: contain; }
