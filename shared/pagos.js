@@ -5,6 +5,8 @@
                                           Transferencia = precio exacto. Link o tarjeta = precio + "cargo por pago online (X %)" en una línea aparte.
    CFX_PAGOS.abrir({ rpc, producto })  → G19: comprar un módulo o pack. producto = { clave, nombre, mensual, anual, links: { m, a } } (1 mes o 1 año;
                                           links = link de pago con el monto fijo, si el administrador lo puso). Al aprobarlo se activa solo ese módulo.
+                                          G28 (M2): el link general es ABIERTO (sin monto) y sirve para todo: se muestra el total con 📋 Copiar monto.
+                                          Un link de monto fijo, si existe para ese plan, se usa en su lugar.
    CFX_PAGOS.revisar({ rpc, salir })   → si es un negocio nuevo que debe su primer pago, muestra la pantalla de activación (no se cierra).
    rpc(nombre, args) debe devolver una promesa con los datos (cada app pasa su propia función). */
 (function () {
@@ -147,10 +149,11 @@
           (plan.k === 'otro' ? '<label for="cpOtro">Monto a pagar</label><input id="cpOtro" type="number" inputmode="numeric" min="1" placeholder="Ej: 10000">' : '') +
           (medios.length > 1 ? '<div class="cp-tabs">' + medios.map((m) => '<button type="button" data-m="' + m + '" class="' + (m === medio ? 'on' : '') + '">' + NOMBRE_MEDIO[m] + '</button>').join('') + '</div>' : '') +
           '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div><div class="cp-fila"><button type="button" data-copiar>📋 Copiar monto</button>' +
-            (medio !== 'transferencia' ? '<a class="cp-btn" href="' + esc(url) + '" target="_blank" rel="noopener">' + (medio === 'tarjeta' ? '💳 Abrir pago con tarjeta' : '🔗 Abrir link de pago') + '</a>' : '') + '</div>' +
+            (medio !== 'transferencia' && url ? '<a class="cp-btn" href="' + esc(url) + '" target="_blank" rel="noopener">' + (medio === 'tarjeta' ? '💳 Abrir pago con tarjeta' : '🔗 Abrir link de pago') + '</a>' : '') + '</div>' +
           (medio === 'transferencia'
             ? '<div class="cp-ayuda">Copia cada dato, abre la app de tu banco y pégalo (mantén presionado el campo → <b>Pegar</b>). La transferencia no tiene cargo extra.</div>' +
               datos.map((x, i) => '<div class="cp-dato"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b>' + (/^(Banco|Tipo de cuenta)$/.test(x[0]) ? '' : '<button type="button" data-d="' + i + '">Copiar</button>') + '</div>').join('')
+            : !url ? '<div class="cp-err">Este plan aún no tiene link de pago. Elige otro plan o escríbenos por el chat.</div>'
             : fijo ? '<div class="cp-ayuda">Abre el link: ya trae el monto del plan. Paga y vuelve aquí a subir el pantallazo.</div>'
             : '<div class="cp-ayuda">Toca <b>Copiar monto</b>, abre el ' + (medio === 'tarjeta' ? 'pago con tarjeta' : 'link') + ' y pega el total donde dice monto.' + (pc ? ' El cargo por pago online (' + String(pc).replace('.', ',') + ' %) lo cobra la plataforma de pago; por transferencia no se cobra.' : '') + '</div>') + '</div>' +
           '<label for="cpFoto">Pantallazo del comprobante</label><input id="cpFoto" type="file" accept="image/*">' + (foto ? '<img class="cp-vista" alt="Comprobante" src="' + foto + '">' : '') +

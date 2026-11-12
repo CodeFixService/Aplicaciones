@@ -1,1 +1,1 @@
-{"version": "6.02", "bd": "5.42", "notas": "👆 Deslizar un menú de pestañas mueve solo ese menú (ya no se mueve lo de adentro, como Día / 7 días / 30 días). 🎤 El micrófono va dentro de su campo: al bajar se va con él y no queda flotando."}
+{"version": "6.03", "bd": "5.42", "notas": "💳 Un solo link de pago abierto (sin monto) sirve para Premium, módulos y packs: la app muestra el total con 📋 Copiar monto. Los links de monto fijo siguen sirviendo y ahora son opcionales."}
