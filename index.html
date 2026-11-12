@@ -950,20 +950,44 @@
         '<div class="btns"><button type="button" class="small" data-rd="medir">Guardar</button></div>';
     return h;
   }
-  // 🌐 Mi dominio (G25: fila propia en Ajustes → Tu tienda)
+  // 🌐 Mi dominio (G25: fila propia en Ajustes → Tu tienda · G29: pasos CNAME + estado con Cloudflare for SaaS)
+  let domEstado = null; // null = sin revisar · 'activo' · 'pendiente'
+  async function revisarDominio(d) {
+    try {
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+      const r = await fetch('https://www.' + d + '/cfx-dominio', { signal: ctl.signal, cache: 'no-store' }).then((x) => x.json()).finally(() => clearTimeout(t));
+      domEstado = r && r.slug && (!redes || r.slug === redes.slug) ? 'activo' : 'pendiente';
+    } catch (e) { domEstado = 'pendiente'; }
+    pintarDominio();
+  }
   function pintarDominio() {
     const w = web, e = Core.esc, b = $('dominioBody');
     if (!w) { b.innerHTML = '<p class="muted">No disponible por ahora: recarga en un rato.</p>'; return; }
-    const tienda = redes ? Core.rootUrl() + 't/?s=' + encodeURIComponent(redes.slug) : '';
-    let h = tienda ? '<p class="muted" style="margin:0 0 6px">Hoy tu tienda está en:<br><b style="overflow-wrap:anywhere">' + e(tienda) + '</b></p>' : '';
-    h += !w.con_dominio ? '<p class="muted">Con el módulo, tu tienda abre en tu propia dirección (mitienda.cl): más confianza y más ventas.</p>' +
-        '<div class="btns"><button type="button" class="small" data-rd-ir="premium">' + (w.modulos ? '🧩 Ver módulo' : '⭐ Ver Pro') + '</button></div>'
-      : '<ol class="muted" style="margin:0 0 6px;padding-left:20px"><li>Compra tu dominio en nic.cl (.cl) o en Cloudflare.</li><li>Escríbelo aquí y toca <b>Guardar</b>.</li>' +
-        '<li>CodeFix te manda por el chat el dato para pegar en tu dominio (DNS). Al conectarlo, te avisamos.</li></ol>' +
-        (w.dominio ? '<p style="margin:0 0 6px">✅ <b>' + e(w.dominio) + '</b> guardado.</p>' : '');
-    if (w.con_dominio) h += '<label for="mdDom">Tu dominio</label><input id="mdDom" inputmode="url" maxlength="80" placeholder="mitienda.cl" value="' + e(w.dominio || '') + '">' +
-        '<div class="btns"><button type="button" class="small" data-rd="dominio">Guardar</button>' + (w.dominio ? '<button type="button" class="small alt" data-rd="sin-dominio">Quitar</button>' : '') + '</div>';
+    const tienda = redes ? Core.rootUrl() + 't/?s=' + encodeURIComponent(redes.slug) : '', d = w.dominio, act = d && domEstado === 'activo';
+    let h = tienda ? '<p class="muted" style="margin:0 0 6px">Hoy tu tienda está en:<br><b style="overflow-wrap:anywhere">' + e(act ? 'https://www.' + d : tienda) + '</b></p>' : '';
+    if (!w.con_dominio) {
+      b.innerHTML = h + '<p class="muted">Con el módulo, tu tienda abre en tu propia dirección (mitienda.cl): más confianza y más ventas.</p>' +
+        '<div class="btns"><button type="button" class="small" data-rd-ir="premium">' + (w.modulos ? '🧩 Ver módulo' : '⭐ Ver Pro') + '</button></div>';
+      return;
+    }
+    const copia = (t, v) => '<div class="row" style="gap:6px;align-items:center;margin:4px 0"><small class="muted" style="flex:none;width:64px">' + t + '</small><input readonly value="' + e(v) + '" style="flex:1;min-width:0">' +
+      '<button type="button" class="small alt" style="flex:none" aria-label="Copiar ' + t + '" data-rd-copiar="' + e(v) + '">📋</button></div>';
+    if (!d) {
+      h += '<ol class="muted" style="margin:0 0 6px;padding-left:20px"><li>Compra tu dominio en nic.cl (.cl) o en Cloudflare.</li><li>Escríbelo aquí y toca <b>Guardar</b>.</li><li>Te mostramos el dato para pegar en tu dominio.</li></ol>';
+    } else {
+      h += '<p style="margin:0 0 6px">' + (act ? '✅ <b>Activo</b>: tu tienda abre en <b>www.' + e(d) + '</b>' : domEstado === 'pendiente' ? '⏳ <b>Pendiente</b>: aún no conecta (puede tardar hasta 24 h)' : '🔎 Revisando…') + '</p>';
+      if (!act) h += w.cname
+        ? '<p class="muted" style="margin:0 0 4px"><b>1.</b> En tu proveedor del dominio (nic.cl, Cloudflare…) → <b>DNS</b> → agrega este registro:</p>' +
+          copia('Tipo', 'CNAME') + copia('Nombre', 'www') + copia('Destino', w.cname) +
+          '<p class="muted" style="margin:6px 0 4px"><b>2.</b> Redirige <b>' + e(d) + '</b> a <b>www.' + e(d) + '</b> (en tu proveedor: "Redirección" o "Reenvío").</p>' +
+          '<p class="cfx-nota-btn">En Cloudflare el registro va con la nube gris (solo DNS). CodeFix activa el certificado y te avisa.</p>'
+        : '<p class="muted">CodeFix te manda por el chat el dato para pegar en tu dominio (DNS). Al conectarlo, te avisamos.</p>';
+    }
+    h += '<label for="mdDom">Tu dominio</label><input id="mdDom" inputmode="url" maxlength="80" placeholder="mitienda.cl" value="' + e(d || '') + '">' +
+      '<div class="btns"><button type="button" class="small" data-rd="dominio">Guardar</button>' + (d ? (act ? '' : '<button type="button" class="small alt" data-rd="revisar-dom">🔄 Revisar</button>') +
+      '<button type="button" class="small alt" data-rd="sin-dominio">Quitar</button>' : '') + '</div>';
     b.innerHTML = h;
+    if (d && domEstado === null) { domEstado = 'revisando'; revisarDominio(d); }
   }
   function pintarRedes() {
     const r = redes, e = Core.esc, tienda = Core.rootUrl() + 't/?s=' + encodeURIComponent(r.slug), tel = String(r.telefono || '').replace(/\D/g, '');
@@ -1007,12 +1031,14 @@
     if (ir) { ev.preventDefault(); return MENU_O && MENU_O.abrir(ir.dataset.rdIr); }
     if (!b) return;
     const a = b.dataset.rd;
+    if (a === 'revisar-dom') { domEstado = 'revisando'; pintarDominio(); return revisarDominio(web.dominio); }
     if (a === 'medir' || a === 'dominio' || a === 'sin-dominio') {
       b.disabled = true;
       try {
         web = a === 'medir' ? await Cuenta.rpc('medicion_guardar', { p_meta: $('mdMeta').value, p_ga: $('mdGa').value })
           : await Cuenta.rpc('dominio_guardar', { p_dominio: a === 'dominio' ? $('mdDom').value : null });
-        Core.toast(a === 'medir' ? '📊 Medición guardada' : a === 'dominio' ? '🌐 Dominio guardado: CodeFix lo conecta y te avisa' : 'Dominio quitado');
+        if (a !== 'medir') domEstado = null;
+        Core.toast(a === 'medir' ? '📊 Medición guardada' : a === 'dominio' ? '🌐 Dominio guardado: sigue los pasos de abajo' : 'Dominio quitado');
         pintarRedes();
       } catch (err) { Core.toast(err.message); b.disabled = false; }
       return;

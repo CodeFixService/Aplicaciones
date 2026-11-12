@@ -8,7 +8,7 @@
 // WhatsApp y los buscadores no corren JavaScript: por eso las etiquetas se ponen aquí, antes de mandar la página.
 // Si Supabase no responde en 1,5 s, se manda la página tal cual (nunca queda más lenta ni rota).
 // · 📊 Medir anuncios (módulo): si la tienda tiene Meta Pixel / Google Analytics, se agregan aquí y la CSP de ESA página permite solo esos 2 dominios.
-// · 🌐 Dominio propio (módulo): mitienda.cl/ → /t/?s=tienda (el dominio se agrega a mano en Cloudflare → Workers → Domains & Routes).
+// · 🌐 Dominio propio (módulo): mitienda.cl/ → /t/?s=tienda (Cloudflare for SaaS: Custom Hostnames + Workers Routes */* → aplicaciones; /cfx-dominio dice si ya está conectado).
 let CFG = null; // { url, key } leídos de shared/config.js (una vez por isolate)
 const MEM = new Map(); // caché corta en memoria: clave → { t, v }
 const MS = 120000;
@@ -198,9 +198,17 @@ async function dominio(req, url, env) {
   } catch (e) { return null; }
 }
 
+// 🌐 ¿Ya está conectado? La app del negocio pregunta https://www.sutienda.cl/cfx-dominio: si responde con su tienda, el dominio está ✅ activo.
+async function dominioEstado(url, env) {
+  let slug = null;
+  try { const s = await rpc(env, url, 'tienda_por_dominio', { p_host: url.hostname.toLowerCase() }); if (typeof s === 'string' && /^[a-z0-9-]{2,60}$/.test(s)) slug = s; } catch (e) { slug = null; }
+  return new Response(JSON.stringify({ slug }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    if (url.pathname === '/cfx-dominio') return dominioEstado(url, env);
     if (url.pathname === '/') { const r = await dominio(req, url, env); if (r) return r; }
     if (url.pathname === '/t/og') return conCache(req, ctx, () => imagen(url, env));
     if (url.pathname === '/t/feed') return conCache(req, ctx, () => catalogo(url, env));

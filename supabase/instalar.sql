@@ -5359,7 +5359,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.42'::text $$;
+language sql immutable as $$ select '5.43'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -9077,3 +9077,56 @@ revoke all on function public.pro_con_fecha() from public, anon, authenticated;
 drop trigger if exists profiles_vence on public.profiles;
 create trigger profiles_vence before insert or update of plan, pro_until, role on public.profiles for each row execute function public.pro_con_fecha();
 update public.profiles set pro_until = now() + interval '30 days' where plan = 'pro' and pro_until is null and role <> 'admin';
+
+-- ---------- VERSIÓN 5.43 · G29 🌐 Dominio con Cloudflare for SaaS (se puede volver a correr) ----------
+-- El administrador guarda en el CM (Control → Órbita → 🌐 Dominio) a dónde apunta el CNAME del negocio (ej: tiendas.codefix.cl).
+-- El negocio ve: CNAME www → ese destino. El dominio se guarda sin "www." (el Worker lo quita al buscar la tienda).
+insert into public.cfx_config (clave, valor) values ('dominio', '{"cname": ""}') on conflict (clave) do nothing;
+create or replace function public.cfx_dominio() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select valor from public.cfx_config where clave = 'dominio') || jsonb_build_object('tiendas', coalesce((select jsonb_agg(jsonb_build_object('slug', p.slug, 'dominio', p.dominio,
+    'activo', public.pro_o_modulo(p.id, 'dominio')) order by p.dominio) from public.profiles p where p.dominio is not null and p.role = 'user'), '[]'::jsonb));
+end $$;
+create or replace function public.cfx_dominio_guardar(p_cname text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c text := nullif(lower(trim(regexp_replace(coalesce(p_cname, ''), '^https?://|/.*$|\.$', '', 'gi'))), '');
+begin
+  perform public.cfx_es_admin();
+  if c is not null and (c !~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$' or length(c) > 80) then raise exception 'Escribe solo el nombre, ej: tiendas.codefix.cl'; end if;
+  insert into public.cfx_config (clave, valor) values ('dominio', jsonb_build_object('cname', coalesce(c, '')))
+    on conflict (clave) do update set valor = excluded.valor;
+  return public.cfx_dominio();
+end $$;
+revoke all on function public.cfx_dominio(), public.cfx_dominio_guardar(text) from public, anon;
+grant execute on function public.cfx_dominio(), public.cfx_dominio_guardar(text) to authenticated;
+
+create or replace function public.mi_marca_web() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare p public.profiles;
+begin
+  select * into p from public.profiles where id = public.webhook_dueno();
+  return jsonb_build_object('slug', p.slug, 'meta', p.medicion ->> 'meta', 'ga', p.medicion ->> 'ga', 'dominio', p.dominio,
+    'medicion', public.pro_o_modulo(p.id, 'medicion'), 'con_dominio', public.pro_o_modulo(p.id, 'dominio'), 'modulos', public.mis_modulos(p.id) is not null,
+    'cname', nullif((select valor ->> 'cname' from public.cfx_config where clave = 'dominio'), ''));
+end $$;
+create or replace function public.dominio_guardar(p_dominio text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := public.webhook_dueno(); d text := nullif(regexp_replace(lower(trim(regexp_replace(coalesce(p_dominio, ''), '^https?://|/.*$', '', 'gi'))), '^www\.', ''), ''); antes text;
+begin
+  if not public.pro_o_modulo(me, 'dominio') then raise exception '🌐 Dominio propio es % ', case when public.mis_modulos(me) is not null then 'un módulo: actívalo en Ajustes → 🧩 Módulos' else 'de la versión Pro' end; end if;
+  if d is not null and (d !~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$' or length(d) > 80 or d ~ '(workers\.dev|supabase\.|pages\.dev|codefix)') then
+    raise exception 'Escribe solo el dominio, ej: mitienda.cl';
+  end if;
+  if d is not null and exists (select 1 from public.profiles where dominio = d and id <> me) then raise exception 'Ese dominio ya lo usa otra tienda'; end if;
+  select dominio into antes from public.profiles where id = me;
+  update public.profiles set dominio = d where id = me;
+  if d is not null and d is distinct from antes then
+    perform public.cfx_al_cm('🌐 Dominio nuevo: www.' || d, 'Tienda ' || coalesce((select slug from public.profiles where id = me), '') ||
+      '. Agrégalo en Cloudflare → tu dominio → SSL/TLS → Custom Hostnames → Add custom hostname → www.' || d || ' → Add.');
+  end if;
+  return public.mi_marca_web();
+end $$;
+update public.profiles set dominio = regexp_replace(dominio, '^www\.', '') where dominio ~ '^www\.'
+  and not exists (select 1 from public.profiles q where q.dominio = regexp_replace(public.profiles.dominio, '^www\.', ''));
