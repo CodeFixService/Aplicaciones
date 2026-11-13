@@ -4,7 +4,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
   Strict-Transport-Security: max-age=31536000
-  Permissions-Policy: camera=(self), microphone=(self), geolocation=(self), payment=(self), usb=(), serial=(), bluetooth=(), hid=(), midi=()
+  Permissions-Policy: camera=(self), microphone=(self), geolocation=(self), payment=(self), usb=(), serial=(), bluetooth=(self), hid=(), midi=()
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Content-Security-Policy: object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://challenges.cloudflare.com https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net
 /sw.js
