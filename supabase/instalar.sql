@@ -2584,13 +2584,13 @@ revoke all on public.planes from anon, authenticated;
 insert into public.planes (codigo, nombre, descripcion, beneficios, limites) values
  ('negocio_free', 'Gratis', 'Para partir', '["Tienda con link y QR", "Caja Rápida", "Pedidos online"]',
   '{"productos": 50, "clientes": 50, "fichas": 10, "respuestas": 3, "equipo": 0, "pedidos_mes": 30}'),
- ('negocio_pro', 'Pro', 'Todo Órbita', '["Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]',
+ ('negocio_pro', 'Pro', 'Todo Despega Pyme', '["Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]',
   '{"productos": 200, "clientes": 300, "fichas": 60, "respuestas": 20, "equipo": 5, "pedidos_mes": 100000}'),
  ('cliente_free', 'Gratis', 'Cliente', '[]', '{"contactos": 3, "favoritos": 5, "mensajes_seguidos": 1}'),
  ('cliente_pro', 'Premium', 'Cliente Premium', '["Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]',
   '{"contactos": 20, "favoritos": 1000, "mensajes_seguidos": 5}')
 on conflict (codigo) do nothing;
-update public.planes set descripcion = 'Todo Órbita' where codigo = 'negocio_pro' and descripcion = 'Todo FichaPro';  -- nuevo nombre de la app
+update public.planes set descripcion = 'Todo Despega Pyme' where codigo = 'negocio_pro' and descripcion in ('Todo FichaPro', 'Todo Órbita');  -- nuevo nombre de la app (G33)
 
 create or replace function public.plan_de(u uuid) returns text
 language sql stable security definer set search_path = '' as $$
@@ -3875,7 +3875,7 @@ begin
       where x.negocio_id = r.id and x.created_at >= d and x.estado not in ('cancelado', 'expirado', 'rechazado')
       group by 1 order by sum((l ->> 'cant')::int) desc limit 1;
     perform public.notify_user(r.id,
-      case when cnt > 0 then '📊 Tu semana: vendiste $' || to_char(ven, 'FM999G999G999') else '📊 Tu semana en Órbita' end,
+      case when cnt > 0 then '📊 Tu semana: vendiste $' || to_char(ven, 'FM999G999G999') else '📊 Tu semana en Despega Pyme' end,
       case when cnt > 0 then cnt || ' pedido(s) online' || coalesce(' · Tu producto top fue ' || top, '') || '. ¡Vamos por más!'
            else 'Esta semana no hubo ventas online. Comparte tu tienda por WhatsApp desde Hoy 📣' end, './');
     n := n + 1;
@@ -5359,7 +5359,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.45'::text $$;
+language sql immutable as $$ select '5.46'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5424,6 +5424,7 @@ revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
 -- =====================================================================
+--  VERSIÓN 5.46 · G33 ✏️ nombre visible "Despega Pyme" (plan Pro, resumen semanal, módulo dominio) · G32 f 🔒 3 claves malas: se pausa la clave y el QR; se entra con el enlace al correo (núcleo 2.66 qr.sql: cfx_login_fallos).
 --  VERSIÓN 5.45 · G32 d 🔑 Entrar con QR (núcleo 2.65 qr.sql): tabla cfx_login_qr + cfx_qr_crear/ver/aprobar/estado/canjear.
 --  VERSIÓN 5.44 · G32 🧾 Boleta SII desde la Caja (OpenFactura o folio manual): tabla boletas_caja + boleta_caja(jsonb).
 -- =====================================================================
@@ -7065,7 +7066,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -7318,7 +7319,7 @@ language sql immutable as $$
          ('redes', '📲 Vender en redes', 'Pedir por WhatsApp, catálogo para Google e Instagram.'),
          ('webhooks', '🔗 Avisos a tu sistema', 'Cada pedido llega firmado a tu sistema o planilla (webhooks).'),
          ('medicion', '📊 Medir anuncios', 'Meta Pixel y Google Analytics en tu tienda: mide qué anuncio te trae ventas.'),
-         ('dominio', '🌐 Dominio propio', 'Tu tienda en tu dirección (mitienda.cl) en vez del link de Órbita.'),
+         ('dominio', '🌐 Dominio propio', 'Tu tienda en tu dirección (mitienda.cl) en vez del link de Despega Pyme.'),
          ('reservas', '📅 Reservas', 'Agenda en línea para tus clientes.'),
          ('recordatorios', '⏰ Recordatorios', 'Avisos automáticos antes de cada cita o vencimiento.')
 $$;
@@ -8400,18 +8401,6 @@ end $$;
 revoke all on function public.cfx_qr_ver(text) from public, anon;
 grant execute on function public.cfx_qr_ver(text) to authenticated;
 
-create or replace function public.cfx_qr_aprobar(p text) returns jsonb
-language plpgsql security definer set search_path = '' as $$
-declare q public.cfx_login_qr := public.cfx_qr_buscar(p);
-begin
-  if auth.uid() is null then return jsonb_build_object('ok', false, 'error', 'Primero inicia sesión en este celular'); end if;
-  if q.token is null then return jsonb_build_object('ok', false, 'error', 'El código venció o no existe. En el computador toca "Otro código".'); end if;
-  update public.cfx_login_qr set user_id = auth.uid(), aprobado_at = now() where token = q.token and aprobado_at is null;
-  return jsonb_build_object('ok', true);
-end $$;
-revoke all on function public.cfx_qr_aprobar(text) from public, anon;
-grant execute on function public.cfx_qr_aprobar(text) to authenticated;
-
 -- El computador pregunta: esperando | aprobado | vencido (con su secreto: nadie más puede preguntar).
 create or replace function public.cfx_qr_estado(p_token text, p_secreto text) returns text
 language sql stable security definer set search_path = '' as $$
@@ -8422,17 +8411,79 @@ language sql stable security definer set search_path = '' as $$
     from public.cfx_login_qr where token = p_token and secreto = encode(extensions.digest(coalesce(p_secreto, ''), 'sha256'), 'hex')), 'vencido') $$;
 grant execute on function public.cfx_qr_estado(text, text) to anon, authenticated;
 
--- Solo la Edge Function (clave de servidor): marca el código como usado UNA vez y entrega el correo para el enlace mágico.
+
+-- ---------- G32 f · 🔒 3 claves malas: no se bloquea la cuenta, solo la clave y el QR; se entra con el enlace al correo (gratis) ----------
+-- Se cuenta por correo (exista o no la cuenta: no revela nada). Al entrar con el enlace (amr otp/magiclink) se desbloquea.
+create table if not exists public.cfx_login_fallos (
+  email      text primary key,
+  fallos     int not null default 0,
+  updated_at timestamptz not null default now()
+);
+alter table public.cfx_login_fallos enable row level security;
+revoke all on public.cfx_login_fallos from anon, authenticated;
+
+create or replace function public.cfx_login_bloqueado(p_email text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select fallos >= 3 from public.cfx_login_fallos where email = lower(trim(coalesce(p_email, '')))), false) $$;
+grant execute on function public.cfx_login_bloqueado(text) to anon, authenticated;
+
+-- Clave mala → suma 1 y responde si quedó bloqueada (y cuántos intentos quedan).
+create or replace function public.cfx_login_fallo(p_email text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare e text := lower(trim(coalesce(p_email, ''))); n int;
+begin
+  if e !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then return jsonb_build_object('ok', false); end if;
+  delete from public.cfx_login_fallos where updated_at < now() - interval '30 days';
+  insert into public.cfx_login_fallos (email, fallos) values (e, 1)
+  on conflict (email) do update set fallos = least(public.cfx_login_fallos.fallos + 1, 99), updated_at = now()
+  returning fallos into n;
+  return jsonb_build_object('ok', true, 'bloqueado', n >= 3, 'quedan', greatest(0, 3 - n));
+end $$;
+grant execute on function public.cfx_login_fallo(text) to anon, authenticated;
+
+-- Con sesión: clave correcta (sin bloqueo) o entró por el enlace del correo → contador a cero. 'estaba' = venía bloqueada (ofrecer cambiar la clave).
+create or replace function public.cfx_login_desbloquear() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare e text := lower(coalesce(auth.jwt() ->> 'email', '')); f int; enlace boolean;
+begin
+  if auth.uid() is null or e = '' then return jsonb_build_object('ok', false); end if;
+  enlace := exists (select 1 from jsonb_array_elements(coalesce(auth.jwt() -> 'amr', '[]'::jsonb)) a where a ->> 'method' in ('otp', 'magiclink', 'email/signup', 'recovery'));
+  select fallos into f from public.cfx_login_fallos where email = e;
+  if f is null then return jsonb_build_object('ok', true, 'estaba', false); end if;
+  if f >= 3 and not enlace then return jsonb_build_object('ok', false, 'bloqueado', true); end if;
+  delete from public.cfx_login_fallos where email = e;
+  return jsonb_build_object('ok', true, 'estaba', f >= 3);
+end $$;
+revoke all on function public.cfx_login_desbloquear() from public, anon;
+grant execute on function public.cfx_login_desbloquear() to authenticated;
+
+-- Aprobar (celular) y canjear (solo la Edge Function, clave de servidor: marca el código usado UNA vez y entrega el correo).
+-- El QR también queda cerrado mientras la cuenta esté protegida.
+create or replace function public.cfx_qr_aprobar(p text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare q public.cfx_login_qr := public.cfx_qr_buscar(p);
+begin
+  if auth.uid() is null then return jsonb_build_object('ok', false, 'error', 'Primero inicia sesión en este celular'); end if;
+  if public.cfx_login_bloqueado(auth.jwt() ->> 'email') then return jsonb_build_object('ok', false, 'error', '🔒 Tu cuenta está protegida por 3 claves malas. Entra en el computador con el enlace de tu correo.'); end if;
+  if q.token is null then return jsonb_build_object('ok', false, 'error', 'El código venció o no existe. En el computador toca "Otro código".'); end if;
+  update public.cfx_login_qr set user_id = auth.uid(), aprobado_at = now() where token = q.token and aprobado_at is null;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function public.cfx_qr_aprobar(text) from public, anon;
+grant execute on function public.cfx_qr_aprobar(text) to authenticated;
+
 create or replace function public.cfx_qr_canjear(p_token text, p_secreto text) returns text
 language plpgsql security definer set search_path = '' as $$
-declare u uuid;
+declare u uuid; m text;
 begin
   update public.cfx_login_qr set usado_at = now()
   where token = p_token and secreto = encode(extensions.digest(coalesce(p_secreto, ''), 'sha256'), 'hex')
     and aprobado_at is not null and aprobado_at > now() - interval '2 minutes' and usado_at is null
   returning user_id into u;
   if u is null then return null; end if;
-  return (select email from auth.users where id = u);
+  m := (select email from auth.users where id = u);
+  if public.cfx_login_bloqueado(m) then return null; end if;
+  return m;
 end $$;
 revoke all on function public.cfx_qr_canjear(text, text) from public, anon, authenticated;
 grant execute on function public.cfx_qr_canjear(text, text) to service_role;

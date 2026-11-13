@@ -6,6 +6,9 @@
 //   CFX_QR.pc(el)        → en la pantalla de ingreso (solo se ve en computador)
 //   CFX_QR.revisar()     → con sesión: si la dirección trae ?qr=, pregunta "¿Entrar en el computador?"
 //   CFX_QR.celular()     → menú "💻 Entrar en un computador" (escanear o escribir el código)
+// G32 f · 🔒 3 claves malas: no se bloquea la cuenta; se pausan la clave y el QR y se entra con el enlace al correo (gratis).
+//   const { error } = await CFX_QR.clave(email, () => sb.auth.signInWithPassword({ email, password }))
+//   Al entrar por el enlace se desbloquea solo y ofrece cambiar la clave (lo hace iniciar(); si la página se va a otra: await CFX_QR.despues()).
 (function () {
   'use strict';
   let O = null, vuelta = 0;
@@ -27,7 +30,8 @@
       'dialog.cfx-qrd p{margin:6px 0;font-size:14.5px;color:var(--cfx-texto-2,#5b6472)}dialog.cfx-qrd .cq-eq{font-weight:700;color:var(--cfx-texto,#0f172a)}' +
       'dialog.cfx-qrd input{width:100%;box-sizing:border-box;font:700 22px ui-monospace,monospace;letter-spacing:4px;text-transform:uppercase;text-align:center;padding:10px;border:1px solid var(--cfx-borde,#cbd5e1);border-radius:10px;background:var(--cfx-campo,#fff);color:inherit}' +
       'dialog.cfx-qrd video{width:100%;border-radius:10px;background:#000;margin-top:8px}dialog.cfx-qrd .cq-err{color:var(--cfx-mal,#dc2626);min-height:1em}' +
-      'dialog.cfx-qrd .cq-pie{display:flex;gap:8px;margin-top:14px}dialog.cfx-qrd .cq-pie button{flex:1}';
+      'dialog.cfx-qrd .cq-pie{display:flex;gap:8px;margin-top:14px}dialog.cfx-qrd .cq-pie button{flex:1}' +
+      'dialog.cfx-qrd input.cq-clave{font:16px system-ui,sans-serif;letter-spacing:0;text-transform:none;text-align:left}dialog.cfx-qrd .cq-ok{color:#16a34a;font-weight:700}';
     document.head.appendChild(s);
   }
   function dialogo(html) {
@@ -166,8 +170,78 @@
     };
   }
 
+
+  // ---------- G32 f · 🔒 Clave ----------
+  const SALIDA = () => location.origin + location.pathname;
+  const malClave = (e) => !!e && (e.code === 'invalid_credentials' || /invalid login credentials/i.test(e.message || ''));
+  function bloqueo(email) {
+    const d = dialogo('<h2>🔒 Por seguridad pausamos la clave</h2><p>Hubo 3 intentos con clave incorrecta. <b>Tu cuenta está bien</b>: entra con un enlace que te mandamos al correo.</p>' +
+      '<p class="cq-eq">' + esc(email) + '</p><p class="cq-err"></p>' +
+      '<div class="cq-pie"><button type="button" class="alt" data-cerrar>Cerrar</button><button type="button" data-enlace>📧 Enviarme el enlace</button></div>');
+    d.querySelector('[data-enlace]').onclick = async (ev) => {
+      ev.target.disabled = true;
+      const { error } = await O.sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: SALIDA() } });
+      if (error && /rate|seconds|segundos|429/i.test(error.message || '')) { d.querySelector('.cq-err').textContent = 'Espera un minuto y vuelve a tocar.'; ev.target.disabled = false; return; }
+      d.firstChild.innerHTML = '<h2>📧 Revisa tu correo</h2><p>Si <b>' + esc(email) + '</b> tiene cuenta, te llegó un enlace para entrar (mira también en spam). Ábrelo en este equipo.</p>' +
+        '<div class="cq-pie"><button type="button" data-cerrar>Entendido</button></div>';
+    };
+    return d;
+  }
+  // Envuelve el ingreso con clave: devuelve la misma respuesta de Supabase ({ error }); si está pausada, ni la intenta.
+  async function clave(email, intentar) {
+    email = String(email || '').trim().toLowerCase();
+    if (!O) return intentar();
+    let b = false; try { b = await rpc('cfx_login_bloqueado', { p_email: email }); } catch (e) { /* base sin G32 f */ }
+    const pausa = () => { bloqueo(email); return { data: null, error: Object.assign(new Error('🔒 Por seguridad, entra con el enlace de tu correo.'), { code: 'cfx_bloqueado' }) }; };
+    if (b) return pausa();
+    const r = await intentar();
+    if (r && r.error) {
+      if (malClave(r.error)) { let f = null; try { f = await rpc('cfx_login_fallo', { p_email: email }); } catch (e) { /* sin G32 f */ } if (f && f.bloqueado) return pausa(); }
+      return r;
+    }
+    rpc('cfx_login_desbloquear').catch(() => {});
+    return r;
+  }
+  // Entró con el enlace del correo: desbloquea y ofrece cambiar la clave.
+  function amr(s) { try { return JSON.parse(atob(s.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return {}; } }
+  const enCurso = {};
+  function trasEnlace(s) {
+    const j = amr(s), m = (j.amr || []).map((a) => a.method), t = Math.max(0, ...(j.amr || []).map((a) => +a.timestamp || 0));
+    if (!m.some((x) => x === 'otp' || x === 'magiclink') || Date.now() / 1000 - t > 900) return Promise.resolve(false);
+    const k = 'cfx:enlace:' + t;
+    if (enCurso[k]) return enCurso[k];  // ya en curso en esta página (el diálogo puede estar abierto): esperar el mismo
+    try { if (sessionStorage.getItem(k)) return Promise.resolve(false); } catch (e) { /* privado */ }
+    return (enCurso[k] = (async () => {
+      let r; try { r = await rpc('cfx_login_desbloquear'); } catch (e) { return false; }
+      try { sessionStorage.setItem(k, '1'); } catch (e) { /* privado */ }
+      if (!r || !r.estaba) return false;
+      const d = dialogo('<h2>✅ Entraste con el enlace</h2><p>Tu clave quedó activa otra vez. Si no la recuerdas, crea una nueva ahora.</p>' +
+        '<input type="password" class="cq-clave" data-nueva autocomplete="new-password" placeholder="Nueva clave (mínimo 6)" aria-label="Nueva clave"><p class="cq-err"></p>' +
+        '<div class="cq-pie"><button type="button" class="alt" data-cerrar>Ahora no</button><button type="button" data-guardar>Guardar clave</button></div>');
+      d.querySelector('[data-guardar]').onclick = async (ev) => {
+        const v = d.querySelector('[data-nueva]').value;
+        if (v.length < 6) { d.querySelector('.cq-err').textContent = 'Mínimo 6 caracteres.'; return; }
+        ev.target.disabled = true;
+        const { error } = await O.sb.auth.updateUser({ password: v });
+        if (error) { d.querySelector('.cq-err').textContent = /same|different/i.test(error.message) ? 'Usa una clave distinta a la anterior.' : 'No se pudo guardar. Intenta de nuevo.'; ev.target.disabled = false; return; }
+        d.firstChild.innerHTML = '<h2>✅ Clave nueva guardada</h2><p class="cq-ok">La próxima vez entra con tu correo y esta clave.</p><div class="cq-pie"><button type="button" data-cerrar>Listo</button></div>';
+      };
+      await new Promise((ok) => d.addEventListener('close', ok));
+      return true;
+    })());
+  }
+  // Para páginas que cambian de página al entrar: esperar esto antes de irse (el diálogo de clave nueva no se pierde).
+  async function despues() {
+    if (!O) return false;
+    let s = null; try { s = (await O.sb.auth.getSession()).data.session; } catch (e) { return false; }
+    return s ? trasEnlace(s) : false;
+  }
+
   window.CFX_QR = {
-    iniciar(o) { O = Object.assign({ funcion: 'enviar', qrLib: 'shared/vendor/qrcode.js' }, o); },
-    listo: () => !!O, pc, revisar, celular, confirmar
+    iniciar(o) {  // se puede llamar de nuevo para sumar opciones (ej. alEntrar en la pantalla de ingreso)
+      const ya = !!O; O = Object.assign(O || { funcion: 'enviar', qrLib: 'shared/vendor/qrcode.js' }, o);
+      if (!ya) try { O.sb.auth.onAuthStateChange((ev, s) => { if (s && (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION')) setTimeout(() => trasEnlace(s), 0); }); } catch (e) { /* sin auth */ }
+    },
+    listo: () => !!O, pc, revisar, celular, confirmar, clave, despues
   };
 })();

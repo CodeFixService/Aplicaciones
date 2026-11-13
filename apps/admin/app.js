@@ -130,7 +130,7 @@
     directo: {
       titulos: ['🎯 {n}: tu tienda necesita movimiento', '🎯 Una idea rápida para vender más', '🎯 5 minutos para tu tienda'],
       inicios: ['Hola {n}.', '{n}, un dato rápido:', 'Hola {n}, vamos al grano:'],
-      cierres: ['Te toma 5 minutos: entra, sube una oferta y listo.', 'Hoy: 1 ficha nueva en Órbita. Mañana: más pedidos.',
+      cierres: ['Te toma 5 minutos: entra, sube una oferta y listo.', 'Hoy: 1 ficha nueva en Despega Pyme. Mañana: más pedidos.',
         'Entra hoy y publica algo, aunque sea chico.']
     },
     divertido: {
@@ -402,7 +402,7 @@
     $('bNuevo').disabled = true;
     try {
       await Cuenta.crearUsuario(d);
-      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: 'Órbita' }, d));
+      ultimoAcceso = Cuenta.mensajeAcceso(Object.assign({ tienda: 'Despega Pyme' }, d));
       $('nCred').textContent = ultimoAcceso;
       $('nCred').classList.remove('hidden'); $('nCredBtns').classList.remove('hidden');
       $('nNombre').value = ''; $('nEmail').value = ''; $('nClave').value = '';

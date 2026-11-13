@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
-<title>Tienda · Órbita</title>
+<title>Tienda · Despega Pyme</title>
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icons/icon-192.png">
 <link rel="stylesheet" href="../shared/vendor/bootstrap-utilities.min.css">
@@ -118,7 +118,7 @@
     if (a && a.role === 'client' && a.negocio_id === t.id) { location.replace('../apps/catalogo/'); return; }
     if (a) { $('bIngresar').textContent = 'Mi app'; $('cCuenta').classList.add('hidden'); }
   } catch (e) { /* sin sesión */ }
-  document.title = t.empresa + ' · Órbita';
+  document.title = t.empresa + ' · Despega Pyme';
   $('titulo').textContent = t.empresa;
   if (/^#[0-9a-f]{6}$/i.test(t.color || '')) Core.tema.aplicar(t.color); else if (Core.colorRubro(t.rubro)) Core.tema.aplicar(Core.colorRubro(t.rubro));
   if (/^data:image\//.test(t.logo || '')) $('lg').style.backgroundImage = 'url("' + t.logo + '")'; else {

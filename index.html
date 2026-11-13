@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
-<title>Órbita</title>
+<title>Despega Pyme</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -105,7 +105,7 @@
 </style>
 </head>
 <body>
-<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">Órbita</h1><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
+<header class="top"><a href="#" id="bVolver" class="hidden" aria-label="Volver al inicio">‹</a><h1 id="titulo">Despega Pyme</h1><button class="icono-top hidden" id="bAjustes" aria-label="Ajustes">⚙️</button></header>
 <main>
   <div class="instalar hidden" id="cInstalar">
     <div style="font-size:30px">📲</div>
@@ -277,7 +277,7 @@
       <h2>🧾 Boletas</h2>
       <div id="boletaBody"></div>
       <details class="guia" id="gNecesito"><summary>❓ ¿Necesito boleta?</summary><ul>
-        <li><b>Sin inicio de actividades</b>: vendes igual con todo Órbita. Tu cliente recibe un comprobante (no es boleta). Para dar boleta SII primero haz el inicio de actividades en <b>sii.cl</b>.</li>
+        <li><b>Sin inicio de actividades</b>: vendes igual con todo Despega Pyme. Tu cliente recibe un comprobante (no es boleta). Para dar boleta SII primero haz el inicio de actividades en <b>sii.cl</b>.</li>
         <li><b>Con inicio de actividades</b>: das boleta electrónica por cada venta. Hazlo aquí: <b>Automática</b> (OpenFactura) o <b>Manual</b> (gratis en sii.cl).</li>
         <li><b>Pago con máquina de tarjeta</b>: en algunos casos el voucher vale como boleta, solo si tu máquina está habilitada para eso. Confírmalo en sii.cl o con tu proveedor. Efectivo y transferencia: sí llevan boleta.</li></ul></details>
       <details class="guia" id="gAuto"><summary>⚡ Boleta automática paso a paso</summary><ol>
@@ -608,7 +608,7 @@
 
     // Órbita: el negocio y su equipo ven "Hoy"; las secciones están en la barra de abajo.
     $('hoy').classList.toggle('hidden', cliente);
-    $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Órbita') : (acc.empresa || 'Órbita'));
+    $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Despega Pyme') : (acc.empresa || 'Despega Pyme'));
     const dueno = acc.role === 'user';
     ['cTienda', 'cLinks', 'cDespacho', 'cBoleta', 'cDominio', 'cEquipo', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
     if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x)); }
@@ -1233,7 +1233,7 @@
     const wsp = String((s && s.contact_whatsapp) || '').replace(/\D/g, '');
     if (!wsp) return;
     $('bEmprende').href = 'https://wa.me/' + wsp + '?text=' + encodeURIComponent('Hola 👋 Soy cliente de ' + (acc.negocio || 'una tienda') +
-      ' en Órbita y quiero emprender con mi propia tienda. ¿Cómo lo hago?');
+      ' en Despega Pyme y quiero emprender con mi propia tienda. ¿Cómo lo hago?');
     $('bEmprende').classList.remove('hidden');
   }
 

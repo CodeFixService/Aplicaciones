@@ -791,11 +791,11 @@
     if (w.Api && w.U) return 'estaciona';
     if (/BiciTaller/i.test(t)) return 'taller';
     if (/Barber/i.test(t)) return 'barberia';
-    if (/Órbita|Orbita/i.test(t)) return 'orbita';
+    if (/Despega|Órbita|Orbita/i.test(t)) return 'orbita';
     if (/Mando/i.test(t)) return 'mando';
     return '';
   }
-  const NOMBRE = { billetera: 'Libreta de Cobros', orbita: 'Órbita', barberia: 'Barbería', taller: 'BiciTaller', estaciona: 'Estaciona', mando: 'Centro de Mando' };
+  const NOMBRE = { billetera: 'Libreta de Cobros', orbita: 'Despega Pyme', barberia: 'Barbería', taller: 'BiciTaller', estaciona: 'Estaciona', mando: 'Centro de Mando' };
   // Lo propio de cada tipo de negocio (va como sección 5).
   const PROPIO = {
     barberia: ['Reservas y abono previo',
@@ -1121,7 +1121,7 @@
   // ---------- Otras apps CodeFix (debajo del ingreso de cada app) ----------
   // Bajo el formulario de ingreso se muestran las otras apps: al tocar una se abre su registro. El CM y Cerebro (personales) no se muestran
   // ni la llevan; un formulario con data-sin-apps tampoco. La app donde estás no sale.
-  const OTRAS = [['emprendedor', 'billetera', 'Billetera', 'Cobros y deudas', '#0f8a5f', '#crear'], ['aplicaciones', 'apps', 'Órbita', 'Tienda y pedidos', '#2563eb', ''],
+  const OTRAS = [['emprendedor', 'billetera', 'Billetera', 'Cobros y deudas', '#0f8a5f', '#crear'], ['aplicaciones', 'apps', 'Despega Pyme', 'Tienda y pedidos', '#2563eb', ''],
     ['barberia', 'barberia', 'Barbería', 'Reservas de hora', '#b8860b', 'registro/'], ['taller', 'bicitaller', 'BiciTaller', 'Taller de bicis', '#16a34a', 'n/'],
     ['estacionamiento', 'estaciona', 'Estaciona', 'Arrienda o publica', '#1d4ed8', '']];
   const h0 = location.hostname.split('.')[0];
