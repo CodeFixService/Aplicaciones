@@ -102,6 +102,8 @@
     const s = document.querySelector('script[src*="shared/core.js"]');
     return s ? s.src.replace(/shared\/core\.js.*$/, '') : './';
   }
+  // G33 · Link para compartir (WhatsApp, QR, suscriptores): el dominio de CodeFix si está ✅; si no, el de siempre.
+  function linkUrl() { return (window.CFX_AYUDA && CFX_AYUDA.sitio && CFX_AYUDA.sitio()) || rootUrl(); }
 
   function download(filename, content, type) {
     const blob = content instanceof Blob ? content : new Blob([content], { type: type || 'application/json' });
@@ -344,8 +346,8 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '6.12';
-  const DB_VERSION = '5.48'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const APP_VERSION = '6.13';
+  const DB_VERSION = '5.49'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -402,6 +404,6 @@
   global.Core = {
     RUBROS, plantilla, colorRubro, script,
     store, uid, money, precioNum, precioTxt, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
+    backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, linkUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };
 })(window);

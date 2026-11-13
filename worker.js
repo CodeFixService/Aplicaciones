@@ -191,6 +191,7 @@ async function imagen(url, env) {
 async function dominio(req, url, env) {
   const host = url.hostname.toLowerCase();
   if (req.method !== 'GET' || /(^|\.)workers\.dev$|^localhost$|^127\.|^\[/.test(host)) return null;
+  if (/^(despega|cm|barberia|billetera|bicitaller|estaciona|tiendas)\./.test(host)) return null;  // G33: las apps en el dominio de CodeFix no son tiendas
   try {
     const slug = await rpc(env, url, 'tienda_por_dominio', { p_host: host });
     if (typeof slug !== 'string' || !/^[a-z0-9-]{2,60}$/.test(slug)) return null;

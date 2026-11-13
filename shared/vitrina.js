@@ -84,7 +84,9 @@
       '</div><div class="pf-nom"><h2>' + esc(t.empresa || 'Tienda') + '</h2>' + (t.rubro ? '<div class="muted">' + esc(t.rubro) + '</div>' : '') + '</div></div>' +
       '<div class="pf-cuerpo">' + partes.join('') + '</div></section>';
     nodo.querySelector('[data-pf="compartir"]').onclick = async () => {
-      const url = location.href.split('#')[0];
+      // G33: abierta en workers.dev y con dominio de CodeFix ✅ → se comparte el link del dominio.
+      const sd = window.CFX_AYUDA && CFX_AYUDA.sitio ? CFX_AYUDA.sitio() : '';
+      const url = /\.workers\.dev$/.test(location.hostname) && /^https:\/\//.test(sd) && sd.indexOf(location.origin) !== 0 ? sd.replace(/\/$/, '') + location.pathname + location.search : location.href.split('#')[0];
       try { if (navigator.share) return await navigator.share({ title: t.empresa, url }); } catch (e) { return; }
       try { await navigator.clipboard.writeText(url); (window.Core && Core.toast) ? Core.toast('🔗 Link copiado') : alert('Link copiado'); } catch (e) { prompt('Copia el link', url); }
     };

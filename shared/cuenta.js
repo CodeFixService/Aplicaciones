@@ -273,7 +273,7 @@
   // Mensaje con los datos de acceso para enviar por WhatsApp.
   function mensajeAcceso(d) {
     return 'Hola ' + d.nombre + ' 👋\nTe creamos tu cuenta en ' + (d.tienda || 'Despega Pyme') + '.\n\n' +
-      '📲 Entra aquí e instala la app: ' + rootUrl() + '\n' +
+      '📲 Entra aquí e instala la app: ' + (window.Core && Core.linkUrl ? Core.linkUrl() : rootUrl()) + '\n' +
       '👤 Correo: ' + d.email + '\n🔑 Contraseña: ' + d.password + '\n\n' +
       'Te recomendamos cambiar la contraseña en "Mi cuenta" la primera vez que entres.';
   }

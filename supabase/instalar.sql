@@ -3481,7 +3481,7 @@ end $$;
 create or replace function public.avisar_version_nueva(p_version text default null) returns text
 language plpgsql security definer set search_path = '' as $$
 declare v text := p_version; a uuid := public.admin_id();
-  u text := coalesce((select value from public.app_settings where key = 'app_url'), 'https://aplicaciones.juanjosuecastilloloyola.workers.dev/');
+  u text := coalesce(public.cfx_sitio_url(), (select value from public.app_settings where key = 'app_url'), 'https://aplicaciones.juanjosuecastilloloyola.workers.dev/');
 begin
   if v is null then
     begin
@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.48'::text $$;
+language sql immutable as $$ select '5.49'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5425,6 +5425,7 @@ revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
 -- =====================================================================
+--  VERSIÓN 5.49 · núcleo 2.69: G33 🌐 dominio de CodeFix (cfx_sitio); correos usan cfx_sitio_url() si está activo.
 --  VERSIÓN 5.48 · núcleo 2.67: se borra la cfx_pago_pedir de 7 parámetros (quedaban 2 y el pago fallaba).
 --  VERSIÓN 5.47 · G33b ✏️ "Fichas" → "Diseños" (mensajes de publicar_ficha, beneficios del plan, hoja del respaldo).
 --  VERSIÓN 5.46 · G33 ✏️ nombre visible "Despega Pyme" (plan Pro, resumen semanal, módulo dominio) · G32 f 🔒 3 claves malas: se pausa la clave y el QR; se entra con el enlace al correo (núcleo 2.66 qr.sql: cfx_login_fallos).
@@ -8536,6 +8537,37 @@ begin
 end $$;
 revoke all on function public.cfx_seguridad() from public, anon;
 grant execute on function public.cfx_seguridad() to authenticated;
+-- ---------- G33 🌐 Dominio de CodeFix (núcleo 2.69, se puede volver a correr) ----------
+-- El CM (Control → 🌐 Dominio) arma los dominios en Cloudflare y le guarda a cada app su dirección: ej. https://despega.codefix.cl/
+-- "activo" = Cloudflare ya lo sirve. Mientras no esté activo (o vacío) todo sigue en workers.dev como hoy.
+-- Público (no es secreto): las apps lo usan para armar links, QR y correos.
+insert into public.cfx_config (clave, valor) values ('sitio', '{"dominio": "", "url": "", "activo": false}') on conflict (clave) do nothing;
+create or replace function public.cfx_sitio() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select valor from public.cfx_config where clave = 'sitio'), '{"dominio": "", "url": "", "activo": false}'::jsonb) $$;
+revoke all on function public.cfx_sitio() from public;
+grant execute on function public.cfx_sitio() to anon, authenticated;
+-- Dirección de la app para correos y links del servidor: null si no hay dominio activo (se usa la de siempre).
+create or replace function public.cfx_sitio_url() returns text
+language sql stable security definer set search_path = '' as $$
+  select case when (valor->>'activo')::boolean and coalesce(valor->>'url', '') <> '' then valor->>'url' end
+  from public.cfx_config where clave = 'sitio' $$;
+revoke all on function public.cfx_sitio_url() from public;
+grant execute on function public.cfx_sitio_url() to anon, authenticated;
+create or replace function public.cfx_sitio_guardar(p_dominio text, p_url text, p_activo boolean default false) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare d text := nullif(lower(trim(regexp_replace(coalesce(p_dominio, ''), '^https?://|/.*$|\.$', '', 'gi'))), '');
+        u text := nullif(lower(trim(coalesce(p_url, ''))), '');
+begin
+  perform public.cfx_es_admin();
+  if d is not null and (d !~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$' or length(d) > 80) then raise exception 'Escribe solo el dominio, ej: codefix.cl'; end if;
+  if u is not null and (u !~ '^https://([a-z0-9-]+\.)+[a-z]{2,24}/$' or d is null or right(u, length(d) + 1) <> d || '/') then raise exception 'Dirección no válida'; end if;
+  insert into public.cfx_config (clave, valor) values ('sitio', jsonb_build_object('dominio', coalesce(d, ''), 'url', coalesce(u, ''), 'activo', d is not null and u is not null and coalesce(p_activo, false)))
+    on conflict (clave) do update set valor = excluded.valor;
+  return public.cfx_sitio();
+end $$;
+revoke all on function public.cfx_sitio_guardar(text, text, boolean) from public, anon;
+grant execute on function public.cfx_sitio_guardar(text, text, boolean) to authenticated;
 -- <<< CFX núcleo
 
 -- ---------- VERSIÓN 5.34 · C17 + C18 + B10 (se puede volver a correr) ----------
@@ -9018,7 +9050,7 @@ begin
     if coalesce((env ->> 'por_pagar')::boolean, false) then cab := trim(cab || E'\n📦 Envío por pagar: lo pagas al recibir.'); end if;
     res := (select string_agg((l ->> 'cant') || ' × ' || (l ->> 'nombre') || coalesce(' (' || nullif(l ->> 'opcion', '') || ')', ''), E'\n')
             from (select l from jsonb_array_elements(new.lineas) l limit 8) z);
-    url := coalesce((select value from public.app_settings where key = 'app_url'), 'https://aplicaciones.juanjosuecastilloloyola.workers.dev/');
+    url := coalesce(public.cfx_sitio_url(), (select value from public.app_settings where key = 'app_url'), 'https://aplicaciones.juanjosuecastilloloyola.workers.dev/');
     url := regexp_replace(url, '/?$', '/') || 'r/?t=' || new.token;
     insert into public.notifications (owner_id, audience, channels, title, body, url, send_at, email_directo, nombre_directo)
     values (new.negocio_id, 'correo', '{email}', left(tit, 80),

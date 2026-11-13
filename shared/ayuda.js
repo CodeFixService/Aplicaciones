@@ -22,13 +22,17 @@
   //  · dominio propio (mando.codefix.app)                → <sub>.codefix.app
   //  · pruebas, GitHub Pages o Pages.dev                 → los Workers de la cuenta
   const CUENTA_WORKERS = 'juanjosuecastilloloyola.workers.dev';
+  // G33 · Dominio de CodeFix ✅ (cfx_sitio, lo guarda el CM): los links entre apps, QR y "compartir" usan https://<sub>.<dominio>/.
+  const SUBS = { saas: 'cm', aplicaciones: 'despega', barberia: 'barberia', emprendedor: 'billetera', taller: 'bicitaller', estacionamiento: 'estaciona' };
+  function dom() { try { const s = JSON.parse(localStorage.getItem('cfx:sitio') || 'null'); return s && s.activo && /^[a-z0-9.-]+\.[a-z]{2,24}$/.test(s.dominio || '') ? s.dominio : ''; } catch (e) { return ''; } }
   function web(worker, sub) {
-    const h = location.hostname, p = h.split('.');
+    const h = location.hostname, p = h.split('.'), d = dom();
+    if (d && SUBS[worker]) return 'https://' + SUBS[worker] + '.' + d + '/';
     if (/\.workers\.dev$/.test(h) && p.length >= 4) return 'https://' + worker + '.' + p.slice(1).join('.') + '/';
     if (/^(localhost|127\.|\d+\.\d+\.\d+\.\d+$)|github\.io$|pages\.dev$/.test(h) || p.length < 2) return 'https://' + worker + '.' + CUENTA_WORKERS + '/';
     return 'https://' + sub + '.' + (p.length >= 3 ? p.slice(1).join('.') : h) + '/';
   }
-  const panelCM = () => web('saas', 'mando') + 'admin/';
+  const panelCM = () => web('saas', 'cm') + 'admin/';
   const css = document.createElement('style');
   css.textContent =
     // Cabecera común: [campana][FREE/PRO][foto] a la derecha del encabezado de cada app.
@@ -1066,10 +1070,13 @@
     if (pinFuera && Date.now() - pinFuera > 5 * 60 * 1000) { try { sessionStorage.removeItem('cfx-pin-ok'); } catch (e) { /* nada */ } pinRevisar(); }
   });
 
+  // Dirección para compartir de esta app: la del dominio si está ✅, si no la de siempre.
+  function sitio() { try { const s = JSON.parse(localStorage.getItem('cfx:sitio') || 'null'); if (s && s.activo && /^https:\/\/[a-z0-9.-]+\/$/.test(s.url || '')) return s.url; } catch (e) { /* nada */ } return RAIZ; }
   function iniciar(o) {
     if (!o || !o.rpc) return;
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
+    if (primera) R('cfx_sitio').then((s) => { try { if (s && typeof s === 'object') localStorage.setItem('cfx:sitio', JSON.stringify({ dominio: s.dominio || '', url: s.url || '', activo: !!s.activo })); } catch (e) { /* nada */ } }).catch(() => { /* base sin la función todavía */ });
     if (primera) pinRevisar();
     Object.assign(CFG, o);
     contarAvisos();
@@ -1171,7 +1178,7 @@
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } else if (boya && boya.parentNode && boya.parentNode !== document.body) marcarExtras(boya.parentNode); }, 1500);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM, avisos: contarAvisos, ventanaAvisos };
+  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM, sitio, avisos: contarAvisos, ventanaAvisos };
   window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad, misDatos };
   // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
   function marcarTira(x) {
