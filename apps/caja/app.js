@@ -141,7 +141,7 @@
   function agregar(item) {
     const line = ticket.find((l) => l.id === item.id && l.precio === item.precio && (l.opcion || '') === (item.opcion || ''));
     if (line) line.cant++; else ticket.push(Object.assign({ cant: 1 }, item));
-    $('bComp').hidden = true;
+    $('bComp').hidden = true; $('bBol').hidden = true;
     if (navigator.vibrate) navigator.vibrate(12);
     renderTicket();
   }
@@ -224,7 +224,7 @@
       n++;
     });
     if (!n) return;
-    $('bComp').hidden = true; renderTicket(); $('vozX').click();
+    $('bComp').hidden = true; $('bBol').hidden = true; renderTicket(); $('vozX').click();
     Core.toast('🎤 ' + n + ' producto(s) en la venta. Revisa y toca Cobrar.');
     const c = document.querySelector('.ticketCard'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -298,13 +298,44 @@
     const v = ventas.find((x) => x.id === id);
     if (!v || !window.CFX_COMPROBANTE) return;
     CFX_COMPROBANTE.abrir({ negocio: equipo ? cuenta.negocio : cuenta.empresa, fecha: v.t, numero: String(v.id).slice(-6).toUpperCase(),
-      items: v.items, total: v.items.reduce((s, l) => s + l.precio * l.cant, 0), medio: v.medio || 'efectivo' });
+      items: v.items, total: v.items.reduce((s, l) => s + l.precio * l.cant, 0), medio: v.medio || 'efectivo', boleta: v.boleta });
   }
   $('bComp').onclick = () => comprobante(ultimaVenta);
+  /* G32: 🧾 Boleta SII de una venta de Caja: Automática (OpenFactura, la emite el servidor) o Manual (gratis en sii.cl y se anota el N°). */
+  let BOL = {};
+  const bolTxt = () => BOL.modo === 'openfactura' ? '🧾 Emitir boleta SII' : '🧾 Anotar N° boleta SII';
+  if (!esCliente) Cuenta.rpc('boleta_estado').then((b) => { BOL = b || {}; $('bBol').textContent = bolTxt(); }).catch(() => {});
+  async function boletaVenta(id, btn) {
+    const v = ventas.find((x) => x.id === id);
+    if (!v) return;
+    if (v.boleta && v.boleta.folio) return comprobante(id);
+    if (!BOL.conectado) {
+      if (equipo) return Core.toast('Pídele al dueño completar Ajustes → 🧾 Boletas');
+      if (confirm('Para dar boleta SII, primero completa tus datos en Ajustes → 🧾 Boletas. ¿Ir ahora?')) location.href = '../../#boleta';
+      return;
+    }
+    const items = v.items.map((l) => ({ nombre: l.nombre, cant: l.cant, precio: l.precio }));
+    let folio = null;
+    if (BOL.modo !== 'openfactura') {
+      folio = prompt('Emite la boleta gratis en sii.cl (Boleta electrónica) por ' + money(items.reduce((s, l) => s + l.precio * l.cant, 0)) + ' y escribe aquí su N° (folio):');
+      if (!folio) return;
+    }
+    if (btn) btn.disabled = true;
+    try {
+      const r = await Cuenta.rpc('boleta_caja', { p: { venta: v.id, items, folio } });
+      if (!r || !r.ok) throw new Error((r && r.error) || 'No se pudo emitir');
+      v.boleta = { folio: r.folio, url: r.url || null }; db.set('ventas', ventas);
+      Core.toast('🧾 Boleta N° ' + r.folio + (folio ? ' anotada' : ' emitida'));
+      if (id === ultimaVenta) $('bBol').hidden = true;
+      renderReporte();
+      comprobante(id);
+    } catch (err) { Core.toast('⚠️ ' + err.message); } finally { if (btn) btn.disabled = false; }
+  }
+  $('bBol').onclick = (e) => boletaVenta(ultimaVenta, e.currentTarget);
   $('bCobrar').onclick = () => {
     if (!ticket.length) return Core.toast('La venta está vacía');
     const venta = { id: Core.uid(), t: Date.now(), medio, items: ticket.map((l) => Object.assign({}, l)) };
-    ventas.push(venta); ultimaVenta = venta.id; $('bComp').hidden = false;
+    ventas.push(venta); ultimaVenta = venta.id; $('bComp').hidden = false; $('bBol').hidden = esCliente;
     ticket.forEach((l) => {
       const p = productos.find((x) => x.id === l.id);
       if (p && p.stock !== '') p.stock = Math.max(0, p.stock - l.cant);
@@ -705,15 +736,18 @@
     $('r-lista').innerHTML = vs.length ? vs.slice().reverse().map((v) =>
       '<li><div class="grow"><b>' + new Date(v.t).toLocaleString('es', rango === 'dia' ? { hour: '2-digit', minute: '2-digit' } : { dateStyle: 'short', timeStyle: 'short' }) +
       ' · ' + (MEDIOS[v.medio || 'efectivo'] || '') + '</b>' +
-      '<div class="muted">' + v.items.map((l) => l.cant + '× ' + Core.esc(l.nombre)).join(', ') + '</div></div>' +
+      '<div class="muted">' + v.items.map((l) => l.cant + '× ' + Core.esc(l.nombre)).join(', ') + (v.boleta && v.boleta.folio ? ' · SII N° ' + Core.esc(v.boleta.folio) : '') + '</div></div>' +
       '<b>' + money(v.items.reduce((s, l) => s + l.precio * l.cant, 0)) + '</b>' +
       '<button class="small alt" data-comp="' + v.id + '" aria-label="Comprobante">🧾</button>' +
+      (!esCliente && !(v.boleta && v.boleta.folio) ? '<button class="small alt" data-bol="' + Core.esc(v.id) + '" aria-label="Boleta SII">SII</button>' : '') +
       '<button class="small danger" data-id="' + v.id + '" aria-label="Anular venta">✕</button></li>'
     ).join('') : '<li class="empty">Sin ventas en este período</li>';
   }
   $('r-lista').onclick = (e) => {
     const c = e.target.closest('[data-comp]');
     if (c) return comprobante(c.dataset.comp);
+    const bo = e.target.closest('[data-bol]');
+    if (bo) return boletaVenta(bo.dataset.bol, bo);
     const id = e.target.dataset.id;
     if (!id || !confirm('¿Anular esta venta?')) return;
     ventas = ventas.filter((v) => v.id !== id);

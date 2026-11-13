@@ -5359,7 +5359,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.43'::text $$;
+language sql immutable as $$ select '5.44'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5423,6 +5423,8 @@ $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
+-- =====================================================================
+--  VERSIÓN 5.44 · G32 🧾 Boleta SII desde la Caja (OpenFactura o folio manual): tabla boletas_caja + boleta_caja(jsonb).
 -- =====================================================================
 --  VERSIÓN 5.42 · G25 ⏰ Renovación obligatoria: todo plan Pro/Premium tiene fecha de término (mensual 30 días, anual 365, regalo los días
 --  que se den) y se corta solo al vencer; nunca queda "permanente" (solo el administrador). Los módulos ya vencían solos (hasta).
@@ -7062,7 +7064,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -9130,3 +9132,67 @@ begin
 end $$;
 update public.profiles set dominio = regexp_replace(dominio, '^www\.', '') where dominio ~ '^www\.'
   and not exists (select 1 from public.profiles q where q.dominio = regexp_replace(public.profiles.dominio, '^www\.', ''));
+
+-- ---------- VERSIÓN 5.44 · G32 🧾 Boleta SII desde la Caja (venta en local) con OpenFactura o folio manual (se puede volver a correr) ----------
+-- Las ventas de Caja viven en el equipo (localStorage); aquí queda solo la boleta emitida (una por venta, sin repetir).
+create table if not exists public.boletas_caja (
+  negocio_id uuid not null references public.profiles(id) on delete cascade,
+  venta_id   text not null check (venta_id ~ '^[A-Za-z0-9_-]{4,40}$'),
+  total      numeric not null default 0,
+  folio      text,
+  url        text,
+  error      text,
+  created_at timestamptz not null default now(),
+  primary key (negocio_id, venta_id)
+);
+alter table public.boletas_caja enable row level security;
+revoke all on public.boletas_caja from anon, authenticated;
+
+-- p = { venta, items: [{ nombre, cant, precio }], folio? }. Con folio = modo manual (anota el N° del SII). Sin folio = OpenFactura.
+create or replace function public.boleta_caja(p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  n uuid := public.negocio_de(auth.uid()); v text := p ->> 'venta'; c public.boleta_cuentas; x public.pedidos; b public.boletas_caja;
+  l jsonb; lin jsonb := '[]'::jsonb; tot numeric := 0; q numeric; pr numeric; r jsonb; f text; e text;
+  fm text := nullif(regexp_replace(coalesce(p ->> 'folio', ''), '\D', '', 'g'), '');
+begin
+  if n is null or not public.equipo_puede('caja') then raise exception 'Sin permiso para vender en la Caja'; end if;
+  if v is null or v !~ '^[A-Za-z0-9_-]{4,40}$' then raise exception 'Venta no válida'; end if;
+  select * into b from public.boletas_caja where negocio_id = n and venta_id = v;
+  if b.folio is not null then return jsonb_build_object('ok', true, 'folio', b.folio, 'url', b.url); end if;
+  if jsonb_typeof(p -> 'items') <> 'array' or jsonb_array_length(p -> 'items') not between 1 and 60 then raise exception 'La venta no tiene productos'; end if;
+  for l in select * from jsonb_array_elements(p -> 'items') loop
+    q := greatest(coalesce((l ->> 'cant')::numeric, 1), 1); pr := greatest(coalesce((l ->> 'precio')::numeric, 0), 0);
+    lin := lin || jsonb_build_object('nombre', left(coalesce(nullif(trim(l ->> 'nombre'), ''), 'Producto'), 80),
+      'cant', q, 'subtotal', round(q * pr));
+    tot := tot + round(q * pr);
+  end loop;
+  if tot < 1 then raise exception 'La venta no tiene monto'; end if;
+  select * into c from public.boleta_cuentas where owner_id = n;
+  if c.owner_id is null then raise exception 'Primero completa tus datos de boleta en Ajustes → 🧾 Boletas'; end if;
+  if fm is not null or c.modo <> 'openfactura' then
+    if fm is null or length(fm) > 10 then raise exception 'Escribe el N° (folio) de la boleta del SII'; end if;
+    insert into public.boletas_caja (negocio_id, venta_id, total, folio) values (n, v, tot, fm)
+    on conflict (negocio_id, venta_id) do update set folio = excluded.folio, total = excluded.total, error = null;
+    return jsonb_build_object('ok', true, 'folio', fm);
+  end if;
+  if c.apikey is null then raise exception 'Pega tu API key de OpenFactura en Ajustes → 🧾 Boletas'; end if;
+  x.lineas := lin; x.total := tot;
+  r := public.of_api(c.apikey, public.boleta_dte(x, c), 'cfx-caja-' || n::text || '-' || v);
+  f := nullif(coalesce(r #>> '{body,FOLIO}', r #>> '{body,folio}'), '');
+  if coalesce((r ->> 'status')::int, 0) in (200, 201) and f is not null then
+    insert into public.boletas_caja (negocio_id, venta_id, total, folio, url) values (n, v, tot, left(f, 20),
+      case when r #>> '{body,SELF_SERVICE,url}' ~ '^https://[^\s"<>]+$' then left(r #>> '{body,SELF_SERVICE,url}', 500) end)
+    on conflict (negocio_id, venta_id) do update set folio = excluded.folio, url = excluded.url, total = excluded.total, error = null
+    returning * into b;
+    return jsonb_build_object('ok', true, 'folio', b.folio, 'url', b.url);
+  end if;
+  e := left(coalesce(case when (r ->> 'status')::int = 0 then 'No se pudo conectar con OpenFactura' end,
+                     r #>> '{body,error,message}', r #>> '{body,message}', 'OpenFactura respondió ' || coalesce(r ->> 'status', '?')), 200);
+  if (r ->> 'status')::int in (401, 403) then e := 'OpenFactura no aceptó la API key'; end if;
+  insert into public.boletas_caja (negocio_id, venta_id, total, error) values (n, v, tot, e)
+  on conflict (negocio_id, venta_id) do update set error = excluded.error;
+  return jsonb_build_object('ok', false, 'error', e);
+end $$;
+revoke all on function public.boleta_caja(jsonb) from public, anon;
+grant execute on function public.boleta_caja(jsonb) to authenticated;

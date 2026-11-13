@@ -274,11 +274,22 @@
     <div class="card hidden" id="cBoleta"><span id="boleta"></span>
       <h2>🧾 Boletas</h2>
       <div id="boletaBody"></div>
+      <details class="guia" id="gNecesito"><summary>❓ ¿Necesito boleta?</summary><ul>
+        <li><b>Sin inicio de actividades</b>: vendes igual con todo Órbita. Tu cliente recibe un comprobante (no es boleta). Para dar boleta SII primero haz el inicio de actividades en <b>sii.cl</b>.</li>
+        <li><b>Con inicio de actividades</b>: das boleta electrónica por cada venta. Hazlo aquí: <b>Automática</b> (OpenFactura) o <b>Manual</b> (gratis en sii.cl).</li>
+        <li><b>Pago con máquina de tarjeta</b>: en algunos casos el voucher vale como boleta, solo si tu máquina está habilitada para eso. Confírmalo en sii.cl o con tu proveedor. Efectivo y transferencia: sí llevan boleta.</li></ul></details>
+      <details class="guia" id="gAuto"><summary>⚡ Boleta automática paso a paso</summary><ol>
+        <li>Ten tu <b>inicio de actividades</b> en sii.cl.</li>
+        <li>Crea tu cuenta en <b>openfactura.cl</b> (Haulmer). Es tu cuenta: revisa sus precios ahí. CodeFix no cobra extra.</li>
+        <li>OpenFactura te guía para conectarte con el SII (puede pedirte tu certificado digital).</li>
+        <li>En OpenFactura copia tu <b>API key</b> (Configuración → API).</li>
+        <li>Aquí arriba marca <b>Automática</b>, completa tus datos, pega la API key y toca <b>Guardar</b>.</li>
+        <li>Listo: la boleta sale sola en pedidos pagados, y en <b>Caja</b> después de cobrar tocas <b>🧾 Emitir boleta SII</b>.</li></ol></details>
       <details class="guia"><summary>📖 ¿Cómo se usa?</summary><ol>
         <li>Es la boleta electrónica que pide el SII (Servicio de Impuestos Internos) por cada venta.</li>
         <li>Completa RUT, razón social, giro, dirección y comuna, y toca <b>Guardar</b>. Esos datos salen también como firma en tus comprobantes.</li>
-        <li><b>Manual (gratis)</b>: cuando un pedido queda pagado, emite la boleta en <b>sii.cl</b> (Boleta electrónica, sistema gratuito) con tu clave tributaria. Luego en <b>Pedidos</b> → el pedido → <b>🧾 Anotar N° boleta SII</b> y escribe el folio.</li>
-        <li><b>Automática</b>: con una cuenta de OpenFactura (Haulmer, de pago) pega tu API key y marca “Emitir sola”: la boleta sale al pagar en línea o al entregar.</li>
+        <li><b>Automática</b>: con tu cuenta de OpenFactura (ver ⚡ paso a paso) la boleta sale sola al pagar en línea o al entregar.</li>
+        <li><b>Manual (gratis, respaldo)</b>: emite la boleta en <b>sii.cl</b> (Boleta electrónica, sistema gratuito) con tu clave tributaria. Luego en <b>Pedidos</b> → <b>🧾 Anotar N° boleta SII</b>, o en <b>Caja</b> después de cobrar, y escribe el folio.</li>
         <li>Tu cliente ve la boleta en su pedido y le llega un aviso.</li>
         <li><b>📋 Registro de ventas</b>: todas tus ventas (pedidos pagados y Caja de este equipo) en formato boleta, para imprimir, guardar en PDF o enviar.</li></ol></details>
       <div class="btns"><button class="alt" id="bRegistro">📋 Registro de ventas</button></div>
@@ -808,7 +819,8 @@
     ['¿Cómo sumo a alguien de mi equipo?', 'Ajustes → Mi equipo: escribe su nombre y correo y elige su rol (vendedor, bodega o admin).'],
     ['¿Dónde pongo el seguimiento del envío?', 'Pedidos → un pedido con 🚚 Despacho (ya pagado) → botón 🚚 Seguimiento: eliges el courier y pegas el código. Tu cliente lo ve en Mis pedidos con "Seguir mi envío". Los pedidos con retiro en tienda no lo tienen.'],
     ['¿Qué le llega al cliente cuando compra?', 'Al confirmar el pago, el pedido queda con 🧾 Detalle de compra en Mis pedidos (puede compartirlo). Si emites la boleta SII (Ajustes → 🧾 Boletas), su N° aparece en ese mismo detalle.'],
-    ['¿Cómo emito la boleta?', 'Ajustes → 🧾 Boletas: manual (anotas el folio del SII) o automática con OpenFactura.'],
+    ['¿Cómo emito la boleta?', 'Ajustes → 🧾 Boletas: automática con tu cuenta OpenFactura o manual gratis en sii.cl. En Caja: después de cobrar, 🧾 Boleta SII.'],
+    ['¿Necesito boleta?', 'Sin inicio de actividades vendes igual con comprobante. Con inicio de actividades das boleta por cada venta. Ajustes → 🧾 Boletas → ❓ ¿Necesito boleta?'],
     ['¿Cómo cierro la tienda o me voy de vacaciones?', 'Ajustes → Mi tienda: desmarca "Tienda abierta" o activa el modo vacaciones con la fecha de regreso.']
   ];
   function faq(chat) {
@@ -914,8 +926,8 @@
     $('boletaBody').innerHTML = '<p class="muted" style="margin:0 0 6px">Entrega la boleta electrónica de cada pedido pagado: tu cliente la ve en su pedido y le llega un aviso.' +
       (b.conectado ? ' <b>' + (of ? '✅ Automática' + (b.auto ? '' : ' (al tocar 🧾 en Pedidos)') + (b.fin ? ' · key …' + Core.esc(b.fin) : '') : '✅ Manual') + '</b>' : '') + '</p>' +
       '<div class="row" style="flex-wrap:wrap;gap:6px">' +
-      '<label class="terms"><input type="radio" name="bModo" value="manual"' + (of ? '' : ' checked') + '> <span><b>Manual</b>: la emites gratis en sii.cl y anotas el folio</span></label>' +
-      '<label class="terms"><input type="radio" name="bModo" value="openfactura"' + (of ? ' checked' : '') + '> <span><b>Automática</b> con OpenFactura <span class="pill">beta</span></span></label></div>' +
+      '<label class="terms"><input type="radio" name="bModo" value="openfactura"' + (of ? ' checked' : '') + '> <span><b>Automática</b> con tu cuenta OpenFactura: sale sola</span></label>' +
+      '<label class="terms"><input type="radio" name="bModo" value="manual"' + (of ? '' : ' checked') + '> <span><b>Manual (gratis)</b>: la emites en sii.cl y anotas el N°</span></label></div>' +
       campo('bRut', 'RUT de la empresa', 'rut', '76.123.456-7', 12) + campo('bRazon', 'Razón social', 'razon', 'Mi Tienda SpA', 100) +
       campo('bGiro', 'Giro', 'giro', 'Venta al por menor de vestuario', 80) + campo('bDir', 'Dirección', 'direccion', 'Av. Siempre Viva 123', 70) +
       campo('bComuna', 'Comuna', 'comuna', 'Santiago', 20) +
@@ -951,7 +963,7 @@
       entrega: p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') : '🏪 Retiro en tienda',
       items: (p.lineas || []).map((x) => ({ cant: x.cant, nombre: x.nombre, opcion: x.opcion, precio: x.subtotal / (x.cant || 1) })) }))
       .concat(caja.map((v) => ({ negocio: yo.empresa, fecha: v.t, numero: String(v.id).slice(-6).toUpperCase(), items: v.items || [], origen: '🧾 Caja',
-        total: (v.items || []).reduce((t, l) => t + l.precio * l.cant, 0), medio: v.medio || 'efectivo' })))
+        total: (v.items || []).reduce((t, l) => t + l.precio * l.cant, 0), medio: v.medio || 'efectivo', boleta: v.boleta })))
       .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     const pesos = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
     ul.innerHTML = REG.length ? REG.map((r, i) => '<li><div class="grow"><b>' + Core.esc(r.origen + ' N° ' + r.numero) + '</b> · ' + Core.esc(pesos(r.total)) +
