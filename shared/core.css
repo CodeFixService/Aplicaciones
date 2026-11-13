@@ -337,4 +337,4 @@ header.top h1::before { display: inline-block; vertical-align: middle; margin-ri
 /* 🧩 Módulo apagado desde el Centro de Mando (Cuenta.modulos): sin botones ni links al chat */
 body.sin-chat [data-k=chat], body.sin-chat a[href*="apps/mensajes/"] { display: none !important; }
 /* Cupones, sellos y calificaciones (núcleo C15/C16): con el módulo apagado la base ya no los muestra; aquí se esconden sus campos */
-body.sin-cupones [data-v=cupones], body.sin-cupones .m-cupones, body.sin-sellos .m-sellos, body.sin-calificaciones .m-calif { display: none !important; }
+body.sin-cupones.sin-sellos [data-v=cupones], body.sin-cupones .m-cupones, body.sin-sellos .m-sellos, body.sin-calificaciones .m-calif { display: none !important; }

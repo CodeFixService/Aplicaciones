@@ -61,13 +61,14 @@
   .ped .prem { border: 2px solid var(--premium); }
   .card.nuevo { animation: ped-nuevo 1.2s ease-in-out 3; box-shadow: 0 0 0 2px var(--brand, #2563eb); }
   @keyframes ped-nuevo { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand, #2563eb) 35%, transparent); } }
+  .bloqueado input, .bloqueado #bSellos { opacity: .55; pointer-events: none; }
 </style>
 </head>
 <body>
 <header class="top"><a href="../../" aria-label="Volver al inicio">‹</a><h1>Pedidos</h1></header>
 <nav class="tabs sub" id="subtabs">
   <button data-v="pedidos" class="on"><span data-ico="paquete"></span>Pedidos</button>
-  <button data-v="cupones" class="dueno"><span data-ico="ticket"></span>Promociones</button>
+  <button data-v="cupones" class="dueno"><span data-ico="ticket"></span>Cupones y sellos</button>
   <button data-v="stats" class="dueno ver-stats"><span data-ico="grafico"></span>Estadísticas</button>
 </nav>
 <main>
@@ -86,7 +87,7 @@
 
   <!-- CUPONES -->
   <section class="view" id="v-cupones">
-    <div class="card upsell hidden" id="cupLock">
+    <div class="m-cupones"><div class="card upsell hidden" id="cupLock">
       <h2>🎟️ Cupones de descuento <span class="pill pro">PRO</span></h2>
       <p class="muted">Crea códigos como VERANO10 (−10%) para que tus clientes los usen en el carrito.</p>
       <div class="btns"><a class="btn warn" href="../../#plan">⭐ Pásate a Pro</a></div>
@@ -102,6 +103,15 @@
         <div class="btns"><button id="bCupon">Guardar cupón</button></div>
       </div>
       <div class="card"><ul class="list" id="cupones"></ul></div>
+    </div></div>
+    <div class="card m-sellos" id="cSellos">
+      <h2>🎟️ Tarjeta de sellos <span class="pill pro">PRO</span></h2>
+      <div class="row" style="flex-wrap:wrap">
+        <div style="min-width:120px"><label for="tSellos">N° de sellos</label><input id="tSellos" inputmode="numeric" placeholder="10 (vacío = sin tarjeta)"></div>
+        <div style="min-width:160px"><label for="tPremio">Premio</label><input id="tPremio" maxlength="80" placeholder="Un café gratis"></div>
+      </div>
+      <p class="muted" style="margin:4px 0 0">Cada pedido entregado suma un sello a tu cliente.</p>
+      <div class="btns"><button id="bSellos">Guardar tarjeta</button></div>
     </div>
   </section>
 
@@ -158,7 +168,7 @@
       if (!await CFX_MODULOS_TIENDA.probar(c.id === 'cupLock' ? 'cupones' : 'estadisticas', { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1200) })) location.href = b.href;
     };
   });
-  // Admin del equipo también ve Estadísticas (Promociones, solo el dueño).
+  // Admin del equipo también ve Estadísticas (Cupones y sellos, solo el dueño).
   const verStats = dueno || yo.equipo_rol === 'admin';
   document.querySelectorAll('.dueno').forEach((b) => b.classList.toggle('hidden', b.classList.contains('ver-stats') ? !verStats : !dueno));
   const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
@@ -169,7 +179,7 @@
     document.querySelectorAll('#subtabs button').forEach((x) => x.classList.toggle('on', x.dataset.v === v));
     document.querySelectorAll('.view').forEach((x) => x.classList.toggle('on', x.id === 'v-' + v));
     scrollTo(0, 0);
-    if (v === 'cupones') cargarCupones();
+    if (v === 'cupones') { cargarCupones(); cargarSellos(); }
     if (v === 'stats') cargarStats();
   }
 
@@ -352,6 +362,34 @@
       Core.toast('🎟️ Cupón guardado: compártelo con tus clientes'); cargarCupones();
     } catch (err) { Core.toast(err.message); }
   };
+  /* G30: 🎟️ Tarjeta de sellos (antes en Ajustes → Mi tienda). Guarda con set_mi_tienda sin tocar el resto de la tienda. */
+  let TIENDA = null;
+  async function cargarSellos() {
+    const sin = !Cuenta.puede('sellos'), c = $('cSellos');
+    c.classList.toggle('bloqueado', sin);
+    if (sin && !c.querySelector('.mod-probar')) {
+      const nb = document.createElement('button'); nb.type = 'button'; nb.className = 'small mod-probar'; nb.textContent = yo.mods ? '▶️ Probar módulo' : '⭐ Pásate a Pro';
+      nb.onclick = async () => {
+        if (!yo.mods) { location.href = '../../#plan'; return; }
+        if (!window.CFX_MODULOS_TIENDA || !await CFX_MODULOS_TIENDA.probar('sellos', { rpc: (f, a) => Cuenta.rpc(f, a), alCambiar: () => setTimeout(() => location.reload(), 1200) })) location.href = '../../#modulos';
+      };
+      c.querySelector('h2').after(nb);
+    }
+    if (yo.mods) c.querySelector('.pill').textContent = '🧩 MÓDULO';
+    try { TIENDA = await Cuenta.rpc('tienda_info', { p_negocio: yo.id }); } catch (e) { TIENDA = null; }
+    if (TIENDA) { $('tSellos').value = TIENDA.sellos_meta || ''; $('tPremio').value = TIENDA.sellos_premio || ''; }
+  }
+  $('bSellos').onclick = async () => {
+    const meta = parseInt($('tSellos').value, 10);
+    if (!isNaN(meta) && !Cuenta.puede('sellos')) return Core.toast('🎟️ La tarjeta de sellos es de Pro');
+    if (!TIENDA) return Core.toast('⚠️ Sin conexión: inténtalo de nuevo');
+    try {
+      await Cuenta.rpc('set_mi_tienda', { p_datos_pago: TIENDA.datos_pago || '', p_horario: TIENDA.horario || '', p_abierto: TIENDA.abierto !== false,
+        p_sellos_meta: isNaN(meta) ? null : meta, p_sellos_premio: $('tPremio').value });
+      TIENDA.sellos_meta = isNaN(meta) ? null : meta; TIENDA.sellos_premio = $('tPremio').value;
+      Core.toast('✅ Tarjeta de sellos guardada');
+    } catch (err) { Core.toast(err.message); }
+  };
   $('cupones').onclick = async (e) => {
     const id = e.target.dataset.c;
     if (!id || !confirm('¿Eliminar este cupón?')) return;
@@ -477,8 +515,8 @@
     const c = document.querySelector('[data-ped="' + ir + '"]');
     if (c) { c.classList.add('nuevo'); c.scrollIntoView({ block: 'center' }); }
   })();
-  // 🧩 Promociones (cupones) se esconde si el módulo está apagado desde el Centro de Mando.
-  if ((params.get('v') === 'cupones' && (await Cuenta.modulos(), !document.body.classList.contains('sin-cupones'))) || params.get('v') === 'stats') show(params.get('v'));
+  // 🧩 Cupones y sellos se esconde si ambos módulos están apagados desde el Centro de Mando.
+  if ((params.get('v') === 'cupones' && (await Cuenta.modulos(), !(document.body.classList.contains('sin-cupones') && document.body.classList.contains('sin-sellos')))) || params.get('v') === 'stats') show(params.get('v'));
   setInterval(() => { if (!document.hidden && ['revisar', 'activos', 'pagando'].includes(filtro)) cargar(); }, 20000);
 })();
 </script>

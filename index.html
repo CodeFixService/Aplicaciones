@@ -17,7 +17,9 @@
 <script src="shared/humano.js"></script>
 <script src="shared/core.js"></script>
 <script src="shared/despacho.js"></script>
+<script src="shared/comprobante.js"></script>
 <style>
+  details.guia{margin:10px 0 0;font-size:14px}details.guia summary{cursor:pointer;font-weight:700}details.guia ol{margin:6px 0 0;padding-left:20px}details.guia li{margin:4px 0}
   #redesBody h3{margin:16px 0 4px;font-size:16px}
   #redesBody h3:first-child{margin-top:0}
   .rd-item{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
@@ -245,14 +247,6 @@
         <div style="min-width:140px"><label for="tVacHasta">De vacaciones hasta el</label><input type="date" id="tVacHasta"></div>
         <div style="min-width:180px;flex:2"><label for="tVacMsg">Mensaje para tus clientes</label><input id="tVacMsg" maxlength="160" placeholder="¡Volvemos con todo el lunes! 🌴"></div>
       </div>
-      <div id="rowSellos" class="m-sellos">
-        <label>🎟️ Tarjeta de sellos <span class="pill pro">PRO</span></label>
-        <div class="row" style="flex-wrap:wrap">
-          <div style="min-width:120px"><label for="tSellos">Sellos para el premio</label><input id="tSellos" inputmode="numeric" placeholder="10 (vacío = sin tarjeta)"></div>
-          <div style="min-width:160px"><label for="tPremio">Premio</label><input id="tPremio" maxlength="80" placeholder="Un café gratis"></div>
-        </div>
-        <p class="muted" style="margin:4px 0 0">Cada pedido entregado suma un sello a tu cliente.</p>
-      </div>
       <label for="tDescPrem">⭐ Descuento para clientes Premium (%)</label>
       <input id="tDescPrem" inputmode="numeric" placeholder="0 (sin descuento) · máximo 50">
       <p class="muted" style="margin:4px 0 0">Se descuenta solo en los pedidos de tus clientes con Premium, y sus pedidos te aparecen primero con ⭐.</p>
@@ -269,11 +263,26 @@
     </div>
 
     <div class="card hidden" id="cDespacho"><span id="despacho"></span><div id="despachoBody"></div>
-      <p class="cfx-nota-btn">🚚 El código de seguimiento se pone en Pedidos → pedido con despacho → 🚚 Seguimiento.</p></div>
+      <details class="guia"><summary>📖 ¿Cómo se usa?</summary><ol>
+        <li><b>Retiro en tienda</b>: déjalo marcado si tus clientes pueden ir a buscar.</li>
+        <li><b>Tu comuna</b>: desde donde despachas.</li>
+        <li><b>+ Agregar comuna</b>: cada comuna a la que llegas con su precio. Tu cliente elige la suya y ve el costo antes de pedir.</li>
+        <li><b>Resto de Chile</b>: para regiones; “Por pagar” = el courier se lo cobra a quien recibe.</li>
+        <li><b>Gratis desde</b>: monto de compra con despacho gratis (0 = nunca).</li>
+        <li>Toca <b>Guardar</b>. Cuando envíes, ve a <b>Pedidos</b> → el pedido → <b>🚚 Seguimiento</b> y pega el código del courier: a tu cliente le llega el aviso.</li></ol></details></div>
 
     <div class="card hidden" id="cBoleta"><span id="boleta"></span>
       <h2>🧾 Boletas</h2>
       <div id="boletaBody"></div>
+      <details class="guia"><summary>📖 ¿Cómo se usa?</summary><ol>
+        <li>Es la boleta electrónica que pide el SII (Servicio de Impuestos Internos) por cada venta.</li>
+        <li>Completa RUT, razón social, giro, dirección y comuna, y toca <b>Guardar</b>. Esos datos salen también como firma en tus comprobantes.</li>
+        <li><b>Manual (gratis)</b>: cuando un pedido queda pagado, emite la boleta en <b>sii.cl</b> (Boleta electrónica, sistema gratuito) con tu clave tributaria. Luego en <b>Pedidos</b> → el pedido → <b>🧾 Anotar N° boleta SII</b> y escribe el folio.</li>
+        <li><b>Automática</b>: con una cuenta de OpenFactura (Haulmer, de pago) pega tu API key y marca “Emitir sola”: la boleta sale al pagar en línea o al entregar.</li>
+        <li>Tu cliente ve la boleta en su pedido y le llega un aviso.</li>
+        <li><b>📋 Registro de ventas</b>: todas tus ventas (pedidos pagados y Caja de este equipo) en formato boleta, para imprimir, guardar en PDF o enviar.</li></ol></details>
+      <div class="btns"><button class="alt" id="bRegistro">📋 Registro de ventas</button></div>
+      <ul class="list hidden" id="registro"></ul>
     </div>
 
     <div class="card hidden" id="cRedes"><span id="redes"></span>
@@ -598,7 +607,7 @@
       caja.dataset.pf = '1'; caja.classList.remove('card');
       const ir = (u) => ({ ir: u }), equipo = acc.role === 'equipo';
       const L = [
-        ...(dueno ? [['apps/caja/#productos', 'bolsa', 'Productos, fotos y stock'], ['apps/fichas/#clientes', 'usuarios', 'Clientes'], ['apps/pedidos/?v=cupones', 'ticket', 'Promociones: cupones y sellos'],
+        ...(dueno ? [['apps/caja/#productos', 'bolsa', 'Productos, fotos y stock'], ['apps/fichas/#clientes', 'usuarios', 'Clientes'], ['apps/pedidos/?v=cupones', 'ticket', 'Cupones y sellos'],
           ['apps/pedidos/?v=stats', 'grafico', 'Estadísticas'], ['apps/catalogo/?v=ofertas', 'ojo', 'Ver mi tienda como cliente'], ['apps/mensajes/', 'chat', 'Mensajes']]
           .map(([u, i, t]) => Object.assign({ k: 'n-' + i, ico: Core.ico(i), t, grupo: 'Tu negocio' }, ir(u))) : []),
         dueno && { k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario y pagos', grupo: 'Tu tienda', nodo: $('cTienda') },
@@ -617,9 +626,8 @@
     }
     $('cTienda').classList.toggle('hidden', cliente);
     $('eTel').value = acc.telefono || '';
-    $('rowSellos').classList.toggle('bloqueado', !Cuenta.puede('sellos'));
     // G24: módulo que no tiene → botón ▶️ Probar módulo (demo animada + prueba gratis + Comprar).
-    [[$('rowSellos'), 'sellos'], [$('cEquipo'), 'equipo']].forEach(([n, k]) => {
+    [[$('cEquipo'), 'equipo']].forEach(([n, k]) => {
       const sin = dueno && acc.mods && !Cuenta.puede(k), b = n.querySelector('.mod-probar');
       const pill = n.querySelector('.pill.pro'); if (pill) pill.textContent = acc.mods ? '🧩 MÓDULO' : 'PRO';
       if (b) b.hidden = !sin;
@@ -928,6 +936,29 @@
       Core.toast(a === 'quitar' ? 'Boleta quitada' : '🧾 Datos de boleta guardados'); cargarBoleta();
     } catch (err) { Core.toast(err.message); e.target.disabled = false; }
   };
+  /* G30: 📋 Registro de ventas: pedidos pagados (servidor) + ventas de Caja de este equipo, cada una en formato boleta. */
+  let REG = [];
+  $('bRegistro').onclick = async () => {
+    const ul = $('registro');
+    if (!ul.classList.contains('hidden')) { ul.classList.add('hidden'); return; }
+    ul.classList.remove('hidden'); ul.innerHTML = '<li class="empty">Cargando…</li>';
+    const yo = Cuenta.account, PAG = ['preparando', 'listo', 'en_camino', 'entregado'];
+    let ped = [];
+    try { ped = (await Cuenta.rpc('pedidos_tienda', { p_estado: null })) || []; } catch (e) { ped = []; }
+    const caja = Core.store('caja:' + yo.id).get('ventas', []) || [];
+    REG = ped.filter((p) => PAG.includes(p.estado)).map((p) => ({ negocio: yo.empresa, fecha: p.fecha, numero: String(p.id).slice(0, 8).toUpperCase(), cliente: p.cliente, tel: p.telefono || '',
+      total: p.total, descuento: p.descuento, medio: p.medio, compra: true, boleta: p.boleta, origen: '🛒 Pedido',
+      entrega: p.entrega === 'despacho' ? '🚚 Despacho a ' + (p.direccion || '') : '🏪 Retiro en tienda',
+      items: (p.lineas || []).map((x) => ({ cant: x.cant, nombre: x.nombre, opcion: x.opcion, precio: x.subtotal / (x.cant || 1) })) }))
+      .concat(caja.map((v) => ({ negocio: yo.empresa, fecha: v.t, numero: String(v.id).slice(-6).toUpperCase(), items: v.items || [], origen: '🧾 Caja',
+        total: (v.items || []).reduce((t, l) => t + l.precio * l.cant, 0), medio: v.medio || 'efectivo' })))
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const pesos = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
+    ul.innerHTML = REG.length ? REG.map((r, i) => '<li><div class="grow"><b>' + Core.esc(r.origen + ' N° ' + r.numero) + '</b> · ' + Core.esc(pesos(r.total)) +
+      '<div class="muted">' + Core.esc(new Date(r.fecha).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })) + (r.boleta && r.boleta.folio ? ' · SII N° ' + Core.esc(r.boleta.folio) : '') +
+      '</div></div><button class="small alt" data-reg="' + i + '">🧾 Ver</button></li>').join('') : '<li class="empty">Aún no tienes ventas</li>';
+  };
+  $('registro').onclick = (e) => { const b = e.target.closest('[data-reg]'); if (b && REG[+b.dataset.reg]) CFX_COMPROBANTE.abrir(REG[+b.dataset.reg]); };
   /* ---------- 📲 G35-G37: vender en WhatsApp Business, Google e Instagram + 🔌 avisos a otro sistema (webhooks, Pro) ---------- */
   let redes = null;
   let web = null; // 📊 medir anuncios y 🌐 dominio propio (módulos)
@@ -1115,13 +1146,14 @@
   $('bPagarPro').onclick = () => CFX_PAGOS.abrir({ rpc: (f, a) => Cuenta.rpc(f, a), alPagar: cargarPagos });
 
   /* ---------- Mi tienda (empresas) ---------- */
+  let SELLOS = null; // G30: la tarjeta se edita en Pedidos → Cupones y sellos; aquí se conserva tal cual.
   async function cargarTienda(acc) {
     try {
       const t = await Cuenta.rpc('tienda_info', { p_negocio: acc.id });
       if (!t) return;
       $('tPago').value = t.datos_pago || ''; $('tHorario').value = t.horario || '';
       $('tAbierto').checked = t.abierto !== false;
-      $('tSellos').value = t.sellos_meta || ''; $('tPremio').value = t.sellos_premio || '';
+      SELLOS = [t.sellos_meta ?? null, t.sellos_premio || ''];
       $('tVac').checked = !!t.vacaciones_hasta;
       $('tVacHasta').value = t.vacaciones_hasta || ''; $('tVacMsg').value = t.vacaciones_msg || '';
       $('rowVac').classList.toggle('hidden', !t.vacaciones_hasta);
@@ -1136,8 +1168,7 @@
     if ($('tVac').checked && !$('tVacHasta').value) $('tVacHasta').focus();
   };
   $('bTienda').onclick = async () => {
-    const meta = parseInt($('tSellos').value, 10);
-    if (!isNaN(meta) && !Cuenta.isPro()) return Core.toast('⭐ La tarjeta de sellos es de la versión Pro');
+    if (!SELLOS) return Core.toast('⚠️ Sin conexión: recarga e inténtalo de nuevo');
     if ($('tVac').checked && !$('tVacHasta').value) { $('tVacHasta').focus(); return Core.toast('🌴 Elige hasta qué día estás de vacaciones'); }
     const dp = parseInt($('tDescPrem').value, 10) || 0;
     if (dp < 0 || dp > 50) { $('tDescPrem').focus(); return Core.toast('⭐ El descuento Premium va de 0 a 50%'); }
@@ -1151,7 +1182,7 @@
       await Cuenta.rpc('set_my_phone', { p_tel: $('eTel').value });
       await Cuenta.rpc('set_vacaciones', { p_hasta: $('tVac').checked ? $('tVacHasta').value : null, p_msg: $('tVacMsg').value });
       pintar(await Cuenta.rpc('set_mi_tienda', { p_datos_pago: $('tPago').value, p_horario: $('tHorario').value,
-        p_abierto: $('tAbierto').checked, p_sellos_meta: isNaN(meta) ? null : meta, p_sellos_premio: $('tPremio').value }));
+        p_abierto: $('tAbierto').checked, p_sellos_meta: SELLOS[0], p_sellos_premio: SELLOS[1] }));
       Core.toast('✅ Mi tienda guardada');
     } catch (err) { Core.toast(err.message); }
   };
