@@ -412,7 +412,7 @@
       : a.role === 'equipo'
         ? [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'], ['chat', 'chat', 'Chat', 'apps/mensajes/']]
         : [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'],
-           ['fichas', 'paleta', 'Fichas', 'apps/fichas/'], ['mas', 'ajustes', 'Más', '#ajustes']];
+           ['fichas', 'paleta', 'Diseños', 'apps/fichas/'], ['mas', 'ajustes', 'Más', '#ajustes']];
     let n = document.querySelector('nav.tabs.abajo');
     if (!n) { n = document.createElement('nav'); n.className = 'tabs abajo'; document.body.appendChild(n); }
     document.body.classList.add('con-nav');

@@ -235,7 +235,7 @@
       </div>
       <label for="tRubro">¿A qué se dedica tu negocio?</label>
       <select id="tRubro"><option value="">Elige un rubro…</option></select>
-      <label for="tLogo">Logo (sale arriba, al lado del nombre, y en tus fichas)</label>
+      <label for="tLogo">Logo (sale arriba, al lado del nombre, y en tus diseños)</label>
       <div class="row" style="align-items:center"><input type="file" accept="image/*" id="tLogo" style="flex:2"><button class="alt small" id="bQuitarLogo" type="button" style="flex:none">Quitar</button></div>
       <label for="tPago">Datos para transferencia</label>
       <textarea id="tPago" maxlength="400" placeholder="Banco · Tipo de cuenta · N° de cuenta · RUT · Nombre · Correo"></textarea>
@@ -355,7 +355,7 @@
 
     <div class="card hidden" id="cRespaldo">
       <h2>💾 Respaldo de mi tienda</h2>
-      <p class="muted">Descarga en Excel tus productos, pedidos, clientes, fichas, cupones y reseñas. Guárdalo donde quieras.
+      <p class="muted">Descarga en Excel tus productos, pedidos, clientes, diseños, cupones y reseñas. Guárdalo donde quieras.
         Los avisos y mensajes se borran solos a los 30 días (te avisamos antes); tus pedidos y productos no.</p>
       <div class="btns"><button class="alt" id="bRespaldo">⬇️ Descargar respaldo</button></div><small class="cfx-nota-btn">En Excel: se abre en el computador o en el teléfono.</small>
     </div>
@@ -572,11 +572,11 @@
   }
 
   const APPS = {
-    fichas: ['apps/fichas/', 'paleta', 'Fichas', 'Fichas publicitarias, campañas y avisos a tus clientes'],
+    fichas: ['apps/fichas/', 'paleta', 'Diseños', 'Diseños publicitarios, campañas y avisos a tus clientes'],
     caja: ['apps/caja/', 'caja', 'Caja Rápida', 'Ventas, inventario, categorías y reportes'],
     mensajes: ['apps/mensajes/', 'chat', 'Mensajes', 'Chat con tus clientes y con soporte'],
     mensajesCli: ['apps/mensajes/', 'chat', 'Mensajes', 'Chat con la tienda y tus contactos'],
-    vista: ['apps/catalogo/?v=ofertas', 'ojo', 'Mi tienda', 'Lo que ven tus clientes: fichas, ofertas y productos'],
+    vista: ['apps/catalogo/?v=ofertas', 'ojo', 'Mi tienda', 'Lo que ven tus clientes: diseños, ofertas y productos'],
     tienda: ['apps/catalogo/?v=ofertas', 'bolsa', 'Tienda', 'Ofertas, productos y tus pedidos'],
     pedidos: ['apps/pedidos/', 'paquete', 'Pedidos', 'Pedidos de tus clientes, cupones y estadísticas'],
     cajaCli: ['apps/caja/', 'caja', 'Mi Caja', 'Tu caja, productos y finanzas (Premium)'],
@@ -695,13 +695,13 @@
          'Elige el color de tu app y tu ícono', 'Favoritos ilimitados (gratis: 5)']
       : ['🛒 Recordatorio de carrito: si un cliente no termina su pedido, le llega un aviso al día siguiente',
          '📣 Vende por WhatsApp en 1 toque: tu tienda con foto y ofertas', '📊 Reporte semanal automático: cuánto vendiste y tu producto top',
-         '⚠️ Aviso de stock bajo (quedan 2 o menos)', 'Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10)',
+         '⚠️ Aviso de stock bajo (quedan 2 o menos)', 'Hasta 200 productos, 300 clientes y 60 diseños publicados (Free: 50, 50 y 10)',
          'Cupones de descuento, tarjeta de sellos y equipo de hasta 5 personas', '📊 Estadísticas: vistas, productos más pedidos y mejores clientes',
          'Push y correos automáticos, y respaldo diario en la nube']
     ).map((t) => '<li>' + t + '</li>').join('');
     if (plan && plan.beneficios && plan.beneficios.length) $('proFeat').innerHTML = plan.beneficios.map((t) => '<li>' + Core.esc(t) + '</li>').join('');
     // G19: con módulos a la venta, el Pro es capacidad y extras; las funciones van en 🧩 Módulos (con descuento para Premium).
-    if (!cliente && acc.mods) $('proFeat').innerHTML = ['⭐ Hasta 200 productos, 300 clientes y 60 fichas publicadas (Free: 50, 50 y 10)', '📊 Reporte semanal automático y ⚠️ aviso de stock bajo',
+    if (!cliente && acc.mods) $('proFeat').innerHTML = ['⭐ Hasta 200 productos, 300 clientes y 60 diseños publicados (Free: 50, 50 y 10)', '📊 Reporte semanal automático y ⚠️ aviso de stock bajo',
       '🎨 Todas las plantillas, tus colores y respaldo diario en la nube', '🧩 Pagas menos en todos los módulos (chat, cupones, estadísticas, equipo…)']
       .map((t) => '<li>' + t + '</li>').join('');
   }

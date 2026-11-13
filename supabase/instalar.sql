@@ -2826,14 +2826,14 @@ declare
   img text := nullif(trim(coalesce(p_imagen, '')), '');
   nueva boolean; lim int := public.limite(auth.uid(), 'fichas');
 begin
-  if not public.is_business(auth.uid()) or public.is_admin() then raise exception 'Solo las empresas publican fichas'; end if;
-  if coalesce(trim(p_key), '') = '' or coalesce(trim(p_titulo), '') = '' then raise exception 'La ficha necesita un título'; end if;
+  if not public.is_business(auth.uid()) or public.is_admin() then raise exception 'Solo las empresas publican diseños'; end if;
+  if coalesce(trim(p_key), '') = '' or coalesce(trim(p_titulo), '') = '' then raise exception 'El diseño necesita un título'; end if;
   if img is not null and img !~ '^(https://|data:image/(jpeg|png|webp);base64,)' then raise exception 'Imagen no válida'; end if;
   if length(coalesce(img, '')) > 600000 then raise exception 'La imagen es muy pesada'; end if;
   if p_precio_num is not null and (p_precio_num < 0 or p_precio_num > 99999999) then raise exception 'Precio no válido'; end if;
   nueva := not exists (select 1 from public.publicaciones where owner_id = auth.uid() and client_key = p_key);
   if nueva and (select count(*) from public.publicaciones where owner_id = auth.uid()) >= lim then
-    raise exception 'Llegaste a % fichas publicadas de tu plan: borra alguna antigua o pásate a Pro.', lim;
+    raise exception 'Llegaste a % diseños publicados de tu plan: borra alguna antigua o pásate a Pro.', lim;
   end if;
   insert into public.publicaciones (owner_id, client_key, titulo, detalle, precio, imagen, tipo, precio_num)
   values (auth.uid(), left(p_key, 60), left(trim(p_titulo), 80), left(coalesce(p_detalle, ''), 300), left(coalesce(p_precio, ''), 40), img,
@@ -4069,6 +4069,7 @@ revoke all on function public.set_mi_rubro(text), public.admin_negocios() from a
 -- Beneficios nuevos en la lista de los planes (solo si el administrador no los había cambiado).
 update public.planes set beneficios = '["🛒 Recordatorio de carrito: el cliente que no terminó su pedido recibe un aviso", "📣 Vende por WhatsApp en 1 toque (foto + ofertas)", "📊 Reporte semanal: cuánto vendiste y tu producto top", "⚠️ Aviso de stock bajo", "Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]'::jsonb
 where codigo = 'negocio_pro' and beneficios = '["Hasta 200 productos y 300 clientes", "60 fichas y todas las plantillas", "Equipo de hasta 5 personas", "Pedidos online ilimitados", "Cupones, sellos y estadísticas", "Push y respaldo diario"]'::jsonb;
+update public.planes set beneficios = replace(beneficios::text, '60 fichas', '60 diseños')::jsonb where beneficios::text like '%60 fichas%';  -- G33b: Fichas → Diseños
 update public.planes set beneficios = '["⭐ El descuento Premium de tu tienda en cada pedido", "⭐ Tus pedidos aparecen primero en la fila", "🔔 Avísame cuando llegue (productos agotados)", "Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]'::jsonb
 where codigo = 'cliente_pro' and beneficios = '["Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]'::jsonb;
 
@@ -4257,7 +4258,7 @@ begin
         p.pagado_at as pagado from public.pedidos p left join public.profiles c on c.id = p.cliente_id where p.negocio_id = n) x),
     'Clientes', (select coalesce(jsonb_agg(x order by x.nombre), '[]') from (select empresa as nombre, email as correo, telefono, plan, pro_until as premium_hasta,
         created_at as creado from public.profiles where negocio_id = n and role = 'client') x),
-    'Fichas', (select coalesce(jsonb_agg(x order by x.creada), '[]') from (select titulo, detalle, precio, tipo, vip, created_at as creada from public.publicaciones where owner_id = n) x),
+    'Diseños', (select coalesce(jsonb_agg(x order by x.creada), '[]') from (select titulo, detalle, precio, tipo, vip, created_at as creada from public.publicaciones where owner_id = n) x),
     'Cupones', (select coalesce(jsonb_agg(x), '[]') from (select codigo, porcentaje, hasta, activo, usos from public.cfx_descuentos where owner_id = n) x)
   );
 end $$;
@@ -5359,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.46'::text $$;
+language sql immutable as $$ select '5.47'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5424,6 +5425,7 @@ revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
 -- =====================================================================
+--  VERSIÓN 5.47 · G33b ✏️ "Fichas" → "Diseños" (mensajes de publicar_ficha, beneficios del plan, hoja del respaldo).
 --  VERSIÓN 5.46 · G33 ✏️ nombre visible "Despega Pyme" (plan Pro, resumen semanal, módulo dominio) · G32 f 🔒 3 claves malas: se pausa la clave y el QR; se entra con el enlace al correo (núcleo 2.66 qr.sql: cfx_login_fallos).
 --  VERSIÓN 5.45 · G32 d 🔑 Entrar con QR (núcleo 2.65 qr.sql): tabla cfx_login_qr + cfx_qr_crear/ver/aprobar/estado/canjear.
 --  VERSIÓN 5.44 · G32 🧾 Boleta SII desde la Caja (OpenFactura o folio manual): tabla boletas_caja + boleta_caja(jsonb).

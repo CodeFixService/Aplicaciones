@@ -410,7 +410,7 @@
 
   $('bGuardar').onclick = async () => {
     if (!editId && !licensed() && fichas.length >= FREE_LIMIT.fichas) {
-      return Core.toast('La prueba guarda hasta ' + FREE_LIMIT.fichas + ' fichas. Activa tu licencia.');
+      return Core.toast('La prueba guarda hasta ' + FREE_LIMIT.fichas + ' diseños. Activa tu licencia.');
     }
     await draw(ficha);
     const thumb = thumbnail();
@@ -422,12 +422,12 @@
       fichas.unshift(Object.assign(data, { id: editId }));
     }
     if (!db.set('fichas', fichas)) return;
-    Core.toast('Ficha guardada. Publicando…');
+    Core.toast('Diseño guardado. Publicando…');
     const guardada = fichas.find((x) => x.id === editId);
     try {
       await publicarFicha(guardada);
       db.set('fichas', fichas);
-      Core.toast('✅ Ficha guardada y publicada: ' + (cuenta.is_admin ? 'la ven todas las empresas' : 'la ven tus clientes en Ofertas'));
+      Core.toast('✅ Diseño guardado y publicado: ' + (cuenta.is_admin ? 'la ven todas las empresas' : 'la ven tus clientes en Ofertas'));
     } catch (err) { Core.toast('Guardada en este celular, pero no se publicó: ' + err.message); }
   };
 
@@ -457,7 +457,7 @@
     editId = null; fillForm(); changed();
   };
 
-  const slug = (s) => (s || 'ficha').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'ficha';
+  const slug = (s) => (s || 'diseno').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'diseno';
 
   async function shareImage(blob, title, text) {
     const file = new File([blob], slug(title) + '.png', { type: 'image/png' });
@@ -487,7 +487,7 @@
     const tipo = TEMPLATES[f.plantilla] && (licensed() || FREE_TEMPLATES.includes(f.plantilla)) ? f.plantilla : 'oferta';
     const pn = Core.precioNum(f.precio);
     await Cuenta.rpc('publicar_ficha', {
-      p_key: f.id, p_titulo: f.titulo || 'Ficha', p_detalle: f.subtitulo || '',
+      p_key: f.id, p_titulo: f.titulo || 'Diseño', p_detalle: f.subtitulo || '',
       p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 432), // ~35 KB: rápida y liviana
       p_tipo: tipo, p_vip: false, p_precio_num: tipo !== 'lista' && !isNaN(pn) ? pn : null
     });
@@ -499,18 +499,18 @@
     let n = 0;
     for (const f of pend) {
       try { await publicarFicha(f); n++; }
-      catch (e) { Core.toast('Fichas sin publicar: ' + e.message); break; }
+      catch (e) { Core.toast('Diseños sin publicar: ' + e.message); break; }
     }
     if (n) {
       db.set('fichas', fichas);
-      Core.toast('📣 ' + n + ' ficha(s) publicadas: ' + (cuenta.is_admin ? 'las ven todas las empresas' : 'las ven tus clientes en Ofertas'));
+      Core.toast('📣 ' + n + ' diseño(s) publicado(s): ' + (cuenta.is_admin ? 'las ven todas las empresas' : 'las ven tus clientes en Ofertas'));
     }
   }
 
   /* ---------- Galería ---------- */
   function renderGaleria() {
     const g = $('gal');
-    if (!fichas.length) { g.innerHTML = '<p class="empty">Aún no guardas fichas. Diseña una y toca 💾.</p>'; return; }
+    if (!fichas.length) { g.innerHTML = '<p class="empty">Aún no guardas diseños. Crea uno y toca 💾.</p>'; return; }
     g.innerHTML = fichas.map((f) =>
       '<figure><img src="' + f.thumb + '" alt=""><figcaption><b style="flex-basis:100%">' + Core.esc(f.titulo) + '</b>' +
       '<button class="small" data-a="edit" data-id="' + f.id + '">Editar</button>' +
@@ -527,7 +527,7 @@
       editId = a === 'edit' ? id : null;
       fillForm(); changed(); show('disenar');
     }
-    if (a === 'del' && confirm('¿Eliminar esta ficha?')) {
+    if (a === 'del' && confirm('¿Eliminar este diseño?')) {
       fichas = fichas.filter((x) => x.id !== id);
       if (editId === id) editId = null;
       db.set('fichas', fichas); renderGaleria();
@@ -674,7 +674,7 @@
   function renderCampanas() {
     $('k-ficha').innerHTML = fichas.length
       ? fichas.map((f) => '<option value="' + f.id + '">' + Core.esc(f.titulo) + '</option>').join('')
-      : '<option value="">Primero guarda una ficha</option>';
+      : '<option value="">Primero guarda un diseño</option>';
     const conWsp = todos().filter((c) => c.tel);
     $('k-tag').innerHTML = '<option value="">Todos (' + todos().length + ' clientes · ' + conWsp.length + ' con WhatsApp)</option>' +
       tags().map((t) => '<option value="' + Core.esc(t) + '">Etiqueta: ' + Core.esc(t) + ' (' +
@@ -721,7 +721,7 @@
   $('bAddCampana').onclick = async () => {
     const fichaId = $('k-ficha').value;
     const fecha = new Date($('k-fecha').value).getTime();
-    if (!fichaId) return Core.toast('Guarda una ficha primero');
+    if (!fichaId) return Core.toast('Guarda un diseño primero');
     if (!fecha) return Core.toast('Elige fecha y hora');
     const canales = [$('k-push').checked && 'push', $('k-mail').checked && 'email'].filter(Boolean);
     const k = {
@@ -731,7 +731,7 @@
     $('bAddCampana').disabled = true;
     try {
       // Siempre se publica en "Ofertas" de los clientes con cuenta; Pro además envía push y/o correo.
-      Core.toast('Publicando la ficha…');
+      Core.toast('Publicando el diseño…');
       let aviso = '';
       try {
         k.notifId = await programarAutomatico(k);
@@ -846,7 +846,7 @@
       if (!k.avisado && k.fecha <= now) {
         k.avisado = true; cambio = true;
         Core.notify('Hora de enviar: ' + k.nombre, {
-          body: destinatarios(k).length + ' clientes esperan tu ficha',
+          body: destinatarios(k).length + ' clientes esperan tu diseño',
           tag: 'camp-' + k.id,
           data: { url: location.href.split('#')[0] + '#camp=' + k.id }
         });
@@ -869,7 +869,7 @@
     const ok = licensed(), a = Cuenta.account;
     $('licEstado').textContent = ok
       ? '⭐ Versión Pro' + (a.is_admin ? ' (administrador)' : a.pro_until ? ' hasta el ' + new Date(a.pro_until).toLocaleDateString('es') : ' permanente') + ' · ' + a.email
-      : 'Versión Free: marca de agua, ' + FREE_TEMPLATES.length + ' plantillas, ' + FREE_LIMIT.fichas + ' fichas y ' +
+      : 'Versión Free: marca de agua, ' + FREE_TEMPLATES.length + ' plantillas, ' + FREE_LIMIT.fichas + ' diseños y ' +
         FREE_LIMIT.clientes + ' clientes. Pide tu key Pro para desbloquear todo.';
     $('rowKey').classList.toggle('hidden', ok);
     $('licTag').textContent = ok ? 'PRO' : 'FREE';

@@ -78,7 +78,7 @@
     actividad.forEach((e) => { e.sem = semaforo(e); n[e.sem]++; });
     $('actPill').textContent = '🟢 ' + n.verde + ' · 🟡 ' + n.amarillo + ' · 🔴 ' + n.rojo;
     $('actHoy').innerHTML = '<b>Hoy:</b> ' + hoy.empresas + ' empresa(s) activa(s) · ' + hoy.clientes + ' cliente(s) · ' + hoy.productos + ' producto(s) nuevo(s) · ' +
-      hoy.fichas + ' ficha(s) · ' + hoy.pedidos + ' pedido(s)';
+      hoy.fichas + ' diseño(s) · ' + hoy.pedidos + ' pedido(s)';
     pintarActividad();
   }
   function pintarActividad() {
@@ -88,8 +88,8 @@
       (e.pro ? '<span class="pill pro">PRO</span>' : '<span class="pill">FREE</span>') +
       '<div class="muted">Entró ' + hace(e.visto_at) + ' · ' + (e.push ? '🔔 con notificaciones' : '🔕 sin notificaciones') +
         (e.motivado_at && dias(e.motivado_at) < 1 ? ' · 📣 motivada hoy' : '') + '</div>' +
-      '<div class="muted">📦 Último producto: ' + hace(e.ultimo_producto) + ' · 🖼️ Ficha: ' + hace(e.ultima_ficha) + ' · 🛒 Pedido: ' + hace(e.ultimo_pedido) + '</div>' +
-      '<div class="muted">' + e.productos + ' productos · ' + e.fichas + ' fichas · ' + e.clientes + ' clientes (' + e.clientes_activos + ' activos) · ' +
+      '<div class="muted">📦 Último producto: ' + hace(e.ultimo_producto) + ' · 🖼️ Diseño: ' + hace(e.ultima_ficha) + ' · 🛒 Pedido: ' + hace(e.ultimo_pedido) + '</div>' +
+      '<div class="muted">' + e.productos + ' productos · ' + e.fichas + ' diseños · ' + e.clientes + ' clientes (' + e.clientes_activos + ' activos) · ' +
         e.pedidos_7d + ' pedidos y ' + e.entradas_7d + ' entradas en 7 días</div></div>' +
       '<div class="acc"><button class="alt" data-ver="' + e.id + '">👁️ Ver</button><button data-mot="' + e.id + '">📣 Motivar</button></div></li>').join('')
       : '<li class="empty">' + (actividad.length ? 'Ninguna en este grupo 🎉' : 'Aún no hay empresas') + '</li>';
@@ -130,7 +130,7 @@
     directo: {
       titulos: ['🎯 {n}: tu tienda necesita movimiento', '🎯 Una idea rápida para vender más', '🎯 5 minutos para tu tienda'],
       inicios: ['Hola {n}.', '{n}, un dato rápido:', 'Hola {n}, vamos al grano:'],
-      cierres: ['Te toma 5 minutos: entra, sube una oferta y listo.', 'Hoy: 1 ficha nueva en Despega Pyme. Mañana: más pedidos.',
+      cierres: ['Te toma 5 minutos: entra, sube una oferta y listo.', 'Hoy: 1 diseño nuevo en Despega Pyme. Mañana: más pedidos.',
         'Entra hoy y publica algo, aunque sea chico.']
     },
     divertido: {
@@ -241,7 +241,7 @@
     const item = (t, v) => '<div class="card"><span class="muted">' + t + '</span><b>' + v + '</b></div>';
     $('empTitulo').textContent = '🏢 ' + (r.empresa || r.email);
     $('empStats').innerHTML = item('Plan', r.plan) + item('Clientes', r.clientes + ' (' + r.clientes_premium + ' Premium)') +
-      item('Productos', r.productos) + item('Fichas publicadas', r.publicaciones) + item('Pedidos (30 días)', r.pedidos_30d) +
+      item('Productos', r.productos) + item('Diseños publicados', r.publicaciones) + item('Pedidos (30 días)', r.pedidos_30d) +
       item('Ventas entregadas (30 días)', Core.money(r.ventas_30d));
     $('empInfo').textContent = r.email + (r.telefono ? ' · WhatsApp +' + r.telefono : '') + (r.horario ? ' · 🕒 ' + r.horario : '') +
       (r.abierto === false ? ' · 🔴 Cerrada' : '') + ' · desde ' + new Date(r.creada).toLocaleDateString('es');
@@ -250,7 +250,7 @@
     $('empAct').innerHTML = '';
     Cuenta.rpc('admin_empresa_actividad', { p_id: id }).then(pintarEmpAct).catch(() => {});
     $('empPubs').innerHTML = r.ultimas_publicaciones.length ? r.ultimas_publicaciones.map((x) => '<li><span class="grow">' + (x.vip ? '⭐ VIP · ' : '') +
-      Core.esc(x.titulo) + '</span><span class="muted">' + new Date(x.updated_at).toLocaleDateString('es') + '</span></li>').join('') : '<li class="empty">Sin fichas publicadas</li>';
+      Core.esc(x.titulo) + '</span><span class="muted">' + new Date(x.updated_at).toLocaleDateString('es') + '</span></li>').join('') : '<li class="empty">Sin diseños publicados</li>';
     show('resumen', true);
     $('cEmpresa').classList.remove('hidden');
     $('cEmpresa').scrollIntoView({ behavior: 'smooth' });

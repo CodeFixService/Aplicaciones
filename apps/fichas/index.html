@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
-<title>Fichas · Despega Pyme</title>
+<title>Diseños · Despega Pyme</title>
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="icon" href="../../icons/icon-192.png">
 <link rel="stylesheet" href="../../shared/vendor/bootstrap-utilities.min.css">
@@ -66,7 +66,7 @@
 <body>
 <header class="top">
   <a href="../../" aria-label="Volver">‹</a>
-  <h1>Fichas</h1>
+  <h1>Diseños</h1>
   <span id="licTag" class="pill">FREE</span>
 </header>
 <nav class="tabs sub" id="subtabs">
@@ -87,7 +87,7 @@
         <canvas id="lienzo" width="1080" height="1350"></canvas>
         <div class="sel hidden" id="sel"></div>
       </div>
-      <p class="muted" style="margin:8px 0 0;font-size:13px;text-align:center">✏️ Toca un texto de la ficha para cambiarle el estilo</p>
+      <p class="muted" style="margin:8px 0 0;font-size:13px;text-align:center">✏️ Toca un texto del diseño para cambiarle el estilo</p>
       <div class="editor" id="editor">
         <div class="elems" id="elems"></div>
         <div class="herr hidden" id="herr">
@@ -132,7 +132,7 @@
       <div class="btns"><button class="alt small" id="bQuitarFoto">Quitar foto</button></div>
       <label class="vipChk"><input type="checkbox" id="f-vip"> <span>⭐ <b>VIP</b>: <span id="vipTxt">solo para clientes Premium</span>
         (los demás la ven en gris con "Hazte Premium")</span></label>
-      <p class="muted" style="margin-bottom:0">💾 Al <b>guardar</b>, la ficha se publica sola en <b id="pubDonde">Ofertas de tus clientes</b> y les llega un aviso.</p>
+      <p class="muted" style="margin-bottom:0">💾 Al <b>guardar</b>, el diseño se publica solo en <b id="pubDonde">Ofertas de tus clientes</b> y les llega un aviso.</p>
     </div>
   </section>
 
@@ -200,7 +200,7 @@
     <div class="card">
       <h2>Nueva campaña</h2>
       <label>Nombre</label><input id="k-nombre" placeholder="Promo fin de semana">
-      <label>Ficha</label><select id="k-ficha"></select>
+      <label>Diseño</label><select id="k-ficha"></select>
       <label for="k-tag">Para enviar por WhatsApp</label><select id="k-tag"></select>
       <label>Mensaje (usa {nombre} para personalizar)</label>
       <textarea id="k-msg">Hola {nombre} 👋 Tenemos una oferta especial para ti.</textarea>
@@ -232,7 +232,7 @@
     <div class="card">
       <h2>Mi negocio</h2>
       <label>Nombre del negocio</label><input id="a-negocio">
-      <label>WhatsApp / teléfono que sale en la ficha</label><input id="a-tel" inputmode="tel">
+      <label>WhatsApp / teléfono que sale en el diseño</label><input id="a-tel" inputmode="tel">
       <label>Logo</label><input type="file" accept="image/*" id="a-logo">
       <div class="btns"><button id="bGuardarAjustes">Guardar</button><button class="alt small" id="bQuitarLogo">Quitar logo</button></div>
     </div>
@@ -252,7 +252,7 @@
     </div>
     <div class="card">
       <h2>☁️ Respaldo en la nube <span class="pill pro">PRO</span></h2>
-      <p class="muted" id="nubeEstado">Guarda tus fichas y clientes en tu cuenta para recuperarlos en otro celular.</p>
+      <p class="muted" id="nubeEstado">Guarda tus diseños y clientes en tu cuenta para recuperarlos en otro celular.</p>
       <div class="btns"><button id="bNubeSubir">⬆️ Guardar en la nube</button><button class="alt" id="bNubeBajar">⬇️ Recuperar</button></div>
     </div>
     <div class="card">

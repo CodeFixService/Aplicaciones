@@ -298,7 +298,7 @@
   $('tPedidos').onclick = () => vista('pedidos');
   $('tPedidos').classList.toggle('hidden', !comprador);
   if (!comprador) {
-    $('ofTip').textContent = '👁️ Así ven tus clientes tus fichas y campañas. Cada ficha que guardas en Fichas aparece aquí.';
+    $('ofTip').textContent = '👁️ Así ven tus clientes tus diseños y campañas. Cada diseño que guardas en Diseños aparece aquí.';
     $('ofTip').classList.remove('hidden');
   }
 
@@ -365,7 +365,7 @@
   function pintarOfertas() {
     $('ofertas').innerHTML = ofertas.length ? ofertas.map(tarjeta).join('') : '<p class="empty" style="grid-column:1/-1">' +
       vacio('ofertas', comprador ? 'La tienda aún no publica ofertas.'
-        : 'Aún no publicas nada. Guarda una ficha en Fichas y aparecerá aquí para tus clientes.') + '</p>';
+        : 'Aún no publicas nada. Guarda un diseño en Diseños y aparecerá aquí para tus clientes.') + '</p>';
   }
   $('ofertas').onclick = (e) => {
     if (!comprador && e.target.closest('.acc button')) return previa();

@@ -119,7 +119,7 @@
   <section class="view" id="v-stats">
     <div class="card upsell hidden" id="stLock">
       <h2>📊 Estadísticas de tu tienda <span class="pill pro">PRO</span></h2>
-      <p class="muted">Cuántos clientes vieron cada ficha, tus productos más pedidos y tus mejores clientes.</p>
+      <p class="muted">Cuántos clientes vieron cada diseño, tus productos más pedidos y tus mejores clientes.</p>
       <div class="btns"><a class="btn warn" href="../../#plan">⭐ Pásate a Pro</a></div>
     </div>
     <div id="stPro">
@@ -140,7 +140,7 @@
         <div class="segs" id="sSegB"></div><div id="sSegL"></div></div>
       <div class="card"><h2>🏆 Productos más pedidos</h2><ul class="list" id="sTop"></ul></div>
       <div class="card"><h2>💎 Mejores clientes</h2><ul class="list" id="sMejores"></ul></div>
-      <div class="card"><h2>👁️ Vistas de tus fichas</h2><ul class="list" id="sVistas"></ul></div>
+      <div class="card"><h2>👁️ Vistas de tus diseños</h2><ul class="list" id="sVistas"></ul></div>
     </div>
   </section>
 </main>
@@ -422,7 +422,7 @@
       const fila = (a, b) => '<li><span class="grow">' + a + '</span><b>' + b + '</b></li>';
       $('sTop').innerHTML = s.top_productos.length ? s.top_productos.map((p) => fila(Core.esc(p.nombre), p.cant + ' · ' + precio(p.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
       $('sMejores').innerHTML = s.mejores_clientes.length ? s.mejores_clientes.map((c) => fila(Core.esc(c.nombre), c.pedidos + ' pedidos · ' + precio(c.monto))).join('') : '<li class="empty">Sin pedidos aún</li>';
-      $('sVistas').innerHTML = s.vistas.length ? s.vistas.map((v) => fila(Core.esc(v.titulo), '👁️ ' + v.vistas)).join('') : '<li class="empty">Aún no publicas fichas</li>';
+      $('sVistas').innerHTML = s.vistas.length ? s.vistas.map((v) => fila(Core.esc(v.titulo), '👁️ ' + v.vistas)).join('') : '<li class="empty">Aún no publicas diseños</li>';
     } catch (e) { Core.toast(e.message); }
   }
 
