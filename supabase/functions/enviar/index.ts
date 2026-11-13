@@ -3,12 +3,13 @@
 //     envía por push y/o correo (Gmail);
 //  2) crea cuentas desde el panel ({accion: 'crear_usuario'}): el admin crea empresas y
 //     clientes; cada empresa crea sus propios clientes. El registro libre está cerrado.
+//  3) entrar con QR ({accion: 'qr_entrar'}): el computador entra con la sesión que aprobó el celular.
 // Se despliega en Supabase → Edge Functions → nombre "enviar".
 import webpush from 'npm:web-push@3.6.7';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const VERSION = '3.3';
+const VERSION = '3.4';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
 const BRAND = 'Órbita · CodeFix';
@@ -125,6 +126,17 @@ function adminDb() {
   });
 }
 
+// G32 d · 🔑 Entrar con QR: el celular ya aprobó; se canjea UNA vez y se entrega un enlace mágico de un solo uso (no se envía correo).
+export async function qrEntrar(b: { token?: string; secreto?: string }) {
+  const db = adminDb();
+  const { data: email, error } = await db.rpc('cfx_qr_canjear', { p_token: String(b.token || ''), p_secreto: String(b.secreto || '') });
+  if (error) return { ok: false, error: 'Actualiza la base de datos (falta Entrar con QR)' };
+  if (!email) return { ok: false, error: 'El código venció o ya se usó' };
+  const { data, error: e2 } = await db.auth.admin.generateLink({ type: 'magiclink', email: String(email) });
+  if (e2 || !data?.properties?.hashed_token) return { ok: false, error: 'No se pudo abrir la sesión' };
+  return { ok: true, token_hash: data.properties.hashed_token };
+}
+
 type NuevoUsuario = { email?: string; password?: string; nombre?: string; tipo?: string; negocio?: string | null };
 
 export async function crearUsuario(jwt: string, b: NuevoUsuario) {
@@ -218,6 +230,10 @@ if (Deno.env.get('SUPABASE_URL')) {
       if (body && body.accion === 'crear_usuario') {
         const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
         try { return json(await crearUsuario(jwt, body)); }
+        catch (e) { return json({ ok: false, error: 'Error del servidor: ' + String((e as Error).message || e) }); }
+      }
+      if (body && body.accion === 'qr_entrar') {
+        try { return json(await qrEntrar(body)); }
         catch (e) { return json({ ok: false, error: 'Error del servidor: ' + String((e as Error).message || e) }); }
       }
       if (body && body.accion === 'registro_cliente') {

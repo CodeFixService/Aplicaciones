@@ -128,6 +128,7 @@
         <button id="tIn" class="on small" type="button">Ingresar</button>
         <button id="tUp" class="small" type="button">Crear cuenta</button>
       </div>
+      <div id="lQR" hidden></div>
       <form id="fLogin" autocomplete="on">
         <div id="rowEmpresa" class="hidden"><label id="lblEmpresa" for="lEmpresa">Nombre de tu empresa</label>
           <input id="lEmpresa" autocomplete="organization" maxlength="80"></div>
@@ -382,12 +383,14 @@
 <script src="shared/config.js"></script>
 <script src="shared/vendor/supabase.js"></script>
 <script src="shared/cuenta.js"></script>
+<script src="shared/qr.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
   const views = ['v-setup', 'v-login', 'v-reset', 'v-terms', 'v-home', 'v-ajustes'];
   const showView = (v) => {
     views.forEach((x) => $(x).classList.toggle('hidden', x !== v));
+    if (v === 'v-login' && window.CFX_QR) CFX_QR.pc($('lQR'));  // G32 d · 🔑 computador: entrar con el QR del celular
     // Inicio: botón ⚙️ Ajustes. Ajustes: botón ‹ para volver.
     // El cliente tiene todo en Cuenta (menú común): sin ⚙️ ni ‹ en la cabecera.
     const a = Cuenta.account, negocio = a && (a.role === 'user' || a.role === 'equipo'), cli = a && a.role === 'client';
@@ -452,6 +455,7 @@
     $('lBtn').textContent = { in: 'Ingresar', up: 'Crear cuenta', olvide: 'Enviar enlace' }[m];
     $('lErr').textContent = '';
   }
+  if (window.CFX_QR) CFX_QR.iniciar({ sb: Cuenta.sb, funcion: 'enviar', qrLib: 'shared/vendor/qrcode.js', alEntrar: async () => entrar(await Cuenta.refresh()) });
   $('tIn').onclick = () => setModo('in');
   $('tUp').onclick = () => setModo('up');
   $('lOlvide').onclick = (e) => { e.preventDefault(); setModo('olvide'); };
@@ -514,6 +518,8 @@
   function entrar(acc) {
     if (recuperando) return;
     if (!acc) { showView('v-login'); return; }
+    // G32 d · 🔑 el celular escaneó el QR del computador (?qr=): primero pregunta "¿Entrar en el computador?".
+    if (window.CFX_QR && new URLSearchParams(location.search).get('qr')) { CFX_QR.revisar().then(() => entrar(acc)); return; }
     const volver = params.get('volver');
     if (volver && volver.startsWith('/') && !volver.startsWith('//')) { location.replace(volver); return; }
     if (params.get('cliente')) history.replaceState(null, '', location.pathname);

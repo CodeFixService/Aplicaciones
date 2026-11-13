@@ -687,6 +687,8 @@
       { k: 'terminos', ico: '📄', t: 'Términos y condiciones', accion: a('terminos') },
       { k: 'privacidad', ico: '🔒', t: 'Política de privacidad', accion: a('privacidad') },
       !adm && { k: 'misdatos', ico: '🗂️', t: 'Mis datos y privacidad', accion: a('misdatos') },
+      // G32 d · 🔑 Celular con sesión → aprueba el QR del computador (núcleo qr.js, si la app lo activó).
+      window.CFX_QR && CFX_QR.listo() && !matchMedia('(pointer:fine)').matches && { k: 'computador', ico: 'qr', t: 'Entrar en un computador', accion: () => CFX_QR.celular() },
       { k: 'salir', ico: '🚪', t: 'Cerrar sesión', rojo: true, accion: confirmarSalir }
     ].filter((x) => x && !(yaEstan || []).includes(x.k)).map((x) => Object.assign(x, { grupo: g }));
   }
