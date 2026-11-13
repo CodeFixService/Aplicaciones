@@ -193,8 +193,20 @@
           if (pagado < 1) { err.textContent = 'Escribe el monto que pagaste'; return; }
           if (plan.k !== 'otro' && monto() && pagado < monto() && !o._menosOk) { o._menosOk = true; err.textContent = 'Pagaste menos que el total (' + pesos(monto()) + '). Si es correcto, toca Enviar otra vez.'; return; }
           b.disabled = true; b.textContent = 'Enviando…';
+          const args = { p_periodo: plan.k, p_monto: pagado, p_medio: medio, p_comprobante: foto, p_nota: plan.k === 'otro' ? 'Otro monto' : plan.k === 'meses' ? plan.m + ' meses' : '', p_cupon: cupon ? cupon.codigo : null, p_meses: plan.k === 'meses' ? plan.m : null, ...(pr ? { p_producto: pr.clave } : {}) };
+          // Señal débil (4G): si se corta, revisa si igual llegó y, si no, reintenta solo 2 veces antes de avisar.
+          const red = (x) => /Failed to fetch|NetworkError|Load failed|Sin conexi[oó]n|network/i.test((x && x.message) || String(x));
+          const llego = async () => { try { const s = await o.rpc('cfx_pago_estado'); return !!(s && s.ultimo && s.ultimo.estado === 'pendiente'); } catch (y) { return false; } };
           try {
-            await o.rpc('cfx_pago_pedir', { p_periodo: plan.k, p_monto: pagado, p_medio: medio, p_comprobante: foto, p_nota: plan.k === 'otro' ? 'Otro monto' : plan.k === 'meses' ? plan.m + ' meses' : '', p_cupon: cupon ? cupon.codigo : null, p_meses: plan.k === 'meses' ? plan.m : null, ...(pr ? { p_producto: pr.clave } : {}) });
+            for (let n = 0; ; n++) {
+              try { await o.rpc('cfx_pago_pedir', args); break; } catch (x) {
+                if (!red(x)) throw x;
+                await new Promise((r) => setTimeout(r, 1500));
+                if (await llego()) break;
+                if (n >= 2) throw new Error('No se pudo enviar: la señal está débil. Conéctate a Wi-Fi o acércate a mejor señal y toca Enviar otra vez.');
+                b.textContent = 'Reintentando…';
+              }
+            }
             caja.innerHTML = '<h2>✅ ¡Recibido!</h2><div class="cp-ok">Ya nos llegó tu comprobante. Lo revisamos en 5 a 10 minutos y te llega un aviso apenas se active. Puedes cerrar esta ventana.</div>' + pie;
             if (o.alPagar) o.alPagar();
           } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = 'Enviar comprobante'; }
