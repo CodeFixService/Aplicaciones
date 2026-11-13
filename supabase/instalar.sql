@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.47'::text $$;
+language sql immutable as $$ select '5.48'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5425,6 +5425,7 @@ revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
 
 -- =====================================================================
+--  VERSIÓN 5.48 · núcleo 2.67: se borra la cfx_pago_pedir de 7 parámetros (quedaban 2 y el pago fallaba).
 --  VERSIÓN 5.47 · G33b ✏️ "Fichas" → "Diseños" (mensajes de publicar_ficha, beneficios del plan, hoja del respaldo).
 --  VERSIÓN 5.46 · G33 ✏️ nombre visible "Despega Pyme" (plan Pro, resumen semanal, módulo dominio) · G32 f 🔒 3 claves malas: se pausa la clave y el QR; se entra con el enlace al correo (núcleo 2.66 qr.sql: cfx_login_fallos).
 --  VERSIÓN 5.45 · G32 d 🔑 Entrar con QR (núcleo 2.65 qr.sql): tabla cfx_login_qr + cfx_qr_crear/ver/aprobar/estado/canjear.
@@ -5831,6 +5832,7 @@ end $$;
 
 drop function if exists public.cfx_pago_pedir(text, int, text, text, text);
 drop function if exists public.cfx_pago_pedir(text, int, text, text, text, text);
+drop function if exists public.cfx_pago_pedir(text, int, text, text, text, text, int);  -- G36: la de 7 dejaba 2 versiones ("Could not choose the best candidate")
 drop function if exists public.cfx_pago_pedir(text, int, text, text, text, text, int, text);
 create or replace function public.cfx_pago_pedir(p_periodo text, p_monto int, p_medio text, p_comprobante text, p_nota text default '', p_cupon text default null, p_meses int default null, p_producto text default null) returns uuid
 language plpgsql security definer set search_path = '' as $$
