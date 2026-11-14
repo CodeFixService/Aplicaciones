@@ -363,8 +363,8 @@
     const liberada = ajustes.version_liberada || '';
     const esAdmin = !!(account && account.is_admin);
     if (!esAdmin && (!liberada || mayor(nueva, liberada))) return null;
-    // Núcleo: si ya está liberada, se instala sola (sin botón). El admin ve el aviso solo mientras no la libera.
-    if (liberada && !mayor(nueva, liberada) && global.CodeFixAuto) { global.CodeFixAuto(nueva, () => actualizarAhora()); return nueva; }
+    // G36 · núcleo: el admin la recibe sola apenas se publica; los usuarios, al liberarla, con el botón "🔄 Actualizar".
+    if (global.CodeFixAuto && (esAdmin || (liberada && !mayor(nueva, liberada)))) { global.CodeFixAuto(nueva, () => actualizarAhora(), { admin: esAdmin }); return nueva; }
     mostrarAviso(actual, nueva, esAdmin && (!liberada || mayor(nueva, liberada)));
     return nueva;
   }
