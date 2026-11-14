@@ -1092,7 +1092,7 @@
         web = a === 'medir' ? await Cuenta.rpc('medicion_guardar', { p_meta: $('mdMeta').value, p_ga: $('mdGa').value })
           : await Cuenta.rpc('dominio_guardar', { p_dominio: a === 'dominio' ? $('mdDom').value : null });
         if (a !== 'medir') domEstado = null;
-        Core.toast(a === 'medir' ? '📊 Medición guardada' : a === 'dominio' ? '🌐 Dominio guardado: sigue los pasos de abajo' : 'Dominio quitado');
+        Core.toast(a === 'medir' ? '📊 Medición guardada' : a === 'dominio' ? '🌐 Dominio guardado: mira los pasos arriba' : 'Dominio quitado');
         pintarRedes();
       } catch (err) { Core.toast(err.message); b.disabled = false; }
       return;
