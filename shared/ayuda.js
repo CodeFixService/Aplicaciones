@@ -999,7 +999,7 @@
   //   una sola llamada al tener la cuenta (también para el admin): cabecera común, ayuda y sensación Premium (CFX_PREMIUM, nunca al admin).
   //   cuenta / panel: dirección (#… o url) o función para "Mi cuenta" y "Panel de administración". Se puede volver a llamar (p. ej. al cambiar la foto).
   // ---------- Referidos: ?ref=CODIGO en el link queda guardado y se asocia al crear/entrar a la cuenta nueva ----------
-  const PANEL_EN_CM = ['orbita', 'barberia'];  // G34: se suman al pasar su panel al CM (falta Billetera, BiciTaller y Estaciona: G35)
+  const PANEL_EN_CM = ['orbita', 'barberia', 'billetera', 'taller', 'estaciona'];  // G34/G35: apps con su panel en el CM (Cerebro no)
   const PERSONALES = ['mando', 'contenido'], SOCIOS_NUCLEO = ['billetera', 'orbita', 'estaciona'];
   try { const rf = new URLSearchParams(location.search).get('ref'); if (rf && /^[A-Za-z0-9]{4,12}$/.test(rf)) localStorage.setItem('cfx-ref', rf.toUpperCase()); } catch (e) { /* nada */ }
   async function refRegistrar() {
@@ -1082,7 +1082,11 @@
     Object.assign(CFG, o);
     // G34 · 🧭 Panel universal: las apps con su panel ya en el Centro de Mando no se usan como administrador (public.admin_email()):
     // el admin que entra va directo al CM (su usuario y clave siguen sirviendo allí). Socios, negocios y clientes, normal.
-    if (CFG.admin && !CFG.socio && PANEL_EN_CM.includes(APP)) { location.replace(panelCM()); return; }
+    if (CFG.admin && !CFG.socio && PANEL_EN_CM.includes(APP)) {
+      // Socios del núcleo (cfx_socios) entran como admin en algunas apps: se confirma en la base antes de mandarlos al CM (ellos siguen en su panel).
+      if (!SOCIOS_NUCLEO.includes(APP)) { location.replace(panelCM()); return; }
+      R('cfx_es_socio').then((s) => { if (!s) location.replace(panelCM()); }).catch(() => { /* base sin socios: se queda */ });
+    }
     contarAvisos();
     if (!CFG.foto && !(window.CFX_PERFIL_APP || {}).foto) CFG.foto = lsL(fotoKey()) || null;  // foto guardada por BASE (este celular)
     try { if (!sessionStorage.getItem('cfx-inicio')) sessionStorage.setItem('cfx-inicio', location.pathname + location.search); } catch (e) { /* nada */ }
