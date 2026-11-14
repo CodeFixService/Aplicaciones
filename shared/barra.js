@@ -328,11 +328,11 @@
   const pzEnPantalla = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); return r.bottom > 60 && r.top < innerHeight - 90 && r.width > 40; };
   let pzOn = false, pzUlt = 0; const pzHecho = new Set();
   const pzCss = document.createElement('style');
-  pzCss.textContent = '.cfx-pz{position:fixed;z-index:2147482000;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);box-sizing:border-box;' +
-    'padding:9px 14px;border-radius:999px;background:rgba(15,23,42,.92);color:#fff;font:600 13.5px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3);' +
-    'pointer-events:none;animation:cfxPzIn .3s ease}.cfx-pz span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-pz-m{font-size:20px;flex:none;display:inline-block}' +
+  pzCss.textContent = '.cfx-pz{position:fixed;z-index:2147482000;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));margin:0 auto;max-width:520px;display:flex;align-items:center;gap:8px;box-sizing:border-box;' +
+    'padding:8px 14px;border-radius:16px;background:rgba(15,23,42,.92);color:#fff;font:600 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3);' +
+    'pointer-events:none;animation:cfxPzIn .3s ease}.cfx-pz span:last-child{min-width:0;flex:1;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.cfx-pz-m{font-size:20px;flex:none;display:inline-block}' +
     '.cfx-pz.lado .cfx-pz-m{animation:cfxPzLado 1.1s ease-in-out infinite}.cfx-pz.izq .cfx-pz-m{animation:cfxPzIzq 1.1s ease-in-out infinite}.cfx-pz.arriba .cfx-pz-m{animation:cfxPzArr 1.1s ease-in-out infinite}' +
-    '@keyframes cfxPzIn{from{opacity:0;transform:translate(-50%,8px)}}@keyframes cfxPzLado{0%,100%{transform:translateX(-10px)}50%{transform:translateX(10px)}}' +
+    '@keyframes cfxPzIn{from{opacity:0;transform:translateY(8px)}}@keyframes cfxPzLado{0%,100%{transform:translateX(-10px)}50%{transform:translateX(10px)}}' +
     '@keyframes cfxPzIzq{0%{transform:translateX(10px)}60%,100%{transform:translateX(-14px);opacity:.4}}@keyframes cfxPzArr{0%{transform:translateY(8px)}60%,100%{transform:translateY(-10px);opacity:.4}}' +
     '@keyframes cfxPista{0%,100%{transform:none}35%,60%{transform:translateX(-42px)}}.cfx-pista{animation:cfxPista 1.1s cubic-bezier(.2,.8,.2,1)}' +
     '@keyframes cfxPzPan{0%,100%{transform:none}30%,55%{transform:translateX(-26px)}}.cfx-pz-pan{animation:cfxPzPan 1.2s cubic-bezier(.2,.8,.2,1)}' +
@@ -348,8 +348,8 @@
     p.className = 'cfx-pz ' + (m || 'lado'); p.setAttribute('role', 'status');
     p.innerHTML = '<span class="cfx-pz-m" aria-hidden="true">' + (m === 'arriba' ? '👆' : '👉') + '</span><span></span>';
     p.lastChild.textContent = t;
-    const arriba = r.top > 120 ? r.top - 52 : Math.min(innerHeight - 140, r.bottom + 10);
-    p.style.top = Math.max(70, arriba) + 'px';
+    // Siempre abajo, sobre la barra (o más arriba si el elemento señalado está ahí abajo): ancho completo, letra chica y hasta 2 líneas.
+    if (r.bottom > innerHeight - 150) p.style.bottom = Math.max(84, innerHeight - r.top + 10) + 'px';
     document.body.appendChild(p);
     if (!pzQuieto() && mover) { try { mover(); } catch (e) { /* nada */ } }
     const fuera = () => { removeEventListener('pointerdown', fuera, true); p.remove(); pzOn = false; pzUlt = Date.now(); };

@@ -155,7 +155,7 @@
     } catch (err) { Core.toast(err.message); }
   };
   $('bCancelar').onclick = async () => {
-    if (!confirm('¿Cancelar tu pedido?')) return;
+    if (!await Core.confirmar('¿Cancelar tu pedido?')) return;
     try {
       const r = await Cuenta.rpc('cancelar_pedido', { p_ref: tk });
       if (!r.ok) throw new Error(r.error);

@@ -131,7 +131,7 @@
     .sort((a, b) => b.s - a.s).slice(0, 4).map((o) => o.x);
   async function compartir(title, url) {
     try { if (navigator.share) return await navigator.share({ title, url }); } catch (e) { return; }
-    try { await navigator.clipboard.writeText(url); if (window.Core) Core.toast('🔗 Link copiado'); } catch (e) { prompt('Copia el link', url); }
+    try { await navigator.clipboard.writeText(url); if (window.Core) Core.toast('🔗 Link copiado'); } catch (e) { if (window.CFX_DIALOGO) CFX_DIALOGO.pedir('Copia el link', url, { si: 'Cerrar' }); else prompt('Copia el link', url); }
   }
   function ficha(it, H) {
     const s = it.querySelector('select[data-opc]'), add = it.querySelector('[data-add]');

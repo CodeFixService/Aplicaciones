@@ -921,7 +921,7 @@
   }
   $('mpBody').onclick = async (e) => {
     const a = e.target.dataset.mp;
-    if (!a || (a === 'quitar' && !confirm('¿Desconectar Mercado Pago? Tus pedidos volverán al link y comprobante.'))) return;
+    if (!a || (a === 'quitar' && !await Core.confirmar('¿Desconectar Mercado Pago? Tus pedidos volverán al link y comprobante.'))) return;
     e.target.disabled = true;
     try {
       await Cuenta.rpc('mp_guardar', a === 'quitar' ? { p_token: null, p_activo: null } : { p_token: $('mpTok').value, p_activo: $('mpOn') ? $('mpOn').checked : true });
@@ -951,7 +951,7 @@
   $('boletaBody').onchange = (e) => { if (e.target.name === 'bModo') $('bOf').classList.toggle('hidden', e.target.value !== 'openfactura'); };
   $('boletaBody').onclick = async (e) => {
     const a = e.target.dataset.bo;
-    if (!a || (a === 'quitar' && !confirm('¿Quitar tus datos de boleta? Las boletas ya entregadas no cambian.'))) return;
+    if (!a || (a === 'quitar' && !await Core.confirmar('¿Quitar tus datos de boleta? Las boletas ya entregadas no cambian.'))) return;
     e.target.disabled = true;
     try {
       await Cuenta.rpc('boleta_guardar', { p: a === 'quitar' ? null : { modo: document.querySelector('[name=bModo]:checked').value, rut: $('bRut').value, razon: $('bRazon').value,
@@ -1097,8 +1097,8 @@
       } catch (err) { Core.toast(err.message); b.disabled = false; }
       return;
     }
-    if (a === 'quitar' && !confirm('¿Quitar los avisos a tu sistema? Dejarán de llegar los pedidos a esa URL.')) return;
-    if (a === 'secreto' && !confirm('¿Crear un secreto nuevo? El anterior deja de servir al tiro: cámbialo también en tu sistema.')) return;
+    if (a === 'quitar' && !await Core.confirmar('¿Quitar los avisos a tu sistema? Dejarán de llegar los pedidos a esa URL.')) return;
+    if (a === 'secreto' && !await Core.confirmar('¿Crear un secreto nuevo? El anterior deja de servir al tiro: cámbialo también en tu sistema.')) return;
     b.disabled = true;
     try {
       if (a === 'probar') {
@@ -1152,7 +1152,7 @@
   };
   $('eqL').onclick = async (e) => {
     const id = e.target.dataset.q;
-    if (!id || !confirm('¿Quitar a esta persona de tu equipo? Se borra su cuenta.')) return;
+    if (!id || !await Core.confirmar('¿Quitar a esta persona de tu equipo? Se borra su cuenta.')) return;
     try { await Cuenta.rpc('quitar_equipo', { p_id: id }); Core.toast('Quitado del equipo'); cargarEquipo(); } catch (err) { Core.toast(err.message); }
   };
 
@@ -1204,7 +1204,7 @@
     } catch (e) { Core.toast('⚠️ ' + e.message); }
   };
   $('bCorreoX').onclick = async () => {
-    if (!confirm('¿Quitar tu correo? Tus clientes dejarán de recibir correos (las notificaciones siguen).')) return;
+    if (!await Core.confirmar('¿Quitar tu correo? Tus clientes dejarán de recibir correos (las notificaciones siguen).')) return;
     try { await Cuenta.rpc('mi_correo_quitar'); Core.toast('Correo quitado'); cargarCorreo(); } catch (e) { Core.toast('⚠️ ' + e.message); }
   };
   $('tRubro').innerHTML += Core.RUBROS.map(([i, n]) => '<option value="' + Core.esc(n) + '">' + i + ' ' + Core.esc(n) + '</option>').join('');
@@ -1294,7 +1294,7 @@
   // 🧹 Limpiar: quedan ocultos los avisos anteriores; solo se ven los que lleguen después.
   const limpiosDesde = () => { const a = Cuenta.account; return a && a.avisos_limpios_at ? new Date(a.avisos_limpios_at) : null; };
   $('bLimpiarAvisos').onclick = async () => {
-    if (!confirm('¿Limpiar tus avisos? Solo verás los que lleguen desde ahora.')) return;
+    if (!await Core.confirmar('¿Limpiar tus avisos? Solo verás los que lleguen desde ahora.')) return;
     if (window.CFX_ANIM) await window.CFX_ANIM.salirTodos();
     try {
       const t = await Cuenta.rpc('limpiar_mis_avisos');

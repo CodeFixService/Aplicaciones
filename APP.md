@@ -32,7 +32,7 @@ Tienda online + caja + pedidos para pymes chilenas. Free / Pro / 🧩 módulos (
 profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, boleta_cuentas, boletas_caja, calificaciones, sellos, avisos_stock, publicaciones, publicacion_vistas, subscribers, user_invites, requests, conexiones, webhooks, webhook_envios, negocio_correo, notifications, notification_reads, push_subscriptions, planes, textos, app_settings, app_secrets, actividad_dia.
 
 ## Versiones
-core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.24 · bd 5.51 · enviar 3.5.
+core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.25 · bd 5.52 · enviar 3.5.
 
 ## ✉️ Correo (G42f, 6.19 · bd 5.50 · enviar 3.5)
 - CodeFix → negocios/todos: Gmail de Josué (app_secrets gmail_*), se pone en CM → Control → ✉️ Correo.
@@ -44,3 +44,4 @@ core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()`
 - ✅ G42e (núcleo 2.78, 6.24): utilidades Bootstrap 5.3.8 con los colores de la tienda (--bs-* → --cfx-*), claro/oscuro y Colores a tu gusto. El diseño galáctico es solo del CM.
 - ✅ G48 (núcleo 2.77): ✋ secciones del Más se mueven completas desde su título (también en el celular); 🎨 Mi perfil → Color y modo → Colores a tu gusto (fondo, texto, íconos y +).
 - ✅ G42 (núcleo 2.75): ⬆️ 🪟 📌 ✋ activos (Más → secciones y opciones se ordenan manteniendo presionado); 🔐 aviso de enlace tapado; links de boleta/pago con CFX_URL.
+- ✅ Núcleo 2.79 (6.25): 💬 avisos propios: usar SIEMPRE `await Core.confirmar(texto)` / `await Core.pedir(texto, valor)` (nunca confirm/prompt de Chrome); pistas Desliza enteras; ▶️ SVG.

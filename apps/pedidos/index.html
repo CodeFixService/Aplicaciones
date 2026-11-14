@@ -302,7 +302,7 @@
           : r && r.estado === 'pagando' ? '🔁 Rechazado: el pedido sigue apartado para que suba otro comprobante' : 'Comprobante rechazado: pedido cerrado');
       }
       if (b.dataset.e) {
-        if (b.dataset.e === 'cancelado' && !confirm('¿Cancelar este pedido? Se le avisará al cliente.')) return;
+        if (b.dataset.e === 'cancelado' && !await Core.confirmar('¿Cancelar este pedido? Se le avisará al cliente.')) return;
         await Cuenta.rpc('actualizar_pedido', { p_id: b.dataset.id, p_estado: b.dataset.e });
         Core.toast('Pedido: ' + ESTADOS[b.dataset.e]);
       }
@@ -313,7 +313,7 @@
           if (!r.ok) throw new Error(r.error);
           Core.toast('🧾 Boleta N° ' + r.folio + ' emitida');
         } else {
-          const f = prompt('Emite la boleta en sii.cl (Boleta electrónica) y escribe aquí su folio (N°):');
+          const f = await Core.pedir('Emite la boleta en sii.cl (Boleta electrónica) y escribe aquí su folio (N°):');
           if (!f) return;
           await Cuenta.rpc('boleta_anotar', { p_id: b.dataset.bol, p_folio: f });
           Core.toast('🧾 Boleta anotada: le avisamos al cliente');
@@ -325,9 +325,9 @@
         const C = [['starken', 'Starken'], ['chilexpress', 'Chilexpress'], ['blue', 'Blue Express'], ['correos', 'Correos de Chile'], ['propio', 'Reparto propio'], ['otro', 'Otro courier (con link)']];
         const n = await Core.elegir('¿Con qué courier lo envías?', C.map((x) => x[1]));
         const c = n && C.find((x) => x[1] === n); if (!c) return;
-        const cod = c[0] === 'propio' ? '' : prompt('Código de seguimiento (número de envío):', '');
+        const cod = c[0] === 'propio' ? '' : await Core.pedir('Código de seguimiento (número de envío):', '');
         if (cod === null) return;
-        const link = c[0] === 'otro' ? prompt('Link para seguir el envío (https://…):', '') : null;
+        const link = c[0] === 'otro' ? await Core.pedir('Link para seguir el envío (https://…):', '') : null;
         if (link === null && c[0] === 'otro') return;
         await Cuenta.rpc('pedido_seguimiento', { p_id: b.dataset.env, p_courier: c[0], p_codigo: cod || null, p_link: link || null });
         Cuenta.sb.functions.invoke('enviar').catch(() => {});
@@ -356,6 +356,10 @@
     } catch (e) { $('cupones').innerHTML = '<li class="empty">⚠️ ' + Core.esc(e.message) + '</li>'; }
   }
   $('bCupon').onclick = async () => {
+    // Se revisa aquí antes de ir al servidor (antes salía un error 400 al tocar Guardar vacío).
+    const cod = $('cCodigo').value.trim(), pct = parseInt($('cPct').value, 10);
+    if (!/^[a-z0-9]{3,20}$/i.test(cod)) { $('cCodigo').focus(); return Core.toast('🎟️ Escribe un código de 3 a 20 letras o números (ej: VERANO10)'); }
+    if (!(pct >= 1 && pct <= 90)) { $('cPct').focus(); return Core.toast('🎟️ El descuento va de 1 a 90 %'); }
     try {
       await Cuenta.rpc('cfx_desc_guardar', { p_codigo: $('cCodigo').value, p_porcentaje: parseInt($('cPct').value, 10), p_hasta: $('cHasta').value || null });
       $('cCodigo').value = ''; $('cPct').value = ''; $('cHasta').value = '';
@@ -392,7 +396,7 @@
   };
   $('cupones').onclick = async (e) => {
     const id = e.target.dataset.c;
-    if (!id || !confirm('¿Eliminar este cupón?')) return;
+    if (!id || !await Core.confirmar('¿Eliminar este cupón?')) return;
     await Cuenta.rpc('cfx_desc_borrar', { p_id: id }).catch(() => {});
     cargarCupones();
   };

@@ -92,6 +92,7 @@
     sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     contraste: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
     pausa: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
+    play: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z"/>',
     mundo: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
     ayuda: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
     salvavidas: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/>',
@@ -155,7 +156,7 @@
   asignar('🗺', 'mapa'); asignar('🧭', 'brujula'); asignar('🛡', 'escudo'); asignar('🏆 🥇', 'trofeo', 'oro'); asignar('🚩 🏁', 'bandera');
   asignar('🖼', 'imagen'); asignar('🩺', 'pulso'); asignar('🚗 🚙 🚕 🛻 🏍 🛵', 'auto'); asignar('♾', 'infinito'); asignar('📎', 'clip');
   asignar('☁', 'nube'); asignar('📧 ✉ 📩', 'correo'); asignar('🪪 📇', 'carnet'); asignar('🌙', 'luna'); asignar('☀', 'sol'); asignar('🌓', 'contraste');
-  asignar('⏸', 'pausa'); asignar('🌐 📡 🛰', 'mundo'); asignar('❓', 'ayuda'); asignar('🛟', 'salvavidas'); asignar('🗄 💻', 'servidor');
+  asignar('⏸', 'pausa'); asignar('▶ ⏯', 'play'); asignar('🌐 📡 🛰', 'mundo'); asignar('❓', 'ayuda'); asignar('🛟', 'salvavidas'); asignar('🗄 💻', 'servidor');
   asignar('🖥', 'pantalla'); asignar('👑', 'corona', 'oro'); asignar('🧮', 'calculadora'); asignar('🖨', 'impresora'); asignar('📞 ☎', 'telefono');
   asignar('↗', 'flecha'); asignar('👋 ✋ 🖐 🙌 🙏 👏', 'mano'); asignar('💪', 'musculo'); asignar('🟢', 'punto', 'verde'); asignar('🔴', 'punto', 'rojo');
   asignar('🟡 🟠', 'punto', 'ambar'); asignar('🔵', 'punto', 'azul'); asignar('⚪', 'punto', 'gris');

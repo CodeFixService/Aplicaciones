@@ -452,7 +452,8 @@
       const b = ev.target.closest('[data-b]');
       if (b) { const x = avL[+b.dataset.b]; avL = avL.filter((y) => y !== x); try { await A.borrar(x.id); } catch (e) { /* se reintenta al abrir */ } return pintar(); }
       if (ev.target.closest('.cfx-av-todos')) {
-        if (!confirm('¿Borrar todos tus avisos? Solo verás los que lleguen desde ahora.')) return;
+        const T = '¿Borrar todos tus avisos? Solo verás los que lleguen desde ahora.';
+        if (!(await (window.CFX_DIALOGO ? CFX_DIALOGO.confirmar(T, { si: 'Borrar' }) : confirm(T)))) return;
         await salirTodos(); try { await A.limpiar(); avL = []; } catch (e) { aviso((e && e.message) || 'No se pudo borrar.'); } return pintar();
       }
       const f = ev.target.closest('.cfx-av-f'); if (f) unAviso(+f.dataset.i, pintar);
@@ -551,7 +552,10 @@
     const quitar = () => document.querySelectorAll('.cfx-cuenta-g').forEach((x) => x.remove());
     const on = document.querySelector('nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current]');
     const MAS = /^(más|mas|ajustes|cuenta|perfil)$/i;
-    if (!(on && MAS.test((on.getAttribute('aria-label') || on.textContent || '').replace(/[0-9+]/g, '').trim())) && !MAS.test(location.hash.replace(/^#\/?/, '').split(/[/?]/)[0])) return quitar();
+    const h = location.hash.replace(/^#\/?/, '').split(/[/?]/)[0];
+    // G52c: si la dirección nombra OTRA pantalla (ej. #clientes abierta desde Más), no va: antes salía abajo de Clientes en Barbería.
+    if (h && !MAS.test(h) && document.getElementById('v-' + h)) return quitar();
+    if (!(on && MAS.test((on.getAttribute('aria-label') || on.textContent || '').replace(/[0-9+]/g, '').trim())) && !MAS.test(h)) return quitar();
     // Si la pantalla ya tiene el menú común (CFX_MENU), "Cuenta y ayuda" ya viene adentro.
     if ([...document.querySelectorAll('.cfx-mmas')].some(vis)) return quitar();
     const gs = [...document.querySelectorAll('.cfx-grilla')].filter(vis);

@@ -216,3 +216,62 @@
   window.CFX_SUBIR = { revisar };
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', () => { revisarListas(); fijar(); }); else { revisarListas(); fijar(); }
 })();
+
+/* G52b 💬 Avisos propios en vez de los de Chrome (confirm / prompt / alert): misma tarjeta, colores y letra de la app; solo cambia el texto.
+   API (todas devuelven una promesa):  CFX_DIALOGO.confirmar(texto, { si, no, peligro }) → true/false
+        CFX_DIALOGO.pedir(texto, valor, { tipo, si }) → texto escrito o null       CFX_DIALOGO.avisar(texto) → al cerrar
+   window.alert queda reemplazado (no bloquea). confirm/prompt de Chrome NO se reemplazan solos (son síncronos): usar estas funciones con await. */
+(function () {
+  'use strict';
+  if (window.CFX_DIALOGO) return;
+  const d = document;
+  const PELIGRO = /eliminar|borrar|quitar|anular|bloquear|vaciar|reemplazar|desconectar|cancelar (este|tu|el) |limpiar/i;
+  let css = null;
+  function estilo() {
+    if (css) return; css = d.createElement('style');
+    css.textContent = '.cfx-dlg{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom);background:rgba(8,12,24,.55);' +
+      'backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);font-family:var(--cfx-letra,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);animation:cfxDlgF .16s ease both}' +
+      '.cfx-dlg-c{box-sizing:border-box;width:100%;max-width:520px;margin:0 auto;padding:18px 16px 16px;border-radius:20px 20px 0 0;background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);' +
+      'border:1px solid var(--cfx-borde,#dce3ea);border-bottom:0;box-shadow:0 -12px 40px -12px rgba(0,0,0,.45);animation:cfxDlgS .2s cubic-bezier(.2,.8,.2,1) both}' +
+      '.cfx-dlg-t{margin:0 0 14px;font-size:16px;line-height:1.4;font-weight:600;white-space:pre-line;overflow-wrap:anywhere}' +
+      '.cfx-dlg-i{box-sizing:border-box;width:100%;margin:0 0 14px;padding:12px;border-radius:12px;border:1.5px solid var(--cfx-borde,#dce3ea);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;font-size:16px}' +
+      '.cfx-dlg-i:focus{outline:2px solid var(--brand,#2563eb);outline-offset:0}.cfx-dlg-b{display:flex;gap:10px}' +
+      '.cfx-dlg-b button{flex:1;min-height:46px;border-radius:14px;border:0;font:inherit;font-weight:700;font-size:15px;cursor:pointer}' +
+      '.cfx-dlg-no{background:var(--cfx-campo,#f1f4f7);color:var(--cfx-texto,#111827);border:1px solid var(--cfx-borde,#dce3ea)!important}' +
+      '.cfx-dlg-si{background:var(--brand,#2563eb);color:var(--brand-ink,#fff)}.cfx-dlg-si.peligro{background:var(--cfx-rojo,#dc2626);color:#fff}' +
+      '@keyframes cfxDlgF{from{opacity:0}}@keyframes cfxDlgS{from{transform:translateY(24px);opacity:.6}}' +
+      '@media (min-width:700px){.cfx-dlg{align-items:center}.cfx-dlg-c{border-radius:20px;border-bottom:1px solid var(--cfx-borde,#dce3ea)}}' +
+      '@media (prefers-reduced-motion:reduce){.cfx-dlg,.cfx-dlg-c{animation:none}}';
+    (d.head || d.documentElement).appendChild(css);
+  }
+  function abrir(texto, o) {
+    estilo();
+    return new Promise((fin) => {
+      const antes = d.activeElement, v = d.createElement('div');
+      v.className = 'cfx-dlg'; v.setAttribute('role', 'presentation');
+      const c = d.createElement('div'); c.className = 'cfx-dlg-c'; c.setAttribute('role', o.input ? 'dialog' : 'alertdialog'); c.setAttribute('aria-modal', 'true');
+      const t = d.createElement('p'); t.className = 'cfx-dlg-t'; t.id = 'cfxDlgT' + Date.now(); t.textContent = String(texto == null ? '' : texto); c.setAttribute('aria-labelledby', t.id); c.appendChild(t);
+      let inp = null;
+      if (o.input) { inp = d.createElement('input'); inp.className = 'cfx-dlg-i'; inp.type = o.tipo || 'text'; inp.value = o.valor == null ? '' : String(o.valor); if (o.tipo === 'number') inp.inputMode = 'decimal'; c.appendChild(inp); }
+      const b = d.createElement('div'); b.className = 'cfx-dlg-b';
+      const si = d.createElement('button'); si.type = 'button'; si.className = 'cfx-dlg-si' + (o.peligro ? ' peligro' : ''); si.textContent = o.si || 'Aceptar';
+      if (o.no !== false) { const no = d.createElement('button'); no.type = 'button'; no.className = 'cfx-dlg-no'; no.textContent = o.no || 'Cancelar'; no.onclick = () => cerrar(o.vacio); b.appendChild(no); }
+      b.appendChild(si); c.appendChild(b); v.appendChild(c);
+      function cerrar(r) { d.removeEventListener('keydown', tecla, true); v.remove(); try { if (antes && antes.focus) antes.focus({ preventScroll: true }); } catch (e) { /* nada */ } fin(r); }
+      function tecla(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(o.vacio); } else if (e.key === 'Enter' && (inp ? d.activeElement === inp : true)) { e.preventDefault(); si.click(); } }
+      si.onclick = () => cerrar(inp ? inp.value : o.lleno);
+      v.addEventListener('click', (e) => { if (e.target === v) cerrar(o.vacio); });
+      d.addEventListener('keydown', tecla, true);
+      d.body.appendChild(v);
+      setTimeout(() => { if (inp) { inp.focus(); inp.select(); } else si.focus(); }, 30);
+    });
+  }
+  // El botón rojo dice la acción ("Eliminar", "Quitar"…), no "Aceptar".
+  const verbo = (t) => { const m = String(t).match(PELIGRO); if (!m) return null; const v = m[0].trim().split(' ')[0].toLowerCase(); return v === 'cancelar' ? 'Sí, cancelar' : v[0].toUpperCase() + v.slice(1); };
+  const confirmar = (texto, o = {}) => { const pel = o.peligro != null ? o.peligro : PELIGRO.test(String(texto));
+    return abrir(texto, { si: o.si || (pel && verbo(texto)) || undefined, no: o.no || (pel ? 'No' : undefined), peligro: pel, vacio: false, lleno: true }); };
+  const pedir = (texto, valor, o = {}) => abrir(texto, { input: true, valor, tipo: o.tipo, si: o.si || 'Listo', vacio: null });
+  const avisar = (texto, o = {}) => abrir(texto, { si: o.si || 'Entendido', no: false, vacio: undefined, lleno: undefined });
+  window.CFX_DIALOGO = { confirmar, pedir, avisar };
+  window.alert = (t) => { avisar(t); };
+})();

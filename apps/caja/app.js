@@ -311,13 +311,13 @@
     if (v.boleta && v.boleta.folio) return comprobante(id);
     if (!BOL.conectado) {
       if (equipo) return Core.toast('Pídele al dueño completar Ajustes → 🧾 Boletas');
-      if (confirm('Para dar boleta SII, primero completa tus datos en Ajustes → 🧾 Boletas. ¿Ir ahora?')) location.href = '../../#boleta';
+      if (await Core.confirmar('Para dar boleta SII, primero completa tus datos en Ajustes → 🧾 Boletas. ¿Ir ahora?')) location.href = '../../#boleta';
       return;
     }
     const items = v.items.map((l) => ({ nombre: l.nombre, cant: l.cant, precio: l.precio }));
     let folio = null;
     if (BOL.modo !== 'openfactura') {
-      folio = prompt('Emite la boleta gratis en sii.cl (Boleta electrónica) por ' + money(items.reduce((s, l) => s + l.precio * l.cant, 0)) + ' y escribe aquí su N° (folio):');
+      folio = await Core.pedir('Emite la boleta gratis en sii.cl (Boleta electrónica) por ' + money(items.reduce((s, l) => s + l.precio * l.cant, 0)) + ' y escribe aquí su N° (folio):');
       if (!folio) return;
     }
     if (btn) btn.disabled = true;
@@ -379,7 +379,7 @@
     const b = e.target.closest('[data-inv]');
     if (!b) return;
     const p = productos.find((x) => x.id === b.dataset.inv), o = b.dataset.op || '';
-    const t = prompt('¿Cuántas unidades entraron de ' + p.nombre + (o ? ' (' + o + ')' : '') + '?\n(Para restar, escribe con signo menos: -2)', '');
+    const t = await Core.pedir('¿Cuántas unidades entraron de ' + p.nombre + (o ? ' (' + o + ')' : '') + '?\n(Para restar, escribe con signo menos: -2)', '');
     const n = parseInt(t, 10);
     if (!t || isNaN(n) || !n) return;
     const v = o && varDe(p, o);
@@ -680,7 +680,7 @@
       renderLista();
       scrollTo(0, 0);
     }
-    if (a === 'del' && confirm('¿Eliminar ' + p.nombre + '?')) {
+    if (a === 'del' && await Core.confirmar('¿Eliminar ' + p.nombre + '?')) {
       if (p.publicado) await sincronizar(p, true);
       productos = productos.filter((x) => x.id !== id);
       guardarProductos(); renderLista(); renderProds();
@@ -743,13 +743,13 @@
       '<button class="small danger" data-id="' + v.id + '" aria-label="Anular venta">✕</button></li>'
     ).join('') : '<li class="empty">Sin ventas en este período</li>';
   }
-  $('r-lista').onclick = (e) => {
+  $('r-lista').onclick = async (e) => {
     const c = e.target.closest('[data-comp]');
     if (c) return comprobante(c.dataset.comp);
     const bo = e.target.closest('[data-bol]');
     if (bo) return boletaVenta(bo.dataset.bol, bo);
     const id = e.target.dataset.id;
-    if (!id || !confirm('¿Anular esta venta?')) return;
+    if (!id || !await Core.confirmar('¿Anular esta venta?')) return;
     ventas = ventas.filter((v) => v.id !== id);
     db.set('ventas', ventas); renderReporte();
   };
@@ -766,14 +766,14 @@
   $('bNube').onclick = async () => {
     if (!pro) return soloPro('El respaldo en la nube');
     const sb = Cuenta.sb, path = cuenta.id + '/caja.json';
-    if (confirm('Aceptar = guardar en la nube.\nCancelar = recuperar desde la nube.')) {
+    if (await Core.confirmar('☁️ ¿Qué quieres hacer con tus datos en la nube?', { si: '⬆️ Guardar en la nube', no: '⬇️ Recuperar', peligro: false })) {
       const blob = new Blob([JSON.stringify({ datos: db.dump() })], { type: 'application/json' });
       const { error } = await sb.storage.from('respaldos').upload(path, blob, { upsert: true, contentType: 'application/json' });
       Core.toast(error ? 'No se pudo guardar: ' + error.message : '☁️ Respaldo guardado');
     } else {
       const { data, error } = await sb.storage.from('respaldos').download(path);
       if (error) return Core.toast('No hay respaldo en la nube');
-      if (!confirm('¿Reemplazar los datos de este celular por los de la nube?')) return;
+      if (!await Core.confirmar('¿Reemplazar los datos de este celular por los de la nube?')) return;
       db.load(JSON.parse(await data.text()).datos);
       location.reload();
     }
@@ -851,9 +851,9 @@
     db.set('gastos', gastos); $('gConcepto').value = ''; $('gMonto').value = '';
     renderFinanzas(); Core.toast('Gasto agregado');
   };
-  $('fGastos').onclick = (e) => {
+  $('fGastos').onclick = async (e) => {
     const id = e.target.dataset.g;
-    if (!id || !confirm('¿Eliminar este gasto?')) return;
+    if (!id || !await Core.confirmar('¿Eliminar este gasto?')) return;
     gastos = gastos.filter((g) => g.id !== id); db.set('gastos', gastos); renderFinanzas();
   };
   $('bFinCSV').onclick = () => {

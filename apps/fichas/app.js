@@ -518,7 +518,7 @@
       '<button class="small danger" data-a="del" data-id="' + f.id + '">✕</button></figcaption></figure>'
     ).join('');
   }
-  $('gal').onclick = (e) => {
+  $('gal').onclick = async (e) => {
     const { a, id } = e.target.dataset;
     if (!a) return;
     const f = fichas.find((x) => x.id === id);
@@ -527,7 +527,7 @@
       editId = a === 'edit' ? id : null;
       fillForm(); changed(); show('disenar');
     }
-    if (a === 'del' && confirm('¿Eliminar este diseño?')) {
+    if (a === 'del' && await Core.confirmar('¿Eliminar este diseño?')) {
       fichas = fichas.filter((x) => x.id !== id);
       if (editId === id) editId = null;
       db.set('fichas', fichas); renderGaleria();
@@ -651,16 +651,16 @@
   }
   $('clientes').onclick = async (e) => {
     const { a, id } = e.target.dataset;
-    if (a === 'del' && confirm('¿Eliminar este contacto de WhatsApp?')) {
+    if (a === 'del' && await Core.confirmar('¿Eliminar este contacto de WhatsApp?')) {
       clientes = clientes.filter((c) => c.id !== id);
       db.set('clientes', clientes); renderClientes();
     }
     if (a === 'edit') {
       const c = todos().find((x) => x.id === id);
       if (!c) return;
-      const tel = prompt('WhatsApp de ' + c.nombre + ' (con código de país, vacío = sin WhatsApp):', c.tel);
+      const tel = await Core.pedir('WhatsApp de ' + c.nombre + ' (con código de país, vacío = sin WhatsApp):', c.tel);
       if (tel === null) return;
-      const tag = prompt('Etiqueta (opcional):', c.tag);
+      const tag = await Core.pedir('Etiqueta (opcional):', c.tag);
       try {
         if (normTel(tel) !== c.tel) await Cuenta.rpc('set_client_phone', { p_email: c.email, p_tel: normTel(tel) });
         if (tag !== null) { tagsApp[id] = tag.trim().toLowerCase(); db.set('tagsApp', tagsApp); }
@@ -776,9 +776,9 @@
     return n.id;
   }
 
-  $('campanas').onclick = (e) => {
+  $('campanas').onclick = async (e) => {
     const { a, id } = e.target.dataset;
-    if (a === 'del' && confirm('¿Eliminar campaña? También se quita de Ofertas de tus clientes.')) {
+    if (a === 'del' && await Core.confirmar('¿Eliminar campaña? También se quita de Ofertas de tus clientes.')) {
       const k = campanas.find((x) => x.id === id);
       if (k && k.notifId) Cuenta.rpc('cancel_notification', { p_id: k.notifId }).catch(() => {});
       campanas = campanas.filter((k) => k.id !== id);
@@ -933,7 +933,7 @@
   }
   $('subsLista').onclick = async (e) => {
     const id = e.target.dataset.id;
-    if (!id || !confirm('¿Quitar este suscriptor?')) return;
+    if (!id || !await Core.confirmar('¿Quitar este suscriptor?')) return;
     await sb.from('subscribers').delete().eq('id', id);
     renderSubs();
   };
@@ -982,7 +982,7 @@
   }
   $('bNubeBajar').onclick = async () => {
     if (!licensed()) return soloPro('El respaldo en la nube');
-    if (!confirm('Esto reemplaza los datos de este celular por los de la nube. ¿Seguir?')) return;
+    if (!await Core.confirmar('Esto reemplaza los datos de este celular por los de la nube. ¿Seguir?')) return;
     const { data, error } = await sb.storage.from('respaldos').download(nubePath);
     if (error) return Core.toast('No hay respaldo en la nube todavía');
     const obj = JSON.parse(await data.text());

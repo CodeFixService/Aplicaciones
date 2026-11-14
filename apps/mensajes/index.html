@@ -289,7 +289,7 @@
   $('msgs').onclick = async (e) => {
     const id = e.target.dataset && e.target.dataset.id;
     if (!id || !e.target.classList.contains('rep')) return;
-    const motivo = prompt('¿Por qué reportas este mensaje? (spam, insultos, fraude…)');
+    const motivo = await Core.pedir('¿Por qué reportas este mensaje? (spam, insultos, fraude…)');
     if (motivo === null) return;
     try {
       const r = await Cuenta.rpc('cfx_msg_reportar', { p_mensaje: id, p_motivo: motivo });
@@ -299,14 +299,14 @@
   };
 
   $('bBorrarChat').onclick = async () => {
-    if (!actual || !confirm('¿Borrar toda la conversación con ' + actual.nombre + '? Se borra para los dos.')) return;
+    if (!actual || !await Core.confirmar('¿Borrar toda la conversación con ' + actual.nombre + '? Se borra para los dos.')) return;
     try { await Cuenta.rpc('cfx_msg_borrar', { p_otro: actual.id }); Core.toast('Chat borrado'); actual = null; $('wrap').classList.remove('abierto'); $('cab').classList.add('hidden'); $('comp').classList.add('hidden');
       $('msgs').innerHTML = '<div class="vacio">Elige una conversación o toca <b>＋ Nuevo</b>.</div>'; cargarLista(); }
     catch (err) { Core.toast(err.message); }
   };
   $('bBloquear').onclick = async () => {
     if (!actual) return;
-    if (!bloqueado && !confirm('¿Bloquear a ' + actual.nombre + '? Ninguno de los dos podrá escribir hasta que desbloquees.')) return;
+    if (!bloqueado && !await Core.confirmar('¿Bloquear a ' + actual.nombre + '? Ninguno de los dos podrá escribir hasta que desbloquees.')) return;
     try {
       await Cuenta.rpc('cfx_msg_bloquear', { p_otro: actual.id, p_bloquear: !bloqueado });
       bloqueado = !bloqueado;

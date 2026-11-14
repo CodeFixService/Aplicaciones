@@ -85,7 +85,7 @@
   try { pintarCodigo(await Cuenta.rpc('mi_codigo')); } catch (e) { $('miCodigo').textContent = '⚠️ ' + e.message; }
   $('bCopiar').onclick = () => navigator.clipboard.writeText(codigo).then(() => Core.toast('📋 Código copiado'));
   $('bCambiar').onclick = async () => {
-    if (!confirm('¿Cambiar tu código? El anterior deja de servir (tus contactos actuales se mantienen).')) return;
+    if (!await Core.confirmar('¿Cambiar tu código? El anterior deja de servir (tus contactos actuales se mantienen).')) return;
     try { pintarCodigo(await Cuenta.rpc('cambiar_codigo')); Core.toast('Código nuevo listo'); } catch (e) { Core.toast(e.message); }
   };
 
@@ -128,7 +128,7 @@
     if (!b) return;
     try {
       if (b.dataset.a === 'del') {
-        if (!confirm('¿Eliminar este contacto? Ya no podrán chatear.')) return;
+        if (!await Core.confirmar('¿Eliminar este contacto? Ya no podrán chatear.')) return;
         await Cuenta.rpc('eliminar_conexion', { p_otro: b.dataset.otro });
         Core.toast('Contacto eliminado');
       } else {

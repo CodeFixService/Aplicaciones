@@ -234,6 +234,10 @@
     });
   }
 
+  // G52b: avisos propios (núcleo CFX_DIALOGO) en vez de los de Chrome; si faltara ui.js, cae al de Chrome.
+  const confirmar = (t, o) => (window.CFX_DIALOGO ? CFX_DIALOGO.confirmar(t, o) : Promise.resolve(confirm(t)));
+  const pedir = (t, v, o) => (window.CFX_DIALOGO ? CFX_DIALOGO.pedir(t, v, o) : Promise.resolve(prompt(t, v == null ? '' : v)));
+
   // Elegir con un toque (ej. motivo del rechazo). Devuelve el texto elegido, o null si cierra.
   // "✏️ Otro…" pide escribirlo. opciones: lista de textos.
   function elegir(titulo, opciones, otro) {
@@ -249,7 +253,7 @@
         const b = e.target.closest('button');
         if (e.target === d || (b && b.dataset.x)) return fin(null);
         if (!b) return;
-        if (b.dataset.otro) { const t = prompt(otro, ''); return fin(t && t.trim() ? t.trim() : null); }
+        if (b.dataset.otro) { d.remove(); return pedir(otro, '').then((t) => resolve(t && t.trim() ? t.trim() : null)); }
         fin(opciones[+b.dataset.i]);
       };
       document.body.appendChild(d);
@@ -346,8 +350,8 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '6.24';
-  const DB_VERSION = '5.51'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const APP_VERSION = '6.25';
+  const DB_VERSION = '5.52'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -404,6 +408,6 @@
   global.Core = {
     RUBROS, plantilla, colorRubro, script,
     store, uid, money, precioNum, precioTxt, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, copiar, rootUrl, linkUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
+    backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, confirmar, pedir, copiar, rootUrl, linkUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };
 })(window);

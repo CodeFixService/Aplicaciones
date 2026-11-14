@@ -264,7 +264,7 @@
     if (b && tienda.slug) b.onclick = async () => {
       const url = Core.rootUrl() + 't/?s=' + encodeURIComponent(tienda.slug);
       try { if (navigator.share) return await navigator.share({ title: tienda.empresa, url }); } catch (e) { return; }
-      try { await navigator.clipboard.writeText(url); Core.toast('🔗 Link copiado'); } catch (e) { prompt('Copia el link', url); }
+      try { await navigator.clipboard.writeText(url); Core.toast('🔗 Link copiado'); } catch (e) { Core.pedir('Copia el link', url, { si: 'Cerrar' }); }
     };
     else if (b) b.remove();
   }
@@ -539,7 +539,7 @@
     if (l) { l.cant += Number(d); guardarCarro(); }
   };
   $('bVerCarro').onclick = () => vista('pedidos');
-  $('bVaciar').onclick = () => { if (confirm('¿Vaciar el pedido?')) { carro = []; guardarCarro(); } };
+  $('bVaciar').onclick = async () => { if (await Core.confirmar('¿Vaciar el pedido?')) { carro = []; guardarCarro(); } };
 
   // Retiro o despacho (el despacho tiene costo adicional según la distancia).
   let entrega = 'retiro';
@@ -686,7 +686,7 @@
       }
       if (b.dataset.comp) { compDe = b.dataset.comp; fComp.click(); return; }
       if (b.dataset.can) {
-        if (!confirm('¿Cancelar este pedido?')) return;
+        if (!await Core.confirmar('¿Cancelar este pedido?')) return;
         const r = await Cuenta.rpc('cancelar_pedido', { p_ref: b.dataset.can });
         if (!r.ok) throw new Error(r.error);
         Core.toast(r.devolucion === 'pendiente' ? 'Pedido cancelado: la tienda te devolverá el pago' : r.devolucion === 'sin_devolucion' ? 'Pedido cancelado (fuera de plazo: sin devolución)' : 'Pedido cancelado');

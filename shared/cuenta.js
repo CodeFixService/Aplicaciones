@@ -157,7 +157,7 @@
     clave: (n) => setPassword(n),
     eliminarTexto: 'Se borran tu cuenta, tus mensajes y tus datos del servidor. No se puede deshacer.',
     eliminar: async () => {
-      const v = prompt('Para borrar tu cuenta para siempre escribe ELIMINAR');
+      const v = await Core.pedir('Para borrar tu cuenta para siempre escribe ELIMINAR', '', { si: 'Borrar cuenta' });
       if (String(v || '').trim().toUpperCase() !== 'ELIMINAR') return;
       const uid = account && account.id;
       await rpc('delete_my_account'); await signOut();
