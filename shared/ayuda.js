@@ -139,7 +139,7 @@
     '.cfx-arch-v{flex:none;width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:center;border:1px solid var(--cfx-borde,#e2e7ec);display:block}' +
     // Menú en lista (CFX_AJUSTES / CFX_MENU): filas con ícono, nombre, detalle, dato y ›; igual en las 7 apps.
     '.cfx-aj-w{--pf:var(--brand,var(--marca,#2563eb))}.cfx-aj-g{margin:20px 6px 8px;font:800 12px/1.2 var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472)}' +
-    '.cfx-aj-w>.cfx-aj-g:first-child{margin-top:4px}' +
+    '.cfx-aj-w>.cfx-aj-g:first-child,.cfx-aj-w>.cfx-aj-sec:first-child>.cfx-aj-g{margin-top:4px}' +
     '.cfx-lista{display:flex!important;flex-direction:column;gap:0!important;margin:0 0 6px!important;padding:0!important;border-radius:20px;overflow:hidden;background:var(--cfx-tarjeta,#fff);' +
     'border:1.5px solid color-mix(in srgb,var(--pf) 18%,var(--cfx-borde,#e2e7ec));box-shadow:0 1px 2px rgba(15,23,42,.05),0 8px 24px -12px rgba(15,23,42,.18)}' +
     '.cfx-lista>.cfx-fila{display:flex!important;align-items:center;gap:12px;width:100%!important;min-height:62px!important;margin:0!important;padding:10px 14px!important;border:0!important;border-radius:0!important;' +
@@ -163,6 +163,9 @@
     '.cfx-hm-cab h2{flex:1;min-width:0;margin:0;font:800 18px/1.25 var(--cfx-letra,system-ui,sans-serif);white-space:normal;overflow-wrap:anywhere}' +
     '.cfx-hm-x{flex:none;width:40px!important;height:40px!important;min-height:0!important;padding:0!important;margin:0!important;display:grid!important;place-items:center;border-radius:12px!important;border:1.5px solid var(--cfx-borde,#e2e7ec)!important;background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;cursor:pointer}' +
     '.cfx-hm-zona{overflow:auto;overscroll-behavior:contain;padding:16px 16px calc(28px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}.cfx-hm-zona>.card:first-child,.cfx-hm-zona>.tarjeta:first-child{margin-top:0}' +
+    // G42b 🪟 Ventana principal: ✕ arriba + Cerrar abajo. Subventana: tapa a la principal y muestra ← Volver.
+    '.cfx-hoja-m.cfx-hm-tapada{display:none!important}.cfx-hm-x.cfx-hm-volver{width:auto!important;display:inline-flex!important;align-items:center;gap:4px;padding:0 12px 0 8px!important;font:700 14px/1 var(--cfx-letra,system-ui,sans-serif)!important}.cfx-hm-volver svg{width:18px;height:18px}' +
+    '.cfx-hm-pie{display:flex;justify-content:center;margin:20px 0 0}.cfx-hm-cerrar{min-width:150px!important;min-height:46px!important;margin:0!important;padding:0 22px!important;border-radius:14px!important;border:1.5px solid var(--cfx-borde,#e2e7ec)!important;background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;font:700 15px/1 var(--cfx-letra,system-ui,sans-serif)!important;box-shadow:none!important;cursor:pointer;width:auto!important}' +
     '@media (min-width:700px){.cfx-hoja-m{align-items:center}.cfx-hm-c{border-radius:24px;max-height:86vh}}' +
     '.cfx-reg-b{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.cfx-reg-b button{flex:1 1 180px;min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font:700 14px var(--cfx-letra,system-ui,sans-serif);cursor:pointer}' +
     '.cfx-reg-b .cfx-reg-todo{color:#dc2626}.cfx-reg-f{padding:10px 12px;border-radius:12px;background:var(--cfx-tarjeta,#fff);border:1px solid var(--cfx-borde,#e2e7ec);margin:0 0 8px;overflow-wrap:anywhere}' +
@@ -616,10 +619,22 @@
     rev(); const mo = new MutationObserver(rev); mo.observe(z, { childList: true, subtree: true, characterData: true }); setTimeout(() => mo.disconnect(), 5000);
   }
   const hojas = []; let popPropio = 0;
+  // G42b 🪟 Si ya hay una abierta, la nueva es subventana: la tapa (no se apilan a la vista) y muestra "← Volver" en vez de ✕/Cerrar.
+  const SVG_VOLVER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
   function hoja(titulo, alCerrar) {
-    const d = document.createElement('div'); d.className = 'cfx-hoja-m cfx-pf-w'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
-    d.innerHTML = '<div class="cfx-hm-c"><div class="cfx-hm-cab"><i class="cfx-hm-tir" aria-hidden="true"></i><h2></h2><button type="button" class="cfx-hm-x" aria-label="Cerrar">' + SVG_X + '</button></div><div class="cfx-hm-zona"></div></div>';
+    const padre = hojas[hojas.length - 1] || null;
+    const d = document.createElement('div'); d.className = 'cfx-hoja-m cfx-pf-w' + (padre ? ' cfx-hm-sub' : ''); d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+    d.innerHTML = '<div class="cfx-hm-c"><div class="cfx-hm-cab"><i class="cfx-hm-tir" aria-hidden="true"></i>' +
+      (padre ? '<button type="button" class="cfx-hm-x cfx-hm-volver" aria-label="Volver">' + SVG_VOLVER + '<span>Volver</span></button><h2></h2>'
+        : '<h2></h2><button type="button" class="cfx-hm-x" aria-label="Cerrar">' + SVG_X + '</button>') + '</div><div class="cfx-hm-zona"></div></div>';
     d.querySelector('h2').innerHTML = titulo;
+    if (padre) { d._padre = padre; padre.classList.add('cfx-hm-tapada'); }
+    else {
+      // "Cerrar" abajo: siempre queda al final aunque la app agregue cosas después.
+      const zp = d.querySelector('.cfx-hm-zona'), pie = document.createElement('div'); pie.className = 'cfx-hm-pie';
+      pie.innerHTML = '<button type="button" class="cfx-hm-cerrar">Cerrar</button>'; zp.appendChild(pie);
+      new MutationObserver(() => { if (zp.lastElementChild !== pie) zp.appendChild(pie); }).observe(zp, { childList: true });
+    }
     document.body.appendChild(d); document.documentElement.classList.add('cfx-hoja-on');
     hojas.push(d); d._t = performance.now();
     // El foco va a la hoja (no a la ✕: en algunas apps se veía con un anillo doble apenas se abría).
@@ -631,17 +646,18 @@
     const fuera = (porAtras) => {
       if (ido) return; ido = true;
       const i = hojas.indexOf(d); if (i >= 0) hojas.splice(i, 1);
+      if (d._padre) d._padre.classList.remove('cfx-hm-tapada');
       if (!porAtras) { popPropio++; try { history.back(); } catch (e) { popPropio--; } }
       const c = d.firstChild; c.style.transition = 'transform .18s ease-in'; c.style.transform = 'translateY(105%)';
       d.classList.add('cfx-hm-sale'); setTimeout(() => { d.remove(); if (!hojas.length) document.documentElement.classList.remove('cfx-hoja-on'); }, 170);
       if (alCerrar) alCerrar();
     };
     d._fuera = fuera;
-    d.addEventListener('click', (ev) => { if (ev.target === d || ev.target.closest('.cfx-hm-x')) fuera(); });
+    d.addEventListener('click', (ev) => { if (ev.target === d || ev.target.closest('.cfx-hm-x, .cfx-hm-cerrar')) fuera(); });
     // Deslizar hacia abajo desde la barra de arriba (o desde el contenido si ya está arriba de todo) la cierra.
     const c = d.firstChild, z = d.querySelector('.cfx-hm-zona'); let y0 = null, dy = 0;
     c.addEventListener('pointerdown', (e) => { if (e.target.closest('input, textarea, select') || (!e.target.closest('.cfx-hm-cab') && z.scrollTop > 0)) return; y0 = e.clientY; dy = 0; c.style.transition = 'none'; });
-    c.addEventListener('pointermove', (e) => { if (y0 === null) return; dy = Math.max(0, e.clientY - y0); if (dy > 6) c.style.transform = 'translateY(' + dy + 'px)'; });
+    c.addEventListener('pointermove', (e) => { if (y0 === null) return; if (document.documentElement.classList.contains('cfx-ordenando')) { y0 = null; c.style.transform = ''; return; } dy = Math.max(0, e.clientY - y0); if (dy > 6) c.style.transform = 'translateY(' + dy + 'px)'; });
     const soltar = () => { if (y0 === null) return; y0 = null; c.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)'; if (dy > 110) fuera(); else c.style.transform = ''; };
     c.addEventListener('pointerup', soltar); c.addEventListener('pointercancel', soltar);
     return { zona: z, cerrar: () => fuera(), d };
@@ -676,7 +692,11 @@
       const rep = o.menu && enBarra();
       L.forEach((s) => { if (rep && rep(s)) return; const g = s.grupo || ''; let x = grupos.find((y) => y.g === g); if (!x) grupos.push(x = { g, l: [] }); x.l.push(s); });
       ['Configuración', 'Cuenta y ayuda'].forEach((g) => { const i = grupos.findIndex((x) => x.g === g); if (i >= 0) grupos.push(grupos.splice(i, 1)[0]); });
-      w.innerHTML = (o.arriba || '') + grupos.map((x) => (x.g ? '<div class="cfx-aj-g">' + esc(x.g) + '</div>' : '') + '<div class="cfx-aj cfx-lista">' + x.l.map(fila).join('') + '</div>').join('') + (o.abajo || '');
+      // G42c ✋ Cada sección y cada opción se ordena manteniendo presionado (núcleo ui.js: data-cfx-orden / data-cfx-oi, se guarda por usuario).
+      const ck = 'aj:' + (o.clave || (o.menu ? 'menu' : el.id || 'ajustes'));
+      w.dataset.cfxOrden = ck;
+      w.innerHTML = (o.arriba || '') + grupos.map((x) => '<div class="cfx-aj-sec" data-cfx-oi="' + esc(x.g || '-') + '">' + (x.g ? '<div class="cfx-aj-g">' + esc(x.g) + '</div>' : '') +
+        '<div class="cfx-aj cfx-lista" data-cfx-orden="' + esc(ck + ':' + (x.g || '-')) + '">' + x.l.map(fila).join('') + '</div></div>').join('') + (o.abajo || '');
       w.querySelectorAll('.cfx-aj > [data-k]').forEach((b) => { b.onclick = () => abrir(b.dataset.k); });
       if (o.alPintar) o.alPintar(w);
     };

@@ -74,7 +74,7 @@
   let toque = null;
   d.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button,.btn');
-    if (!b || b.disabled || b.closest('nav,header,.tabs,.cfx-cab,.cfx-hm-cab,.cfx-aj,dialog .cfx-hm-x') || (b.textContent || '').trim().length < 2 || b.offsetWidth < 60) { toque = null; return; }
+    if (!b || b.disabled || b.closest('nav,header,.tabs,.cfx-cab,.cfx-hm-cab,.cfx-hm-pie,.cfx-aj,dialog .cfx-hm-x') || (b.textContent || '').trim().length < 2 || b.offsetWidth < 60) { toque = null; return; }
     toque = { b, t: Date.now(), n: 0, ok: true, timer: 0, fin: 0 };
   }, true);
   const ocupar = (q) => { if (!q.b.isConnected) return; q.b.style.setProperty('--cfx-c', getComputedStyle(q.b).color); q.b.classList.add('cfx-ocupado'); q.b.setAttribute('aria-busy', 'true'); q.fin = setTimeout(() => soltar(q, false), 15000); };

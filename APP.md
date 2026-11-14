@@ -8,3 +8,4 @@
 - La función "enviar" pregunta notif_correo(id) por cada notificación con email (solo el servidor puede).
 
 ## 🧠 Del núcleo: falta aplicar aquí
+- ✅ G42 (núcleo 2.75): ⬆️ 🪟 📌 ✋ activos (Más → secciones y opciones se ordenan manteniendo presionado); 🔐 aviso de enlace tapado; links de boleta/pago con CFX_URL.

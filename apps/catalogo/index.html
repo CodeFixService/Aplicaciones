@@ -639,13 +639,13 @@
       (p.estado === 'en_revision' ? '<p class="muted" style="margin:6px 0 0">🧾 La tienda está revisando tu comprobante.</p>' : '') +
       (p.devolucion === 'pendiente' ? '<p class="muted" style="margin:6px 0 0">💸 La tienda te devolverá el pago.</p>' : '') +
       (p.boleta && p.boleta.folio ? '<p class="muted" style="margin:6px 0 0">🧾 Boleta electrónica N° ' + Core.esc(p.boleta.folio) + (p.boleta.razon ? ' · ' + Core.esc(p.boleta.razon) + ' (' + Core.esc(p.boleta.rut || '') + ')' : '') +
-        (p.boleta.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(p.boleta.url) + '">Ver boleta</a>' : '') + '</p>' : '') +
+        (p.boleta.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.boleta.url)) + '">Ver boleta</a>' : '') + '</p>' : '') +
       (p.estado === 'entregado' && !p.calificado ? '<div style="margin-top:8px"><span class="muted">Califica tu compra: </span><span class="califica">' +
         [1, 2, 3, 4, 5].map((k) => '<button type="button" data-cal="' + p.id + '" data-n="' + k + '" aria-label="' + k + ' estrellas">★</button>').join('') + '</span></div>' : '') +
       '</div><div class="acc" style="display:flex;gap:6px;flex-wrap:wrap">' +
       (p.estado === 'pagando' ? '<button class="small alt" data-monto="' + Math.round(Number(p.total)) + '">📋 Copiar monto</button>' : '') +
       (p.estado === 'pagando' && links[p.id] && links[p.id].mp ? '<button class="small ok" data-mp="' + p.id + '" data-tk="' + Core.esc(links[p.id].tk) + '">⚡ Pagar con Mercado Pago</button>' : '') +
-      (p.estado === 'pagando' && links[p.id] && links[p.id].url ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(links[p.id].url) + '">💳 Pagar ' + precio(p.total) + '</a>' : '') +
+      (p.estado === 'pagando' && links[p.id] && links[p.id].url ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(links[p.id].url)) + '">💳 Pagar ' + precio(p.total) + '</a>' : '') +
       (p.estado === 'pagando' && !(links[p.id] && links[p.id].mp && !links[p.id].url) ? '<button class="small" data-comp="' + p.id + '">📷 Subir comprobante</button>' : '') +
       (['pagando', 'en_revision', 'recibido', 'preparando'].includes(p.estado) ? '<button class="small alt" data-can="' + p.id + '">Cancelar</button>' : '') +
       (['recibido', 'preparando', 'listo', 'en_camino', 'entregado'].includes(p.estado) ? '<button class="small alt" data-det="' + n + '">🧾 Detalle de compra</button>' : '') +
@@ -754,5 +754,6 @@ document.addEventListener('click', (e) => {
 <script src="../../shared/tienda.js"></script>
 <script src="../../shared/datos.js"></script>
 <script src="../../shared/vitrina.js"></script>
+<script src="../../shared/ui.js"></script>
 </body>
 </html>

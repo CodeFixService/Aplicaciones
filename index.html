@@ -475,7 +475,7 @@
       const email = $('lEmail').value, pass = $('lPass').value;
       if (modo === 'olvide') {
         await Cuenta.resetPassword(email);
-        Core.toast('Te enviamos un enlace a ' + email);
+        Core.toast('Te enviamos un enlace a ' + (window.CFX_TAPAR ? CFX_TAPAR.correo(email) || email : email));
         setModo('in');
       } else if (modo === 'up') {
         const extra = clienteDe ? { rol: 'client', negocio: clienteDe } : {};
@@ -1416,5 +1416,6 @@
 <script src="shared/tour.js"></script>
 <script src="shared/datos.js"></script>
 <script src="shared/vitrina.js"></script>
+<script src="shared/ui.js"></script>
 </body>
 </html>

@@ -182,7 +182,7 @@
       ev.target.disabled = true;
       const { error } = await O.sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: SALIDA() } });
       if (error && /rate|seconds|segundos|429/i.test(error.message || '')) { d.querySelector('.cq-err').textContent = 'Espera un minuto y vuelve a tocar.'; ev.target.disabled = false; return; }
-      d.firstChild.innerHTML = '<h2>📧 Revisa tu correo</h2><p>Si <b>' + esc(email) + '</b> tiene cuenta, te llegó un enlace para entrar (mira también en spam). Ábrelo en este equipo.</p>' +
+      d.firstChild.innerHTML = '<h2>📧 Revisa tu correo</h2><p>Si <b>' + esc(window.CFX_TAPAR ? CFX_TAPAR.correo(email) || email : email) + '</b> tiene cuenta, te llegó un enlace para entrar (mira también en spam). Ábrelo en este equipo.</p>' +
         '<div class="cq-pie"><button type="button" data-cerrar>Entendido</button></div>';
     };
     return d;
