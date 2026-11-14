@@ -1,6 +1,38 @@
-# APP.md
+# APP.md · 🚀 Despega Pyme
 
-(Mapa completo pendiente: G42j.)
+Leer esto antes que el código (G42j). Repo Aplicaciones · id `orbita` · Supabase gilsamacgappycibcqhq.
+Tienda online + caja + pedidos para pymes chilenas. Free / Pro / 🧩 módulos (G39: Free compra módulos, Pro -20%).
+
+## Quién usa qué
+- **Negocio**: `/` (Inicio + Más) y las apps de `apps/`.
+- **Cliente** (invitado por el negocio): `/`, Pedidos, Mensajes, Tienda.
+- **Público** (sin cuenta): vitrina `/t/?s=<slug>`, ficha `&p=<producto>`, carrito `#carrito`.
+- **Admin**: el panel vive en CM → Apps → 🧭 Despega (`apps/admin/` solo redirige).
+
+## Pantallas
+| URL | Qué es |
+|---|---|
+| `/` | Entrar · Inicio · Más (`nav.cfx-barra` "Más") |
+| `/#tienda` | Más → 🏪 Mi tienda (datos, ✉️ Correo de tu tienda) |
+| `/#links` `#equipo` `#despacho` `#boleta` `#redes` `#modulos` `#plan` `#ajustes` | Secciones del Más |
+| `/apps/caja/` (`#productos`) | Caja / venta en local + productos (app.js) |
+| `/apps/pedidos/` (`?v=stats`, `?v=cupones`) | Pedidos, estadísticas, cupones |
+| `/apps/fichas/` (`#clientes`) | Diseños / fichas y clientes (app.js) |
+| `/apps/mensajes/` `contactos/` `catalogo/` `suscribirse/` `legal/` | Chat, contactos, tienda del cliente, ofertas, términos |
+| `/t/` · `/n/` · `/r/` | Vitrina pública · Crear tienda gratis · Seguimiento de pedido |
+
+## Archivos clave
+- `shared/core.js` (APP_VERSION l.349 / DB_VERSION l.350), `shared/cuenta.js` (sesión, plan, push, CFX_COMPROBANTE_DATOS al final), `shared/config.js` (⚠️ correo: solo Edit).
+- Del núcleo (NO editar aquí, viene de SaaS/nucleo): auto, ayuda, barra, carga, comprobante, datos, despacho, fotos, humano, iconos, impresora, instalar, modulos, pagos, premium, qr, respaldo, seguro, tema.css, tienda, tour, ui, verificar, vitrina, voz.
+- `worker.js`: vitrina con SEO y vista previa al compartir (Cloudflare).
+- `supabase/instalar.sql` (~9.500 l, db_version() ~l.5363; boleta SII boleta_* solo aquí) · `supabase/functions/enviar` (correo y push).
+- Pruebas en SaaS/pruebas: `node celular.js Aplicaciones`, g42_apl.js, g42f_apl.js, central.js.
+
+## Tablas propias (además de las cfx_* del núcleo)
+profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, boleta_cuentas, boletas_caja, calificaciones, sellos, avisos_stock, publicaciones, publicacion_vistas, subscribers, user_invites, requests, conexiones, webhooks, webhook_envios, negocio_correo, notifications, notification_reads, push_subscriptions, planes, textos, app_settings, app_secrets, actividad_dia.
+
+## Versiones
+core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.24 · bd 5.51 · enviar 3.5.
 
 ## ✉️ Correo (G42f, 6.19 · bd 5.50 · enviar 3.5)
 - CodeFix → negocios/todos: Gmail de Josué (app_secrets gmail_*), se pone en CM → Control → ✉️ Correo.
