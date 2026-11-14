@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.49'::text $$;
+language sql immutable as $$ select '5.50'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -9015,13 +9015,82 @@ revoke all on function public.pedido_por_pagar() from public, anon, authenticate
 drop trigger if exists pedido_por_pagar on public.pedidos;
 create trigger pedido_por_pagar before insert on public.pedidos for each row execute function public.pedido_por_pagar();
 
--- ✉️ Correo al comprador: al hacer el pedido y en cada cambio de estado (solo si el correo de la app está configurado). Nunca rompe el pedido.
+-- G42f ✉️ Correo propio del negocio: lo que el negocio manda a SUS clientes sale con SU Gmail (nunca con el de CodeFix).
+-- La clave se guarda solo para el servidor: ninguna pantalla la puede volver a leer.
+create table if not exists public.negocio_correo (
+  negocio_id  uuid primary key references public.profiles (id) on delete cascade,
+  usuario     text not null,
+  clave       text not null,
+  nombre      text not null default '',
+  actualizado timestamptz not null default now()
+);
+alter table public.negocio_correo enable row level security;  -- sin políticas = nadie salvo el servidor
+revoke all on table public.negocio_correo from anon, authenticated;
+
+create or replace function public.tapar_correo(e text) returns text
+language sql immutable set search_path = '' as $$
+  select case when coalesce(e, '') !~ '@' then '' else left(e, 1) || '•••' || substring(e from position('@' in e)) end
+$$;
+
+create or replace function public.mi_correo() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x public.negocio_correo;
+begin
+  if not public.is_business(auth.uid()) then return jsonb_build_object('ok', false, 'error', 'Solo las tiendas'); end if;
+  select * into x from public.negocio_correo where negocio_id = auth.uid();
+  return jsonb_build_object('ok', true, 'configurado', x.negocio_id is not null, 'usuario', public.tapar_correo(x.usuario), 'nombre', coalesce(x.nombre, ''));
+end $$;
+
+create or replace function public.mi_correo_guardar(p_usuario text, p_clave text, p_nombre text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare u text := lower(trim(coalesce(p_usuario, ''))); k text := regexp_replace(coalesce(p_clave, ''), '\s', '', 'g');
+begin
+  if not public.is_business(auth.uid()) then return jsonb_build_object('ok', false, 'error', 'Solo las tiendas'); end if;
+  if u !~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' or length(u) > 120 then return jsonb_build_object('ok', false, 'error', 'Revisa tu Gmail'); end if;
+  if k !~ '^[A-Za-z]{16}$' then return jsonb_build_object('ok', false, 'error', 'La contraseña de aplicación tiene 16 letras'); end if;
+  insert into public.negocio_correo (negocio_id, usuario, clave, nombre, actualizado)
+  values (auth.uid(), u, k, left(trim(coalesce(p_nombre, '')), 60), now())
+  on conflict (negocio_id) do update set usuario = excluded.usuario, clave = excluded.clave, nombre = excluded.nombre, actualizado = now();
+  return jsonb_build_object('ok', true, 'usuario', public.tapar_correo(u));
+end $$;
+
+create or replace function public.mi_correo_quitar() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_business(auth.uid()) then return jsonb_build_object('ok', false, 'error', 'Solo las tiendas'); end if;
+  delete from public.negocio_correo where negocio_id = auth.uid();
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- Para la función "enviar": con qué Gmail sale cada notificación. CodeFix (admin) → el de Control → ✉️ Correo; negocio → el suyo; sin él → null (no se manda correo).
+create or replace function public.notif_correo(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare o uuid; r text; x public.negocio_correo;
+begin
+  select n.owner_id, p.role into o, r from public.notifications n left join public.profiles p on p.id = n.owner_id where n.id = p_id;
+  if o is null then return null; end if;
+  if r = 'admin' then
+    return (select case when count(*) filter (where name in ('gmail_user', 'gmail_app_password') and coalesce(value, '') <> '') = 2
+      then jsonb_build_object('usuario', max(value) filter (where name = 'gmail_user'), 'clave', max(value) filter (where name = 'gmail_app_password'),
+        'nombre', coalesce(max(value) filter (where name = 'mail_from_name'), 'CodeFix'), 'propio', false) end from public.app_secrets);
+  end if;
+  select * into x from public.negocio_correo where negocio_id = o;
+  if x.negocio_id is null then return null; end if;
+  return jsonb_build_object('usuario', x.usuario, 'clave', x.clave, 'nombre', coalesce(nullif(x.nombre, ''), (select nullif(empresa, '') from public.profiles where id = o), 'Tu tienda'), 'propio', true);
+end $$;
+
+revoke all on function public.notif_correo(uuid) from public, anon, authenticated;
+revoke all on function public.tapar_correo(text) from public, anon;
+revoke all on function public.mi_correo(), public.mi_correo_guardar(text, text, text), public.mi_correo_quitar() from public, anon;
+grant execute on function public.mi_correo(), public.mi_correo_guardar(text, text, text), public.mi_correo_quitar() to authenticated;
+
+-- ✉️ Correo al comprador: al hacer el pedido y en cada cambio de estado (solo si la tienda puso SU correo: Mi tienda → ✉️ Correo). Nunca rompe el pedido.
 create or replace function public.pedido_correo() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare dest text; nom text; t public.profiles; tit text; cab text; res text; url text; env jsonb; resumen boolean := false;
 begin
   begin
-    if not exists (select 1 from public.app_secrets where name = 'gmail_user' and coalesce(value, '') <> '') then return null; end if;
+    if not exists (select 1 from public.negocio_correo where negocio_id = new.negocio_id) then return null; end if;
     dest := coalesce(new.invitado_correo, (select c.email from public.profiles c where c.id = new.cliente_id and c.role = 'client'));
     if coalesce(dest, '') = '' then return null; end if;
     if tg_op = 'INSERT' then resumen := new.estado in ('pagando', 'recibido');

@@ -1,6 +1,7 @@
 // Edge Function "enviar":
 //  1) cada minuto busca las notificaciones programadas que ya llegaron a su hora y las
-//     envía por push y/o correo (Gmail);
+//     envía por push y/o correo (Gmail). G42f: lo de CodeFix sale con el Gmail de Control → ✉️ Correo;
+//     lo de cada negocio a SUS clientes, con el Gmail del negocio (Mi tienda → ✉️ Correo). Sin él, no se manda correo;
 //  2) crea cuentas desde el panel ({accion: 'crear_usuario'}): el admin crea empresas y
 //     clientes; cada empresa crea sus propios clientes. El registro libre está cerrado.
 //  3) entrar con QR ({accion: 'qr_entrar'}): el computador entra con la sesión que aprobó el celular.
@@ -9,7 +10,7 @@ import webpush from 'npm:web-push@3.6.7';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const VERSION = '3.4';
+const VERSION = '3.5';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
 const BRAND = 'Despega Pyme · CodeFix';
@@ -92,7 +93,7 @@ export async function deliver(
   if (n.channels.includes('email')) {
     const emails = [...new Map(targets.filter((t) => t.email).map((t) => [t.email!.toLowerCase(), t])).values()];
     if (!transportOverride && (!secrets.gmail_user || !secrets.gmail_app_password)) {
-      errors.push('Falta configurar Gmail (Admin → Ajustes)');
+      errors.push(secrets.correo_falta || 'Falta el correo de CodeFix (CM → Control → ✉️ Correo)');
     } else if (emails.length) {
       const transport = (transportOverride as nodemailer.Transporter) || nodemailer.createTransport({
         host: 'smtp.gmail.com', port: 465, secure: true, pool: true,
@@ -202,8 +203,17 @@ async function run() {
     try {
       const { data: targets, error: tErr } = await db.rpc('notification_targets', { p_id: n.id });
       if (tErr) throw tErr;
-      const r = await deliver(n, targets || [], secrets || {}, emailsLeft, removeEndpoint);
-      emailsLeft -= r.emailSent;
+      // G42f: con qué Gmail sale el correo de esta notificación (CodeFix o el propio del negocio).
+      let sec: Secrets = secrets || {}, propio = false;
+      if (n.channels.includes('email')) {
+        const { data: sm, error: smErr } = await db.rpc('notif_correo', { p_id: n.id });
+        if (!smErr) {
+          if (sm && sm.usuario && sm.clave) { sec = { ...sec, gmail_user: sm.usuario, gmail_app_password: sm.clave, mail_from_name: sm.nombre || '' }; propio = !!sm.propio; }
+          else sec = { ...sec, gmail_user: '', gmail_app_password: '', correo_falta: 'La tienda no puso su correo (Mi tienda → ✉️ Correo)' };
+        }
+      }
+      const r = await deliver(n, targets || [], sec, propio ? EMAIL_DAILY_LIMIT : emailsLeft, removeEndpoint);
+      if (!propio) emailsLeft -= r.emailSent;
       await db.rpc('finish_notification', {
         p_id: n.id, p_push_sent: r.pushSent, p_push_failed: r.pushFailed, p_email_sent: r.emailSent, p_error: r.error,
       });

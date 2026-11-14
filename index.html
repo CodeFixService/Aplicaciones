@@ -253,6 +253,13 @@
       <input id="tDescPrem" inputmode="numeric" placeholder="0 (sin descuento) · máximo 50">
       <p class="muted" style="margin:4px 0 0">Se descuenta solo en los pedidos de tus clientes con Premium, y sus pedidos te aparecen primero con ⭐.</p>
       <div class="btns"><button id="bTienda">Guardar mi tienda</button></div>
+      <details id="dCorreo"><summary style="cursor:pointer;font-weight:700;margin:12px 0 4px">✉️ Correo de tu tienda <span class="muted" id="coEst" style="font-weight:400"></span></summary>
+        <p class="muted" style="font-size:13px;margin:4px 0">Los correos a tus clientes (pedidos y avisos) salen con TU Gmail. Sin él, solo les llegan notificaciones. La contraseña se crea en Google → Seguridad → Contraseñas de aplicaciones.</p>
+        <label for="coU">Tu Gmail</label><input id="coU" type="email" maxlength="120" autocomplete="off" placeholder="tutienda@gmail.com">
+        <label for="coP">Contraseña de aplicación (16 letras)</label><input id="coP" type="password" maxlength="40" autocomplete="off" data-sin-voz placeholder="xxxx xxxx xxxx xxxx">
+        <label for="coN">Nombre del remitente</label><input id="coN" maxlength="60" placeholder="El nombre de tu tienda">
+        <div class="btns"><button type="button" id="bCorreo">Guardar correo</button><button type="button" class="alt hidden" id="bCorreoX">Quitar</button></div>
+      </details>
     </div>
 
     <div class="card hidden" id="cLinks"><span id="links"></span>
@@ -612,7 +619,7 @@
         ...(dueno ? [['apps/caja/#productos', 'bolsa', 'Productos, fotos y stock'], ['apps/fichas/#clientes', 'usuarios', 'Clientes'], ['apps/pedidos/?v=cupones', 'ticket', 'Cupones y sellos'],
           ['apps/pedidos/?v=stats', 'grafico', 'Estadísticas'], ['apps/catalogo/?v=ofertas', 'ojo', 'Ver mi tienda como cliente'], ['apps/mensajes/', 'chat', 'Mensajes']]
           .map(([u, i, t]) => Object.assign({ k: 'n-' + i, ico: Core.ico(i), t, grupo: 'Tu negocio' }, ir(u))) : []),
-        dueno && { k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario y pagos', grupo: 'Tu tienda', nodo: $('cTienda') },
+        dueno && { k: 'tienda', ico: '🏪', t: 'Mi tienda', d: 'Logo, WhatsApp, horario, pagos y correo', grupo: 'Tu tienda', nodo: $('cTienda') },
         dueno && { k: 'links', ico: '💳', t: 'Pagos', d: 'Links de pago del cliente', grupo: 'Tu tienda', nodo: $('cLinks') },
         dueno && { k: 'despacho', ico: '🚚', t: 'Despacho', grupo: 'Tu tienda', nodo: $('cDespacho') },
         dueno && { k: 'boleta', ico: '🧾', t: 'Boletas', d: 'Boleta SII de tus pedidos', grupo: 'Tu tienda', nodo: $('cBoleta') },
@@ -1177,7 +1184,29 @@
       $('tRubro').value = t.rubro || '';
       CodeFixVitrina.editor($('tPerfil'), t.perfil, { politicas: true }); $('tPerfil').dataset.listo = '1';
     } catch (e) { /* sin red */ }
+    cargarCorreo();
   }
+  // G42f ✉️ Correo propio: la clave nunca vuelve a la pantalla (solo "listo" y el correo tapado).
+  async function cargarCorreo() {
+    try {
+      const c = await Cuenta.rpc('mi_correo'); if (!c || !c.ok) return;
+      $('coEst').textContent = c.configurado ? '· ✅ ' + c.usuario : '· sin configurar';
+      $('bCorreoX').classList.toggle('hidden', !c.configurado);
+      if (c.nombre) $('coN').value = c.nombre;
+      $('coU').placeholder = c.configurado ? c.usuario : 'tutienda@gmail.com';
+    } catch (e) { /* base antigua o sin red */ }
+  }
+  $('bCorreo').onclick = async () => {
+    try {
+      const r = await Cuenta.rpc('mi_correo_guardar', { p_usuario: $('coU').value, p_clave: $('coP').value, p_nombre: $('coN').value });
+      if (!r.ok) return Core.toast('⚠️ ' + r.error);
+      $('coP').value = ''; $('coU').value = ''; Core.toast('✉️ Correo guardado: ' + r.usuario); cargarCorreo();
+    } catch (e) { Core.toast('⚠️ ' + e.message); }
+  };
+  $('bCorreoX').onclick = async () => {
+    if (!confirm('¿Quitar tu correo? Tus clientes dejarán de recibir correos (las notificaciones siguen).')) return;
+    try { await Cuenta.rpc('mi_correo_quitar'); Core.toast('Correo quitado'); cargarCorreo(); } catch (e) { Core.toast('⚠️ ' + e.message); }
+  };
   $('tRubro').innerHTML += Core.RUBROS.map(([i, n]) => '<option value="' + Core.esc(n) + '">' + i + ' ' + Core.esc(n) + '</option>').join('');
   $('tVac').onchange = () => {
     $('rowVac').classList.toggle('hidden', !$('tVac').checked);
