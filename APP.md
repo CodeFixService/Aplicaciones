@@ -9,4 +9,5 @@
 
 ## 🧠 Del núcleo: falta aplicar aquí
 - ✅ G37 (núcleo 2.76): shared/comprobante.js e impresora.js vienen del núcleo (no editar aquí: SaaS/nucleo). Logo y firma (boleta_estado) los da window.CFX_COMPROBANTE_DATOS al final de shared/cuenta.js. La 🧾 boleta SII (boleta_*) sigue en el SQL de Despega.
+- ✅ G48 (núcleo 2.77): ✋ secciones del Más se mueven completas desde su título (también en el celular); 🎨 Mi perfil → Color y modo → Colores a tu gusto (fondo, texto, íconos y +).
 - ✅ G42 (núcleo 2.75): ⬆️ 🪟 📌 ✋ activos (Más → secciones y opciones se ordenan manteniendo presionado); 🔐 aviso de enlace tapado; links de boleta/pago con CFX_URL.

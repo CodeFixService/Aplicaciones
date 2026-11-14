@@ -20,7 +20,10 @@
     '.cfx-fijo{position:sticky!important;top:var(--cfx-fijo-top,0px);z-index:3;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;' +
     'margin-left:calc(-1 * var(--cfx-fijo-px,0px))!important;margin-right:calc(-1 * var(--cfx-fijo-px,0px))!important;padding-left:var(--cfx-fijo-px,0px)!important;padding-right:var(--cfx-fijo-px,0px)!important;padding-top:8px!important;padding-bottom:8px!important}' +
     '.cfx-fijo:is(h2):not(.cfx-tit-rep){display:block!important}.cfx-fijo.cfx-pegado{background:var(--cfx-fijo-bg,var(--cfx-tarjeta,#fff))!important;box-shadow:0 6px 10px -8px rgba(15,23,42,.25)}' +
-    '[data-cfx-orden]>*{-webkit-touch-callout:none}.cfx-arrastra{position:relative;z-index:20!important;transition:none!important;box-shadow:0 16px 36px -10px rgba(15,23,42,.45)!important;scale:1.02;opacity:.97;' +
+    '[data-cfx-orden]>*{-webkit-touch-callout:none}[data-cfx-orden]>.cfx-fila,[data-cfx-orden]>*>:is(h2,h3,.cfx-aj-g){-webkit-user-select:none;user-select:none}' +
+    '[data-cfx-orden]>.cfx-aj-sec>.cfx-aj-g{display:flex;align-items:center;gap:8px;cursor:grab}[data-cfx-orden]>.cfx-aj-sec>.cfx-aj-g::after{content:"";margin-left:auto;flex:none;width:14px;height:14px;opacity:.55;background:currentColor;' +
+    '-webkit-mask:radial-gradient(circle,#000 1.6px,transparent 1.9px) 0 0/7px 4.7px;mask:radial-gradient(circle,#000 1.6px,transparent 1.9px) 0 0/7px 4.7px}' +
+    '.cfx-arrastra{position:relative;z-index:20!important;transition:none!important;box-shadow:0 16px 36px -10px rgba(15,23,42,.45)!important;scale:1.02;opacity:.97;' +
     'outline:2px solid var(--brand,var(--marca,#2563eb));outline-offset:-2px;border-radius:14px;background:var(--cfx-tarjeta,#fff)}html.cfx-ordenando,html.cfx-ordenando *{user-select:none!important;-webkit-user-select:none!important;cursor:grabbing!important}' +
     '.cfx-orden-ok{animation:cfxOrdOk .5s ease}@keyframes cfxOrdOk{50%{scale:1.015}}' +
     '@media (prefers-reduced-motion:reduce){.cfx-subir{transition:none}.cfx-orden-ok{animation:none}}';
@@ -160,7 +163,7 @@
   }
   const cancelarArm = () => { if (arm) { clearTimeout(arm.t); arm = null; } };
   d.addEventListener('pointermove', (e) => {
-    if (arm && Math.hypot(e.clientX - arm.x, e.clientY - arm.y) > 8) cancelarArm();
+    if (arm && Math.hypot(e.clientX - arm.x, e.clientY - arm.y) > 10) cancelarArm();
     if (!drag) return;
     e.preventDefault();
     const { it, l } = drag;
@@ -180,8 +183,13 @@
     if (e.clientY < r.top + 70) sc.scrollTop -= 12; else if (e.clientY > r.bottom - 90) sc.scrollTop += 12;
   }, { passive: false, capture: true });
   // Mientras se arrastra con el dedo, la pantalla no se mueve.
-  d.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); else cancelarArm(); }, { passive: false, capture: true });
+  // G48: el dedo siempre tiembla un poco; solo se cancela si se movió de verdad (más de 10 px = quiere bajar la pantalla).
+  d.addEventListener('touchmove', (e) => {
+    if (drag) return e.preventDefault();
+    const t = e.touches && e.touches[0]; if (arm && (!t || Math.hypot(t.clientX - arm.x, t.clientY - arm.y) > 10)) cancelarArm();
+  }, { passive: false, capture: true });
   d.addEventListener('contextmenu', (e) => { if (arm || drag) e.preventDefault(); }, true);
+  d.addEventListener('selectstart', (e) => { if (arm || drag) e.preventDefault(); }, true);  // mantener presionado un título no selecciona el texto
   const soltar = () => {
     cancelarArm();
     if (!drag) return;

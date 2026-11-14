@@ -218,6 +218,15 @@
     '.cfx-pf .cfx-pf-cols button.on{box-shadow:0 0 0 3px var(--cfx-texto,#111827),0 6px 16px rgba(0,0,0,.25)!important;transform:scale(1.08)}.cfx-pf .cfx-pf-cols button.cfx-pf-lock{opacity:.4}' +
     '.cfx-pf-libre{flex-direction:row!important;align-items:center;gap:10px!important;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--cfx-texto,#111827)!important}' +
     '.cfx-pf-libre input{width:48px;height:40px;padding:0;border:0;background:none;flex:none;cursor:pointer}.cfx-pf-libre i{font-style:normal}' +
+    // G48 🎨 Colores a tu gusto (fondo, texto, íconos).
+    '.cfx-pf-mc{display:flex;flex-direction:column;gap:8px}.cfx-pf .cfx-pf-mcf{display:flex!important;flex-direction:row!important;align-items:center;gap:12px!important;min-height:54px;padding:6px 10px;margin:0!important;border-radius:14px;' +
+    'border:1.5px solid var(--pf-borde);background:var(--cfx-campo,#f3f5f8);text-transform:none!important;letter-spacing:0!important;font-size:15px!important;color:var(--cfx-texto,#111827)!important;cursor:pointer;position:relative}' +
+    '.cfx-pf-mcf>span:nth-child(2){flex:1;min-width:0}.cfx-pf-mcf b{display:block;font-weight:700}.cfx-pf-mcf small{display:block;font-size:12.5px;font-weight:500;color:var(--cfx-texto-2,#5b6472)}' +
+    '.cfx-pf-mcm{flex:none;width:34px;height:34px;border-radius:10px;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--cfx-texto,#111827) 25%,transparent);background:repeating-conic-gradient(#cbd5e1 0 25%,#fff 0 50%) 0 0/10px 10px}' +
+    '.cfx-pf-mcf input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}.cfx-pf-mcf i{font-style:normal}' +
+    '.cfx-pf-nota{margin:2px 2px 0;font-size:12.5px;color:var(--cfx-texto-2,#5b6472)}.cfx-pf .cfx-pf-mcr{min-height:44px;border-radius:12px!important}' +
+    'html.cfx-col-ico .cfx-fila:not(.cfx-fila-rojo) .cfx-fila-ic,html.cfx-col-ico .cfx-pnl-op:not(.rojo)>span,html.cfx-col-ico .cfx-hm-ic{color:var(--cfx-icono)!important;background:color-mix(in srgb,var(--cfx-icono) 14%,transparent)!important}' +
+    'html.cfx-col-ico nav.cfx-barra>:not(.cfx-mas):not(.on):not(.activo):not([aria-current]) :is(svg,.cfx-ico),html.cfx-col-ico :is(.cfx-ham,[data-cfx-campana]) svg{color:var(--cfx-icono)!important}html.cfx-col-ico nav.cfx-barra>.cfx-mas svg{color:var(--cfx-mas-ink)!important}' +
     '.cfx-pf .cfx-pf-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}' +
     '.cfx-pf .cfx-pf-modos button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:74px!important;width:100%;min-width:0;margin:0!important;padding:10px 4px!important;border-radius:16px!important;' +
     'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1.5px solid var(--pf-borde)!important;box-shadow:none!important;font:700 13.5px/1.2 inherit!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
@@ -1600,10 +1609,76 @@
     const n = parseInt(c.slice(1), 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255, r = document.documentElement.style;
     r.setProperty('--brand', c); r.setProperty('--marca', c); r.setProperty('--brand-ink', l > 0.62 ? '#0f172a' : '#ffffff');
     const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = c;
+    pintarCols();  // G48: el + vuelve a quedar legible sobre el color nuevo
   }
+  // ---------- G48 🎨 Colores a tu gusto: fondo, texto e íconos (también el + del centro) ----------
+  // Por usuario, por app y por modo (claro y oscuro guardan los suyos). Siempre se ajustan solos para que se lean:
+  // texto 4,5:1 sobre el fondo y las tarjetas; íconos 3:1 sobre las tarjetas; el + 3:1 sobre el color de la app.
+  const COL_BASE = { claro: { fondo: '#f3f5f7', tarjeta: '#ffffff', texto: '#111827', mas: '#111827' }, oscuro: { fondo: '#0e1318', tarjeta: '#161d25', texto: '#e8edf2', mas: '#111827' } };
+  const COL_PROPS = ['--cfx-fondo', '--cfx-tarjeta', '--cfx-campo', '--cfx-borde', '--cfx-texto', '--cfx-texto-2', '--cfx-icono', '--cfx-mas-ink'];
+  const rgbDe = (c) => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const hexDe = (a) => '#' + a.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('');
+  const mezcla = (a, b, t) => { const x = rgbDe(a), y = rgbDe(b); return hexDe(x.map((v, i) => v + (y[i] - v) * t)); };
+  const luz = (c) => { const [r, g, b] = rgbDe(c).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const contraste = (a, b) => { const x = luz(a), y = luz(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  // Acerca el color a negro o a blanco (lo que más se lea) hasta que se lea sobre todos los fondos dados.
+  function legible(c, fondos, min) {
+    const peor = (x) => Math.min(...fondos.map((f) => contraste(x, f)));
+    if (peor(c) >= min) return c;
+    const meta = peor('#000000') >= peor('#ffffff') ? '#000000' : '#ffffff';
+    for (let t = 0.1; t < 1; t += 0.1) { const x = mezcla(c, meta, t); if (peor(x) >= min) return x; }
+    return meta;
+  }
+  const esOscuro = () => {
+    const r = document.documentElement, t = r.dataset.theme, k = r.className + ' ' + (document.body ? document.body.className : '');
+    if (t === 'dark' || /(^|\s)(dark|oscuro)(\s|$)/.test(k)) return true;
+    if (t === 'light' || /(^|\s)(light|claro)(\s|$)/.test(r.className)) return false;
+    return matchMedia('(prefers-color-scheme: dark)').matches;
+  };
+  const colQuien = () => {
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^sb-.*-auth-token$/.test(k)) { const u = (JSON.parse(localStorage.getItem(k)) || {}).user; if (u && u.id) return u.id; } } } catch (e) { /* sin almacenamiento */ }
+    return 'yo';
+  };
+  const colLlave = (m) => 'cfx-col:' + location.pathname.replace(/index\.html$/, '') + ':' + colQuien() + ':' + m;
+  const colLeer = (m) => { try { const g = JSON.parse(localStorage.getItem(colLlave(m)) || '{}') || {}; Object.keys(g).forEach((k) => { if (!HEX.test(g[k])) delete g[k]; }); return g; } catch (e) { return {}; } };
+  const colGuardar = (m, g) => { try { if (Object.keys(g).length) localStorage.setItem(colLlave(m), JSON.stringify(g)); else localStorage.removeItem(colLlave(m)); } catch (e) { /* lleno */ } };
+  let colFirma = '';
+  // Pinta los colores guardados del modo que se ve (o los de prueba mientras se elige). Devuelve true si alguno se ajustó para que se lea.
+  function pintarCols(prueba) {
+    const r = document.documentElement, st = r.style, m = esOscuro() ? 'oscuro' : 'claro', B = COL_BASE[m], g = prueba || colLeer(m);
+    const marca = (st.getPropertyValue('--brand') || getComputedStyle(r).getPropertyValue('--brand') || '#2563eb').trim();
+    const firma = m + JSON.stringify(g) + marca;
+    if (!prueba && firma === colFirma) return false;
+    colFirma = prueba ? '' : firma;
+    let ajuste = false;
+    COL_PROPS.forEach((p) => st.removeProperty(p));
+    const fondo = g.fondo || B.fondo, osc = luz(fondo) < 0.18, tarjeta = g.fondo ? mezcla(fondo, '#ffffff', osc ? 0.07 : 0.72) : B.tarjeta;
+    if (g.fondo) {
+      st.setProperty('--cfx-fondo', fondo); st.setProperty('--cfx-tarjeta', tarjeta);
+      st.setProperty('--cfx-campo', mezcla(fondo, '#ffffff', osc ? 0.11 : 0.45)); st.setProperty('--cfx-borde', osc ? mezcla(fondo, '#ffffff', 0.18) : mezcla(fondo, '#000000', 0.1));
+    }
+    if (g.fondo || g.texto) {
+      const t0 = g.texto || COL_BASE[osc ? 'oscuro' : 'claro'].texto, t = legible(t0, [fondo, tarjeta], 4.5); if (g.texto && t !== t0) ajuste = true;
+      st.setProperty('--cfx-texto', t); st.setProperty('--cfx-texto-2', legible(mezcla(t, tarjeta, 0.35), [fondo, tarjeta], 4.5));
+    }
+    if (g.icono) {
+      const i = legible(g.icono, [tarjeta], 3); if (i !== g.icono) ajuste = true;
+      st.setProperty('--cfx-icono', i);
+      const bMas = r.classList.contains('cfx-premium') ? ['#f7d774', '#d9a21b'] : HEX.test(marca) ? [marca] : [];  // Premium: el + es dorado
+      st.setProperty('--cfx-mas-ink', bMas.length ? legible(g.icono, bMas, 3) : g.icono);
+    }
+    r.classList.toggle('cfx-col-ico', !!g.icono);
+    return ajuste;
+  }
+  // Al cambiar de modo (claro/oscuro) o de color de la app, se pintan los colores de ese modo.
+  new MutationObserver(() => pintarCols()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+  if (document.body) new MutationObserver(() => pintarCols()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => pintarCols()); } catch (e) { /* navegador viejo */ }
+  window.CFX_COLORES = { pintar: pintarCols, leer: colLeer, guardar: colGuardar, oscuro: esOscuro, legible, contraste };
   // Lo guardado por BASE se aplica apenas carga (solo existe en las apps que usan BASE).
   if (lsL('modo')) pintarModo(lsL('modo'));
   if (lsL('color')) pintarColor(lsL('color'));
+  pintarCols();
   const fotoKey = () => 'foto:' + (CFG.id || CFG.email || '');
   function achicar(f, lado) {
     return new Promise((ok, mal) => {
@@ -1694,13 +1769,36 @@
       z.innerHTML = '<div class="cfx-pf">' + (P.guardarColor ? '<label>Color de la app</label><div class="cfx-pf-cols">' + cols.map(([n, c]) => '<button type="button" data-c="' + esc(c) + '" title="' + esc(n) + '" aria-label="' + esc(n) + '" style="background:' + esc(c) + '" class="' +
         (c.toLowerCase() === act ? 'on' : '') + (P.bloqueo('color', c) ? ' cfx-pf-lock' : '') + '"></button>').join('') + '</div>' +
         (libre ? '<label class="cfx-pf-libre"><input type="color" value="' + esc(HEX.test(act) ? act : '#2563eb') + '"><span>🎨 Color a tu gusto' + (P.bloqueo('libre') ? ' <i>⭐</i>' : '') + '</span></label>' : '') : '') +
-        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + '</div>';
+        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + '<div data-pf-mc></div></div>';
+      // G48 🎨 Colores a tu gusto: fondo, texto e íconos (con el + del centro). Se guardan para el modo que se está viendo.
+      const MC = [['fondo', '🖼️', 'Fondo', 'Detrás de todo'], ['texto', '📝', 'Texto', 'Letras y títulos'], ['icono', '✨', 'Íconos y botón +', 'Menú, barra de abajo y el +']];
+      const pintarMC = () => {
+        const c = z.querySelector('[data-pf-mc]'); if (!c) return;
+        const mo = esOscuro() ? 'oscuro' : 'claro', g = colLeer(mo), lock = P.bloqueo('libre');
+        c.innerHTML = '<label>Colores a tu gusto · modo ' + mo + '</label><div class="cfx-pf-mc">' + MC.map(([k, i, t, d]) => '<label class="cfx-pf-mcf"><span class="cfx-pf-mcm"' + (g[k] ? ' style="background:' + esc(g[k]) + '"' : '') + '></span>' +
+          '<span><b>' + i + ' ' + t + (lock ? ' <i>⭐</i>' : '') + '</b><small>' + (g[k] ? d : 'Normal · toca para elegir') + '</small></span>' +
+          '<input type="color" data-col="' + k + '" value="' + esc(g[k] || COL_BASE[mo][k === 'icono' ? 'texto' : k]) + '" aria-label="' + esc(t) + '"></label>').join('') + '</div>' +
+          (Object.keys(g).length ? '<button type="button" class="cfx-pf-mcr" data-pf-colnormal>↺ Volver a los colores normales</button>' : '') +
+          '<p class="cfx-pf-nota">Si un color no se lee, la app lo ajusta sola. El modo ' + (mo === 'oscuro' ? 'claro' : 'oscuro') + ' guarda los suyos.</p>';
+        c.querySelectorAll('[data-col]').forEach((i) => {
+          i.onclick = (ev) => { if (pide('libre')) ev.preventDefault(); };
+          i.oninput = () => pintarCols(Object.assign(colLeer(mo), { [i.dataset.col]: i.value }));
+          i.onchange = () => {
+            const n = Object.assign(colLeer(mo), { [i.dataset.col]: i.value.toLowerCase() });
+            colGuardar(mo, n); colFirma = ''; const aj = pintarCols(); pintarMC();
+            aviso(aj ? '🎨 Guardado (lo ajusté un poco para que se lea)' : '🎨 Color guardado');
+          };
+        });
+        const r0 = c.querySelector('[data-pf-colnormal]');
+        if (r0) r0.onclick = () => { colGuardar(mo, {}); colFirma = ''; pintarCols(); pintarMC(); aviso('↺ Colores normales'); };
+      };
+      pintarMC();
       // Se marca la opción en su lugar (sin volver a dibujar la sección).
       const marcar = (sel, b) => z.querySelectorAll(sel).forEach((x) => x.classList.toggle('on', x === b));
       z.onclick = (ev) => {
         const b = ev.target.closest('[data-c], [data-m]'); if (!b) return;
         ev.preventDefault();
-        if (b.dataset.m) { marcar('[data-m]', b); return listo(() => P.guardarModo(b.dataset.m)).then((ok) => { if (!ok) marcar('[data-m]', z.querySelector('[data-m="' + (valor(P.modo) || 'auto') + '"]')); }); }
+        if (b.dataset.m) { marcar('[data-m]', b); return listo(() => P.guardarModo(b.dataset.m)).then((ok) => { if (!ok) marcar('[data-m]', z.querySelector('[data-m="' + (valor(P.modo) || 'auto') + '"]')); setTimeout(pintarMC, 60); }); }
         if (pide('color', b.dataset.c)) return;
         marcar('[data-c]', b);
         listo(() => P.guardarColor(b.dataset.c), '🎨 Color guardado');
