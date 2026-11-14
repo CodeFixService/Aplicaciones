@@ -111,7 +111,12 @@
   function cabecera(a, rootPath) {
     window.CFX_AYUDA_PEND = Object.assign(window.CFX_AYUDA_PEND || {}, { rpc, app: 'orbita', admin: !!a.is_admin, premium: !!a.is_pro, id: a.id, hasta: a.pro_until,
       nombre: a.empresa || a.nombre || '', email: a.email, foto: null, quitar: '.pill.admin, #licTag',
-      cuenta: rootPath + '#ajustes', panel: null,  // G34: el panel del admin está en el Centro de Mando (núcleo ayuda.js lo lleva allá)
+      cuenta: rootPath + '#ajustes', panel: null,
+      // G43: cada paso de la 🧭 Guía lleva al campo exacto (el núcleo lo marca y explica cómo se hace).
+      guiaPasos: { perfil: { ir: rootPath + '#tienda', campo: '#tLogo', como: 'Tu nombre ya está. Toca aquí y sube tu logo desde la galería: se guarda solo.' },
+        whatsapp: { ir: rootPath + '#tienda', campo: '#eTel' }, productos: { ir: rootPath + 'apps/caja/#productos', campo: '#p-nombre' },
+        cobro: { ir: rootPath + '#links', campo: '#cLinks input[type=url]' }, despacho: { ir: rootPath + '#despacho', campo: '#dRet' },
+        politicas: { ir: rootPath + '#tienda', campo: '#pf-cambios', como: 'Escribe tu política de cambios (y tu RUT si tienes; no es obligatorio) y toca Guardar.' } },  // G34: el panel del admin está en el Centro de Mando (núcleo ayuda.js lo lleva allá)
       salir: async () => { await signOut(); location.replace(rootPath); },
       // 🔔 G20: la campana abre la ventana de avisos del núcleo (deslizar = borrar; tocar = texto completo).
       avisos: {
@@ -470,6 +475,7 @@
       if (!pushSupported() || !account) return;
       if (!pushTimer) pushTimer = setInterval(() => { if (!document.hidden) ofrecerPush(); }, 6e4);
       if (Notification.permission === 'granted' && await suscripcionActual()) return;
+      if (global.CodeFixInstalar) return;  // G43: un solo aviso de notificaciones, el del núcleo (instalar.js)
       const k = 'cfx:pushPedido', t = +localStorage.getItem(k) || 0;
       // Al abrir la app (primera pantalla de esta sesión) se muestra siempre; después, una vez por hora.
       let inicio = false;

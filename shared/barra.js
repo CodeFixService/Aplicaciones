@@ -317,7 +317,69 @@
   }, { passive: true });
   addEventListener('touchcancel', () => { dz = null; }, { passive: true });
 
-  window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra, pasar };
+  // ---------- G43 · 👆 Pistas animadas: enseñan lo que se puede deslizar (máx. 2 veces cada una por equipo) ----------
+  //   pantallas: desliza a los lados para cambiar de pantalla · barra: menú o filtros que siguen hacia el lado (se asoman solos)
+  //   borrar: avisos que se borran deslizando · pila: tarjetas que se apilan al bajar. Una a la vez, sin tapar ventanas; no bloquea toques.
+  //   Sin movimiento si el celular pide "reducir movimiento" (solo el letrero). CodeFixBarra.pista(k, el, texto) para usarla desde una app.
+  const PZ_MAX = 2, PZ_BARRAS = '.tabs, .chips, .seg, .sub, .filtros, .cats, [role=tablist], .scroll-x, .cfx-chips';
+  const pzVeces = (k) => { try { return Number(localStorage.getItem('cfx:pista:' + k)) || 0; } catch (e) { return PZ_MAX; } };
+  const pzSuma = (k) => { try { localStorage.setItem('cfx:pista:' + k, String(pzVeces(k) + 1)); } catch (e) { /* nada */ } };
+  const pzQuieto = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pzEnPantalla = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); return r.bottom > 60 && r.top < innerHeight - 90 && r.width > 40; };
+  let pzOn = false, pzUlt = 0; const pzHecho = new Set();
+  const pzCss = document.createElement('style');
+  pzCss.textContent = '.cfx-pz{position:fixed;z-index:2147482000;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);box-sizing:border-box;' +
+    'padding:9px 14px;border-radius:999px;background:rgba(15,23,42,.92);color:#fff;font:600 13.5px/1.25 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3);' +
+    'pointer-events:none;animation:cfxPzIn .3s ease}.cfx-pz span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cfx-pz-m{font-size:20px;flex:none;display:inline-block}' +
+    '.cfx-pz.lado .cfx-pz-m{animation:cfxPzLado 1.1s ease-in-out infinite}.cfx-pz.izq .cfx-pz-m{animation:cfxPzIzq 1.1s ease-in-out infinite}.cfx-pz.arriba .cfx-pz-m{animation:cfxPzArr 1.1s ease-in-out infinite}' +
+    '@keyframes cfxPzIn{from{opacity:0;transform:translate(-50%,8px)}}@keyframes cfxPzLado{0%,100%{transform:translateX(-10px)}50%{transform:translateX(10px)}}' +
+    '@keyframes cfxPzIzq{0%{transform:translateX(10px)}60%,100%{transform:translateX(-14px);opacity:.4}}@keyframes cfxPzArr{0%{transform:translateY(8px)}60%,100%{transform:translateY(-10px);opacity:.4}}' +
+    '@keyframes cfxPista{0%,100%{transform:none}35%,60%{transform:translateX(-42px)}}.cfx-pista{animation:cfxPista 1.1s cubic-bezier(.2,.8,.2,1)}' +
+    '@keyframes cfxPzPan{0%,100%{transform:none}30%,55%{transform:translateX(-26px)}}.cfx-pz-pan{animation:cfxPzPan 1.2s cubic-bezier(.2,.8,.2,1)}' +
+    '@keyframes cfxPzSube{0%,100%{transform:none}40%{transform:translateY(-14px)}}.cfx-pz-sube{animation:cfxPzSube 1s ease-in-out 2}' +
+    '@media (prefers-reduced-motion:reduce){.cfx-pz,.cfx-pz .cfx-pz-m,.cfx-pista,.cfx-pz-pan,.cfx-pz-sube{animation:none!important}}';
+  (document.head || document.documentElement).appendChild(pzCss);
+  // k: nombre · el: lo que se anima · t: texto · m: 'lado' | 'izq' | 'arriba' · mover(): animación propia del elemento.
+  function pista(k, el, t, m, mover) {
+    if (pzOn || pzHecho.has(k) || pzVeces(k) >= PZ_MAX || Date.now() - pzUlt < 6000 || !pzEnPantalla(el)) return false;
+    if (document.hidden || document.querySelector('dialog[open], .cfx-hoja-m, .cfx-mv.on, .modal.on, .velo')) return false;
+    pzOn = true; pzHecho.add(k); pzSuma(k);
+    const r = el.getBoundingClientRect(), p = document.createElement('div');
+    p.className = 'cfx-pz ' + (m || 'lado'); p.setAttribute('role', 'status');
+    p.innerHTML = '<span class="cfx-pz-m" aria-hidden="true">' + (m === 'arriba' ? '👆' : '👉') + '</span><span></span>';
+    p.lastChild.textContent = t;
+    const arriba = r.top > 120 ? r.top - 52 : Math.min(innerHeight - 140, r.bottom + 10);
+    p.style.top = Math.max(70, arriba) + 'px';
+    document.body.appendChild(p);
+    if (!pzQuieto() && mover) { try { mover(); } catch (e) { /* nada */ } }
+    const fuera = () => { removeEventListener('pointerdown', fuera, true); p.remove(); pzOn = false; pzUlt = Date.now(); };
+    addEventListener('pointerdown', fuera, true);
+    setTimeout(fuera, 3600);
+    return true;
+  }
+  function pzClase(el, c) { el.classList.remove(c); void el.offsetWidth; el.classList.add(c); setTimeout(() => el.classList.remove(c), 2200); }
+  function pistas() {
+    if (window.CFX_SIN_HOLA || window.CFX_SIN_PISTAS || pzOn || innerWidth >= 900) return;
+    // 1) Avisos que se borran deslizando
+    const av = [...document.querySelectorAll('.cfx-aviso-desl')].find(pzEnPantalla);
+    if (av && pista('borrar', av, 'Desliza el aviso para borrarlo', 'izq', () => pzClase(av, 'cfx-pista'))) return;
+    // 2) Menús o filtros que siguen hacia el lado: se asoman y vuelven
+    const b = [...document.querySelectorAll(PZ_BARRAS)].find((e) => !e.closest('.cfx-barra, dialog, .cfx-hoja-m') && e.scrollWidth > e.clientWidth + 24 &&
+      /auto|scroll/.test(getComputedStyle(e).overflowX) && pzEnPantalla(e));
+    if (b && pista('barra', b, 'Desliza a los lados: hay más', 'lado', () => {
+      const x0 = b.scrollLeft; b.scrollTo({ left: x0 + 70, behavior: 'smooth' }); setTimeout(() => b.scrollTo({ left: x0, behavior: 'smooth' }), 800);
+    })) return;
+    // 3) Tarjetas que se apilan al bajar
+    const pl = [...document.querySelectorAll('.cfx-apilar')].find(pzEnPantalla);
+    if (pl && pista('pila', pl, 'Baja: las tarjetas se apilan', 'arriba', () => { const c = pl.querySelectorAll(':scope > .cfx-pila')[1]; if (c) pzClase(c, 'cfx-pz-sube'); })) return;
+    // 4) Pantallas: con la barra de abajo se cambia de pantalla deslizando a los lados
+    const bar = document.querySelector('.cfx-barra'), zona = document.querySelector('main') || document.body;
+    if (bar && bar.getClientRects().length && visibles(bar).length >= 3) pista('pantallas', zona, 'Desliza para cambiar de pantalla', 'lado', () => pzClase(zona, 'cfx-pz-pan'));
+  }
+  const pzIniciar = () => { setTimeout(pistas, 2500); setInterval(pistas, 3000); addEventListener('hashchange', () => setTimeout(pistas, 900)); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pzIniciar); else pzIniciar();
+
+  window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra, pasar, pista };
   const iniciar = () => setTimeout(() => { montar(); setTimeout(() => document.documentElement.classList.add('cfx-barra-lista'), 1200); }, 0);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
   // Barras que la app dibuja después (al iniciar sesión).

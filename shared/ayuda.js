@@ -1,7 +1,7 @@
 /* CodeFix · Núcleo · Cabecera, Ayuda y Ajustes (mismo archivo en cada repositorio).
    CFX_AYUDA.iniciar({ rpc, app, admin, premium, nombre, foto, cuenta, panel… })  → al entrar con sesión: cabecera común [campana][FREE/PRO][foto]; la foto abre el menú con
        · Guía para partir: lo que le falta configurar al negocio (cfx_guia). No se marca como listo hasta que lo hace de verdad,
-         y se le recuerda cada vez que entra (y cada 1 hora con la app abierta) mientras falte algo.
+         y se le muestra en el Resumen 1 vez por inicio de sesión (✕ = hasta el próximo inicio; "No mostrar más" = nunca). Cada paso lleva directo al campo (G43).
        · Chat con soporte: escribe y le respondes desde el Centro de Mando → Mensajes (cfx_chat_*). El globo muestra lo no leído.
        · Términos y condiciones según el tipo de negocio (ley chilena: 19.496 del consumidor y 19.628 modificada por la 21.719 de datos personales).
        · Política de privacidad y aceptación con versión (CFX_LEGAL; cfx_legal_* en sql/legal.sql).
@@ -16,7 +16,6 @@
   const yo = document.currentScript && document.currentScript.src;
   const RAIZ = yo ? yo.replace(/(shared|js)\/ayuda\.js.*$/, '') : location.origin + '/';
   const color = () => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || getComputedStyle(document.documentElement).getPropertyValue('--marca').trim() || (document.querySelector('meta[name="theme-color"]') || {}).content || '#2563eb';
-  const CADA = 60 * 60 * 1000;
   // Dirección de cada app y del Centro de Mando según dónde se abre (un solo lugar para las 7):
   //  · Cloudflare Workers (<worker>.<cuenta>.workers.dev) → <worker>.<cuenta>.workers.dev
   //  · dominio propio (mando.codefix.app)                → <sub>.codefix.app
@@ -227,7 +226,27 @@
     '.cfx-pf .cfx-pf-peligro{border-color:color-mix(in srgb,var(--cfx-mal,#dc2626) 35%,transparent);background:color-mix(in srgb,var(--cfx-mal,#dc2626) 5%,var(--cfx-tarjeta,#fff))}' +
     '.cfx-pf .cfx-pf-peligro button{color:var(--cfx-mal,#dc2626)!important;border-color:color-mix(in srgb,var(--cfx-mal,#dc2626) 45%,transparent)!important}' +
     '@media (max-width:360px){.cfx-pf .cfx-pf-modos button{font-size:12.5px!important}.cfx-pf-av{width:64px;height:64px}}' +
-    '.cfx-ayuda .cfx-pf-d{min-height:200px}';
+    '.cfx-ayuda .cfx-pf-d{min-height:200px}' +
+    // G43: campo marcado por la guía + "💡 Cómo se hace" + tarjeta del Resumen (claro/oscuro: todo sobre transparente).
+    '.cfx-guia-foco{outline:3px solid var(--brand,var(--marca,#2563eb))!important;outline-offset:3px;border-radius:12px;animation:cfxGuiaLat 1.2s ease-in-out 4}' +
+    '@keyframes cfxGuiaLat{50%{outline-offset:8px;outline-color:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 35%,transparent)}}' +
+    '.cfx-guia-tip{margin:10px 0 14px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--cfx-g) 12%,transparent);border:1.5px solid color-mix(in srgb,var(--cfx-g) 40%,transparent);' +
+    'color:inherit;font-size:14px;line-height:1.45;text-align:left;animation:cfxGuiaIn .3s ease}.cfx-guia-tip b{display:block;margin-bottom:4px}.cfx-guia-tip p{margin:0 0 6px}' +
+    '.cfx-guia-tip small{display:block;opacity:.85;margin-bottom:8px}.cfx-guia-tip small:empty{display:none}' +
+    '.cfx-guia-tip button,.cfx-gt-p,.cfx-gt-pie button,.cfx-gt-x{font:inherit;cursor:pointer;color:inherit;background:transparent}' +
+    '.cfx-guia-tip button{min-height:40px;padding:0 16px;border-radius:12px;border:0;background:var(--cfx-g);color:#fff;font-weight:700}' +
+    '@keyframes cfxGuiaIn{from{opacity:0;transform:translateY(-6px)}}' +
+    '.cfx-gt{margin:12px 0;padding:14px;border-radius:18px;border:1.5px solid color-mix(in srgb,var(--cfx-g) 35%,transparent);background:color-mix(in srgb,var(--cfx-g) 9%,transparent);' +
+    'color:inherit;box-sizing:border-box;max-width:100%;animation:cfxGuiaIn .35s ease}' +
+    '.cfx-gt-c{display:flex;align-items:center;gap:8px}.cfx-gt-c b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:16px}' +
+    '.cfx-gt-x{flex:none;width:36px;height:36px;border-radius:50%;border:0;font-size:16px;opacity:.7}.cfx-gt>small{display:block;opacity:.85;margin:4px 0 8px;font-size:13.5px}' +
+    '.cfx-gt-b{height:8px;border-radius:4px;background:color-mix(in srgb,var(--cfx-g) 18%,transparent);overflow:hidden}.cfx-gt-b i{display:block;height:100%;background:var(--cfx-g);border-radius:4px;transition:width .5s}' +
+    '.cfx-gt>.cfx-gt-n{margin:4px 0 8px;font-size:12.5px}' +
+    '.cfx-gt-p{display:flex;align-items:center;gap:8px;width:100%;min-height:48px;margin:6px 0 0;padding:8px 12px;border-radius:14px;text-align:left;' +
+    'border:1.5px solid color-mix(in srgb,var(--cfx-g) 25%,transparent);background:color-mix(in srgb,var(--cfx-g) 6%,transparent)}' +
+    '.cfx-gt-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.cfx-gt-h{flex:none;font-weight:700;color:var(--cfx-g);font-size:13.5px}' +
+    '.cfx-gt-pie{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;margin-top:8px}.cfx-gt-pie button{min-height:40px;padding:0 6px;border:0;font-size:13.5px;opacity:.8;text-decoration:underline}' +
+    '@media (prefers-reduced-motion:reduce){.cfx-guia-foco,.cfx-guia-tip,.cfx-gt{animation:none}}';
   document.head.appendChild(css);
 
   let R = null, APP = '', estado = { items: [], sin_leer: 0 }, boya = null, campanaN = null, pest = null, cinta = null, abierta = null;
@@ -734,30 +753,167 @@
   }
 
   // ---------- Guía ----------
+  // G43 · Cada paso lleva DIRECTO al campo que hay que llenar: lo marca, lo deja al centro y abajo pone "💡 Cómo se hace".
+  //   Paso = { k, t, d, ir, campo (selector, opcional), como (texto, opcional) }. La app puede afinar sin tocar la base:
+  //   CFX_AYUDA.iniciar({ guiaPasos: { perfil: { ir: '#tienda', campo: '#tNombre', como: 'Escribe…' } } }). Sin campo, se busca por el tema del paso.
+  //   Si hay que cambiar de página, el paso queda anotado (sessionStorage, 20 s) y se marca al llegar.
+  const COMO = {
+    perfil: 'Escribe el nombre como quieres que te vean tus clientes, sube tu logo y toca Guardar.',
+    nombre: 'Escribe el nombre de tu negocio como quieres que te vean y toca Guardar.',
+    logo: 'Toca aquí y elige la imagen de tu logo en la galería. Se ve en tu tienda y en tus diseños.',
+    whatsapp: 'Escribe tu número con el 9 (ej: 912345678) y guarda. Ahí te llegan los pedidos.',
+    horario: 'Escribe tus días y horas (ej: Lun a Vie 9:00 a 19:00) y guarda.',
+    rubro: 'Elige a qué se dedica tu negocio: así te damos ejemplos y plantillas listas.',
+    cobro: 'Pega tu link de pago (Mercado Pago u otro) o tus datos de transferencia y guarda.',
+    abono: 'Escribe cuánto pides de abono y tus datos de transferencia, y guarda.',
+    politicas: 'Escribe tu política de cambios y devoluciones y guarda. Da confianza para comprar.',
+    despacho: 'Marca si tienes retiro y agrega tus comunas con su precio. Luego guarda.',
+    servicios: 'Toca Agregar, escribe el nombre, el precio y la duración, y guarda.',
+    productos: 'Escribe nombre y precio, súmale una foto y guarda. Con 3 productos ya puedes vender.',
+    link: 'Copia tu link y compártelo por WhatsApp o Instagram: así llegan tus clientes.',
+    publicar: 'Completa los datos y toca Publicar.',
+    cliente: 'Escribe el nombre y el teléfono de tu cliente y guarda.'
+  };
+  const BUSCA = { perfil: /nombre|empresa|negocio/i, nombre: /nombre|empresa/i, logo: /logo/i, whatsapp: /whats|tel[eé]fono|celular/i, horario: /horario/i, rubro: /rubro|dedica/i,
+    cobro: /link de pago|transferencia|banco|cobr/i, abono: /abono|transferencia|banco/i, politicas: /pol[ií]tica|cambios|devoluc/i, despacho: /despacho|retiro|env[ií]o/i,
+    servicios: /servicio/i, productos: /producto/i, link: /link|enlace|compartir/i, publicar: /publicar/i, cliente: /nombre|cliente/i };
+  const paso = (x) => Object.assign({}, x, ((CFG.guiaPasos || {})[x.k]) || {});
+  const seVe = (e) => !!(e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden');
   function ir(dest) {
     cerrar();
-    if (dest === 'verificar' && window.CFX_VERIFICAR) return window.CFX_VERIFICAR.abrir({ rpc: R });
-    if (dest === 'pagar' && window.CFX_PAGOS) return window.CFX_PAGOS.abrir({ rpc: R });
-    const u = new URL(dest, RAIZ);
-    if (u.pathname === location.pathname && u.hash) { if (location.hash === u.hash) dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = u.hash; }
-    else location.href = u.href;
+    const p = dest && typeof dest === 'object' ? dest : { ir: dest }, d = p.ir;
+    if (d === 'verificar' && window.CFX_VERIFICAR) return window.CFX_VERIFICAR.abrir({ rpc: R });
+    if (d === 'pagar' && window.CFX_PAGOS) return window.CFX_PAGOS.abrir({ rpc: R });
+    if (!d) return;
+    const u = new URL(d, RAIZ);
+    if (!/^https?:$/.test(u.protocol)) return;  // nunca javascript: ni data:
+    if (p.k || p.campo) { try { sessionStorage.setItem('cfx-guia-foco', JSON.stringify({ k: p.k || '', campo: p.campo || '', como: p.como || '', d: p.d || '', hasta: Date.now() + 20000 })); } catch (e) { /* nada */ } }
+    if (u.origin === location.origin && u.pathname === location.pathname && u.search === location.search) {
+      if (u.hash && location.hash !== u.hash) location.hash = u.hash; else dispatchEvent(new HashChangeEvent('hashchange'));
+      enfocar();
+    } else location.href = u.href;
+  }
+  function abrirDetalles(el) { for (let d = el.closest('details:not([open])'); d; d = d.parentElement && d.parentElement.closest('details:not([open])')) d.open = true; }
+  function buscarCampo(p) {
+    const capas = [...document.querySelectorAll('.cfx-hoja-m, dialog[open]')].filter(seVe), raiz = capas[capas.length - 1] || document;
+    if (p.campo) {
+      let el = null; try { el = raiz.querySelector(p.campo) || document.querySelector(p.campo); } catch (e) { /* selector malo */ }
+      if (el) { abrirDetalles(el); if (seVe(el) || (el.id && seVe(document.querySelector('label[for="' + CSS.escape(el.id) + '"]')))) return el; }
+      return null;
+    }
+    const re = BUSCA[p.k]; if (!re) return null;
+    const txt = (e) => [e.getAttribute('aria-label'), e.getAttribute('placeholder'), e.name, e.id, e.matches('button, summary, a, label') ? e.textContent : '',
+      e.id ? (document.querySelector('label[for="' + CSS.escape(e.id) + '"]') || {}).textContent : '', (e.closest('label') || {}).textContent].join(' ');
+    return [...raiz.querySelectorAll('input:not([type=hidden]), select, textarea, summary, button, a.btn')]
+      .find((e) => !e.closest('.cfx-gt, .cfx-cab, nav, header') && re.test(txt(e)) && (seVe(e) || (e.id && seVe(document.querySelector('label[for="' + CSS.escape(e.id) + '"]'))))) || null;
+  }
+  let enfoque = 0;
+  function enfocar() {
+    let p = null; try { p = JSON.parse(sessionStorage.getItem('cfx-guia-foco') || 'null'); } catch (e) { /* nada */ }
+    if (!p) return;
+    const fin = () => { clearInterval(enfoque); try { sessionStorage.removeItem('cfx-guia-foco'); } catch (e) { /* nada */ } };
+    if (!(p.hasta > Date.now())) return fin();
+    clearInterval(enfoque); const t0 = Date.now();
+    enfoque = setInterval(() => {
+      if (Date.now() - t0 < 500) return;  // deja que la app termine de abrir su pantalla u hoja
+      const el = buscarCampo(p);
+      if (el) { fin(); marcarCampo(el, p); }
+      else if (Date.now() - t0 > 9000) { fin(); const t = p.como || COMO[p.k] || p.d; if (t) aviso('💡 ' + t); }
+    }, 250);
+  }
+  function marcarCampo(el, p) {
+    document.querySelectorAll('.cfx-guia-tip').forEach((x) => x.remove());
+    document.querySelectorAll('.cfx-guia-foco').forEach((x) => x.classList.remove('cfx-guia-foco'));
+    const foco = seVe(el) ? el : (el.id && document.querySelector('label[for="' + CSS.escape(el.id) + '"]')) || el.closest('label') || el.parentElement;
+    foco.classList.add('cfx-guia-foco');
+    const tip = document.createElement('div'); tip.className = 'cfx-guia-tip'; tip.setAttribute('role', 'note'); tip.style.setProperty('--cfx-g', color());
+    tip.innerHTML = '<b>💡 Cómo se hace</b><p></p><small></small><button type="button">Entendido</button>';
+    tip.querySelector('p').textContent = p.como || COMO[p.k] || p.d || 'Completa lo marcado y toca Guardar.';
+    tip.querySelector('small').textContent = '🚀 ¡Vas muy bien! Cada paso te acerca a tu próxima venta.';
+    const quitar = () => { tip.remove(); foco.classList.remove('cfx-guia-foco'); };
+    tip.querySelector('button').onclick = quitar;
+    (foco.closest('.row, .btns, .impBtns') || foco).after(tip);
+    el.addEventListener('change', () => { const s = tip.querySelector('small'); if (s) s.textContent = '✅ ¡Bien! Ahora toca Guardar.'; foco.classList.remove('cfx-guia-foco'); }, { once: true });
+    setTimeout(() => foco.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' }), 60);
   }
   function guia() {
-    const L = estado.items, ok = L.filter((x) => x.ok).length;
+    const L = estado.items.map(paso), ok = L.filter((x) => x.ok).length;
     const caja = dialogo('<h2>🧭 Guía para partir</h2><p>' + (ok === L.length ? '¡Todo listo! Tu negocio está configurado.' : 'Te faltan ' + (L.length - ok) + ' de ' + L.length + ' pasos. Cada uno se marca solo cuando lo haces.') + '</p>' +
       '<div class="ca-barra"><div style="width:' + Math.round(ok * 100 / Math.max(1, L.length)) + '%"></div></div><div class="ca-cuerpo">' +
       L.map((x, i) => '<div class="ca-it' + (x.ok ? ' ok' : '') + '"><span>' + (x.ok ? '✅' : '⬜') + '</span><div><b>' + esc(x.t) + '</b>' + (x.d && !x.ok ? '<p>' + esc(x.d) + '</p>' : '') + '</div>' +
         (!x.ok && x.ir ? '<button type="button" class="ca-si" data-i="' + i + '">Hacerlo</button>' : '') + '</div>').join('') +
       '</div><div class="ca-pie"><button type="button" data-cerrar>' + (ok === L.length ? 'Cerrar' : 'Después') + '</button></div>');
-    caja.onclick = (ev) => { const b = ev.target.closest('[data-i]'); if (b) ir(L[+b.dataset.i].ir); };
+    caja.onclick = (ev) => { const b = ev.target.closest('[data-i]'); if (b) ir(L[+b.dataset.i]); };
   }
-  function recordar() {
-    if (window.CFX_SIN_HOLA || !pend().length || document.hidden || document.querySelector('dialog[open], .cfx-hoja')) return;  // CFX_SIN_HOLA: pruebas
-    let ult = 0; try { ult = Number(sessionStorage.getItem('cfx-guia-vista')) || 0; } catch (e) { /* nada */ }
-    if (ult && Date.now() - ult < CADA) return;
-    try { sessionStorage.setItem('cfx-guia-vista', String(Date.now())); } catch (e) { /* nada */ }
-    guia();
+
+  // G43 · Tarjeta "🚀 Termina de armar tu negocio" en el inicio (Resumen), después de lo principal: no es una ventana encima.
+  //   · Sale 1 vez por inicio de sesión: ✕ la esconde hasta cerrar sesión y volver a entrar (recargar la página no la vuelve a sacar).
+  //   · "No mostrar más" → nunca más para esa cuenta en ese equipo (la guía sigue en el menú → 🧭 Guía para partir).
+  //   · Lugar: [data-cfx-guia] si la app lo marca; si no, la primera pantalla de la sesión, después de sus 2 primeros bloques.
+  //   · La app con tarjeta propia la marca [data-cfx-guia-propia] y usa CFX_AYUDA.guiaEstado() / guiaOcultar(nunca) / ir(paso).
+  function sesion() {
+    try {
+      for (const k of Object.keys(localStorage)) {
+        const v = localStorage.getItem(k) || ''; if (v.indexOf('access_token') < 0) continue;
+        const o = JSON.parse(v), t = (o && (o.access_token || (o.currentSession || {}).access_token)) || '', pl = t.split('.')[1]; if (!pl) continue;
+        const j = JSON.parse(atob(pl.replace(/-/g, '+').replace(/_/g, '/')));
+        if (j.sub) return { sid: String(j.session_id || ''), sub: String(j.sub) };
+      }
+    } catch (e) { /* sin sesión guardada */ }
+    return { sid: '', sub: '' };
   }
+  const ssGuia = (k, v) => { try { if (v === undefined) return sessionStorage.getItem(k) || ''; sessionStorage.setItem(k, v); } catch (e) { /* nada */ } return ''; };
+  const lsGuia = (k, v) => { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) { /* nada */ } return ''; };
+  function guiaEstado() {
+    const s = sesion();
+    if (lsGuia('cfx:guia:nunca:' + s.sub)) return 'nunca';
+    if (s.sid ? lsGuia('cfx:guia:cerrada') === s.sid : ssGuia('cfx:guia:cerrada')) return 'cerrada';
+    return 'ver';
+  }
+  function guiaOcultar(nunca) {
+    const s = sesion();
+    if (nunca) lsGuia('cfx:guia:nunca:' + s.sub, '1');
+    if (s.sid) lsGuia('cfx:guia:cerrada', s.sid);
+    ssGuia('cfx:guia:cerrada', '1');
+    document.querySelectorAll('.cfx-gt').forEach((x) => x.remove());
+  }
+  function lugarGuia() {
+    const a = [...document.querySelectorAll('[data-cfx-guia]')].find(seVe); if (a) return { el: a, dentro: true };
+    if (document.querySelector('[data-cfx-guia-propia]')) return null;
+    if (location.hash.length > 1 || (ssGuia('cfx-inicio') && ssGuia('cfx-inicio') !== location.pathname + location.search)) return null;  // solo en el inicio
+    const L = [...document.querySelectorAll('main .view.on, main .view.activa, main .vista.on, main section.on, main > section, main, #app, .app')]
+      .filter((e) => seVe(e) && !e.closest('dialog, .cfx-hoja-m, header, nav'));
+    const z = L.find((e) => !L.some((o) => o !== e && e.contains(o))); if (!z) return null;
+    const h = [...z.children].filter((c) => seVe(c) && !c.matches('.cfx-av-tarj, .cfx-gt, script, style'));
+    return h.length ? { el: h[Math.min(1, h.length - 1)], dentro: false } : { el: z, dentro: true };
+  }
+  function tarjetaGuia() {
+    const viejas = [...document.querySelectorAll('.cfx-gt')], P = estado.items.filter((x) => !x.ok).map(paso);
+    if (CFG.admin || window.CFX_SIN_HOLA || !P.length || guiaEstado() !== 'ver') { viejas.forEach((x) => x.remove()); return; }
+    let c = viejas.find((x) => x.isConnected);
+    if (!c) {
+      const l = lugarGuia(); if (!l) return;
+      c = document.createElement('section'); c.className = 'cfx-gt'; c.setAttribute('aria-label', 'Termina de armar tu negocio');
+      if (l.dentro) l.el.prepend(c); else l.el.after(c);
+    }
+    const L = estado.items, ok = L.length - P.length, pct = Math.round(ok * 100 / Math.max(1, L.length));
+    const msg = !ok ? '¡Bienvenido! En pocos minutos dejas tu negocio listo para vender.' : pct >= 70 ? '¡Ya casi! Te queda muy poco para vender.' : '¡Vas muy bien! Cada paso te acerca a tu primera venta.';
+    c.style.setProperty('--cfx-g', color());
+    c.innerHTML = '<div class="cfx-gt-c"><b>🚀 Termina de armar tu negocio</b><button type="button" class="cfx-gt-x" data-x aria-label="Ocultar hasta tu próximo inicio de sesión">✕</button></div>' +
+      '<small>' + esc(msg) + '</small><div class="cfx-gt-b"><i style="width:' + pct + '%"></i></div><small class="cfx-gt-n">' + ok + ' de ' + L.length + ' listos</small>' +
+      P.slice(0, 3).map((x, i) => '<button type="button" class="cfx-gt-p" data-p="' + i + '"><span aria-hidden="true">⬜</span><span class="cfx-gt-t">' + esc(x.t) + '</span><span class="cfx-gt-h">Hacerlo ›</span></button>').join('') +
+      '<div class="cfx-gt-pie">' + (P.length > 3 ? '<button type="button" data-todo>Ver los ' + P.length + ' pasos</button>' : '') + '<button type="button" data-nunca>No mostrar más</button></div>';
+    c.onclick = (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      if (b.hasAttribute('data-x')) return guiaOcultar(false);
+      if (b.hasAttribute('data-nunca')) { guiaOcultar(true); return aviso('Listo. La guía sigue en tu menú → 🧭 Guía para partir.'); }
+      if (b.hasAttribute('data-todo')) return guia();
+      const x = P[+b.dataset.p]; if (x) { if (x.ir) ir(x); else guia(); }
+    };
+  }
+  addEventListener('hashchange', () => { document.querySelectorAll('.cfx-gt').forEach((x) => { if (!x.closest('[data-cfx-guia]')) x.remove(); }); if (estado.items.length) setTimeout(tarjetaGuia, 300); });
+  const alAbrir = () => setTimeout(enfocar, 300);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alAbrir); else alAbrir();
 
   // ---------- Chat ----------
   async function chat(o) {
@@ -993,7 +1149,7 @@
     try { estado = await R('cfx_guia') || estado; } catch (e) { return; }
     estado.items = estado.items || [];
     pintarBoya();
-    setTimeout(recordar, 4000);
+    tarjetaGuia();  // G43: tarjeta en el Resumen (ya no una ventana cada 1 hora)
   }
   // CFX_AYUDA.iniciar({ rpc, app, admin, premium, id, hasta, beneficios, nombre, email, foto, cuenta, panel, quitar, salir })
   //   una sola llamada al tener la cuenta (también para el admin): cabecera común, ayuda y sensación Premium (CFX_PREMIUM, nunca al admin).
@@ -1186,7 +1342,7 @@
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } else if (boya && boya.parentNode && boya.parentNode !== document.body) marcarExtras(boya.parentNode); }, 1500);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, menu, web, panelCM, sitio, avisos: contarAvisos, ventanaAvisos, esAdmin: () => !!CFG.admin };  // G36: esAdmin lo usa auto.js
+  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, ir, guiaEstado, guiaOcultar, menu, web, panelCM, sitio, avisos: contarAvisos, ventanaAvisos, esAdmin: () => !!CFG.admin };  // G36: esAdmin lo usa auto.js
   window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad, misDatos };
   // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
   function marcarTira(x) {
@@ -1256,8 +1412,7 @@
     f.addEventListener('pointerup', soltar); f.addEventListener('pointercancel', soltar);
     // Si se deslizó, no cuenta como toque (no abre el aviso).
     f.addEventListener('click', (e) => { if (mov) { e.preventDefault(); e.stopPropagation(); mov = false; } }, true);
-    // Pista una sola vez: el primer aviso se asoma hacia el lado.
-    try { if (!localStorage.getItem('cfx-desl-pista')) { localStorage.setItem('cfx-desl-pista', '1'); setTimeout(() => f.classList.add('cfx-pista'), 500); } } catch (e) { /* nada */ }
+    // La pista animada ("Desliza el aviso…") la pone barra.js (G43), 2 veces por equipo.
   }
   function avisosDeslizar() { document.querySelectorAll(XAV + ':not([data-cfx-desl])').forEach(deslizable); }
   // "Borrar todos": los avisos salen hacia el lado en cascada (la app lo llama después de confirmar).

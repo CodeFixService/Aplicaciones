@@ -187,7 +187,7 @@
       <div class="stats" id="hoyStats"></div>
       <div class="card hidden" id="hoyStock" style="border-color:#f59e0b"></div>
       <div class="card hidden" id="hoyRecuperar"><h2>🔎 Para vender más</h2><p class="muted" id="hoyRecuperarC" style="margin-top:-4px"></p><div id="hoyRecuperarL"></div></div>
-      <div class="card hidden" id="hoyFalta"><h2>🚀 Tu tienda en 5 minutos</h2><div class="t5"><div class="t5b"><i id="hoyFaltaB"></i></div><b id="hoyFaltaN"></b></div><ul class="list" id="hoyFaltaL"></ul></div>
+      <div class="card hidden" id="hoyFalta" data-cfx-guia-propia><div class="row" style="align-items:center;margin:0 0 6px"><h2 style="flex:2;margin:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🚀 Tu tienda en 5 minutos</h2><button type="button" class="alt small" id="hoyFaltaX" aria-label="Ocultar hasta tu próximo inicio de sesión" style="flex:none;min-width:40px">✕</button></div><div class="t5"><div class="t5b"><i id="hoyFaltaB"></i></div><b id="hoyFaltaN"></b></div><ul class="list" id="hoyFaltaL"></ul></div>
       <div class="card hidden" id="hoyTienda"><h2>🔗 Tu tienda</h2>
         <p class="muted" style="margin-top:0">Compártela en WhatsApp o Instagram, o imprime el QR. Sin cuenta piden desde ahí; con cuenta entran directo a su app.</p>
         <input id="hoyLink" readonly aria-label="Link de tu tienda">
@@ -399,13 +399,13 @@
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|links|equipo|despacho|boleta|redes|dominio|modulos)$/.test(location.hash);
+  const enAjustes = () => /^#(ajustes|plan|premium|tienda|links|equipo|despacho|boleta|redes|dominio|modulos)$/.test(location.hash);
   let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta, #redes y #modulos abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(links|equipo|despacho|boleta|redes|dominio|modulos)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -415,25 +415,7 @@
   Core.registerSW('./');
   Core.marca();
 
-  /* ---------- Instalar como app ---------- */
-  const instalada = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
-  let deferred;
-  if (!instalada) {
-    if (ios) { $('instTxt').innerHTML = 'En Safari toca <b>Compartir ⬆️</b> y luego <b>Agregar a inicio</b>.'; $('cInstalar').classList.remove('hidden'); }
-    else if (/Android/.test(navigator.userAgent)) { $('instTxt').innerHTML = 'Toca <b>Instalar</b> (o menú ⋮ → <b>Instalar app</b>).'; $('cInstalar').classList.remove('hidden'); }
-  }
-  addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault(); deferred = e;
-    $('cInstalar').classList.remove('hidden'); $('bInstalar').style.display = 'inline-flex';
-  });
-  addEventListener('appinstalled', () => $('cInstalar').classList.add('hidden'));
-  $('bInstalar').onclick = async () => {
-    if (!deferred) return;
-    deferred.prompt();
-    if ((await deferred.userChoice).outcome === 'accepted') $('cInstalar').classList.add('hidden');
-    deferred = null;
-  };
+  /* ---------- Instalar como app: lo hace el núcleo (shared/instalar.js): no sale si ya está instalada ni si dijo "Ya la instalé" (G43). ---------- */
 
   if (!Cuenta.configured) { showView('v-setup'); return; }
 
@@ -733,15 +715,28 @@
     // D20/D23 Tienda en 5 min: pasos con barra de progreso; los hechos quedan con ✅ y la tarjeta se va al completar todo.
     const rb = Core.RUBROS.find((x) => x[1] === t.rubro); // ejemplo según el rubro
     let compartio = false; try { compartio = !!localStorage.getItem('cfx:compartio'); } catch (e) { /* sin almacenamiento */ }
-    const pasos = [[!!t.rubro, '#ajustes', 'Elige a qué se dedica tu negocio'], [!!acc.logo, '#ajustes', 'Sube tu logo y elige tu color'],
-      [!!acc.telefono, '#ajustes', 'Escribe el WhatsApp de tu tienda'], [!!t.horario, '#ajustes', 'Escribe tu horario de atención'],
-      [!!h.productos, 'apps/caja/#productos', 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '') + ' o cárgalos de una vez con 📥 Excel, WhatsApp o ✨ plantilla'],
-      [!!h.link_pago, '#links', 'Pega tu link de pago para cobrar pedidos online'], [compartio, '#hoyTienda', 'Comparte tu tienda por WhatsApp o con el QR']];
+    // G43: cada paso lleva DIRECTO a su campo (lo marca y abajo dice cómo se hace). Sale 1 vez por inicio de sesión (✕) y "No mostrar más" la apaga.
+    const pasos = [[!!t.rubro, { ir: '#tienda', campo: '#tRubro', k: 'rubro' }, 'Elige a qué se dedica tu negocio'],
+      [!!acc.logo, { ir: '#tienda', campo: '#tLogo', k: 'logo', como: 'Toca aquí y elige tu logo de la galería: se guarda solo. Tu color lo eliges arriba, en tu perfil de Ajustes.' }, 'Sube tu logo y elige tu color'],
+      [!!acc.telefono, { ir: '#tienda', campo: '#eTel', k: 'whatsapp', como: 'Escribe tu WhatsApp con el 9 (ej: 912345678) y toca "Guardar mi tienda" al final.' }, 'Escribe el WhatsApp de tu tienda'],
+      [!!t.horario, { ir: '#tienda', campo: '#tHorario', k: 'horario', como: 'Escribe tus días y horas (ej: Lun a Vie 9:00 a 19:00) y toca "Guardar mi tienda" al final.' }, 'Escribe tu horario de atención'],
+      [!!h.productos, { ir: 'apps/caja/#productos', campo: '#p-nombre', k: 'productos' }, 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '') + ' o cárgalos de una vez con 📥 Excel, WhatsApp o ✨ plantilla'],
+      [!!h.link_pago, { ir: '#links', campo: '#cLinks input[type=url]', k: 'cobro', como: 'Pega aquí tu link de pago (Mercado Pago u otro) y guarda: tus clientes pagan al tiro.' }, 'Pega tu link de pago para cobrar pedidos online'],
+      [compartio, { ir: '#', campo: '#hoyCompartir', k: 'link', como: 'Toca Compartir y mándalo a tus grupos de WhatsApp o ponlo en tu Instagram. ¡Así llegan tus primeros pedidos!' }, 'Comparte tu tienda por WhatsApp o con el QR']];
     const hechos = pasos.filter((x) => x[0]).length, pct = Math.round(hechos * 100 / pasos.length);
-    $('hoyFalta').classList.toggle('hidden', hechos === pasos.length);
+    const verG = !window.CFX_AYUDA || !CFX_AYUDA.guiaEstado || CFX_AYUDA.guiaEstado() === 'ver';
+    $('hoyFalta').classList.toggle('hidden', hechos === pasos.length || !verG);
     $('hoyFaltaB').style.width = pct + '%'; $('hoyFaltaN').textContent = hechos + ' de ' + pasos.length;
-    $('hoyFaltaL').innerHTML = pasos.map(([ok, u, x]) => ok ? '<li class="muted" style="padding:6px 10px">✅ <s>' + x + '</s></li>'
-      : '<li><a class="mini" href="' + u + '" style="width:100%"><span class="grow">◻️ ' + x + '</span><span>›</span></a></li>').join('');
+    $('hoyFaltaL').innerHTML = pasos.map(([ok, , x], i) => ok ? '<li class="muted" style="padding:6px 10px">✅ <s>' + x + '</s></li>'
+      : '<li><button type="button" class="mini alt" data-g="' + i + '" style="width:100%;text-align:left"><span class="grow">◻️ ' + x + '</span><span style="flex:none;font-weight:700">Hacerlo ›</span></button></li>').join('') +
+      '<li style="text-align:center"><button type="button" class="alt small" data-nunca style="border:0;background:none;text-decoration:underline;opacity:.8">No mostrar más</button></li>';
+    $('hoyFaltaL').onclick = (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      if (b.hasAttribute('data-nunca')) { if (window.CFX_AYUDA && CFX_AYUDA.guiaOcultar) CFX_AYUDA.guiaOcultar(true); $('hoyFalta').classList.add('hidden'); Core.toast('Listo. La guía sigue en tu menú → 🧭 Guía para partir'); return; }
+      const g = pasos[+b.dataset.g]; if (!g) return;
+      if (window.CFX_AYUDA && CFX_AYUDA.ir) CFX_AYUDA.ir(g[1]); else location.hash = g[1].ir;
+    };
+    $('hoyFaltaX').onclick = () => { if (window.CFX_AYUDA && CFX_AYUDA.guiaOcultar) CFX_AYUDA.guiaOcultar(false); $('hoyFalta').classList.add('hidden'); };
     tour(false);
   }
 
@@ -1341,7 +1336,7 @@
       const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
       activo = !!(reg && reg.pushManager && await reg.pushManager.getSubscription()) && Notification.permission === 'granted';
     } catch (e) { /* sin soporte */ }
-    $('cPush').classList.toggle('hidden', activo);
+    $('cPush').classList.add('hidden');  // G43: un solo aviso, el del núcleo (instalar.js); si ya están activas no sale nada
     if (activo) Cuenta.syncPush(); // el celular queda a nombre de esta cuenta
   }
   $('bPush').onclick = async () => {
