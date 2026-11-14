@@ -1,5 +1,7 @@
-/* 🧾 Comprobante de venta (Órbita): resumen de una venta de Caja o de un pedido, para enviarlo al cliente por WhatsApp.
-   No es boleta electrónica (la boleta SII va aparte). G30: se ve como boleta de papel (logo, firma) e imprime. Uso:
+/* 🧾 Comprobante de venta (núcleo G37 · antes en Despega): resumen de una venta, un pedido o un pago, para el cliente (WhatsApp, Bluetooth, PDF).
+   No es boleta electrónica (la boleta SII va aparte). Regla G31: con RUT sale con firma completa; sin RUT sale igual con el nombre del negocio.
+   Necesita del núcleo: seguro.js (CFX_ESC/CFX_URL) y datos.js; opcional impresora.js (🖨️ Bluetooth).
+   La app puede poner window.CFX_COMPROBANTE_DATOS = async (c) => ({ logo, firma: { razon, rut, giro, direccion, comuna } }) para completar solo. Uso:
    CFX_COMPROBANTE.abrir({ negocio, fecha, numero, cliente, tel, items: [{ cant, nombre, opcion, precio }], descuento, total, medio, entrega })
    G25 pedidos online: { compra: true } → "Detalle de compra" (+ boleta: { folio, url } si la tienda la emitió); { cliente_ve: true } = lo abre el cliente (sin WhatsApp). */
 (function () {
@@ -9,7 +11,7 @@
   const MEDIOS = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', mercadopago: 'Mercado Pago' };
   const telDe = (v) => { const t = String(v || '').trim(); if (!t) return ''; const d = window.CodeFixDatos && window.CodeFixDatos.telefono(t); return d || t.replace(/\D/g, ''); };
 
-  const titulo = (c) => c.compra ? 'Detalle de compra' : 'Comprobante de venta';
+  const titulo = (c) => c.titulo || (c.compra ? 'Detalle de compra' : 'Comprobante de venta');  // c.titulo: p. ej. 'Comprobante de pago' (CM)
   function texto(c) {
     const f = new Date(c.fecha || Date.now());
     const l = ['🧾 *' + titulo(c) + '*', '*' + (c.negocio || 'Mi tienda') + '*',
@@ -32,15 +34,19 @@
 
   /* G30: formato boleta (papel blanco, logo, líneas, fecha y hora, firma de la empresa) + 🖨️ Imprimir / PDF.
      c.logo y c.firma { razon, rut, giro, direccion, comuna } son opcionales: si faltan y hay sesión de la tienda, se toman solos. */
-  let FIRMA = null;
   async function completar(c) {
-    const a = window.Cuenta && Cuenta.account;
-    if (!c.logo && a) { const l = a.role === 'client' || a.role === 'equipo' ? a.negocio_logo : a.logo; if (/^(https:|data:image\/)/.test(l || '')) c.logo = l; }
-    if (!c.firma && !c.cliente_ve && a && a.role === 'user' && window.Cuenta.rpc) {
-      if (!FIRMA) FIRMA = Cuenta.rpc('boleta_estado').catch(() => ({}));
-      const b = (await FIRMA) || {};
-      if (b.rut || b.razon) c.firma = b;
-    }
+    const f = window.CFX_COMPROBANTE_DATOS;
+    if (typeof f !== 'function' || (c.logo && c.firma)) return;
+    let r = {};
+    try { r = (await f(c)) || {}; } catch (_) { return; }
+    if (!c.logo && /^(https:|data:image\/)/.test(r.logo || '')) c.logo = r.logo;
+    if (!c.firma && !c.cliente_ve && r.firma && (r.firma.rut || r.firma.razon)) c.firma = r.firma;
+  }
+  function copiar(t) {
+    const ok = () => (window.Core && Core.toast ? Core.toast('📋 Copiado') : window.App && App.toast ? App.toast('📋 Copiado') : null);
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(ok).catch(() => {});
+    const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select();
+    try { document.execCommand('copy'); ok(); } catch (_) {} a.remove();
   }
   const rutF = (r) => { const m = String(r || '').replace(/[^0-9kK]/g, '').toUpperCase().match(/^(\d+)([0-9K])$/); return m ? m[1].replace(/\B(?=(\d{3})+$)/g, '.') + '-' + m[2] : String(r || ''); };
   function papel(c) {
@@ -77,7 +83,11 @@
       descuento: c.descuento > 0 ? '-' + money(c.descuento) : '', total: money(c.total), medio: c.medio ? MEDIOS[c.medio] || c.medio : '',
       entrega: c.entrega || '', folio: c.boleta && c.boleta.folio ? String(c.boleta.folio) : '' };
   }
-  const CSS = '.cfx-comp .cb-papel{background:#fff;color:#111;border-radius:6px;padding:14px 14px 10px;font:13px/1.35 ui-monospace,Menlo,Consolas,monospace;max-height:52vh;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.2)}' +
+  const CSS = '.cfx-comp{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;padding:0;background:rgba(0,0,0,.45)}' +
+    '.cfx-comp>div{width:100%;max-width:520px;max-height:94vh;overflow:auto;display:grid;gap:8px;margin:0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111);border-radius:20px 20px 0 0;box-sizing:border-box}' +
+    '.cfx-comp>div>b{font-size:16px}.cfx-comp>div>button,.cfx-comp>div>a.btn{width:100%}.cfx-comp input{width:100%;box-sizing:border-box}' +
+    '@media(min-width:640px){.cfx-comp{align-items:center}.cfx-comp>div{border-radius:20px}}' +
+    '.cfx-comp .cb-papel{background:#fff;color:#111;border-radius:6px;padding:14px 14px 10px;font:13px/1.35 ui-monospace,Menlo,Consolas,monospace;max-height:52vh;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.2)}' +
     '.cb-papel hr{border:0;border-top:1px dashed #555;margin:8px 0}.cb-logo{display:block;max-width:90px;max-height:60px;margin:0 auto 6px;object-fit:contain}' +
     '.cb-neg{text-align:center;font-weight:800;font-size:15px}.cb-c{text-align:center;font-size:12px}.cb-chico{font-size:11px;color:#555}.cb-tit{text-align:center;font-weight:700;margin-bottom:4px}' +
     '.cb-f{display:flex;justify-content:space-between;gap:8px}.cb-f span:first-child{min-width:0;overflow-wrap:anywhere}.cb-f span:last-child{white-space:nowrap}.cb-tot{font-size:15px;margin:2px 0}' +
@@ -105,7 +115,7 @@
       '<button type="button" class="alt" data-a="print">🖨️ Imprimir o guardar PDF</button>' +
       (navigator.share ? '<button type="button" class="alt" data-a="share">📤 Compartir</button>' : '') +
       '<button type="button" class="alt" data-a="copiar">📋 Copiar</button>' +
-      '<button type="button" class="small" data-a="x">Cerrar</button></div>';
+      '<button type="button" class="small ghost" data-a="x">Cerrar</button></div>';
     completar(c).then(() => { const p = d.querySelector('.cb-papel'); if (p && (c.logo || c.firma)) p.outerHTML = papel(c); });
     const fin = () => d.remove();
     d.onclick = (e) => {
@@ -132,7 +142,7 @@
         return;
       }
       const tel = c.cliente_ve ? '' : telDe(d.querySelector('#compTel').value);
-      if (b.dataset.a === 'copiar') return window.Core ? Core.copiar(t, '📋 Copiado') : null;
+      if (b.dataset.a === 'copiar') return window.Core && Core.copiar ? Core.copiar(t, '📋 Copiado') : copiar(t);
       if (b.dataset.a === 'share' || (b.dataset.a === 'wsp' && !tel && navigator.share)) {
         return navigator.share({ title: titulo(c), text: t }).then(fin).catch(() => {});
       }

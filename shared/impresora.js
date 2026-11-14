@@ -1,4 +1,4 @@
-/* 🖨️ Impresora térmica Bluetooth (G32 c · Órbita): imprime el comprobante en papel de 58 u 80 mm (ESC/POS) desde Chrome de Android o PC.
+/* 🖨️ Impresora térmica Bluetooth (núcleo G37 · antes G32 c de Despega): imprime el comprobante en papel de 58 u 80 mm (ESC/POS) desde Chrome de Android o PC.
    iPhone/Safari no tiene Web Bluetooth → se avisa y se usa "🖨️ Imprimir o guardar PDF". Máquinas de pago por Bluetooth: NO (necesitan su app).
    Uso: CFX_IMPRESORA.imprimir(m) con m = CFX_COMPROBANTE.modelo(c) → Promise; CFX_IMPRESORA.soportado; .papel() / .papel(80); .olvidar(). */
 (function () {

@@ -8,4 +8,5 @@
 - La función "enviar" pregunta notif_correo(id) por cada notificación con email (solo el servidor puede).
 
 ## 🧠 Del núcleo: falta aplicar aquí
+- ✅ G37 (núcleo 2.76): shared/comprobante.js e impresora.js vienen del núcleo (no editar aquí: SaaS/nucleo). Logo y firma (boleta_estado) los da window.CFX_COMPROBANTE_DATOS al final de shared/cuenta.js. La 🧾 boleta SII (boleta_*) sigue en el SQL de Despega.
 - ✅ G42 (núcleo 2.75): ⬆️ 🪟 📌 ✋ activos (Más → secciones y opciones se ordenan manteniendo presionado); 🔐 aviso de enlace tapado; links de boleta/pago con CFX_URL.

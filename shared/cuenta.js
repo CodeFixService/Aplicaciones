@@ -523,3 +523,18 @@
     uid: () => account && account.id
   };
 })(window);
+
+/* G37: el comprobante del núcleo (comprobante.js) pide el logo y la firma (RUT, razón social…) a la app. */
+window.CFX_COMPROBANTE_DATOS = (function () {
+  let FIRMA = null;
+  return async function (c) {
+    const a = window.Cuenta && Cuenta.account, r = {};
+    if (!a) return r;
+    r.logo = a.role === 'client' || a.role === 'equipo' ? a.negocio_logo : a.logo;
+    if (!c.cliente_ve && a.role === 'user' && Cuenta.rpc) {
+      if (!FIRMA) FIRMA = Cuenta.rpc('boleta_estado').catch(() => ({}));
+      r.firma = (await FIRMA) || {};
+    }
+    return r;
+  };
+})();
