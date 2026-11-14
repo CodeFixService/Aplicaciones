@@ -999,7 +999,7 @@
   //   una sola llamada al tener la cuenta (también para el admin): cabecera común, ayuda y sensación Premium (CFX_PREMIUM, nunca al admin).
   //   cuenta / panel: dirección (#… o url) o función para "Mi cuenta" y "Panel de administración". Se puede volver a llamar (p. ej. al cambiar la foto).
   // ---------- Referidos: ?ref=CODIGO en el link queda guardado y se asocia al crear/entrar a la cuenta nueva ----------
-  const PANEL_EN_CM = ['orbita'];  // G34: se suman al pasar su panel al CM (Barbería, Billetera, BiciTaller, Estaciona)
+  const PANEL_EN_CM = ['orbita', 'barberia'];  // G34: se suman al pasar su panel al CM (falta Billetera, BiciTaller y Estaciona: G35)
   const PERSONALES = ['mando', 'contenido'], SOCIOS_NUCLEO = ['billetera', 'orbita', 'estaciona'];
   try { const rf = new URLSearchParams(location.search).get('ref'); if (rf && /^[A-Za-z0-9]{4,12}$/.test(rf)) localStorage.setItem('cfx-ref', rf.toUpperCase()); } catch (e) { /* nada */ }
   async function refRegistrar() {
