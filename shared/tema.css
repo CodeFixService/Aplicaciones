@@ -315,3 +315,18 @@ img, video, canvas, svg { max-width: 100%; }
 .card button, .card .btn, .tarjeta button { overflow-wrap: normal; }
 /* G27: deslizar un menú de pestañas mueve solo ese menú (el gesto no pasa a la página ni a otro menú). */
 nav.tabs.sub, [role=tablist], [data-cfx-pestanas], .seg, .segs, .seg2, .tabs2, nav.cfx-barra { overscroll-behavior-x: contain; }
+
+/* ---------- G42e · Bootstrap 5.3.8 conectado al diseño CodeFix (núcleo 2.78) ----------
+   Las utilidades de Bootstrap (text-body-secondary, border, rounded-*, shadow, link-*…) usan los MISMOS colores de la app:
+   claro/oscuro, color de marca, Pro y 🎨 Colores a tu gusto (todo sale de var(--cfx-*)). No se carga el Bootstrap completo:
+   sus .btn/.card/.modal/.row/.toast chocarían con los de las apps. */
+:root, :root[data-bs-theme] {
+  --bs-body-bg: var(--cfx-fondo); --bs-body-color: var(--cfx-texto); --bs-emphasis-color: var(--cfx-texto);
+  --bs-secondary-color: var(--cfx-texto-2); --bs-tertiary-color: var(--cfx-texto-2); --bs-secondary-bg: var(--cfx-campo); --bs-tertiary-bg: var(--cfx-tarjeta);
+  --bs-border-color: var(--cfx-borde); --bs-border-color-translucent: color-mix(in srgb, var(--cfx-borde) 70%, transparent);
+  --bs-border-radius: var(--cfx-radio-chico); --bs-border-radius-sm: 8px; --bs-border-radius-lg: var(--cfx-radio); --bs-border-radius-xl: 20px; --bs-border-radius-xxl: 28px;
+  --bs-font-sans-serif: var(--cfx-letra); --bs-body-font-family: var(--cfx-letra);
+  --bs-primary: var(--brand, var(--marca, #2563eb)); --bs-link-color: var(--brand, var(--marca, #2563eb)); --bs-link-hover-color: var(--brand, var(--marca, #2563eb));
+  --bs-success: var(--cfx-ok); --bs-danger: var(--cfx-mal); --bs-warning: var(--cfx-aviso);
+  --bs-box-shadow: var(--cfx-sombra); --bs-box-shadow-sm: 0 1px 3px rgba(15, 23, 42, .1); --bs-focus-ring-color: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 30%, transparent);
+}
