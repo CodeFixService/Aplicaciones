@@ -1,1 +1,1 @@
-{"version": "6.13", "bd": "5.49", "notas": "🌐 Dominio de CodeFix: el CM lo arma en Cloudflare y los links, QR y correos usan el dominio cuando está listo."}
+{"version": "6.14", "bd": "5.49", "notas": "🧭 Panel universal: el panel de administrador de Despega Pyme está en el CM (Apps → 🧭 Panel); el admin que entra a la app va directo al CM."}

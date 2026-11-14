@@ -8,7 +8,7 @@ y notificaciones push y por correo. © CodeFix · Josué Castillo — ver [LICEN
 | **Inicio** (`index.html`) | Iniciar sesión / crear cuenta / recuperar contraseña, activar Pro con una key, bandeja de avisos. |
 | **Órbita** (`apps/fichas`) | Fichas publicitarias, clientes, campañas por WhatsApp y, en Pro, envío automático por push y correo a suscriptores. |
 | **Caja Rápida** (`apps/caja`) | Ventas, productos, stock y reportes. |
-| **Administración** (`apps/admin`) | Solo el administrador general: usuarios, keys Pro, avisos a todos, ajustes de push y Gmail. |
+| **Administración** (`apps/admin`) | G34: el panel del admin vive en el Centro de Mando → Apps → Despega Pyme → 🧭 Panel (`apps/admin/` solo desvía allá). |
 | **Suscribirse** (`apps/suscribirse`) | Página pública (sin cuenta) donde los clientes de un negocio Pro se suscriben a sus ofertas. |
 
 ## Roles

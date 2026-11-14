@@ -999,6 +999,7 @@
   //   una sola llamada al tener la cuenta (también para el admin): cabecera común, ayuda y sensación Premium (CFX_PREMIUM, nunca al admin).
   //   cuenta / panel: dirección (#… o url) o función para "Mi cuenta" y "Panel de administración". Se puede volver a llamar (p. ej. al cambiar la foto).
   // ---------- Referidos: ?ref=CODIGO en el link queda guardado y se asocia al crear/entrar a la cuenta nueva ----------
+  const PANEL_EN_CM = ['orbita'];  // G34: se suman al pasar su panel al CM (Barbería, Billetera, BiciTaller, Estaciona)
   const PERSONALES = ['mando', 'contenido'], SOCIOS_NUCLEO = ['billetera', 'orbita', 'estaciona'];
   try { const rf = new URLSearchParams(location.search).get('ref'); if (rf && /^[A-Za-z0-9]{4,12}$/.test(rf)) localStorage.setItem('cfx-ref', rf.toUpperCase()); } catch (e) { /* nada */ }
   async function refRegistrar() {
@@ -1079,6 +1080,9 @@
     if (primera) R('cfx_sitio').then((s) => { try { if (s && typeof s === 'object') localStorage.setItem('cfx:sitio', JSON.stringify({ dominio: s.dominio || '', url: s.url || '', activo: !!s.activo })); } catch (e) { /* nada */ } }).catch(() => { /* base sin la función todavía */ });
     if (primera) pinRevisar();
     Object.assign(CFG, o);
+    // G34 · 🧭 Panel universal: las apps con su panel ya en el Centro de Mando no se usan como administrador (public.admin_email()):
+    // el admin que entra va directo al CM (su usuario y clave siguen sirviendo allí). Socios, negocios y clientes, normal.
+    if (CFG.admin && !CFG.socio && PANEL_EN_CM.includes(APP)) { location.replace(panelCM()); return; }
     contarAvisos();
     if (!CFG.foto && !(window.CFX_PERFIL_APP || {}).foto) CFG.foto = lsL(fotoKey()) || null;  // foto guardada por BASE (este celular)
     try { if (!sessionStorage.getItem('cfx-inicio')) sessionStorage.setItem('cfx-inicio', location.pathname + location.search); } catch (e) { /* nada */ }

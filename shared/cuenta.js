@@ -111,7 +111,7 @@
   function cabecera(a, rootPath) {
     window.CFX_AYUDA_PEND = Object.assign(window.CFX_AYUDA_PEND || {}, { rpc, app: 'orbita', admin: !!a.is_admin, premium: !!a.is_pro, id: a.id, hasta: a.pro_until,
       nombre: a.empresa || a.nombre || '', email: a.email, foto: null, quitar: '.pill.admin, #licTag',
-      cuenta: rootPath + '#ajustes', panel: a.is_admin && !/\/apps\/admin\//.test(location.pathname) ? rootPath + 'apps/admin/' : null,
+      cuenta: rootPath + '#ajustes', panel: null,  // G34: el panel del admin está en el Centro de Mando (núcleo ayuda.js lo lleva allá)
       salir: async () => { await signOut(); location.replace(rootPath); },
       // 🔔 G20: la campana abre la ventana de avisos del núcleo (deslizar = borrar; tocar = texto completo).
       avisos: {

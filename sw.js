@@ -24,7 +24,6 @@ const FILES = [
   'apps/caja/app.js',
   'apps/admin/',
   'apps/admin/index.html',
-  'apps/admin/app.js',
   'apps/suscribirse/',
   'apps/suscribirse/index.html',
   'apps/mensajes/',

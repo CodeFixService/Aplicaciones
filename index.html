@@ -529,7 +529,8 @@
     }
     if (!acc.terms_at) { showView('v-terms'); return; }
     // Órbita: el admin solo administra; el cliente entra directo a su tienda.
-    if (acc.is_admin) { location.replace('apps/admin/'); return; }
+    // G34 · 🧭 El panel del admin está en el Centro de Mando: el admin va directo allá (apps/admin/ también desvía).
+    if (acc.is_admin) { location.replace(window.CFX_AYUDA && CFX_AYUDA.panelCM ? CFX_AYUDA.panelCM() : 'apps/admin/'); return; }
     if (acc.role === 'client' && !/^#(cuenta|avisos|ajustes|plan|premium)$/.test(location.hash)) { location.replace('apps/catalogo/'); return; }
     pintar(acc);
     showView('v-home');

@@ -3,226 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
-<title>Administración · Despega Pyme</title>
-<link rel="manifest" href="../../manifest.webmanifest">
-<link rel="icon" href="../../icons/icon-192.png">
+<title>Panel · Despega Pyme</title>
+<style>body{font:16px system-ui,sans-serif;margin:0;padding:40px 16px;text-align:center;background:#f6f7f9;color:#0f172a}@media (prefers-color-scheme:dark){body{background:#0b1220;color:#e5e7eb}}a{color:#2563eb;font-weight:700}</style>
 <link rel="stylesheet" href="../../shared/vendor/bootstrap-utilities.min.css">
-<link rel="stylesheet" href="../../shared/core.css">
 <link rel="stylesheet" href="../../shared/tema.css">
-<script src="../../shared/seguro.js"></script>
 <script src="../../shared/carga.js"></script>
 <script src="../../shared/humano.js"></script>
-<script src="../../shared/core.js"></script>
-<style>
-  .lic-new { background: var(--bg); border-radius: 10px; padding: 12px; margin-top: 10px; }
-  .st-scheduled { background: color-mix(in srgb, #3b82f6 16%, transparent); color: #3b82f6; border-color: transparent; }
-  .st-sending { background: color-mix(in srgb, #f59e0b 18%, transparent); color: #d97706; border-color: transparent; }
-  .st-sent { background: color-mix(in srgb, #10b981 16%, transparent); color: #059669; border-color: transparent; }
-  .st-failed { background: color-mix(in srgb, #ef4444 16%, transparent); color: #dc2626; border-color: transparent; }
-  .st-cancelled { background: var(--line); }
-  #reportes li { flex-wrap: wrap; }
-  #reportes li > .grow { flex: 1 1 100%; }
-  .acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%; }
-  .acc button, .acc select { width: auto; padding: 7px 12px; font-size: 13px; border-radius: 10px; }
-  .uso { margin: 10px 0; }
-  .uso .barra { height: 12px; border-radius: 99px; background: var(--field); overflow: hidden; margin-top: 4px; }
-  .uso .barra div { height: 100%; border-radius: 99px; }
-  .chk { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
-  .chk label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-size: 15px; }
-  .filtros { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; }
-  .filtros button { flex: none; }
-  #actLista li { flex-wrap: wrap; align-items: flex-start; }
-  #actLista li > .grow { flex: 1 1 220px; min-width: 0; }
-  #actLista .sem { font-size: 22px; line-height: 1; flex: none; }
-  .barras { display: flex; align-items: flex-end; gap: 2px; height: 70px; margin: 6px 0 2px; }
-  .barras div { flex: 1; background: var(--brand); border-radius: 3px 3px 0 0; min-height: 2px; opacity: .85; }
-  .barras.vacia div { background: var(--line); }
-  .ejes { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
-  .seg2 { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
-  .seg2 button { flex: none; }
-  .neg { display: flex; gap: 12px; align-items: flex-start; }
-  .neg .lg { width: 42px; height: 42px; border-radius: 12px; flex: none; display: grid; place-items: center; font-weight: 800; color: #fff; background: var(--brand) center / cover no-repeat; }
-  .lista2 { display: grid; gap: 12px; }
-  .lista2 > .card { margin: 0; }
-  .comp { max-width: 100%; border-radius: 12px; border: 1px solid var(--line); margin-top: 8px; }
-  #tabPagos { min-width: 17px; height: 17px; padding: 0 4px; border-radius: 99px; background: var(--bad); color: #fff; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
-  table.t { width: 100%; border-collapse: collapse; font-size: 14px; } table.t td { padding: 5px 0; border-bottom: 1px solid var(--line); } table.t td.r { text-align: right; font-variant-numeric: tabular-nums; }
-  /* Tu logo reemplaza al escudo de arriba. */
-  header.top h1::before { display: none; }
-  #bInicio.logo { background: #fff var(--logo) center / cover no-repeat; font-size: 0; box-shadow: 0 0 0 1px var(--line); }
-  .logoGrande { width: 72px; height: 72px; border-radius: 18px; display: grid; place-items: center; font-size: 30px; background: var(--field) center / cover no-repeat; }
-</style>
-<script>window.CFX_BARRA = { orden: ['resumen', 'negocios', '+', 'clientes', 'ajustes'], nuevo: { texto: 'Negocio', ir: 'negocios', foco: '#bNuevo' } }; // barra de abajo (núcleo)</script>
+<script src="../../shared/seguro.js"></script>
 </head>
 <body>
-<header class="top"><a href="#" id="bInicio" aria-label="Administración" style="display:none">🛡️</a><h1>Administración</h1><span class="pill admin">ADMIN</span></header>
-<main>
-  <!-- RESUMEN -->
-  <section class="view on" id="v-resumen">
-    <div class="card hidden" id="cBase" style="border:2px solid var(--bad)"><b>⏳ La base de datos se está actualizando sola</b><p class="muted" id="baseTxt" style="margin:4px 0 0"></p></div>
-    <div class="stats" id="stats"></div>
-    <div class="card" id="cActividad">
-      <h2>📡 Actividad de empresas <span class="pill" id="actPill"></span></h2>
-      <p class="muted" id="actHoy"></p>
-      <div class="filtros" id="actFiltros">
-        <button class="small on" data-f="">Todas</button>
-        <button class="small alt" data-f="verde">🟢 Activas</button>
-        <button class="small alt" data-f="amarillo">🟡 Tibias</button>
-        <button class="small alt" data-f="rojo">🔴 Dormidas</button>
-      </div>
-      <ul class="list" id="actLista"></ul>
-      <div class="btns">
-        <button class="small" id="bMotivarTodas">📣 Motivar a las dormidas</button>
-        <button class="alt small" id="bLimpiarAct">🧹 Limpiar historial</button>
-      </div>
-      <p class="muted" style="font-size:13px;margin-bottom:0">🔒 Solo tú ves esto. 🟢 entró hoy o ayer · 🟡 hace 2 a 7 días · 🔴 más de 7 días o nunca.
-        Se guarda la última vez que entraron y un resumen por día (máx. 90 días). "Limpiar historial" borra ese resumen; la última conexión se mantiene.</p>
-    </div>
-    <div class="card hidden" id="cMotivar">
-      <div class="row" style="align-items:center"><h2 style="margin:0;flex:2" id="motTitulo">📣 Motivar</h2><button class="alt small" id="bCerrarMot" style="flex:none">Cerrar</button></div>
-      <p class="muted" id="motInfo"></p>
-      <label>Tono del mensaje</label>
-      <div class="filtros" id="motTonos">
-        <button class="small on" data-t="motivador">💪 Motivador</button>
-        <button class="small alt" data-t="amable">😊 Amable</button>
-        <button class="small alt" data-t="directo">🎯 Directo</button>
-        <button class="small alt" data-t="divertido">😄 Divertido</button>
-      </div>
-      <label for="motTit">Título</label><input id="motTit" maxlength="80">
-      <label for="motTxt">Mensaje (puedes editarlo)</label><textarea id="motTxt" maxlength="1000" rows="6"></textarea>
-      <div class="btns"><button class="alt small" id="bOtroTxt">🔄 Otro texto</button><button id="bEnviarMot">📣 Enviar</button></div>
-      <p class="muted" style="font-size:13px;margin-bottom:0">Le llega como notificación push y queda en su chat con CodeFix. Máximo 1 aviso por empresa al día.</p>
-    </div>
-    <div class="card hidden" id="cEmpresa">
-      <div class="row" style="align-items:center"><h2 style="margin:0;flex:2" id="empTitulo">🏢 Empresa</h2><button class="alt small" id="bCerrarEmp" style="flex:none">Cerrar</button></div>
-      <div class="stats" id="empStats" style="margin-top:12px"></div>
-      <p class="muted" id="empInfo"></p>
-      <div id="empAct"></div>
-      <div class="btns"><button class="small" id="bMotivarEmp">📣 Motivar</button><a class="btn small alt" id="bChatEmp" href="#">💬 Chat</a></div>
-      <ul class="list" id="empPubs"></ul>
-    </div>
-    <div class="card" id="cIngresos">
-      <h2>💰 Ingresos</h2>
-      <div class="stats" id="ingresos"></div>
-      <h2 style="margin-top:14px">⏰ Planes que vencen en 7 días</h2>
-      <p class="muted">Se les avisa solo 15 y 5 días antes (editable en Ajustes → Reglas). Puedes avisarles antes con un toque.</p>
-      <ul class="list" id="vencen"></ul>
-    </div>
-    <div class="card" id="cServidor">
-      <h2>🧹 Limpieza</h2>
-      <p class="muted" style="margin-top:0">Se hace sola todos los días. También puedes limpiar ahora:</p>
-      <div class="btns"><button class="alt small" data-l="comprobantes">Comprobantes viejos</button><button class="alt small" data-l="avisos">Avisos de +7 días</button>
-        <button class="alt small" data-l="mensajes">Mensajes de +7 días</button><button class="alt small" data-l="pedidos">Pedidos expirados (+60 días)</button>
-        <button class="danger small" data-l="todo">Limpiar todo</button></div>
-    </div>
-    <div class="card" id="cReportes">
-      <h2>🚩 Reportes <span class="pill" id="nRep">0</span></h2>
-      <ul class="list" id="reportes"></ul>
-    </div>
-  </section>
-
-  <!-- NEGOCIOS -->
-  <section class="view" id="v-negocios">
-    <div class="card upsell" id="cRegistro"><h2>📲 Registro abierto de negocios</h2>
-      <p class="muted" style="margin-top:0">Publica este link o QR donde quieras (redes, ferias, afiches): cualquier negocio crea su cuenta Gratis sola,
-        elige su rubro y parte con los días de Pro de regalo. Después te compra el Pro desde Mi plan. Se cierra en Ajustes → Reglas.</p>
-      <input id="regLink" readonly aria-label="Link de registro de negocios">
-      <div class="btns"><button class="small" id="regShare" type="button">📤 Compartir</button><button class="small alt" id="regCopiar" type="button">📋 Copiar</button>
-        <button class="small alt" id="regQR" type="button">QR</button><a class="btn small alt" id="regVer" target="_blank" rel="noopener">👁️ Ver</a></div>
-      <div id="regQRbox" class="hidden" style="text-align:center;margin-top:10px"><img id="regQRimg" alt="QR de registro" style="width:220px;background:#fff;border-radius:12px;padding:8px">
-        <div class="btns" style="justify-content:center"><button class="small alt" id="regQRdl" type="button">⬇️ Descargar QR</button></div><small class="cfx-nota-btn" style="text-align:center">Listo para imprimir.</small></div>
-    </div>
-    <div class="card"><h2>🧹 Cuentas que no se usan</h2>
-      <p class="muted" style="margin-top:0">Negocios sin Pro, sin productos, pedidos, clientes ni diseños, que no entran hace los días que elijas. Borrarlos libera espacio.
-        Revisa la lista antes: se borran para siempre.</p>
-      <div class="row" style="align-items:flex-end"><div style="flex:1"><label for="inDias">Sin entrar hace (días)</label><input id="inDias" inputmode="numeric" value="30"></div>
-        <button class="alt small" id="bInBuscar" type="button" style="flex:none">Buscar</button></div>
-      <ul class="list" id="inLista"></ul>
-      <div class="btns hidden" id="inBtns"><button class="danger small" id="bInBorrar" type="button">Borrar estas cuentas</button></div>
-    </div>
-    <div class="card"><h2>➕ Crear negocio</h2>
-      <p class="muted" style="margin-top:0">Los negocios se pueden registrar solos con el link de arriba, o los creas tú aquí. Parten con la prueba Pro gratis (días en Ajustes → Reglas) y luego pasan solos a Gratis; el Pro sigue cuando apruebas su comprobante (o se lo das tú).</p>
-      <div class="row" style="flex-wrap:wrap"><div style="min-width:160px"><label for="nNombre">Nombre del negocio</label><input id="nNombre" maxlength="80" autocomplete="off"></div>
-        <div style="min-width:180px"><label for="nEmail">Correo del dueño</label><input id="nEmail" type="email" autocomplete="off"></div></div>
-      <label for="nClave">Contraseña</label>
-      <div class="row"><input id="nClave" autocomplete="off" style="flex:2"><button class="alt small" id="nGen" type="button" style="flex:none">Generar</button></div>
-      <p class="err" id="nErr"></p>
-      <div class="btns"><button id="bNuevo">Crear negocio</button></div>
-      <div class="lic-new hidden" id="nCred" style="white-space:pre-line;font-size:14px"></div>
-      <div class="btns hidden" id="nCredBtns"><button class="ok small" id="nWsp">💬 Enviar por WhatsApp</button><button class="alt small" id="nCopiar">Copiar</button></div>
-    </div>
-    <input id="nBuscar" placeholder="Buscar negocio…" aria-label="Buscar negocio" style="margin-bottom:10px">
-    <div class="seg2" id="nSeg"><button class="small on" data-f="">Todos</button><button class="small alt" data-f="pro">⭐ Pro</button><button class="small alt" data-f="free">Gratis</button><button class="small alt" data-f="solos">🆕 Se registraron solos</button>
-      <button class="small alt" data-f="vence">⏳ Por vencer</button><button class="small alt" data-f="inactivos">💤 Sin actividad 7 días</button><button class="small alt" data-f="susp">⛔ Suspendidos</button></div>
-    <p class="muted" id="nCuenta"></p>
-    <div class="lista2" id="nLista"></div>
-  </section>
-
-  <!-- CLIENTES -->
-  <section class="view" id="v-clientes">
-    <input id="cBuscar" placeholder="Buscar cliente…" aria-label="Buscar cliente" style="margin-bottom:10px">
-    <select id="cNeg" aria-label="Filtrar por negocio" style="margin-bottom:10px"></select>
-    <div class="seg2" id="cSeg"><button class="small on" data-f="">Todos</button><button class="small alt" data-f="pro">⭐ Premium</button>
-      <button class="small alt" data-f="susp">⛔ Suspendidos</button><button class="small alt" data-f="equipo">🧑‍🍳 Equipo de negocios</button></div>
-    <p class="muted" id="cCuenta"></p>
-    <div class="card"><ul class="list" id="cLista"></ul></div>
-  </section>
-
-  <!-- PAGOS -->
-  <section class="view" id="v-ajustes">
-    <div class="aj hidden" id="aj-reglas"><div class="card"><div id="reglasBody"></div><div class="btns"><button id="bReglas">Guardar reglas</button></div></div></div>
-    <div class="aj hidden" id="aj-push">
-      <div class="card"><h2>🛰️ Servidor (función "enviar")</h2><p class="muted">Comprueba que la función que envía notificaciones y crea cuentas esté instalada y al día.</p>
-        <div class="btns"><button class="alt" id="bPing">Probar conexión</button></div><p class="muted" id="pingRes"></p></div>
-      <div class="card"><h2>🔔 Notificaciones push</h2><p class="muted" id="pushEstado"></p>
-        <div class="btns"><button id="bVapid">Generar claves push</button></div>
-        <p class="muted">Solo se hace una vez. Si las regeneras, todos tendrán que volver a activar las notificaciones.</p></div>
-    <div class="card">
-      <h2>Correo (Gmail)</h2>
-      <p class="muted" id="mailEstado"></p>
-      <label>Cuenta Gmail que envía</label><input id="gUser" type="email" placeholder="tucorreo@gmail.com">
-      <label>Contraseña de aplicación de Google (16 letras)</label>
-      <input id="gPass" type="password" autocomplete="off" placeholder="xxxx xxxx xxxx xxxx">
-      <label>Nombre del remitente</label><input id="gNombre" placeholder="CodeFix">
-      <div class="btns"><button id="bGmail">Guardar</button></div>
-      <p class="muted">Se crea en tu cuenta Google → Seguridad → Verificación en 2 pasos → Contraseñas de aplicaciones.
-        Se guarda protegida en el servidor: nadie puede leerla desde la app, ni siquiera tú.</p>
-    </div>
-    </div>
-    <div class="aj hidden" id="aj-registro"><div class="card">
-      <p class="muted" style="margin-top:0">Solo tú lo ves y solo tú puedes borrarlo.</p>
-      <div class="btns"><button class="alt small" id="bRegViejo" type="button">🧹 Borrar lo de más de 30 días</button><button class="danger small" id="bRegTodo" type="button">Borrar todo</button></div>
-      <ul class="list" id="regLista"></ul></div></div>
-    <div class="aj hidden" id="aj-cuenta"><div class="card"><h2>🎨 Mi marca</h2>
-      <p class="muted" style="margin-top:0">Tu logo sale arriba en tu panel, en el ingreso, en el registro de negocios y en las empresas que aún no suben el suyo.</p>
-      <div class="row" style="align-items:center;gap:14px"><div class="logoGrande" id="mLogoVer">🛡️</div>
-        <div style="flex:2"><label for="mLogo">Logo (cuadrado se ve mejor)</label><input type="file" accept="image/*" id="mLogo"></div></div>
-      <div class="btns"><button class="alt small" id="bQuitarMLogo" type="button">Quitar logo</button></div>
-      <label for="mNombre">Nombre de tu marca</label><input id="mNombre" maxlength="80" placeholder="CodeFix">
-      <div class="btns"><button class="small" id="bMNombre" type="button">Guardar nombre</button></div>
-      <label>Color</label><div class="swatches" id="mColores"></div>
-      <div class="row" style="margin-top:10px;align-items:center"><span class="muted" style="flex:2">O elige cualquier color:</span><input type="color" id="mColor" aria-label="Color personalizado"></div>
-    </div>
-    <div class="card"><h2>👤 Mi cuenta</h2>
-      <label for="sWsp">Tu WhatsApp de contacto (botón 🚀 Emprende de los clientes)</label><input id="sWsp" inputmode="tel" placeholder="56912345678">
-      <div class="btns"><button id="bWsp">Guardar</button><button class="alt" id="bSalir">Cerrar sesión</button></div></div></div>
-  </section>
-</main>
-
-<nav class="tabs">
-  <button data-v="resumen" class="on"><span data-ico="grafico"></span>Resumen</button>
-  <button data-v="negocios"><span data-ico="bolsa"></span>Negocios</button>
-  <button data-v="clientes"><span data-ico="usuarios"></span>Clientes</button>
-  <button data-v="ajustes"><span data-ico="ajustes"></span>Ajustes</button>
-</nav>
-
-<script src="../../shared/config.js"></script>
-<script src="../../shared/vendor/qrcode.js"></script>
-<script src="../../shared/vendor/supabase.js"></script>
-<script src="../../shared/cuenta.js"></script>
-<script src="app.js"></script>
+<!-- G34 · 🧭 El panel de administrador de Despega Pyme ahora está en el Centro de Mando (CM → Apps → Despega Pyme → 🧭 Panel). -->
+<p>🧭 El panel ahora está en el <b>Centro de Mando</b>.</p>
+<p><a id="ir" href="https://saas.juanjosuecastilloloyola.workers.dev/admin/">Abrir el Centro de Mando</a></p>
+<script src="../../shared/ayuda.js"></script>
+<script>
+  (function () {
+    var u = ''; try { u = window.CFX_AYUDA.panelCM(); } catch (e) { u = ''; }
+    if (u) document.getElementById('ir').href = u;
+    location.replace(document.getElementById('ir').href);
+  })();
+</script>
 <script src="../../shared/iconos.js"></script>
 <script src="../../shared/instalar.js"></script>
 <script src="../../shared/barra.js"></script>
@@ -233,7 +34,6 @@
 <script src="../../shared/pagos.js"></script>
 <script src="../../shared/verificar.js"></script>
 <script src="../../shared/premium.js"></script>
-<script src="../../shared/ayuda.js"></script>
 <script src="../../shared/datos.js"></script>
 <script src="../../shared/vitrina.js"></script>
 </body>
