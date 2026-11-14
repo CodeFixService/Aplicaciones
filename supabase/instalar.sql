@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.50'::text $$;
+language sql immutable as $$ select '5.51'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -6106,26 +6106,40 @@ begin
 end $$;
 
 -- ---------- Nueva versión disponible: push a todos al liberar (una sola vez por versión) ----------
--- La llama el Centro de Mando después de liberar (Apps → Liberar) con las notas que se escriben ahí.
+-- G44b: el aviso dice SOLO categorías (🔒 Seguridad · ⚙️ Funcionamiento · 🖥️ Sistema · ✏️ Mejoras · 🎁 Premios/novedades), nunca qué se hizo.
+-- p_notas trae las categorías (claves seg/func/sis/mej/pre o sus nombres); el texto libre NO llega a los usuarios.
+-- El detalle (p_detalle) queda solo para el administrador: en cfx_versiones (sin políticas = nadie lo lee) y en el 📜 Registro.
 create table if not exists public.cfx_versiones (version text primary key, notas text not null default '', avisados int not null default 0, creado timestamptz not null default now());
+alter table public.cfx_versiones add column if not exists detalle text not null default '';
 alter table public.cfx_versiones enable row level security;
-create or replace function public.cfx_avisar_version(p_version text, p_notas text default '', p_app text default '') returns int
+create or replace function public.cfx_version_categorias(p text) returns text
+language sql immutable set search_path = '' as $$
+  select coalesce(string_agg(c.nombre, ' · ' order by c.orden), '')
+  from (values (1, '🔒 Seguridad', '(^|[^a-z])seg([^a-z]|$)|🔒|seguridad'), (2, '⚙️ Funcionamiento', '(^|[^a-z])func([^a-z]|$)|⚙|funcionamiento'),
+               (3, '🖥️ Sistema', '(^|[^a-z])sis([^a-z]|$)|🖥|sistema'), (4, '✏️ Mejoras', '(^|[^a-z])mej([^a-z]|$)|✏|mejora'),
+               (5, '🎁 Premios/novedades', '(^|[^a-z])pre([^a-z]|$)|🎁|premio|novedad')) c(orden, nombre, patron)
+  where lower(coalesce(p, '')) ~ c.patron
+$$;
+drop function if exists public.cfx_avisar_version(text, text, text);
+create or replace function public.cfx_avisar_version(p_version text, p_notas text default '', p_app text default '', p_detalle text default '') returns int
 language plpgsql security definer set search_path = '' as $$
-declare u uuid; n int := 0; v text := trim(coalesce(p_version, '')); nt text := left(trim(coalesce(p_notas, '')), 140);
+declare u uuid; n int := 0; v text := trim(coalesce(p_version, '')); cat text := public.cfx_version_categorias(p_notas);
+  det text := left(trim(coalesce(nullif(trim(coalesce(p_detalle, '')), ''), p_notas, '')), 400);
 begin
   perform public.cfx_es_admin();
   if v !~ '^[0-9]+(\.[0-9]+){0,3}$' then raise exception 'Versión no válida'; end if;
   if exists (select 1 from public.cfx_versiones where version = v) then return 0; end if;
   for u in select * from public.cfx_destinatarios('todos') loop
-    perform public.cfx_avisar(u, '🚀 Nueva versión disponible', left(coalesce(nullif(trim(p_app), '') || ' ', '') || 'v' || v || case when nt <> '' then ' · ' || nt else '' end || '. Se actualiza sola al abrirla.', 240));
+    perform public.cfx_avisar(u, '🔄 Nueva versión', left(coalesce(nullif(trim(p_app), '') || ' ', '') || 'v' || v || case when cat <> '' then ': ' || cat else '' end || '. Se actualiza sola al abrirla.', 240));
     n := n + 1;
   end loop;
-  insert into public.cfx_versiones (version, notas, avisados) values (v, nt, n);
-  perform public.cfx_anotar('version', 'v' || v || ' avisada a ' || n);
+  insert into public.cfx_versiones (version, notas, avisados, detalle) values (v, cat, n, det);
+  perform public.cfx_anotar('version', left('v' || v || ' avisada a ' || n || case when cat <> '' then ' · ' || cat else '' end || case when det <> '' then ' — ' || det else '' end, 500));
   return n;
 end $$;
-revoke execute on function public.cfx_avisar_version(text, text, text) from public, anon;
-grant execute on function public.cfx_avisar_version(text, text, text) to authenticated;
+revoke execute on function public.cfx_avisar_version(text, text, text, text) from public, anon;
+grant execute on function public.cfx_avisar_version(text, text, text, text) to authenticated;
+revoke all on function public.cfx_version_categorias(text) from public, anon, authenticated;
 
 -- ---------- Keys de Premium (de un solo uso). Se guardan cifradas: el código completo solo se ve al crearlas. ----------
 create or replace function public.cfx_keys_crear(p_n int, p_rol text, p_dias int, p_nota text default '') returns jsonb
@@ -7071,7 +7085,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
