@@ -116,7 +116,7 @@
       guiaPasos: { perfil: { ir: rootPath + '#tienda', campo: '#tLogo', como: 'Tu nombre ya está. Toca aquí y sube tu logo desde la galería: se guarda solo.' },
         whatsapp: { ir: rootPath + '#tienda', campo: '#eTel' }, productos: { ir: rootPath + 'apps/caja/#productos', campo: '#p-nombre' },
         cobro: { ir: rootPath + '#links', campo: '#cLinks input[type=url]' }, despacho: { ir: rootPath + '#despacho', campo: '#dRet' },
-        politicas: { ir: rootPath + '#tienda', campo: '#pf-cambios', como: 'Escribe tu política de cambios (y tu RUT si tienes; no es obligatorio) y toca Guardar.' } },  // G34: el panel del admin está en el Centro de Mando (núcleo ayuda.js lo lleva allá)
+        politicas: { ir: rootPath + '#tienda', campo: '#pf-rut', como: 'Escribe tu RUT (si no tienes empresa, el tuyo personal) y tu política de cambios, y toca Guardar. Es obligatorio: la ley lo pide para vender por internet.' } },  // G34: el panel del admin está en el Centro de Mando (núcleo ayuda.js lo lleva allá)
       salir: async () => { await signOut(); location.replace(rootPath); },
       // 🔔 G20: la campana abre la ventana de avisos del núcleo (deslizar = borrar; tocar = texto completo).
       avisos: {
