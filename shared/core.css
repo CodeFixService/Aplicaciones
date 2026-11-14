@@ -120,6 +120,8 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .list li:last-child { border-bottom: 0; }
 .list .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* G42i · correo en 1 línea con … (nunca partido a mitad). */
+.correo { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 
 /* Etiquetas */
 .pill {

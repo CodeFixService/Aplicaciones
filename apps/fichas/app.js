@@ -642,7 +642,7 @@
     const list = all.filter((c) => !q || (c.nombre + c.tel + c.tag + (c.email || '')).toLowerCase().includes(q));
     $('clientes').innerHTML = list.length ? list.map((c) =>
       '<li><div class="grow"><b>' + Core.esc(c.nombre) + '</b> ' + (c.app ? '<span class="pill pro">📲 App</span>' : '<span class="pill">Solo WhatsApp</span>') +
-      '<div class="muted">' + (c.tel ? '+' + c.tel : 'Sin WhatsApp') + (c.email ? ' · ' + Core.esc(c.email) : '') + '</div></div>' +
+      '<div class="muted">' + (c.tel ? '+' + c.tel : 'Sin WhatsApp') + (c.email ? ' · <span class="correo" title="' + Core.esc(c.email) + '">' + Core.esc(c.email) + '</span>' : '') + '</div></div>' +
       (c.tag ? '<span class="pill">' + Core.esc(c.tag) + '</span>' : '') +
       (c.app ? '<a class="btn small alt" href="../mensajes/?con=' + c.id + '" aria-label="Chat">💬</a>' +
                '<button class="small alt" data-a="edit" data-id="' + c.id + '" aria-label="Editar">✏️</button>'
@@ -927,7 +927,7 @@
       $('subsLista').innerHTML = '<li class="cfx-cifras-li"><div class="cfx-cifras">' + cifra('👥', data.length, data.length === 1 ? 'suscriptor' : 'suscriptores') +
         cifra('🔔', data.filter((x) => x.endpoint).length, 'con notificaciones') + cifra('✉️', data.filter((x) => x.email).length, 'con correo') + '</div></li>' +
         data.slice(0, 50).map((x) => '<li><div class="grow"><b>' + Core.esc(x.nombre || 'Sin nombre') + '</b><div class="muted">' +
-          (x.endpoint ? '🔔 ' : '') + Core.esc(x.email || '') + '</div></div>' +
+          (x.endpoint ? '🔔 ' : '') + '<span class="correo" title="' + Core.esc(x.email || '') + '">' + Core.esc(x.email || '') + '</span></div></div>' +
           '<button class="small danger" data-id="' + x.id + '">✕</button></li>').join('');
     } catch (e) { $('subsLista').innerHTML = '<li class="empty">Sin conexión</li>'; }
   }
