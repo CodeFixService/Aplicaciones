@@ -358,7 +358,8 @@
   $('bCupon').onclick = async () => {
     // Se revisa aquí antes de ir al servidor (antes salía un error 400 al tocar Guardar vacío).
     const cod = $('cCodigo').value.trim(), pct = parseInt($('cPct').value, 10);
-    if (!/^[a-z0-9]{3,20}$/i.test(cod)) { $('cCodigo').focus(); return Core.toast('🎟️ Escribe un código de 3 a 20 letras o números (ej: VERANO10)'); }
+    const limpio = cod.replace(/[^a-z0-9]/gi, ''); // como el servidor (cfx_desc_codigo): "g12-b" → G12B
+    if (limpio.length < 3 || limpio.length > 20) { $('cCodigo').focus(); return Core.toast('🎟️ Escribe un código de 3 a 20 letras o números (ej: VERANO10)'); }
     if (!(pct >= 1 && pct <= 90)) { $('cPct').focus(); return Core.toast('🎟️ El descuento va de 1 a 90 %'); }
     try {
       await Cuenta.rpc('cfx_desc_guardar', { p_codigo: $('cCodigo').value, p_porcentaje: parseInt($('cPct').value, 10), p_hasta: $('cHasta').value || null });
