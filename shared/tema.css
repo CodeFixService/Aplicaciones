@@ -316,6 +316,13 @@ img, video, canvas, svg { max-width: 100%; }
 /* G27: deslizar un menú de pestañas mueve solo ese menú (el gesto no pasa a la página ni a otro menú). */
 nav.tabs.sub, [role=tablist], [data-cfx-pestanas], .seg, .segs, .seg2, .tabs2, nav.cfx-barra { overscroll-behavior-x: contain; }
 
+/* G58 🎨 Íconos parejos: el azul de los íconos es el color de la app, y con "Colores a tu gusto → Íconos" cambian TODOS
+   (menús, títulos, tarjetas, pestañas y botones sin relleno). Verde, rojo y ámbar siguen diciendo bien/mal/ojo. */
+html .ic-e.azul { color: var(--brand, var(--marca, #2563eb)); }
+html.cfx-col-ico .ic-e:not(.verde):not(.rojo):not(.ambar):not(.oro) { color: var(--cfx-icono) !important; }
+html.cfx-col-ico :is(button, .btn, .chip, [role=tab]):not(.ghost):not(.lnk):not(.alt):not(.sec):not(.cfx-fila):not(:is(nav.tabs, .seg, .segs, .tabs2) button:not(.on):not(.activo)) .ic-e:not(.verde):not(.rojo):not(.ambar):not(.oro) { color: inherit !important; }
+html.cfx-col-ico :is(nav.tabs, .seg, .segs, .tabs2) button:not(.on):not(.activo) .ic-e { color: var(--cfx-icono) !important; }
+
 /* ---------- G42e · Bootstrap 5.3.8 conectado al diseño CodeFix (núcleo 2.78) ----------
    Las utilidades de Bootstrap (text-body-secondary, border, rounded-*, shadow, link-*…) usan los MISMOS colores de la app:
    claro/oscuro, color de marca, Pro y 🎨 Colores a tu gusto (todo sale de var(--cfx-*)). No se carga el Bootstrap completo:

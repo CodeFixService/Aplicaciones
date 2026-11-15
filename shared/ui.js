@@ -278,3 +278,99 @@
   window.CFX_DIALOGO = { confirmar, pedir, avisar };
   window.alert = (t) => { window.CFX_DIALOGO.avisar(t); };
 })();
+
+/* G58 🔔 Avisos modernos (toast) iguales en todas las apps: tarjeta que sobresale (sombra 3D), ícono según el tipo,
+   barrita de carga que se va vaciando, al final se difumina y desaparece. Se borra deslizándola hacia el lado o con la ✕
+   (la ✕ no se puede tocar mientras el aviso está apareciendo). Mantener el dedo encima pausa la barrita.
+   API: CFX_AVISO(texto, { tipo: 'ok'|'error'|'info', ms, accion: { texto, fn } }) → el aviso. Cada app llama a su toast() de siempre
+   y este lo dibuja (si el núcleo no cargó, la app usa su aviso viejo). Máximo 3 a la vez. */
+(function () {
+  'use strict';
+  if (window.CFX_AVISO) return;
+  const d = document, quieto = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let pila = null;
+  const ICO = {
+    ok: '<path d="M20 6 9 17l-5-5"/>',
+    error: '<path d="M12 8v5M12 16.5v.01"/><path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/>'
+  };
+  function estilo() {
+    if (pila) return;
+    const s = d.createElement('style');
+    s.textContent =
+      '.cfx-tsts{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:2147483100;width:min(94vw,440px);display:flex;flex-direction:column;gap:8px;pointer-events:none;font-family:var(--cfx-letra,system-ui,sans-serif)}' +
+      '.cfx-tst{--c:var(--brand,var(--marca,#2563eb));position:relative;display:flex;align-items:center;gap:10px;padding:12px 12px 15px 12px;border-radius:16px;overflow:hidden;pointer-events:auto;touch-action:pan-y;' +
+      'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);border:1px solid var(--cfx-borde,#dce3ea);' +
+      'box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 2px 4px rgba(15,23,42,.08),0 14px 34px -10px rgba(15,23,42,.42);' +
+      'animation:cfxAvEntra .38s cubic-bezier(.2,.9,.25,1.15) both;transition:transform .25s ease,opacity .25s ease,filter .25s ease}' +
+      '.cfx-tst.ok{--c:var(--cfx-ok,#16a34a)}.cfx-tst.error{--c:var(--cfx-mal,#dc2626)}' +
+      '.cfx-tst-i{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:11px;color:#fff;background:var(--c);box-shadow:0 6px 14px -6px var(--c)}' +
+      '.cfx-tst-i svg{width:19px;height:19px}.cfx-tst-t{flex:1;min-width:0;font-size:14.5px;line-height:1.35;font-weight:600;overflow-wrap:anywhere;white-space:pre-line}' +
+      '.cfx-tst-a{flex:none;min-height:34px;padding:0 12px;border-radius:10px;border:0;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c);font:inherit;font-weight:700;font-size:13.5px;cursor:pointer}' +
+      '.cfx-tst-x{flex:none;display:grid;place-items:center;width:30px;height:30px;min-width:0!important;min-height:0!important;padding:0!important;margin:0!important;border-radius:50%!important;border:0!important;background:transparent!important;color:var(--cfx-texto-2,#5b6472)!important;cursor:pointer;transition:opacity .2s}' +
+      '.cfx-tst-x svg{width:16px;height:16px}.cfx-tst.entrando .cfx-tst-x{opacity:.3;pointer-events:none}' +
+      '.cfx-tst-b{position:absolute;left:0;right:0;bottom:0;height:4px;background:color-mix(in srgb,var(--c) 14%,transparent)}' +
+      '.cfx-tst-b i{display:block;height:100%;width:100%;background:var(--c);border-radius:0 4px 4px 0;transform-origin:left;animation:cfxAvBarra var(--ms,3000ms) linear forwards}' +
+      '.cfx-tst.pausa .cfx-tst-b i{animation-play-state:paused}' +
+      '.cfx-tst.sale{opacity:0;filter:blur(6px);transform:scale(.96) translateY(-6px);pointer-events:none}' +
+      '.cfx-tst.arrastra{transition:none;animation:none}' +
+      '@keyframes cfxAvEntra{from{opacity:0;transform:translateY(-18px) scale(.94)}}@keyframes cfxAvBarra{to{transform:scaleX(0)}}' +
+      '@media (prefers-reduced-motion:reduce){.cfx-tst{animation:none;transition:opacity .2s}.cfx-tst.sale{filter:none;transform:none}}' +
+      '@media print{.cfx-tsts{display:none}}';
+    (d.head || d.documentElement).appendChild(s);
+    pila = d.createElement('div'); pila.className = 'cfx-tsts'; pila.setAttribute('role', 'status'); pila.setAttribute('aria-live', 'polite');
+    d.body.appendChild(pila);
+  }
+  const tipoDe = (t) => /^\s*(⚠️|❌|⛔|🚫)|\b(error|no se pudo|falló|fall[oó]|inválid|incorrect|sin conexión)/i.test(t) ? 'error' : /^\s*(✅|✔️|🎉|👍)|\b(listo|guardad|enviad|copiad|creado|agregad|actualizad)/i.test(t) ? 'ok' : 'info';
+  function aviso(texto, o) {
+    o = o || {}; texto = String(texto == null ? '' : texto);
+    if (!d.body) return null;
+    estilo();
+    if (!pila.isConnected) d.body.appendChild(pila);
+    const tipo = o.tipo || (o.error ? 'error' : tipoDe(texto));
+    const ms = Math.max(1500, +o.ms || (o.accion ? 8000 : tipo === 'error' ? 5000 : 3200));
+    // el mismo texto otra vez → no se apila: se reinicia el que ya está
+    for (const v of pila.children) if (v._t === texto && !v.classList.contains('sale')) { v._reiniciar(); return v; }
+    while (pila.children.length >= 3) pila.firstElementChild._cerrar(true);
+    const v = d.createElement('div'); v.className = 'cfx-tst entrando ' + tipo; v._t = texto; v.style.setProperty('--ms', ms + 'ms');
+    if (tipo === 'error') v.setAttribute('role', 'alert');
+    v.innerHTML = '<span class="cfx-tst-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICO[tipo] + '</svg></span>' +
+      '<span class="cfx-tst-t"></span><button type="button" class="cfx-tst-x no-ico" aria-label="Cerrar aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>' +
+      '<span class="cfx-tst-b" aria-hidden="true"><i></i></span>';
+    v.querySelector('.cfx-tst-t').textContent = texto.replace(/^\s*(✅|✔️|❌|⚠️|⛔|🚫|ℹ️)\uFE0F?\s*/u, '');  // el ícono de la izquierda ya lo dice
+    if (o.accion && o.accion.texto) {
+      const a = d.createElement('button'); a.type = 'button'; a.className = 'cfx-tst-a no-ico'; a.textContent = o.accion.texto;
+      a.onclick = () => { try { o.accion.fn && o.accion.fn(); } finally { cerrar(); } };
+      v.insertBefore(a, v.querySelector('.cfx-tst-x'));
+    }
+    let fin = null, resta = ms, desde = 0, ido = false;
+    const correr = () => { clearTimeout(fin); desde = Date.now(); fin = setTimeout(cerrar, resta); };
+    const pausar = () => { if (ido || v.classList.contains('pausa')) return; clearTimeout(fin); resta = Math.max(400, resta - (Date.now() - desde)); v.classList.add('pausa'); };
+    const seguir = () => { if (ido || !v.classList.contains('pausa')) return; v.classList.remove('pausa'); correr(); };
+    function cerrar(ya) {
+      if (ido) return; ido = true; clearTimeout(fin); v.classList.add('sale');
+      if (ya || quieto()) v.remove(); else setTimeout(() => v.remove(), 260);
+    }
+    v._cerrar = cerrar;
+    v._reiniciar = () => { resta = ms; const b = v.querySelector('.cfx-tst-b i'); b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; v.classList.remove('pausa'); correr(); };
+    v.querySelector('.cfx-tst-x').onclick = () => cerrar();
+    setTimeout(() => v.classList.remove('entrando'), quieto() ? 0 : 420);
+    // deslizar hacia el lado para borrar
+    let x0 = null, y0 = 0, dx = 0, lado = false;
+    v.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; x0 = e.clientX; y0 = e.clientY; dx = 0; lado = false; pausar(); });
+    v.addEventListener('pointermove', (e) => {
+      if (x0 == null) return; dx = e.clientX - x0;
+      if (!lado && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - y0)) { lado = true; v.classList.add('arrastra'); try { v.setPointerCapture(e.pointerId); } catch (er) { /* nada */ } }
+      if (lado) { v.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 40) + 'deg)'; v.style.opacity = String(Math.max(.15, 1 - Math.abs(dx) / 260)); }
+    });
+    const soltar = () => {
+      if (x0 == null) return; x0 = null; v.classList.remove('arrastra');
+      if (lado && Math.abs(dx) > 90) { ido = true; clearTimeout(fin); v.style.transition = 'transform .2s ease,opacity .2s ease'; v.style.transform = 'translateX(' + (dx > 0 ? 120 : -120) + '%)'; v.style.opacity = '0'; setTimeout(() => v.remove(), 210); return; }
+      v.style.transform = ''; v.style.opacity = ''; seguir();
+    };
+    v.addEventListener('pointerup', soltar); v.addEventListener('pointercancel', soltar); v.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') soltar(); });
+    pila.appendChild(v); correr();
+    return v;
+  }
+  window.CFX_AVISO = aviso;
+})();
