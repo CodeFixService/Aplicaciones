@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.56'::text $$;
+language sql immutable as $$ select '5.57'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7458,7 +7458,10 @@ language sql immutable as $$
          ('productos', '🛍️ Productos y stock', 'Vende productos en la caja y lleva su stock.'),
          ('agenda_redes', '🤖 Reservas por WhatsApp e Instagram', 'Link y respuestas listas para que reserven desde tus redes.'),
          -- G59: módulos de taller (BiciTaller primero; sirven para cualquier app con órdenes de trabajo).
-         ('presupuesto', '✅ Presupuesto por link', 'El cliente aprueba o rechaza cada arreglo desde su celular: sin llamadas ni reclamos.')
+         ('presupuesto', '✅ Presupuesto por link', 'El cliente aprueba o rechaza cada arreglo desde su celular: sin llamadas ni reclamos.'),
+         ('aviso_lista', '🔔 Aviso "bici lista"', 'Al dejarla lista, el cliente recibe el aviso por WhatsApp con el total y el link; si no la retira, se lo recordamos.'),
+         ('mantencion', '⏰ Recordatorio de mantención', 'Cada X meses le avisamos al cliente que le toca mantención: vuelve solo.'),
+         ('stock', '📦 Repuestos y stock', 'Stock de repuestos que baja solo con cada orden y pedido a tu proveedor por WhatsApp con un toque.')
 $$;
 
 create or replace function public.cfx_venta() returns jsonb

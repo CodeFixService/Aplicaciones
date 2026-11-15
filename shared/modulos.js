@@ -147,6 +147,9 @@
     membresia: { tit: 'Membresía', pasos: [['fila', '🔁 Plan 4 cortes al mes · $25.000'], ['izq', '👨 Diego se suscribe'], ['fila', '✂️ Corte 1 de 4 usado'], ['aviso', '💰 Plata segura todos los meses']] },
     productos: { tit: 'Productos y stock', pasos: [['fila', '🧴 Pomada mate · stock 8'], ['der', '💵 Vendes 1 en la caja con el corte'], ['fila', '📦 Stock 7 · te avisamos cuando queden 2'], ['aviso', '💰 +$8.990 en la venta']] },
     presupuesto: { tit: 'Presupuesto por link', pasos: [['fila', '🔧 Revisaste la bici: cadena $18.000 · pastillas $9.000'], ['der', '📲 Le llega el link a Pedro'], ['izq', '✅ Cadena: Sí · ❌ Pastillas: No'], ['aviso', '✅ Trabajas solo lo aprobado: total $18.000']] },
+    aviso_lista: { tit: 'Aviso “bici lista”', pasos: [['fila', '🚦 Mueves la bici de Pedro a “Lista”'], ['der', '📲 “Pedro, tu bici está lista ✅ Total $27.000 · ver detalle 👉 link”'], ['fila', '⏳ Pasan 2 días y no la retira…'], ['aviso', '🔔 Le recordamos solo: menos bicis ocupando espacio']] },
+    mantencion: { tit: 'Recordatorio de mantención', pasos: [['fila', '🔧 Pedro hizo mantención en marzo'], ['fila', '📅 Pasan 4 meses…'], ['izq', '🔔 “Pedro, a tu bici le toca mantención. Reserva aquí 👉”'], ['aviso', '✅ Pedro vuelve solo: $25.000 más']] },
+    stock: { tit: 'Repuestos y stock', pasos: [['fila', '⛓️ Cadena 11v · stock 3'], ['der', '🔧 La usas en la orden de Pedro'], ['fila', '📦 Stock 2 · quedan pocas'], ['izq', '📲 Pedido listo a tu proveedor: 5 cadenas 11v'], ['aviso', '✅ Nunca te quedas sin repuestos']] },
     agenda_redes: { tit: 'Reservas desde tus redes', pasos: [['izq', '📲 Instagram: “¿Tienes hora hoy?”'], ['der', '🤖 Respuesta lista: “Reserva aquí 👉 tu link”'], ['fila', '📅 Reserva hecha en 30 segundos'], ['aviso', '✅ Sin contestar uno por uno']] },
     recordatorios: { tit: 'Recordatorios', pasos: [['fila', '📅 Mañana 18:00 · Lucía'], ['izq', '🔔 “Lucía, te esperamos mañana a las 18:00”'], ['aviso', '✅ Menos clientes que olvidan venir']] }
   };
