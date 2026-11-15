@@ -273,5 +273,5 @@
   const pedir = (texto, valor, o = {}) => abrir(texto, { input: true, valor, tipo: o.tipo, si: o.si || 'Listo', vacio: null });
   const avisar = (texto, o = {}) => abrir(texto, { si: o.si || 'Entendido', no: false, vacio: undefined, lleno: undefined });
   window.CFX_DIALOGO = { confirmar, pedir, avisar };
-  window.alert = (t) => { avisar(t); };
+  window.alert = (t) => { window.CFX_DIALOGO.avisar(t); };
 })();
