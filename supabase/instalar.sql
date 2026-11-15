@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.53'::text $$;
+language sql immutable as $$ select '5.54'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7447,7 +7447,16 @@ language sql immutable as $$
          ('medicion', '📊 Medir anuncios', 'Meta Pixel y Google Analytics en tu tienda: mide qué anuncio te trae ventas.'),
          ('dominio', '🌐 Dominio propio', 'Tu tienda en tu dirección (mitienda.cl) en vez del link de Despega Pyme.'),
          ('reservas', '📅 Reservas', 'Agenda en línea para tus clientes.'),
-         ('recordatorios', '⏰ Recordatorios', 'Avisos automáticos antes de cada cita o vencimiento.')
+         ('recordatorios', '⏰ Recordatorios', 'Avisos automáticos antes de cada cita o vencimiento.'),
+         -- G53: módulos de agenda (Barbería primero; sirven para cualquier app con reservas).
+         ('antifalta', '💳 Anti-falta', 'Abono obligatorio y bloqueo automático para los clientes que reservan y no llegan.'),
+         ('espera', '⏳ Lista de espera', 'Si no hay horas, el cliente se anota y le avisamos apenas se libere una.'),
+         ('resenas', '⭐ Reseñas en Google', 'Al cliente feliz le pedimos su reseña en Google: más gente te encuentra.'),
+         ('portafolio', '🖼️ Portafolio', 'Fotos de tus mejores trabajos en tu página de reservas.'),
+         ('giftcards', '🎁 Gift cards', 'Vende tarjetas de regalo con código para canjear en tu negocio.'),
+         ('membresia', '🔁 Membresía', 'Plan mensual para tus clientes (ej. 4 cortes al mes): plata segura cada mes.'),
+         ('productos', '🛍️ Productos y stock', 'Vende productos en la caja y lleva su stock.'),
+         ('agenda_redes', '🤖 Reservas por WhatsApp e Instagram', 'Link y respuestas listas para que reserven desde tus redes.')
 $$;
 
 create or replace function public.cfx_venta() returns jsonb
@@ -7529,6 +7538,17 @@ begin
   return mx;
 end $$;
 
+-- G53: ¿el plan del negocio ya trae este módulo? (ej. Barbería: Premium incluye los 3 primeros). Gancho opcional de cada app:
+-- cfx_modulo_plan_app(text, uuid) → boolean. Sin gancho: ninguno viene en el plan.
+create or replace function public.cfx_modulo_plan(p_modulo text, p_negocio uuid) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare r boolean;
+begin
+  if p_negocio is null or to_regprocedure('public.cfx_modulo_plan_app(text,uuid)') is null then return false; end if;
+  execute 'select public.cfx_modulo_plan_app($1, $2)' into r using p_modulo, p_negocio;
+  return coalesce(r, false);
+end $$;
+
 -- Pantalla 🧩 Módulos del negocio: catálogo, precios (con su descuento Premium), lo que tiene y hasta cuándo.
 create or replace function public.cfx_modulos_tienda() returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
@@ -7544,7 +7564,7 @@ begin
     'prueba_pack', exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item like 'pack:%'),
     'modulos', coalesce((select jsonb_agg(jsonb_build_object('clave', k, 'nombre', coalesce(c.nombre, k), 'detalle', coalesce(c.detalle, ''),
         'precio', round(public.cfx_venta_precio(k) * (100 - d) / 100.0)::int, 'lista', public.cfx_venta_precio(k),
-        'vende', public.cfx_venta_activa(k), 'activo', public.cfx_modulo_de(k, n),
+        'vende', public.cfx_venta_activa(k), 'activo', public.cfx_modulo_de(k, n) or public.cfx_modulo_plan(k, n), 'plan', public.cfx_modulo_plan(k, n),
         'hasta', m.hasta, 'origen', m.origen, 'prueba_usada', exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item = k),
         'links', v #> array['links', k]) order by o)
       from unnest(public.cfx_modulos_de_app()) with ordinality u(k, o)
@@ -7664,7 +7684,7 @@ begin
 end $$;
 
 revoke all on function public.cfx_modulos_catalogo(), public.cfx_venta(), public.cfx_venta_on(), public.cfx_venta_precio(text), public.cfx_venta_activa(text), public.cfx_venta_modulos(text),
-  public.cfx_negocio_cuenta(uuid), public.cfx_negocio_premium(uuid), public.cfx_modulo_de(text, uuid), public.cfx_modulo_mio(text),
+  public.cfx_negocio_cuenta(uuid), public.cfx_negocio_premium(uuid), public.cfx_modulo_plan(text, uuid), public.cfx_modulo_de(text, uuid), public.cfx_modulo_mio(text),
   public.cfx_modulos_dar(uuid, text, int, text), public.cfx_modulos_avisar(), public.cfx_modulos_borrar(uuid) from public, anon, authenticated;
 revoke all on function public.cfx_modulos_de(uuid), public.cfx_modulos_tienda(), public.cfx_modulo_probar(text), public.cfx_venta_admin(),
   public.cfx_venta_guardar(jsonb), public.cfx_modulo_regalar(text, text, int) from public, anon;

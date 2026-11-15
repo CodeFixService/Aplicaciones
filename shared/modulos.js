@@ -35,7 +35,7 @@
     let D = null, anual = false;
     const precio = (x) => anual ? x.precio * D.anual_meses : x.precio;
     const per = () => anual ? '/año' : '/mes';
-    const estado = (m) => !m.vende ? '<span class="cfxm-ok">✓ Incluido</span>' : !m.activo ? '' : m.origen === 'prueba'
+    const estado = (m) => m.plan ? '<span class="cfxm-ok">✅ Incluido en tu Premium</span>' : !m.vende ? '<span class="cfxm-ok">✓ Incluido</span>' : !m.activo ? '' : m.origen === 'prueba'
       ? '<span class="cfxm-prueba">🎁 Prueba gratis hasta el ' + fecha(m.hasta) + '</span>' : '<span class="cfxm-ok">✅ Activo hasta el ' + fecha(m.hasta) + '</span>';
     const nombreDe = (k) => ((D.modulos.find((m) => m.clave === k) || {}).nombre || k);
     function producto(x) {
@@ -45,7 +45,8 @@
     function pintar() {
       if (!D.activo) { el.innerHTML = '<p class="cfxm-sub">Todos los módulos vienen incluidos en tu plan.</p>'; return; }
       const mods = D.modulos.filter((m) => m.vende);
-      const packs = D.packs.map((p) => {
+      const enPlan = (k) => (D.modulos.find((m) => m.clave === k) || {}).plan;
+      const packs = D.packs.filter((p) => !(p.modulos.length && p.modulos.every(enPlan))).map((p) => {  // G53: sin packs que el plan ya trae
         const activo = p.modulos.length && p.modulos.every((k) => (D.modulos.find((m) => m.clave === k) || {}).activo);
         const ahorro = p.suelto > p.lista ? Math.round(100 - p.lista * 100 / p.suelto) : 0;
         return '<div class="cfxm-pack' + (p.destacado ? ' top' : '') + '">' + (p.destacado ? '<span class="cfxm-tag">⭐ Más elegido</span>' : '') +
@@ -59,13 +60,13 @@
       }).join('');
       const sueltos = mods.map((m) => '<div class="cfxm-mod"><div class="cfxm-fila"><h3>' + esc(m.nombre) + '</h3><b>' + pesos(precio(m)) + per() + '</b></div>' +
         '<p class="cfxm-sub">' + esc(m.detalle) + '</p>' + estado(m) +
-        (D.dueno ? '<div class="cfxm-btns">' + (!m.activo ? '<button type="button" data-probar="' + esc(m.clave) + '">▶️ Probar</button>' : '') +
+        (D.dueno && !m.plan ? '<div class="cfxm-btns">' + (!m.activo ? '<button type="button" data-probar="' + esc(m.clave) + '">▶️ Probar</button>' : '') +
           '<button type="button" class="si" data-comprar="' + esc(m.clave) + '">' + (m.activo && m.origen !== 'prueba' ? '🔁 Renovar' : 'Comprar') + '</button></div>' : '') + '</div>').join('');
       const incluidos = D.modulos.filter((m) => !m.vende);
       el.innerHTML = '<div class="cfxm">' +
-        (D.premium && D.descuento ? '<div class="cfxm-aviso">⭐ Eres Premium: pagas ' + D.descuento + '% menos en todos los módulos.</div>'
+        (D.premium && D.descuento ? '<div class="cfxm-aviso">⭐ Eres Premium: pagas ' + D.descuento + '% menos en los módulos' + (D.modulos.some((m) => m.plan) ? ' y algunos ya vienen incluidos' : '') + '.</div>'
           : D.descuento_pro ? '<div class="cfxm-aviso">⭐ Con Premium pagas ' + D.descuento_pro + '% menos en todos los módulos.</div>' : '') +
-        (D.dueno ? '' : '<p class="cfxm-sub">Solo el dueño de la tienda puede comprar módulos.</p>') +
+        (D.dueno ? '' : '<p class="cfxm-sub">Solo el dueño del negocio puede comprar módulos.</p>') +
         '<div class="cfxm-per" role="group" aria-label="Forma de pago"><button type="button" data-per="m" class="' + (anual ? '' : 'on') + '">Mensual</button>' +
         '<button type="button" data-per="a" class="' + (anual ? 'on' : '') + '">Anual · ' + (12 - D.anual_meses) + ' meses gratis</button></div>' +
         (packs ? '<h3 style="margin:4px 0 0">Packs</h3><div class="cfxm-packs">' + packs + '</div>' : '') +
@@ -138,6 +139,14 @@
     medicion: { tit: 'Medir anuncios', pasos: [['fila', '📣 Anuncio en Instagram'], ['barras', [['Vistas', 90], ['Visitas', 55], ['Carrito', 30], ['Ventas', 18]]], ['aviso', '📊 Este anuncio te trajo 5 ventas']] },
     dominio: { tit: 'Dominio propio', pasos: [['fila', '🌐 Escriben <b>mitienda.cl</b>'], ['der', '🏪 Llegan directo a tu tienda'], ['aviso', '✅ Más confianza, tu propia marca']] },
     reservas: { tit: 'Reservas', pasos: [['fila', '📅 Viernes 18:00 libre'], ['izq', '👩 Lucía reserva a las 18:00'], ['aviso', '✅ Queda en tu agenda']] },
+    antifalta: { tit: 'Anti-falta', pasos: [['fila', '📅 Pedro reservó y no llegó (2ª vez)'], ['fila', '🔒 Ahora debe pagar el abono para reservar'], ['izq', '💳 Pedro paga $3.000 de abono'], ['aviso', '✅ Llega a la hora: tu agenda no pierde plata']] },
+    espera: { tit: 'Lista de espera', pasos: [['fila', '📅 Sábado: todo lleno'], ['izq', '🔔 Lucía: “Avísame si se libera una hora”'], ['fila', '❌ Diego anula su hora de las 12:00'], ['aviso', '🔔 Lucía recibe el aviso y la toma']] },
+    resenas: { tit: 'Reseñas en Google', pasos: [['fila', '⭐⭐⭐⭐⭐ Lucía calificó su corte'], ['izq', '“¿Nos ayudas con tu reseña en Google?”'], ['der', '👍 Lucía la deja en 1 toque'], ['aviso', '📍 Más gente te encuentra en Google Maps']] },
+    portafolio: { tit: 'Portafolio', pasos: [['fila', '📸 Subes la foto de tu mejor degradado'], ['izq', '👀 Lucía la ve en tu página de reservas'], ['aviso', '📅 “Quiero ese corte” → reserva']] },
+    giftcards: { tit: 'Gift cards', pasos: [['fila', '🎁 Ana compra una gift card de $15.000'], ['der', '📲 Se la regala a su papá con código'], ['fila', '✂️ Él la canjea en caja'], ['aviso', '💰 Venta extra + cliente nuevo']] },
+    membresia: { tit: 'Membresía', pasos: [['fila', '🔁 Plan 4 cortes al mes · $25.000'], ['izq', '👨 Diego se suscribe'], ['fila', '✂️ Corte 1 de 4 usado'], ['aviso', '💰 Plata segura todos los meses']] },
+    productos: { tit: 'Productos y stock', pasos: [['fila', '🧴 Pomada mate · stock 8'], ['der', '💵 Vendes 1 en la caja con el corte'], ['fila', '📦 Stock 7 · te avisamos cuando queden 2'], ['aviso', '💰 +$8.990 en la venta']] },
+    agenda_redes: { tit: 'Reservas desde tus redes', pasos: [['izq', '📲 Instagram: “¿Tienes hora hoy?”'], ['der', '🤖 Respuesta lista: “Reserva aquí 👉 tu link”'], ['fila', '📅 Reserva hecha en 30 segundos'], ['aviso', '✅ Sin contestar uno por uno']] },
     recordatorios: { tit: 'Recordatorios', pasos: [['fila', '📅 Mañana 18:00 · Lucía'], ['izq', '🔔 “Lucía, te esperamos mañana a las 18:00”'], ['aviso', '✅ Menos clientes que olvidan venir']] }
   };
   function escena(clave, nombre, detalle) {
@@ -170,7 +179,7 @@
       '<div class="cfxd-esc" aria-live="polite"></div><p class="cfxd-ej">▶️ Ejemplo con datos inventados: no usa ni cambia nada de tu negocio. <a href="#" data-otra>Ver otra vez</a></p>' +
       (x.precio ? '<p class="cfxd-precio">' + pesos(x.precio) + '<small>/mes</small></p>' : '') +
       '<div class="cfxd-btns">' + (puedeProbar ? '<button type="button" class="si" data-gratis>🎁 Activar ' + D.prueba_dias + ' días gratis</button>' : '') +
-      (activo ? '' : D.dueno ? '<button type="button" class="' + (puedeProbar ? '' : 'si') + '" data-comprar>Comprar</button>' : '<p class="cfxd-sub" style="text-align:center">Pídele al dueño de la tienda que lo active en Ajustes → 🧩 Módulos.</p>') +
+      (activo ? '' : D.dueno ? '<button type="button" class="' + (puedeProbar ? '' : 'si') + '" data-comprar>Comprar</button>' : '<p class="cfxd-sub" style="text-align:center">Pídele al dueño del negocio que lo active en 🧩 Módulos.</p>') +
       '<button type="button" class="cerrar" data-x>Cerrar</button></div><p class="cfxd-err"></p></div>';
     document.body.appendChild(d);
     const esc_ = d.querySelector('.cfxd-esc'); let i = 0, t = null;
@@ -212,7 +221,7 @@
     const m = D && D.activo && (D.modulos || []).find((x) => x.clave === clave && x.vende);
     if (!m || m.activo) return false;
     el.innerHTML = '<div class="cfxk"><div class="ico">🧩</div><h2>' + esc(m.nombre) + '</h2><p>' + esc(m.detalle) + '</p>' +
-      '<p><b>Este módulo no está activo en tu tienda.</b></p><button type="button">▶️ Probar módulo</button></div>';
+      '<p><b>Este módulo no está activo en tu negocio.</b></p><button type="button">▶️ Probar módulo</button></div>';
     el.querySelector('button').onclick = () => probar(clave, Object.assign({}, o, { datos: D }));
     return true;
   }
