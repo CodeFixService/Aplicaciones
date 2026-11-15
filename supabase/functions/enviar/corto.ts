@@ -1,2 +1,2 @@
 // Versión de una línea para pegar en el editor de Supabase (carga index.ts desde GitHub).
-import 'https://raw.githubusercontent.com/CodeFixService/Aplicaciones/f525557cef33f5f61e9bb3b821c6e188ef731673/supabase/functions/enviar/index.ts';
+import 'https://raw.githubusercontent.com/CodeFixService/Aplicaciones/d5ac2c3efd15f472741018f909e9475658faf430/supabase/functions/enviar/index.ts';
