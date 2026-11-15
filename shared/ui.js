@@ -239,6 +239,7 @@
       '.cfx-dlg-b button{flex:1;min-height:46px;border-radius:14px;border:0;font:inherit;font-weight:700;font-size:15px;cursor:pointer}' +
       '.cfx-dlg-no{background:var(--cfx-campo,#f1f4f7);color:var(--cfx-texto,#111827);border:1px solid var(--cfx-borde,#dce3ea)!important}' +
       '.cfx-dlg-si{background:var(--brand,#2563eb);color:var(--brand-ink,#fff)}.cfx-dlg-si.peligro{background:var(--cfx-rojo,#dc2626);color:#fff}' +
+      'dialog.cfx-dlg{border:0;margin:0;width:auto;height:auto;max-width:none;max-height:none;color:inherit;overflow:visible}dialog.cfx-dlg::backdrop{background:transparent}' +
       '@keyframes cfxDlgF{from{opacity:0}}@keyframes cfxDlgS{from{transform:translateY(24px);opacity:.6}}' +
       '@media (min-width:700px){.cfx-dlg{align-items:center}.cfx-dlg-c{border-radius:20px;border-bottom:1px solid var(--cfx-borde,#dce3ea)}}' +
       '@media (prefers-reduced-motion:reduce){.cfx-dlg,.cfx-dlg-c{animation:none}}';
@@ -247,7 +248,7 @@
   function abrir(texto, o) {
     estilo();
     return new Promise((fin) => {
-      const antes = d.activeElement, v = d.createElement('div');
+      const antes = d.activeElement, v = d.createElement('dialog');  // G55: <dialog> modal → queda ENCIMA de otra ventana abierta (antes quedaba detrás y no se podía tocar)
       v.className = 'cfx-dlg'; v.setAttribute('role', 'presentation');
       const c = d.createElement('div'); c.className = 'cfx-dlg-c'; c.setAttribute('role', o.input ? 'dialog' : 'alertdialog'); c.setAttribute('aria-modal', 'true');
       const t = d.createElement('p'); t.className = 'cfx-dlg-t'; t.id = 'cfxDlgT' + Date.now(); t.textContent = String(texto == null ? '' : texto); c.setAttribute('aria-labelledby', t.id); c.appendChild(t);
@@ -257,12 +258,14 @@
       const si = d.createElement('button'); si.type = 'button'; si.className = 'cfx-dlg-si' + (o.peligro ? ' peligro' : ''); si.textContent = o.si || 'Aceptar';
       if (o.no !== false) { const no = d.createElement('button'); no.type = 'button'; no.className = 'cfx-dlg-no'; no.textContent = o.no || 'Cancelar'; no.onclick = () => cerrar(o.vacio); b.appendChild(no); }
       b.appendChild(si); c.appendChild(b); v.appendChild(c);
-      function cerrar(r) { d.removeEventListener('keydown', tecla, true); v.remove(); try { if (antes && antes.focus) antes.focus({ preventScroll: true }); } catch (e) { /* nada */ } fin(r); }
+      function cerrar(r) { d.removeEventListener('keydown', tecla, true); try { v.close(); } catch (e) { /* nada */ } v.remove(); try { if (antes && antes.focus) antes.focus({ preventScroll: true }); } catch (e) { /* nada */ } fin(r); }
       function tecla(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(o.vacio); } else if (e.key === 'Enter' && (inp ? d.activeElement === inp : true)) { e.preventDefault(); si.click(); } }
       si.onclick = () => cerrar(inp ? inp.value : o.lleno);
       v.addEventListener('click', (e) => { if (e.target === v) cerrar(o.vacio); });
       d.addEventListener('keydown', tecla, true);
+      v.addEventListener('cancel', (e) => { e.preventDefault(); cerrar(o.vacio); });
       d.body.appendChild(v);
+      try { v.showModal(); } catch (e) { v.setAttribute('open', ''); }
       setTimeout(() => { if (inp) { inp.focus(); inp.select(); } else si.focus(); }, 30);
     });
   }

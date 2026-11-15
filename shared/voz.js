@@ -153,7 +153,7 @@
     };
     r.onspeechend = () => { if (rec === r) callado(600); };
     r.onend = () => { if (rec === r) terminar(); };
-    r.onerror = (ev) => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') alert('Permite el micrófono en el navegador para dictar.'); if (rec === r) terminar(); };
+    r.onerror = (ev) => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { const t = 'Permite el micrófono en el navegador para dictar.'; if (window.CFX_DIALOGO) CFX_DIALOGO.avisar(t); else console.warn(t); } if (rec === r) terminar(); };
     b.classList.add('on'); b.setAttribute('aria-label', 'Detener el dictado');
     callado(SIN_VOZ); tMax = setTimeout(parar, MAX);
     try { r.start(); } catch (e) { terminar(); }

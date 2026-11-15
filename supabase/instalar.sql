@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.52'::text $$;
+language sql immutable as $$ select '5.53'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -6644,6 +6644,113 @@ grant execute on function public.cfx_cm_vincular(text, text, text, text), public
   public.cfx_chat_bandeja(), public.cfx_chat_hilo(uuid), public.cfx_chat_responder(uuid, text), public.cfx_guia() to authenticated;
 revoke all on function public.cfx_guia_app() from public, anon, authenticated;
 
+-- ---------- 4) G55 🐞🎁 Reporte de fallas con premio ----------
+-- Cualquiera con cuenta (Más → Cuenta y ayuda → 🐞 Reportar una falla) cuenta qué pasó, con foto opcional; la app adjunta sola
+-- versión, pantalla, celular y sus últimos errores. Le llega al Centro de Mando (aviso + push) y se ve en CM → Mensajes → 🐞 Fallas.
+-- "🎁 Es real" suma 15 días de Premium al negocio (clientes y equipo: solo las gracias, no pagan), una vez por reporte.
+create table if not exists public.cfx_fallas (
+  id        bigserial primary key,
+  cuenta    uuid not null,
+  email     text not null default '',
+  nombre    text not null default '',
+  rol       text not null default '',
+  texto     text not null check (length(texto) between 5 and 1500),
+  foto      text check (foto is null or (foto ~ '^data:image/(webp|jpeg|png);base64,' and length(foto) <= 400000)),
+  datos     jsonb not null default '{}',
+  estado    text not null default 'nuevo' check (estado in ('nuevo', 'revisando', 'real', 'no')),
+  respuesta text not null default '',
+  dias      int not null default 0,
+  creado    timestamptz not null default now(),
+  resuelto  timestamptz
+);
+create index if not exists cfx_fallas_cuenta_idx on public.cfx_fallas (cuenta, creado);
+create index if not exists cfx_fallas_estado_idx on public.cfx_fallas (estado, id);
+alter table public.cfx_fallas enable row level security;
+revoke all on public.cfx_fallas from anon, authenticated;
+
+create or replace function public.cfx_falla_enviar(p_texto text, p_foto text default null, p_datos jsonb default '{}') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare y jsonb := public.cfx_yo(); u uuid := (y ->> 'id')::uuid; t text := trim(coalesce(p_texto, '')); f text := nullif(trim(coalesce(p_foto, '')), ''); d jsonb := coalesce(p_datos, '{}'); i bigint;
+begin
+  if u is null then raise exception 'Inicia sesión'; end if;
+  if length(t) < 5 then raise exception 'Cuéntanos qué pasó (mínimo 5 letras)'; end if;
+  if length(t) > 1500 then raise exception 'Máximo 1500 letras'; end if;
+  if f is not null and (f !~ '^data:image/(webp|jpeg|png);base64,' or length(f) > 400000) then raise exception 'La foto no sirve: usa una captura o foto JPG/PNG'; end if;
+  if jsonb_typeof(d) <> 'object' or length(d::text) > 8000 then d := '{}'; end if;
+  if exists (select 1 from public.cfx_fallas where cuenta = u and creado > now() - interval '2 minutes') then raise exception 'Espera 2 minutos antes de enviar otro reporte'; end if;
+  if (select count(*) from public.cfx_fallas where cuenta = u and creado > now() - interval '1 day') >= 3 then raise exception 'Ya enviaste 3 reportes hoy. Mañana puedes enviar más 🙏'; end if;
+  if (select count(*) from public.cfx_fallas where estado in ('nuevo', 'revisando')) >= 500 then raise exception 'Recibimos muchos reportes. Prueba de nuevo mañana 🙏'; end if;
+  delete from public.cfx_fallas where estado in ('real', 'no') and resuelto < now() - interval '180 days';
+  insert into public.cfx_fallas (cuenta, email, nombre, rol, texto, foto, datos)
+  values (u, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), coalesce(y ->> 'rol', ''), t, f, d) returning id into i;
+  perform public.cfx_al_cm('🐞 Falla: ' || coalesce(nullif(y ->> 'nombre', ''), y ->> 'email', 'reporte'), left(t, 200), 'falla');
+  return jsonb_build_object('id', i);
+end $$;
+
+-- Mis últimos reportes (para que la persona vea en qué van).
+-- premio: si a esta cuenta le tocan los 15 días (solo negocios: clientes y equipo no pagan).
+create or replace function public.cfx_fallas_mias() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('premio', coalesce(public.cfx_yo() ->> 'rol', '') = 'negocio', 'lista',
+    (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'texto', left(texto, 80), 'estado', estado, 'dias', dias, 'creado', creado) order by id desc), '[]')
+     from (select * from public.cfx_fallas where cuenta = auth.uid() order by id desc limit 5) x))
+$$;
+
+-- Administrador: lista (sin la foto), detalle (con la foto; lo marca "revisando") y respuesta.
+create or replace function public.cfx_fallas_lista(p_estado text default 'abiertos') returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', f.id, 'cuenta', f.cuenta, 'email', f.email, 'nombre', f.nombre, 'rol', f.rol, 'texto', f.texto,
+      'con_foto', f.foto is not null, 'datos', f.datos, 'estado', f.estado, 'respuesta', f.respuesta, 'dias', f.dias, 'creado', f.creado, 'resuelto', f.resuelto,
+      'premiados', (select count(*) from public.cfx_fallas g where g.cuenta = f.cuenta and g.estado = 'real')) order by f.id desc), '[]')
+    from (select * from public.cfx_fallas where case coalesce(p_estado, 'abiertos') when 'abiertos' then estado in ('nuevo', 'revisando') when 'todos' then true else estado = p_estado end
+          order by id desc limit 200) f);
+end $$;
+
+create or replace function public.cfx_falla_ver(p_id bigint) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare f public.cfx_fallas;
+begin
+  perform public.cfx_es_admin();
+  update public.cfx_fallas set estado = 'revisando' where id = p_id and estado = 'nuevo';
+  select * into f from public.cfx_fallas where id = p_id;
+  if f.id is null then raise exception 'Reporte no encontrado'; end if;
+  return jsonb_build_object('id', f.id, 'estado', f.estado, 'foto', f.foto);
+end $$;
+
+create or replace function public.cfx_falla_resolver(p_id bigint, p_real boolean, p_mensaje text default '', p_dias int default 15) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare f public.cfx_fallas; m text := left(trim(coalesce(p_mensaje, '')), 500); n int := 0; h timestamptz;
+begin
+  perform public.cfx_es_admin();
+  select * into f from public.cfx_fallas where id = p_id for update;
+  if f.id is null then raise exception 'Reporte no encontrado'; end if;
+  if f.estado in ('real', 'no') then raise exception 'Este reporte ya se respondió'; end if;
+  if p_real then
+    if f.rol = 'negocio' then
+      n := coalesce(p_dias, 15);
+      if n not between 1 and 60 then raise exception 'De 1 a 60 días'; end if;
+      h := public.cfx_dar_premium(f.cuenta, f.rol, n);
+      if h is null then raise exception 'No se encontró la cuenta (¿la borró?)'; end if;
+      perform public.cfx_avisar(f.cuenta, '🎁 Gracias: tu reporte era real', 'Sumamos ' || n || ' días de Premium (hasta el ' || to_char(h at time zone 'America/Santiago', 'DD-MM-YYYY') || '). ' ||
+        coalesce(nullif(m, ''), '¡Gracias por ayudarnos a mejorar!'));
+    else
+      perform public.cfx_avisar(f.cuenta, '🙌 Gracias: tu reporte era real', coalesce(nullif(m, ''), 'Ya lo estamos arreglando. ¡Gracias por ayudarnos a mejorar!'));
+    end if;
+  else
+    perform public.cfx_avisar(f.cuenta, '🐞 Revisamos tu reporte', coalesce(nullif(m, ''),
+      'Gracias por avisarnos. Lo revisamos y en ese punto la app funciona bien. Si vuelve a pasar, escríbenos al 💬 Chat con soporte.'));
+  end if;
+  update public.cfx_fallas set estado = case when p_real then 'real' else 'no' end, respuesta = m, dias = n, resuelto = now() where id = f.id;
+  perform public.cfx_anotar('falla', case when p_real then 'real' || case when n > 0 then ' (+' || n || ' días Premium)' else '' end else 'no es falla' end || ' · #' || f.id || ' ' || f.email);
+  return jsonb_build_object('estado', case when p_real then 'real' else 'no' end, 'dias', n, 'hasta', h);
+end $$;
+revoke all on function public.cfx_falla_enviar(text, text, jsonb), public.cfx_fallas_mias(), public.cfx_fallas_lista(text), public.cfx_falla_ver(bigint),
+  public.cfx_falla_resolver(bigint, boolean, text, int) from public, anon;
+grant execute on function public.cfx_falla_enviar(text, text, jsonb), public.cfx_fallas_mias(), public.cfx_fallas_lista(text), public.cfx_falla_ver(bigint),
+  public.cfx_falla_resolver(bigint, boolean, text, int) to authenticated;
+
 -- ---------- PIN de la app (4 a 6 números), guardado en la cuenta. Se pide al abrir la app y tras 5 min sin usarla. ----------
 create table if not exists public.cfx_pin (
   usuario    uuid primary key references auth.users (id) on delete cascade,
@@ -7085,7 +7192,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_bloqueos', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;

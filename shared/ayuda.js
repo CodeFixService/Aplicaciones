@@ -539,6 +539,7 @@
     if (a === 'invitar') return invitar();
     if (a === 'guia') return guia();
     if (a === 'chat') return chat({ rpc: R });
+    if (a === 'falla') return falla();
     if (a === 'terminos') return terminos();
     if (a === 'privacidad') return privacidad();
     if (a === 'misdatos') return misDatos();
@@ -737,6 +738,7 @@
       CFG.panel && { k: 'panel', ico: '🛡️', t: 'Panel de administración', accion: a('panel') },
       !adm && estado.items.length && { k: 'guia', ico: '🧭', t: 'Guía para partir', dato: p || '', accion: a('guia') },
       !adm && { k: 'chat', ico: '💬', t: 'Chat con soporte', dato: estado.sin_leer || '', accion: a('chat') },
+      !adm && { k: 'falla', ico: '🐞', t: 'Reportar una falla', accion: a('falla') },
       !adm && window.CFX_PAGOS && { k: 'premium', ico: '⭐', t: esPro() ? 'Mi plan PRO' : 'Pasar a PRO', accion: a('premium') },
       !adm && !PERSONALES.includes(APP) && { k: 'invitar', ico: '🎁', t: 'Invita y gana', accion: a('invitar') },
       suelto && { k: 'reparar', ico: '🛠️', t: 'Reparar la app', accion: reparar },
@@ -973,6 +975,67 @@
     };
     await cargar();
     vigia = setInterval(() => { if (!document.hidden) cargar(); }, 10000);
+    ta.focus();
+  }
+
+  // ---------- G55 🐞 Reportar una falla (con premio) ----------
+  // Qué pasó (texto o 🎤, el micrófono sale solo en el campo) + foto opcional. Se adjunta solo: app, versión, pantallas recién vistas,
+  // celular y los últimos errores de esta sesión (CFX_CARGA.ultimos). Llega al Centro de Mando → Mensajes → 🐞 Fallas.
+  const pasos = [];
+  const anotarPaso = () => { const h = (location.pathname + location.hash.split('?')[0]).slice(0, 80); if (pasos[pasos.length - 1] !== h) { pasos.push(h); if (pasos.length > 6) pasos.shift(); } };
+  anotarPaso(); addEventListener('hashchange', anotarPaso);
+  function version() {
+    try { for (const k of Object.keys(window)) if (/_CONFIG$/.test(k) && window[k] && window[k].VERSION) return String(window[k].VERSION); } catch (e) { /* nada */ }
+    return String(window.APP_VERSION || (window.Core && (window.Core.version || window.Core.APP_VERSION)) || '');
+  }
+  const ESTADO_FALLA = { nuevo: '⏳ Recibido', revisando: '🔎 Revisando', real: '✅ Era real', no: '💬 Respondido' };
+  async function falla() {
+    if (!R) return;
+    let foto = null;
+    const caja = dialogo('<h2>🐞 Reportar una falla</h2><div class="ca-cuerpo">' +
+      '<p data-premio style="margin:0 0 8px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--ca-color) 12%,transparent)">🙌 Cuéntanos qué falló y lo arreglamos.</p>' +
+      '<label style="display:block;font-weight:700;margin:4px 0">¿Qué pasó?<textarea data-t maxlength="1500" rows="4" style="display:block;width:100%;box-sizing:border-box;min-height:110px;margin-top:4px" placeholder="Ej.: toqué Guardar y no pasó nada"></textarea></label>' +
+      '<input type="file" accept="image/*" data-file hidden><div data-fv></div><button type="button" data-foto style="width:100%;margin:6px 0">📷 Agregar foto o captura</button>' +
+      '<p style="margin:2px 0 8px"><small>Se envía sola la versión, la pantalla y tu celular, para encontrar la falla rápido.</small></p>' +
+      '<p class="ca-err" style="color:#dc2626;margin:4px 0 0;min-height:1em"></p><div data-mias></div></div>' +
+      '<div class="ca-pie"><button type="button" data-cerrar>Cerrar</button><button type="button" class="ca-si" data-enviar>Enviar reporte</button></div>');
+    const ta = caja.querySelector('[data-t]'), err = caja.querySelector('.ca-err'), fi = caja.querySelector('[data-file]'), fv = caja.querySelector('[data-fv]');
+    const pintarFoto = () => { fv.innerHTML = foto ? '<div style="position:relative;display:inline-block;margin:4px 0"><img src="' + esc(foto) + '" alt="Foto adjunta" style="max-height:120px;max-width:100%;border-radius:10px;display:block">' +
+      '<button type="button" data-quitar aria-label="Quitar foto" style="position:absolute;top:4px;right:4px;min-height:32px;width:32px;padding:0;border-radius:50%">✕</button></div>' : '';
+      caja.querySelector('[data-foto]').hidden = !!foto; };
+    caja.querySelector('[data-foto]').onclick = () => fi.click();
+    fv.onclick = (ev) => { if (ev.target.closest('[data-quitar]')) { foto = null; fi.value = ''; pintarFoto(); } };
+    fi.onchange = async () => {
+      const f = fi.files && fi.files[0]; if (!f) return; err.textContent = '';
+      try { foto = window.CFX_ACHICAR ? await CFX_ACHICAR(f, 'comprobante') : await new Promise((ok, mal) => { if (f.size > 280000) return mal(new Error('La foto es muy pesada')); const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsDataURL(f); }); }
+      catch (x) { foto = null; err.textContent = (x && x.message) || 'No se pudo leer la foto'; }
+      pintarFoto();
+    };
+    async function mias() {
+      try {
+        const m = await R('cfx_fallas_mias');
+        const zp = caja.querySelector('[data-premio]'); if (m && m.premio && zp) zp.textContent = '🎁 Si es una falla real, te regalamos 15 días Premium.';
+        const L = (m && m.lista) || [];
+        caja.querySelector('[data-mias]').innerHTML = L.length ? '<h3 style="margin:10px 0 4px;font-size:15px">Tus reportes</h3>' + L.map((x) => '<p style="margin:4px 0"><small><b>' + esc(ESTADO_FALLA[x.estado] || x.estado) +
+          (x.dias ? ' · 🎁 +' + x.dias + ' días' : '') + '</b> · ' + esc(x.texto) + '</small></p>').join('') : '';
+      } catch (x) { /* base sin actualizar: igual se puede escribir (al enviar dirá qué falta) */ }
+    }
+    caja.querySelector('[data-enviar]').onclick = async (ev) => {
+      const t = ta.value.trim(); err.textContent = '';
+      if (t.length < 5) { err.textContent = 'Cuéntanos qué pasó (mínimo 5 letras)'; ta.focus(); return; }
+      const ua = navigator.userAgent, datos = { app: APP, version: version(), pantalla: pasos[pasos.length - 1] || '', recorrido: pasos.slice(), titulo: document.title.slice(0, 80),
+        celular: ((ua.match(/(Android [\d.]+|iPhone OS [\d_]+|iPad|Windows NT [\d.]+|Mac OS X [\d_]+|Linux)/) || [''])[0] + ' · ' + ((ua.match(/(SamsungBrowser|Edg|Firefox|Chrome|Version)\/[\d]+/) || [''])[0])).replace('Version/', 'Safari/'),
+        tamano: innerWidth + '×' + innerHeight, oscuro: matchMedia('(prefers-color-scheme: dark)').matches, instalada: matchMedia('(display-mode: standalone)').matches,
+        errores: (window.CFX_CARGA && CFX_CARGA.ultimos) ? CFX_CARGA.ultimos() : [] };
+      ev.target.disabled = true;
+      try {
+        await R('cfx_falla_enviar', { p_texto: t, p_foto: foto, p_datos: datos });
+        caja.querySelector('.ca-cuerpo').innerHTML = '<p style="font-size:40px;text-align:center;margin:10px 0">✅</p><h3 style="text-align:center;margin:0 0 6px">¡Gracias por avisarnos!</h3>' +
+          '<p style="text-align:center;margin:0">Lo revisamos y te llega un aviso con la respuesta.</p><div data-mias></div>';
+        ev.target.remove(); mias();
+      } catch (x) { err.textContent = /Could not find|does not exist|PGRST202/i.test((x && x.message) || '') ? 'Esta opción llega con la próxima actualización de la app (máx. 10 minutos).' : (x && x.message) || String(x); ev.target.disabled = false; }
+    };
+    mias();
     ta.focus();
   }
 

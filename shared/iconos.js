@@ -135,13 +135,14 @@
     audifonos: '<path d="M4 15v-3a8 8 0 0 1 16 0v3M4 15h3v5H5a1 1 0 0 1-1-1zM20 15h-3v5h2a1 1 0 0 0 1-1z"/>',
     numeros: '<path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/>',
     pelota: '<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10zM12 7V3M16 10l4-1M14.5 14.5l2.5 3.5M9.5 14.5L7 18M8 10L4 9"/>',
-    dado: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9v.01M15 15v.01M12 12v.01"/>'
+    dado: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9v.01M15 15v.01M12 12v.01"/>',
+    bicho: '<rect x="7" y="7" width="10" height="13" rx="5"/><path d="M9 7.5a3 3 0 0 1 6 0M12 11v9M7 11H3.5M17 11h3.5M7 15H3M17 15h4M7.5 18.5L4.5 21M16.5 18.5l3 2.5M9.5 4.5L8 2.5M14.5 4.5L16 2.5"/>'
   };
   // emoji (sin variante) → [ícono, color]
   const M = {};
   const asignar = (lista, ic, color) => lista.split(' ').forEach((e) => { M[e] = [ic, color || '']; });
   asignar('⭐ 🌟', 'estrella', 'oro'); asignar('✅ ✔', 'ok', 'verde'); asignar('❌ ✖', 'no', 'rojo'); asignar('⛔ 🚫 🛑 📵', 'prohibido', 'rojo');
-  asignar('⚠', 'alerta', 'ambar'); asignar('💬 🗨 📨', 'chat'); asignar('🔔', 'campana'); asignar('🔕', 'campanaNo'); asignar('🧾', 'recibo');
+  asignar('🐞 🐛 🪲', 'bicho'); asignar('⚠', 'alerta', 'ambar'); asignar('💬 🗨 📨', 'chat'); asignar('🔔', 'campana'); asignar('🔕', 'campanaNo'); asignar('🧾', 'recibo');
   asignar('💳', 'tarjeta'); asignar('💈 ✂ 🪒', 'tijeras'); asignar('📅 📆 🗓', 'calendario'); asignar('👤 🧑 🙍', 'usuario'); asignar('👥 🧑‍🍳 👨‍🍳 👩‍🍳', 'usuarios');
   asignar('📲 📱', 'celular'); asignar('⏳ ⌛', 'arena'); asignar('📋', 'portapapeles'); asignar('📣 📢', 'megafono'); asignar('🏷 🎟 🎫', 'etiqueta');
   asignar('🔒 🔐', 'candado'); asignar('🔓', 'abierto'); asignar('📷 📸', 'camara'); asignar('🔄', 'refrescar'); asignar('🔁 ♻', 'repetir');
