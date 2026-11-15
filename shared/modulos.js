@@ -146,6 +146,7 @@
     giftcards: { tit: 'Gift cards', pasos: [['fila', '🎁 Ana compra una gift card de $15.000'], ['der', '📲 Se la regala a su papá con código'], ['fila', '✂️ Él la canjea en caja'], ['aviso', '💰 Venta extra + cliente nuevo']] },
     membresia: { tit: 'Membresía', pasos: [['fila', '🔁 Plan 4 cortes al mes · $25.000'], ['izq', '👨 Diego se suscribe'], ['fila', '✂️ Corte 1 de 4 usado'], ['aviso', '💰 Plata segura todos los meses']] },
     productos: { tit: 'Productos y stock', pasos: [['fila', '🧴 Pomada mate · stock 8'], ['der', '💵 Vendes 1 en la caja con el corte'], ['fila', '📦 Stock 7 · te avisamos cuando queden 2'], ['aviso', '💰 +$8.990 en la venta']] },
+    presupuesto: { tit: 'Presupuesto por link', pasos: [['fila', '🔧 Revisaste la bici: cadena $18.000 · pastillas $9.000'], ['der', '📲 Le llega el link a Pedro'], ['izq', '✅ Cadena: Sí · ❌ Pastillas: No'], ['aviso', '✅ Trabajas solo lo aprobado: total $18.000']] },
     agenda_redes: { tit: 'Reservas desde tus redes', pasos: [['izq', '📲 Instagram: “¿Tienes hora hoy?”'], ['der', '🤖 Respuesta lista: “Reserva aquí 👉 tu link”'], ['fila', '📅 Reserva hecha en 30 segundos'], ['aviso', '✅ Sin contestar uno por uno']] },
     recordatorios: { tit: 'Recordatorios', pasos: [['fila', '📅 Mañana 18:00 · Lucía'], ['izq', '🔔 “Lucía, te esperamos mañana a las 18:00”'], ['aviso', '✅ Menos clientes que olvidan venir']] }
   };
