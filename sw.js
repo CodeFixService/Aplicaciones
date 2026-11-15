@@ -127,9 +127,15 @@ self.addEventListener('fetch', (e) => {
 });
 
 // Notificación push enviada por el servidor (llega aunque la app esté cerrada).
+// G61 a 📲 Confirma al servidor que el aviso llegó (así deja de reenviarlo). Sin red: el servidor reintenta.
+function cfxAck(e, d) {
+  if (!d || !d.ack || !/^https:\/\//.test(d.ackUrl || '')) return;
+  e.waitUntil(fetch(d.ackUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: d.ackKey || '', Authorization: 'Bearer ' + (d.ackKey || '') }, body: JSON.stringify({ p_grupo: d.ack }) }).catch(() => {}));
+}
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: e.data && e.data.text() }; }
+  cfxAck(e, d);
   const opts = {
     body: d.body || '',
     icon: 'icons/icon-192.png',

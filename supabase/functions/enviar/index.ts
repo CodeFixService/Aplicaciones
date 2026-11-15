@@ -10,7 +10,34 @@ import webpush from 'npm:web-push@3.6.7';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const VERSION = '3.5';
+// ---------- G61 a · 📲 Push insistente (núcleo push.sql): cada aviso lleva su "grupo"; el celular confirma al recibirlo
+// (service worker → cfx_push_recibido). Sin confirmación se reenvía a 1, 2, 5, 10, 15, 30 min y luego cada 1 h, hasta 48 h.
+// deno-lint-ignore no-explicit-any
+type Rpc = { rpc: (f: string, a?: Record<string, unknown>) => any };
+type SubPush = { endpoint: string; p256dh: string; auth: string };
+const ACK_URL = (Deno.env.get('SUPABASE_URL') || '') + '/rest/v1/rpc/cfx_push_recibido';
+const ACK_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const grupos = () => { const m = new Map<string, string>(); return (k: string) => { if (!m.has(k)) m.set(k, crypto.randomUUID()); return m.get(k)!; }; };
+function conAck(payload: string, grupo: string) {
+  try { const o = JSON.parse(payload); o.ack = grupo; o.ackUrl = ACK_URL; o.ackKey = ACK_KEY; return JSON.stringify(o); } catch { return payload; }
+}
+async function anotarPush(s: Rpc, lista: (SubPush & { grupo: string; payload: string })[]) {
+  if (!lista.length) return;
+  try { await s.rpc('cfx_push_anotar', { p_lista: lista.map((x) => ({ grupo: x.grupo, endpoint: x.endpoint, p256dh: x.p256dh, auth: x.auth, payload: x.payload })) }); } catch { /* sin push.sql todavía */ }
+}
+async function reintentarPush(s: Rpc, preparar: () => Promise<boolean>) {
+  let data: (SubPush & { payload: string })[] | null = null;
+  try { const r = await s.rpc('cfx_push_tomar'); data = r.error ? null : r.data; } catch { return 0; }
+  if (!data?.length || !(await preparar())) return 0;
+  let n = 0;
+  await Promise.allSettled(data.map(async (e) => {
+    try { await webpush.sendNotification({ endpoint: e.endpoint, keys: { p256dh: e.p256dh, auth: e.auth } }, e.payload, { TTL: 86400, urgency: 'high' }); n++; }
+    catch (err) { const c = (err as { statusCode?: number })?.statusCode; if (c === 404 || c === 410) await s.rpc('cfx_push_muerto', { p_endpoint: e.endpoint }); }
+  }));
+  return n;
+}
+
+const VERSION = '3.6';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
 const BRAND = 'Despega Pyme · CodeFix';
@@ -62,6 +89,7 @@ export async function deliver(
   n: Notif, targets: Target[], secrets: Secrets, emailsLeft: number,
   removeEndpoint: (e: string) => Promise<unknown>,
   transportOverride?: unknown,
+  anotar?: (l: (SubPush & { grupo: string; payload: string })[]) => Promise<unknown>,
 ) {
   let pushSent = 0, pushFailed = 0, emailSent = 0;
   const errors: string[] = [];
@@ -71,8 +99,9 @@ export async function deliver(
       errors.push('Faltan las claves push (Admin → Ajustes)');
     } else {
       webpush.setVapidDetails('mailto:' + (secrets.gmail_user || 'admin@codefix.app'), secrets.vapid_public, secrets.vapid_private);
-      const payload = JSON.stringify({ title: n.title, body: n.body, url: n.url, image: n.image, tag: n.id });
+      const grupo = crypto.randomUUID(), payload = conAck(JSON.stringify({ title: n.title, body: n.body, url: n.url, image: n.image, tag: n.id }), grupo);
       const subs = targets.filter((t) => t.endpoint && t.p256dh && t.auth);
+      if (anotar) await anotar([...new Map(subs.map((t) => [t.endpoint!, { endpoint: t.endpoint!, p256dh: t.p256dh!, auth: t.auth!, grupo, payload }])).values()]);
       const seen = new Set<string>();
       for (let i = 0; i < subs.length; i += 50) {
         const chunk = subs.slice(i, i + 50).filter((t) => !seen.has(t.endpoint!) && seen.add(t.endpoint!));
@@ -189,9 +218,13 @@ export async function registroCliente(b: Registro) {
 
 async function run() {
   const db = adminDb();
+  const reenviados = await reintentarPush(db, async () => {
+    const { data: k } = await db.rpc('get_secrets'); if (!k?.vapid_public || !k?.vapid_private) return false;
+    webpush.setVapidDetails('mailto:' + (k.gmail_user || 'admin@codefix.app'), k.vapid_public, k.vapid_private); return true;
+  });
   const { data: due, error } = await db.rpc('claim_due_notifications');
   if (error) throw error;
-  if (!due?.length) return { processed: 0 };
+  if (!due?.length) return { processed: 0, reenviados };
 
   const { data: secrets } = await db.rpc('get_secrets');
   const { data: sentToday } = await db.rpc('emails_sent_today');
@@ -212,7 +245,7 @@ async function run() {
           else sec = { ...sec, gmail_user: '', gmail_app_password: '', correo_falta: 'La tienda no puso su correo (Mi tienda → ✉️ Correo)' };
         }
       }
-      const r = await deliver(n, targets || [], sec, propio ? EMAIL_DAILY_LIMIT : emailsLeft, removeEndpoint);
+      const r = await deliver(n, targets || [], sec, propio ? EMAIL_DAILY_LIMIT : emailsLeft, removeEndpoint, undefined, (l) => anotarPush(db, l));
       if (!propio) emailsLeft -= r.emailSent;
       await db.rpc('finish_notification', {
         p_id: n.id, p_push_sent: r.pushSent, p_push_failed: r.pushFailed, p_email_sent: r.emailSent, p_error: r.error,
@@ -224,7 +257,7 @@ async function run() {
       });
     }
   }
-  return { processed: due.length, results };
+  return { processed: due.length, results, reenviados };
 }
 
 if (Deno.env.get('SUPABASE_URL')) {

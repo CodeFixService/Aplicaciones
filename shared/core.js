@@ -319,9 +319,6 @@
     const r = document.documentElement.style, c = oscuro() && luz(color) < 0.3 ? aclarar(color, 0.45) : color;
     r.setProperty('--brand', c);
     r.setProperty('--brand-ink', tinta(c));
-    let m = document.querySelector('meta[name=theme-color]');
-    if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.appendChild(m); }
-    m.content = color;
   }
 
   try {
@@ -351,8 +348,8 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '6.28';
-  const DB_VERSION = '5.54'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const APP_VERSION = '6.29';
+  const DB_VERSION = '5.55'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};

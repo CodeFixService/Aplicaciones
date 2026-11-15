@@ -108,11 +108,16 @@
   const OJO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
   const OJO_NO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
   const ojo = (i) => {
-    if (i.dataset.cfxOjo || i.hasAttribute('data-c1') || i.hasAttribute('data-c2') || i.closest('.cfx-pin')) return; i.dataset.cfxOjo = '1';
+    if (i.dataset.cfxOjo || i.closest('.cfx-pin')) return; i.dataset.cfxOjo = '1';
+    // G61 d: solo el ícono, sin marco ni fondo (le gana al CSS de botones de cada app).
+    if (!d.getElementById('cfx-ojo-css')) { const st = d.createElement('style'); st.id = 'cfx-ojo-css';
+      st.textContent = 'button.cfx-ojo{position:absolute!important;right:6px!important;top:50%!important;transform:translateY(-50%)!important;width:34px!important;height:34px!important;min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;' +
+        'border:0!important;border-radius:50%!important;background:none!important;box-shadow:none!important;outline-offset:2px;color:var(--cfx-texto-2,#64748b)!important;display:grid!important;place-items:center!important;cursor:pointer;z-index:2;opacity:.85}' +
+        'button.cfx-ojo:hover,button.cfx-ojo:active{background:none!important;opacity:1;color:var(--cfx-texto,#111827)!important}button.cfx-ojo svg{width:20px!important;height:20px!important;display:block}';
+      d.head.appendChild(st); }
     const w = d.createElement('span'); w.style.cssText = 'position:relative;display:block;width:100%';
     i.parentNode.insertBefore(w, i); w.appendChild(i); i.style.paddingRight = '44px';
     const b = d.createElement('button'); b.type = 'button'; b.className = 'cfx-ojo'; b.setAttribute('aria-label', 'Ver contraseña'); b.innerHTML = OJO;
-    b.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);margin:0;color:inherit;display:grid;place-items:center;cursor:pointer';
     b.onclick = () => { const v = i.type === 'password'; i.type = v ? 'text' : 'password'; b.innerHTML = v ? OJO_NO : OJO; b.setAttribute('aria-label', v ? 'Ocultar contraseña' : 'Ver contraseña'); };
     w.appendChild(b);
   };

@@ -226,7 +226,12 @@
     '.cfx-pf-mcf input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}.cfx-pf-mcf i{font-style:normal}' +
     '.cfx-pf-nota{margin:2px 2px 0;font-size:12.5px;color:var(--cfx-texto-2,#5b6472)}.cfx-pf .cfx-pf-mcr{min-height:44px;border-radius:12px!important}' +
     'html.cfx-col-ico .cfx-fila:not(.cfx-fila-rojo) .cfx-fila-ic,html.cfx-col-ico .cfx-pnl-op:not(.rojo)>span,html.cfx-col-ico .cfx-hm-ic{color:var(--cfx-icono)!important;background:color-mix(in srgb,var(--cfx-icono) 14%,transparent)!important}' +
-    'html.cfx-col-ico nav.cfx-barra>:not(.cfx-mas):not(.on):not(.activo):not([aria-current]) :is(svg,.cfx-ico),html.cfx-col-ico :is(.cfx-ham,[data-cfx-campana]) svg{color:var(--cfx-icono)!important}html.cfx-col-ico nav.cfx-barra>.cfx-mas svg{color:var(--cfx-mas-ink)!important}' +
+    'html.cfx-col-ico nav.cfx-barra>:not(.cfx-mas):not(.on):not(.activo):not([aria-current]) :is(svg,.cfx-ico),html.cfx-col-ico :is(.cfx-ham,[data-cfx-campana]) svg{color:var(--cfx-icono)!important}html.cfx-col-ico nav.cfx-barra>.cfx-mas svg{color:var(--cfx-mas-ink)!important}html.cfx-col-ico [data-menu]{color:var(--cfx-icono)!important}' +
+    // G61 f: barra de abajo a gusto (sus textos e íconos se ajustan para leerse) · degradado de 2 colores.
+    'html.cfx-col-barra nav.cfx-barra{background:var(--cfx-barra)!important;border-color:color-mix(in srgb,var(--cfx-barra-ink) 18%,transparent)!important}' +
+    'html.cfx-col-barra nav.cfx-barra>:not(.cfx-mas):not(.on):not(.activo):not([aria-current]),html.cfx-col-barra nav.cfx-barra>:not(.cfx-mas):not(.on):not(.activo):not([aria-current]) :is(svg,.cfx-ico){color:var(--cfx-barra-ink)!important}' +
+    'html.cfx-col-barra nav.cfx-barra>:is(.on,.activo,[aria-current="page"]):not(.cfx-mas){color:var(--cfx-barra-on)!important}' +
+    'html.cfx-col-barra nav.cfx-barra>.cfx-mas>:first-child{box-shadow:0 6px 16px color-mix(in srgb,var(--brand,#2563eb) 45%,transparent),0 0 0 4px var(--cfx-barra)!important}' +
     '.cfx-pf .cfx-pf-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}' +
     '.cfx-pf .cfx-pf-modos button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:74px!important;width:100%;min-width:0;margin:0!important;padding:10px 4px!important;border-radius:16px!important;' +
     'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1.5px solid var(--pf-borde)!important;box-shadow:none!important;font:700 13.5px/1.2 inherit!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
@@ -1279,6 +1284,29 @@
   }
   // ---------- Bloqueo con PIN (si la cuenta tiene uno): al abrir la app y después de 5 min en segundo plano ----------
   let pinFuera = 0;
+  // G61 c 👆 Huella: desbloqueo con el sensor del celular (WebAuthn, queda en este celular). El PIN sigue de respaldo.
+  const HU = {
+    llave: () => 'cfx-huella:' + colQuien(),
+    id: () => { try { return localStorage.getItem(HU.llave()) || ''; } catch (e) { return ''; } },
+    puede: async () => { try { return !!(window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { return false; } },
+    b64: (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+    bin: (t) => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)),
+    reto: () => crypto.getRandomValues(new Uint8Array(32)),
+    async activar() {
+      const u = colQuien(), c = await navigator.credentials.create({ publicKey: { challenge: HU.reto(), rp: { name: document.title || 'App' },
+        user: { id: new TextEncoder().encode(u).slice(0, 64), name: CFG.email || u, displayName: CFG.nombre || CFG.email || 'Yo' },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
+      if (!c) throw new Error('No se activó la huella');
+      localStorage.setItem(HU.llave(), HU.b64(c.rawId));
+    },
+    quitar: () => { try { localStorage.removeItem(HU.llave()); } catch (e) { /* nada */ } },
+    async probar() {
+      const id = HU.id(); if (!id) return false;
+      return !!(await navigator.credentials.get({ publicKey: { challenge: HU.reto(), allowCredentials: [{ type: 'public-key', id: HU.bin(id), transports: ['internal'] }], userVerification: 'required', timeout: 60000 } }));
+    }
+  };
+  window.CFX_HUELLA = HU;
   const pinOk = () => { try { sessionStorage.setItem('cfx-pin-ok', '1'); } catch (e) { /* nada */ } };
   async function pinRevisar() {
     if (!R || document.querySelector('.cfx-pin')) return;
@@ -1293,19 +1321,23 @@
       '.cfx-pin-d{display:flex;justify-content:center;gap:12px;margin:0 0 20px}.cfx-pin-d i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.6);transition:background .15s,transform .15s}.cfx-pin-d i.on{background:#fff;transform:scale(1.1)}' +
       '.cfx-pin-t{display:grid;grid-template-columns:repeat(3,72px);justify-content:center;gap:16px 22px}.cfx-pin-t button{width:72px;height:72px;min-height:0;min-width:0;padding:0;border-radius:50%!important;aspect-ratio:1;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:600 24px inherit;cursor:pointer;transition:transform .1s,background .15s}' +
       '.cfx-pin-t button:active{transform:scale(.92);background:rgba(255,255,255,.2)}.cfx-pin-t .x{border:0!important;background:none!important;box-shadow:none!important;font-size:15px;font-weight:600;opacity:.9}.cfx-pin-t [data-b]{font-size:24px}.cfx-pin-mal{animation:cfxPinMal .35s}@keyframes cfxPinMal{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}' +
+      '.cfx-pin .cfx-pin-h{margin:18px auto 0;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;border-radius:24px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;font:700 15px inherit;cursor:pointer}' +
       '.cfx-pin-o{margin-top:18px;background:none;border:0;color:#fff;opacity:.8;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer}</style>' +
       '<div class="cfx-pin-c"><div style="font-size:30px">🔒</div><h2>Ingresa tu PIN</h2><p data-m>Para abrir la app</p><div class="cfx-pin-d" data-d></div>' +
       '<div class="cfx-pin-t">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => '<button type="button" data-n="' + n + '">' + n + '</button>').join('') +
       '<button type="button" class="x" data-ok>Entrar</button><button type="button" data-n="0">0</button><button type="button" class="x" data-b aria-label="Borrar">⌫</button></div>' +
+      (HU.id() ? '<button type="button" class="cfx-pin-h" data-hu>👆 Entrar con huella</button>' : '') +
       '<button type="button" class="cfx-pin-o" data-olv>¿Olvidaste tu PIN? Entra con tu correo y contraseña</button></div>';
     document.body.appendChild(w);
     let v = '', ocupado = false; const m = w.querySelector('[data-m]'), d = w.querySelector('[data-d]');
+    const entrar = () => { pinOk(); w.style.transition = 'opacity .25s'; w.style.opacity = '0'; setTimeout(() => w.remove(), 250); };
+    const huella = async () => { if (ocupado) return; ocupado = true; try { if (await HU.probar()) { ocupado = false; return entrar(); } } catch (e) { m.textContent = 'Toca 👆 o usa tu PIN'; } ocupado = false; };
     const pintar = () => { d.innerHTML = Array.from({ length: Math.max(4, v.length) }, (_, i) => '<i' + (i < v.length ? ' class="on"' : '') + '></i>').join(''); };
     const probar = async () => {
       if (ocupado || v.length < 4) return; ocupado = true;
       let r = null; try { r = await R('cfx_pin_verificar', { p_pin: v }); } catch (e) { m.textContent = 'Sin conexión: inténtalo de nuevo'; }
       ocupado = false;
-      if (r && r.ok) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } pinOk(); w.style.transition = 'opacity .25s'; w.style.opacity = '0'; setTimeout(() => w.remove(), 250); return; }
+      if (r && r.ok) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } return entrar(); }
       if (r) { v = ''; pintar(); const c = w.querySelector('.cfx-pin-c'); c.classList.remove('cfx-pin-mal'); void c.offsetWidth; c.classList.add('cfx-pin-mal');
         m.textContent = r.espera > 0 ? 'Demasiados intentos: espera ' + Math.ceil(r.espera / 60) + ' min' : 'PIN incorrecto' + (r.quedan != null ? ' · te quedan ' + r.quedan : ''); }
     };
@@ -1314,9 +1346,11 @@
       if (n && v.length < 6) { v += n.dataset.n; pintar(); let L = 6; try { L = +localStorage.getItem('cfx-pin-n') || 6; } catch (x) { /* nada */ } if (v.length === L) probar(); }
       if (e.target.closest('[data-b]')) { v = v.slice(0, -1); pintar(); }
       if (e.target.closest('[data-ok]')) probar();
+      if (e.target.closest('[data-hu]')) huella();
       if (e.target.closest('[data-olv]')) { try { localStorage.setItem('cfx-pin-reset', '1'); } catch (x) { /* nada */ } pinOk(); salir(); }
     };
     pintar();
+    if (HU.id()) setTimeout(huella, 350);  // la huella se pide sola al abrir; si no, queda el botón 👆
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { pinFuera = Date.now(); return; }
@@ -1325,12 +1359,19 @@
 
   // Dirección para compartir de esta app: la del dominio si está ✅, si no la de siempre.
   function sitio() { try { const s = JSON.parse(localStorage.getItem('cfx:sitio') || 'null'); if (s && s.activo && /^https:\/\/[a-z0-9.-]+\/$/.test(s.url || '')) return s.url; } catch (e) { /* nada */ } return RAIZ; }
+  // G61 a 📲 Abrir la app = ya viste tus avisos: el servidor deja de reenviar los pendientes a este celular.
+  function pushAbri() {
+    try { if (!R || !navigator.serviceWorker) return;
+      navigator.serviceWorker.getRegistration().then((g) => g && g.pushManager && g.pushManager.getSubscription())
+        .then((sub) => { if (sub && sub.endpoint) return Promise.resolve().then(() => R('cfx_push_abri', { p_endpoint: sub.endpoint })); }).catch(() => {});
+    } catch (e) { /* sin push */ }
+  }
   function iniciar(o) {
     if (!o || !o.rpc) return;
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
     if (primera) R('cfx_sitio').then((s) => { try { if (s && typeof s === 'object') localStorage.setItem('cfx:sitio', JSON.stringify({ dominio: s.dominio || '', url: s.url || '', activo: !!s.activo })); } catch (e) { /* nada */ } }).catch(() => { /* base sin la función todavía */ });
-    if (primera) pinRevisar();
+    if (primera) { pinRevisar(); pushAbri(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pushAbri(); }); }
     Object.assign(CFG, o);
     // G34 · 🧭 Panel universal: las apps con su panel ya en el Centro de Mando no se usan como administrador (public.admin_email()):
     // el admin que entra va directo al CM (su usuario y clave siguen sirviendo allí). Socios, negocios y clientes, normal.
@@ -1675,14 +1716,14 @@
     if (!HEX.test(c || '')) return;
     const n = parseInt(c.slice(1), 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255, r = document.documentElement.style;
     r.setProperty('--brand', c); r.setProperty('--marca', c); r.setProperty('--brand-ink', l > 0.62 ? '#0f172a' : '#ffffff');
-    const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = c;
+    // G61 b: la barra del celular (hora/cámara) NO cambia con el color: queda el theme-color de cada app.
     pintarCols();  // G48: el + vuelve a quedar legible sobre el color nuevo
   }
   // ---------- G48 🎨 Colores a tu gusto: fondo, texto e íconos (también el + del centro) ----------
   // Por usuario, por app y por modo (claro y oscuro guardan los suyos). Siempre se ajustan solos para que se lean:
   // texto 4,5:1 sobre el fondo y las tarjetas; íconos 3:1 sobre las tarjetas; el + 3:1 sobre el color de la app.
   const COL_BASE = { claro: { fondo: '#f3f5f7', tarjeta: '#ffffff', texto: '#111827', mas: '#111827' }, oscuro: { fondo: '#0e1318', tarjeta: '#161d25', texto: '#e8edf2', mas: '#111827' } };
-  const COL_PROPS = ['--cfx-fondo', '--cfx-tarjeta', '--cfx-campo', '--cfx-borde', '--cfx-texto', '--cfx-texto-2', '--cfx-icono', '--cfx-mas-ink'];
+  const COL_PROPS = ['--cfx-fondo', '--cfx-tarjeta', '--cfx-campo', '--cfx-borde', '--cfx-texto', '--cfx-texto-2', '--cfx-icono', '--cfx-mas-ink', '--cfx-barra', '--cfx-barra-ink', '--cfx-barra-on', '--cfx-marca2'];
   const rgbDe = (c) => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
   const hexDe = (a) => '#' + a.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('');
   const mezcla = (a, b, t) => { const x = rgbDe(a), y = rgbDe(b); return hexDe(x.map((v, i) => v + (y[i] - v) * t)); };
@@ -1719,29 +1760,51 @@
     colFirma = prueba ? '' : firma;
     let ajuste = false;
     COL_PROPS.forEach((p) => st.removeProperty(p));
-    const fondo = g.fondo || B.fondo, osc = luz(fondo) < 0.18, tarjeta = g.fondo ? mezcla(fondo, '#ffffff', osc ? 0.07 : 0.72) : B.tarjeta;
+    const fondo = g.fondo || B.fondo, osc = luz(fondo) < 0.18, tarjeta = g.tarjeta || (g.fondo ? mezcla(fondo, '#ffffff', osc ? 0.07 : 0.72) : B.tarjeta);
+    if (g.fondo || g.tarjeta) st.setProperty('--cfx-tarjeta', tarjeta);
     if (g.fondo) {
-      st.setProperty('--cfx-fondo', fondo); st.setProperty('--cfx-tarjeta', tarjeta);
+      st.setProperty('--cfx-fondo', fondo);
       st.setProperty('--cfx-campo', mezcla(fondo, '#ffffff', osc ? 0.11 : 0.45)); st.setProperty('--cfx-borde', osc ? mezcla(fondo, '#ffffff', 0.18) : mezcla(fondo, '#000000', 0.1));
     }
-    if (g.fondo || g.texto) {
+    if (g.fondo || g.texto || g.tarjeta) {
       const t0 = g.texto || COL_BASE[osc ? 'oscuro' : 'claro'].texto, t = legible(t0, [fondo, tarjeta], 4.5); if (g.texto && t !== t0) ajuste = true;
       st.setProperty('--cfx-texto', t); st.setProperty('--cfx-texto-2', legible(mezcla(t, tarjeta, 0.35), [fondo, tarjeta], 4.5));
     }
     if (g.icono) {
       const i = legible(g.icono, [tarjeta], 3); if (i !== g.icono) ajuste = true;
       st.setProperty('--cfx-icono', i);
-      const bMas = r.classList.contains('cfx-premium') ? ['#f7d774', '#d9a21b'] : HEX.test(marca) ? [marca] : [];  // Premium: el + es dorado
-      st.setProperty('--cfx-mas-ink', bMas.length ? legible(g.icono, bMas, 3) : g.icono);
     }
-    r.classList.toggle('cfx-col-ico', !!g.icono);
+    // G61 f: 2º color (degradado) para botones de color y el +; se ajusta para que la letra del botón se lea.
+    const tinta = (getComputedStyle(r).getPropertyValue('--brand-ink') || '').trim(), m2 = g.marca2 ? legible(g.marca2, [HEX.test(tinta) ? tinta : '#ffffff'], 3) : '';
+    if (m2) { if (m2 !== g.marca2) ajuste = true; st.setProperty('--cfx-marca2', m2); }
+    // G61 e: el + se calcula SIEMPRE al cargar (y cada vez que cambia el color de la app), no al primer toque.
+    const bMas = r.classList.contains('cfx-premium') ? ['#f7d774', '#d9a21b'] : HEX.test(marca) ? (m2 ? [marca, m2] : [marca]) : [];  // Premium: el + es dorado
+    st.setProperty('--cfx-mas-ink', bMas.length ? legible(g.icono || '#111827', bMas, 3) : g.icono || '#111827');
+    if (g.barra) {
+      const ob = luz(g.barra) < 0.18, bi = legible(g.icono || (ob ? '#c4cdd6' : '#5b6472'), [g.barra], 4.5);
+      st.setProperty('--cfx-barra', g.barra); st.setProperty('--cfx-barra-ink', bi); st.setProperty('--cfx-barra-on', HEX.test(marca) ? legible(marca, [g.barra], 3) : bi);
+    }
+    r.classList.toggle('cfx-col-ico', !!g.icono); r.classList.toggle('cfx-col-barra', !!g.barra); r.classList.toggle('cfx-col-deg', !!m2);
+    degradar();
     return ajuste;
   }
   // Al cambiar de modo (claro/oscuro) o de color de la app, se pintan los colores de ese modo.
-  new MutationObserver(() => pintarCols()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+  new MutationObserver(() => pintarCols()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+  // G61 f: los botones pintados con el color de la app (y el +) llevan el degradado. Se revisa al cambiar la pantalla.
+  function degradar() {
+    const r = document.documentElement, on = r.classList.contains('cfx-col-deg'), cs = getComputedStyle(r);
+    const marcas = new Set(['--brand', '--marca'].map((v) => cs.getPropertyValue(v).trim()).filter((h) => HEX.test(h)).map((h) => 'rgb(' + rgbDe(h).join(', ') + ')'));
+    document.querySelectorAll(on ? 'button,.btn,[role=button],header,.topbar,nav.cfx-barra>.cfx-mas>:first-child,[data-cfx-deg]' : '[data-cfx-deg]').forEach((e) => {
+      const si = on && (e.dataset.cfxDeg ? true : marcas.has(getComputedStyle(e).backgroundColor));
+      if (si && !e.dataset.cfxDeg) { e.dataset.cfxDeg = '1'; e.style.setProperty('background-image', 'linear-gradient(135deg,var(--brand,var(--marca,#2563eb)),var(--cfx-marca2))', 'important'); }
+      else if (!si && e.dataset.cfxDeg) { delete e.dataset.cfxDeg; e.style.removeProperty('background-image'); }
+    });
+  }
+  let degT = 0;
+  new MutationObserver(() => { if (!document.documentElement.classList.contains('cfx-col-deg')) return; clearTimeout(degT); degT = setTimeout(degradar, 150); }).observe(document.documentElement, { childList: true, subtree: true });
   if (document.body) new MutationObserver(() => pintarCols()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => pintarCols()); } catch (e) { /* navegador viejo */ }
-  window.CFX_COLORES = { pintar: pintarCols, leer: colLeer, guardar: colGuardar, oscuro: esOscuro, legible, contraste };
+  window.CFX_COLORES = { pintar: pintarCols, leer: colLeer, guardar: colGuardar, oscuro: esOscuro, legible, contraste, degradar };
   // Lo guardado por BASE se aplica apenas carga (solo existe en las apps que usan BASE).
   if (lsL('modo')) pintarModo(lsL('modo'));
   if (lsL('color')) pintarColor(lsL('color'));
@@ -1838,13 +1901,15 @@
         (libre ? '<label class="cfx-pf-libre"><input type="color" value="' + esc(HEX.test(act) ? act : '#2563eb') + '"><span>🎨 Color a tu gusto' + (P.bloqueo('libre') ? ' <i>⭐</i>' : '') + '</span></label>' : '') : '') +
         (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + '<div data-pf-mc></div></div>';
       // G48 🎨 Colores a tu gusto: fondo, texto e íconos (con el + del centro). Se guardan para el modo que se está viendo.
-      const MC = [['fondo', '🖼️', 'Fondo', 'Detrás de todo'], ['texto', '📝', 'Texto', 'Letras y títulos'], ['icono', '✨', 'Íconos y botón +', 'Menú, barra de abajo y el +']];
+      const MC = [['fondo', '🖼️', 'Fondo', 'Detrás de todo'], ['tarjeta', '🗂️', 'Tarjetas', 'Cajas y menús'], ['texto', '📝', 'Texto', 'Letras y títulos'], ['icono', '✨', 'Íconos y botón +', 'Menú, ⋯, barra de abajo y el +'],
+        ['barra', '📍', 'Barra de abajo', 'Fondo de la barra'], ['marca2', '🌈', 'Degradado', '2º color de botones y el +']];
+      const MCB = (mo, k) => (k === 'icono' ? COL_BASE[mo].texto : k === 'barra' ? COL_BASE[mo].tarjeta : k === 'marca2' ? (HEX.test(String(valor(P.color) || '')) ? valor(P.color) : '#7c3aed') : COL_BASE[mo][k]);
       const pintarMC = () => {
         const c = z.querySelector('[data-pf-mc]'); if (!c) return;
         const mo = esOscuro() ? 'oscuro' : 'claro', g = colLeer(mo), lock = P.bloqueo('libre');
         c.innerHTML = '<label>Colores a tu gusto · modo ' + mo + '</label><div class="cfx-pf-mc">' + MC.map(([k, i, t, d]) => '<label class="cfx-pf-mcf"><span class="cfx-pf-mcm"' + (g[k] ? ' style="background:' + esc(g[k]) + '"' : '') + '></span>' +
           '<span><b>' + i + ' ' + t + (lock ? ' <i>⭐</i>' : '') + '</b><small>' + (g[k] ? d : 'Normal · toca para elegir') + '</small></span>' +
-          '<input type="color" data-col="' + k + '" value="' + esc(g[k] || COL_BASE[mo][k === 'icono' ? 'texto' : k]) + '" aria-label="' + esc(t) + '"></label>').join('') + '</div>' +
+          '<input type="color" data-col="' + k + '" value="' + esc(g[k] || MCB(mo, k)) + '" aria-label="' + esc(t) + '"></label>').join('') + '</div>' +
           (Object.keys(g).length ? '<button type="button" class="cfx-pf-mcr" data-pf-colnormal>↺ Volver a los colores normales</button>' : '') +
           '<p class="cfx-pf-nota">Si un color no se lee, la app lo ajusta sola. El modo ' + (mo === 'oscuro' ? 'claro' : 'oscuro') + ' guarda los suyos.</p>';
         c.querySelectorAll('[data-col]').forEach((i) => {
@@ -1885,20 +1950,22 @@
         (P.clave ? '<div class="cfx-pf-caja"><b>🔑 Cambiar contraseña</b><input data-c1 type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 6)"><input data-c2 type="password" autocomplete="new-password" placeholder="Repítela">' +
           '<button type="button" data-pf="clave">Cambiar contraseña</button></div>' : '') +
         (R ? '<div class="cfx-pf-caja"><b>🔒 PIN de la app</b><small data-pin-txt>Pide 4 a 6 números al abrir la app.</small><div style="position:relative"><input data-pin type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="PIN nuevo (4 a 6 números)"></div>' +
-          '<div class="cfx-pf-fila"><button type="button" data-pf="pin">Guardar PIN</button><button type="button" data-pf="sinpin" hidden>Quitar PIN</button></div></div>' : '') +
+          '<div class="cfx-pf-fila"><button type="button" data-pf="pin">Guardar PIN</button><button type="button" data-pf="sinpin" hidden>Quitar PIN</button><button type="button" data-pf="huella" hidden>👆 Usar huella</button></div></div>' : '') +
         (P.eliminar && valor(P.puedeEliminar) !== false ? '<div class="cfx-pf-caja cfx-pf-peligro"><b>🗑️ Eliminar mi cuenta</b><small>' + esc(valor(P.eliminarTexto) || 'Se borran tu cuenta y tus datos. No se puede deshacer.') + '</small><button type="button" data-pf="eliminar">Eliminar mi cuenta</button></div>' : '') + '</div>';
       const q = (s) => z.querySelector(s);
       let on = false;
       const estado = async () => { on = await Promise.resolve(P.pushActiva()).catch(() => false); q('[data-push]').textContent = on ? '✅ Activas' : 'Apagadas'; q('[data-pf=push]').textContent = on ? (P.desactivarPush ? 'Desactivar' : 'Reactivar') : 'Activar'; q('[data-pf=probar]').hidden = !on; };
       estado();
-      const pinEst = () => R && R('cfx_pin_estado').then((t) => { const x = q('[data-pf=sinpin]'); if (x) x.hidden = !t; const m = q('[data-pin-txt]'); if (m) m.textContent = t ? '✅ Activo: se pide al abrir la app.' : 'Pide 4 a 6 números al abrir la app.'; }).catch(() => {});
+      const pinEst = () => R && R('cfx_pin_estado').then((t) => { const x = q('[data-pf=sinpin]'); if (x) x.hidden = !t; const m = q('[data-pin-txt]'); if (m) m.textContent = t ? '✅ Activo: se pide al abrir la app.' + (HU.id() ? ' 👆 Con huella.' : '') : 'Pide 4 a 6 números al abrir la app.';
+        const h = q('[data-pf=huella]'); if (h) { if (!t) h.hidden = true; else HU.puede().then((si) => { h.hidden = !si; h.textContent = HU.id() ? 'Quitar huella' : '👆 Usar huella'; }); } }).catch(() => {});
       pinEst();
       z.onclick = async (ev) => {
         const b = ev.target.closest('[data-pf]'); if (!b) return; const a = b.dataset.pf;
         if (a === 'pin') { const v = q('[data-pin]').value.trim(); if (!/^\d{4,6}$/.test(v)) return aviso('El PIN debe tener de 4 a 6 números');
           if (await listo(() => R('cfx_pin_guardar', { p_pin: v }), '🔒 PIN guardado', b)) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } q('[data-pin]').value = ''; pinOk(); pinEst(); } }
         if (a === 'verpin') { const i = q('[data-pin]'); i.type = i.type === 'password' ? 'text' : 'password'; b.textContent = i.type === 'password' ? '👁️' : '🙈'; return; }
-        if (a === 'sinpin' && await listo(() => R('cfx_pin_guardar', { p_pin: '' }), 'PIN quitado', b)) pinEst();
+        if (a === 'sinpin' && await listo(() => R('cfx_pin_guardar', { p_pin: '' }), 'PIN quitado', b)) { HU.quitar(); pinEst(); }
+        if (a === 'huella') { if (HU.id()) { HU.quitar(); aviso('Huella quitada: queda el PIN'); } else await listo(() => HU.activar(), '👆 Huella activada: el PIN queda de respaldo', b); pinEst(); }
         // Aviso de prueba: lo muestra el service worker del celular, igual que uno real (sonido, vibración y queda a la vista).
         if (a === 'probar') await listo(async () => {
           const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
