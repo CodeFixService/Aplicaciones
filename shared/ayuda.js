@@ -197,9 +197,9 @@
     'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;font:500 16px/1.3 inherit!important;text-transform:none;letter-spacing:0;box-shadow:none!important;outline:0;transition:border-color .15s,box-shadow .15s}' +
     '.cfx-pf textarea{min-height:90px;resize:vertical}.cfx-pf input:focus,.cfx-pf textarea:focus{border-color:var(--pf)!important;box-shadow:0 0 0 4px color-mix(in srgb,var(--pf) 18%,transparent)!important}.cfx-pf input[readonly]{opacity:.7}' +
     // Botones: mismo alto, borde y radio; el principal con degradado y brillo.
-    '.cfx-pf button:not([data-c]):not([data-ico]):not([data-m]){min-height:48px!important;padding:0 18px!important;margin:0!important;border-radius:14px!important;border:1.5px solid var(--pf-borde)!important;' +
+    '.cfx-pf button:not([data-c]):not([data-ico]):not([data-m]):not(.cfx-ojo){min-height:48px!important;padding:0 18px!important;margin:0!important;border-radius:14px!important;border:1.5px solid var(--pf-borde)!important;' +
     'background:var(--cfx-tarjeta,#fff)!important;color:var(--cfx-texto,#111827)!important;font:700 15px/1.2 inherit!important;box-shadow:0 1px 2px rgba(15,23,42,.06)!important;cursor:pointer;width:auto;transition:transform .12s,box-shadow .15s}' +
-    '.cfx-pf button:active{transform:scale(.97)}.cfx-pf button:disabled{opacity:.55}' +
+    '.cfx-pf button:not(.cfx-ojo):active{transform:scale(.97)}.cfx-pf button:disabled{opacity:.55}' +
     '.cfx-pf .cfx-pf-si{width:100%!important;border:0!important;color:#fff!important;background:linear-gradient(135deg,var(--pf),var(--pf2))!important;box-shadow:0 8px 22px color-mix(in srgb,var(--pf) 38%,transparent),inset 0 1px 0 rgba(255,255,255,.25)!important}' +
     '.cfx-pf-foto{display:flex;flex-direction:column;align-items:center;gap:14px;padding:4px 0 6px}.cfx-pf-foto .cfx-pf-btns{flex:none;justify-content:center}.cfx-pf-foto .cfx-pf-av{width:96px;height:96px;font-size:30px}' +
     '.cfx-pf-fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.cfx-pf-fila>span:first-child{flex:1;min-width:0}.cfx-pf-btns{display:flex;gap:8px;flex-wrap:wrap;flex:1;min-width:0}' +
