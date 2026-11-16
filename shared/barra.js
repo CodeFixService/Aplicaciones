@@ -124,6 +124,7 @@
     fila.forEach((b) => { b.classList.remove('cfx-oculto'); nav.appendChild(b); });
     extra.forEach((b) => { b.classList.add('cfx-oculto'); nav.appendChild(b); });
     nav.style.setProperty('--cfx-n', String(nav.querySelectorAll(':scope > :not(.cfx-oculto)').length));
+    nav.cfxHijos = new Set(nav.children);  // G78: para notar si la app vuelve a dibujar los botones
     document.documentElement.classList.add('cfx-barra-lista');
     verBarra();  // al cargar se ve; se esconde al bajar
   }
@@ -382,8 +383,20 @@
   window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra, pasar, pista };
   const iniciar = () => setTimeout(() => { montar(); setTimeout(() => document.documentElement.classList.add('cfx-barra-lista'), 1200); }, 0);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
-  // Barras que la app dibuja después (al iniciar sesión).
-  const obs = new MutationObserver(() => { const n = buscarNav(); if (n && n.dataset.cfx !== '1') montar(); });
-  const mirar = () => obs.observe(document.body, { childList: true, subtree: false });
+  // Barras que la app dibuja después (al iniciar sesión, o llena con botones cuando llegan los datos).
+  // G78: se mira TODA la página (no solo los hijos de <body>): antes, si la app llenaba su <nav> tarde (recarga con caché), el menú quedaba
+  // "crudo" (abajo en el computador) hasta tocar + o ⚙️. El observador corre antes de pintar, así el menú nunca se ve en el lugar equivocado.
+  // Mientras ya hay una barra armada no hace nada (barato).
+  const revisarNav = () => {
+    const y = document.querySelector('nav.cfx-barra');
+    if (y && y.dataset.cfx === '1') {
+      if (!y.cfxHijos || [...y.children].some((c) => y.cfxHijos.has(c))) return;  // sigue armada
+      delete y.dataset.cfx;  // la app volvió a dibujar sus botones: se arma de nuevo
+    }
+    const n = buscarNav(); if (n && n.dataset.cfx !== '1') montar();
+  };
+  const obs = new MutationObserver(revisarNav);
+  const mirar = () => obs.observe(document.body, { childList: true, subtree: true });
   if (document.body) mirar(); else document.addEventListener('DOMContentLoaded', mirar);
+  addEventListener('load', revisarNav); addEventListener('pageshow', revisarNav);
 })();
