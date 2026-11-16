@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.62'::text $$;
+language sql immutable as $$ select '5.63'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7498,6 +7498,15 @@ begin
   return array(select x from jsonb_array_elements_text(coalesce(p -> 'modulos', '[]')) x where x = any(public.cfx_modulos_de_app()));
 end $$;
 
+-- G74 b · 🎁 Campaña de lanzamiento: {"modulos": [...], "meses": 3, "hasta": "AAAA-MM-DD"} en cfx_venta() -> 'campana'.
+-- Activa hasta el día "hasta" incluido (hora de Chile): sin cron, se apaga sola al pasar la fecha.
+create or replace function public.cfx_campana() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when public.cfx_venta_on() and jsonb_typeof(c) = 'object' and (c ->> 'hasta') ~ '^\d{4}-\d{2}-\d{2}$'
+    and (c ->> 'hasta')::date >= (now() at time zone 'America/Santiago')::date and coalesce((c ->> 'meses')::int, 0) between 1 and 12
+    and jsonb_typeof(c -> 'modulos') = 'array' and jsonb_array_length(c -> 'modulos') > 0 then c end
+  from (select public.cfx_venta() -> 'campana' c) x
+$$;
 create or replace function public.cfx_negocio_cuenta(p_cuenta uuid) returns uuid
 language plpgsql stable security definer set search_path = '' as $$
 declare n uuid;
@@ -7560,6 +7569,14 @@ begin
   return coalesce(r, false);
 end $$;
 
+-- ¿Este negocio puede activar gratis este módulo con la campaña? (una vez por módulo)
+create or replace function public.cfx_campana_puede(p_modulo text, p_negocio uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select p_negocio is not null and public.cfx_campana() is not null and public.cfx_campana() -> 'modulos' ? p_modulo
+    and public.cfx_modulo(p_modulo) and public.cfx_venta_activa(p_modulo) and not public.cfx_modulo_plan(p_modulo, p_negocio)
+    and not exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = p_negocio and p.item = 'campana:' || p_modulo)
+$$;
+
 -- Pantalla 🧩 Módulos del negocio: catálogo, precios (con su descuento Premium), lo que tiene y hasta cuándo.
 create or replace function public.cfx_modulos_tienda() returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
@@ -7572,11 +7589,12 @@ begin
   return jsonb_build_object('activo', coalesce((v ->> 'activo')::boolean, false), 'premium', pre, 'descuento', d, 'anual_meses', am,
     'descuento_pro', case when pre then 0 else greatest(0, least(90, coalesce((v ->> 'descuento_premium')::int, 0))) end,
     'prueba_dias', coalesce((v ->> 'prueba_dias')::int, 7), 'dueno', n = auth.uid(),
+    'campana', (select jsonb_build_object('meses', (c ->> 'meses')::int, 'hasta', c ->> 'hasta') from (select public.cfx_campana() c) x where c is not null),
     'prueba_pack', exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item like 'pack:%'),
     'modulos', coalesce((select jsonb_agg(jsonb_build_object('clave', k, 'nombre', coalesce(c.nombre, k), 'detalle', coalesce(c.detalle, ''),
         'precio', round(public.cfx_venta_precio(k) * (100 - d) / 100.0)::int, 'lista', public.cfx_venta_precio(k),
         'vende', public.cfx_venta_activa(k), 'activo', public.cfx_modulo_de(k, n) or public.cfx_modulo_plan(k, n), 'plan', public.cfx_modulo_plan(k, n),
-        'hasta', m.hasta, 'origen', m.origen, 'prueba_usada', exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item = k),
+        'hasta', m.hasta, 'origen', m.origen, 'regalo', public.cfx_campana_puede(k, n), 'prueba_usada', exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item = k),
         'links', v #> array['links', k]) order by o)
       from unnest(public.cfx_modulos_de_app()) with ordinality u(k, o)
       left join public.cfx_modulos_catalogo() c on c.clave = k
@@ -7611,17 +7629,39 @@ begin
   return jsonb_build_object('ok', true, 'hasta', h);
 end $$;
 
--- Aviso 3 días antes de que venza (una vez por vencimiento). Lo corre el cron diario.
+-- G74 b: el dueño toca 🎁 Activar → queda al tiro con el módulo N meses (origen 'regalo'). Una vez por módulo y negocio.
+create or replace function public.cfx_modulo_campana(p_modulo text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.cfx_negocio_cuenta(auth.uid()); c jsonb := public.cfx_campana(); h timestamptz;
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño del negocio'; end if;
+  if c is null then raise exception 'La campaña ya terminó'; end if;
+  if not public.cfx_campana_puede(p_modulo, n) then
+    raise exception '%', case when exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item = 'campana:' || p_modulo)
+      then 'Ya activaste este regalo' else 'Este módulo no está en la campaña' end;
+  end if;
+  insert into public.cfx_modulos_pruebas (negocio, item) values (n, 'campana:' || p_modulo);
+  insert into public.cfx_modulos_negocio as m (negocio, modulo, hasta, origen)
+  values (n, p_modulo, now() + make_interval(months => (c ->> 'meses')::int), 'regalo')
+  on conflict (negocio, modulo) do update set hasta = greatest(m.hasta, now()) + make_interval(months => (c ->> 'meses')::int), origen = 'regalo', avisado = null
+  returning hasta into h;
+  perform public.cfx_anotar('módulo', 'campaña ' || p_modulo || ' · ' || n);
+  return jsonb_build_object('ok', true, 'hasta', h);
+end $$;
+
+-- Aviso 3 días antes de que venza (7 días si es regalo, G74 b; una vez por vencimiento). Lo corre el cron diario.
 create or replace function public.cfx_modulos_avisar() returns int
 language plpgsql security definer set search_path = '' as $$
 declare r record; c int := 0;
 begin
   for r in select m.negocio, min(m.hasta) hasta, string_agg(coalesce(k.nombre, m.modulo), ', ' order by m.modulo) nombres
            from public.cfx_modulos_negocio m left join public.cfx_modulos_catalogo() k on k.clave = m.modulo
-           where m.avisado is null and m.hasta between now() and now() + interval '3 days' group by m.negocio limit 500 loop
+           where m.avisado is null and m.hasta between now() and now() + case when m.origen = 'regalo' then interval '7 days' else interval '3 days' end
+           group by m.negocio limit 500 loop
     perform public.cfx_avisar(r.negocio, '🧩 Tus módulos vencen pronto', left(r.nombres, 120) || ' · vence el ' ||
       to_char(r.hasta at time zone 'America/Santiago', 'DD/MM') || '. Renuévalos en Ajustes → 🧩 Módulos y no pierdes nada.');
-    update public.cfx_modulos_negocio set avisado = now() where negocio = r.negocio and avisado is null and hasta between now() and now() + interval '3 days';
+    update public.cfx_modulos_negocio set avisado = now() where negocio = r.negocio and avisado is null
+      and hasta between now() and now() + case when origen = 'regalo' then interval '7 days' else interval '3 days' end;
     c := c + 1;
   end loop;
   return c;
@@ -7643,6 +7683,8 @@ begin
     'catalogo', (select coalesce(jsonb_agg(jsonb_build_object('clave', c.clave, 'nombre', c.nombre)), '[]') from public.cfx_modulos_catalogo() c where c.clave = any(public.cfx_modulos_de_app())),
     'activos', (select count(distinct negocio) from public.cfx_modulos_negocio where hasta > now() and origen = 'pago'),
     'pruebas', (select count(distinct negocio) from public.cfx_modulos_negocio where hasta > now() and origen = 'prueba'),
+    'campana_on', public.cfx_campana() is not null,
+    'campana_usos', (select count(distinct negocio) from public.cfx_modulos_pruebas where item like 'campana:%'),
     'negocios', coalesce((select jsonb_agg(x order by x.hasta) from (
       select m.negocio, coalesce((select u.email from auth.users u where u.id = m.negocio), '') email, min(m.hasta) hasta,
         jsonb_agg(jsonb_build_object('modulo', m.modulo, 'hasta', m.hasta, 'origen', m.origen) order by m.modulo) modulos
@@ -7655,10 +7697,27 @@ declare v jsonb := public.cfx_venta(); l record; u record;
 begin
   perform public.cfx_es_admin();
   if jsonb_typeof(p) <> 'object' then raise exception 'Datos no válidos'; end if;
-  v := v || jsonb_strip_nulls(p - 'packs' - 'precios' - 'links')
+  v := v || jsonb_strip_nulls(p - 'packs' - 'precios' - 'links' - 'campana')
          || jsonb_build_object('precios', coalesce(p -> 'precios', v -> 'precios', '{}'),   -- llegan completos desde el CM
                                'links', coalesce(p -> 'links', v -> 'links', '{}'),
                                'packs', coalesce(p -> 'packs', v -> 'packs', '{}'));
+  if p ? 'campana' then  -- G74 b: null o {} = terminar la campaña ahora
+    if coalesce((p #>> '{campana,fin}')::boolean, false) then  -- ⏹️ Terminar hoy: la fecha pasa a ayer (queda el historial)
+      if jsonb_typeof(v -> 'campana') = 'object' then
+        v := jsonb_set(v, '{campana,hasta}', to_jsonb(to_char((now() at time zone 'America/Santiago')::date - 1, 'YYYY-MM-DD')));
+      end if;
+    else v := v - 'campana'; end if;
+    if jsonb_typeof(p -> 'campana') = 'object' and p -> 'campana' <> '{}'::jsonb and not (p -> 'campana' ? 'fin') then
+      if coalesce(p #>> '{campana,meses}', '') !~ '^\d{1,2}$' or (p #>> '{campana,meses}')::int not between 1 and 12 then raise exception 'Meses de regalo: de 1 a 12'; end if;
+      if coalesce(p #>> '{campana,hasta}', '') !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Elige la fecha de término'; end if;
+      if (p #>> '{campana,hasta}')::date < (now() at time zone 'America/Santiago')::date or (p #>> '{campana,hasta}')::date > (now() at time zone 'America/Santiago')::date + 366 then
+        raise exception 'La fecha de término va de hoy a un año más'; end if;
+      if jsonb_typeof(p #> '{campana,modulos}') <> 'array' or not exists (select 1 from jsonb_array_elements_text(p #> '{campana,modulos}') x where x = any(public.cfx_modulos_de_app())) then
+        raise exception 'Elige al menos un módulo'; end if;
+      v := v || jsonb_build_object('campana', jsonb_build_object('meses', (p #>> '{campana,meses}')::int, 'hasta', p #>> '{campana,hasta}',
+        'modulos', (select jsonb_agg(distinct x) from jsonb_array_elements_text(p #> '{campana,modulos}') x where x = any(public.cfx_modulos_de_app()))));
+    end if;
+  end if;
   if coalesce((v ->> 'precio')::numeric, 0) not between 0 and 1000000 or coalesce((v ->> 'descuento_premium')::numeric, 0) not between 0 and 90
      or coalesce((v ->> 'prueba_dias')::numeric, 7) not between 0 and 30 or coalesce((v ->> 'anual_meses')::numeric, 10) not between 1 and 12 then
     raise exception 'Revisa los números: precio de 0 a 1.000.000, descuento de 0 a 90 %%, prueba de 0 a 30 días, anual de 1 a 12 meses';
@@ -7696,11 +7755,12 @@ end $$;
 
 revoke all on function public.cfx_modulos_catalogo(), public.cfx_venta(), public.cfx_venta_on(), public.cfx_venta_precio(text), public.cfx_venta_activa(text), public.cfx_venta_modulos(text),
   public.cfx_negocio_cuenta(uuid), public.cfx_negocio_premium(uuid), public.cfx_modulo_plan(text, uuid), public.cfx_modulo_de(text, uuid), public.cfx_modulo_mio(text),
-  public.cfx_modulos_dar(uuid, text, int, text), public.cfx_modulos_avisar(), public.cfx_modulos_borrar(uuid) from public, anon, authenticated;
-revoke all on function public.cfx_modulos_de(uuid), public.cfx_modulos_tienda(), public.cfx_modulo_probar(text), public.cfx_venta_admin(),
+  public.cfx_modulos_dar(uuid, text, int, text), public.cfx_modulos_avisar(), public.cfx_modulos_borrar(uuid),
+  public.cfx_campana(), public.cfx_campana_puede(text, uuid) from public, anon, authenticated;
+revoke all on function public.cfx_modulos_de(uuid), public.cfx_modulos_tienda(), public.cfx_modulo_probar(text), public.cfx_modulo_campana(text), public.cfx_venta_admin(),
   public.cfx_venta_guardar(jsonb), public.cfx_modulo_regalar(text, text, int) from public, anon;
 grant execute on function public.cfx_modulos_de(uuid) to anon, authenticated;
-grant execute on function public.cfx_modulos_tienda(), public.cfx_modulo_probar(text), public.cfx_venta_admin(), public.cfx_venta_guardar(jsonb),
+grant execute on function public.cfx_modulos_tienda(), public.cfx_modulo_probar(text), public.cfx_modulo_campana(text), public.cfx_venta_admin(), public.cfx_venta_guardar(jsonb),
   public.cfx_modulo_regalar(text, text, int) to authenticated;
 do $$
 begin
