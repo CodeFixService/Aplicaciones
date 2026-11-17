@@ -1371,7 +1371,8 @@
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
     if (primera) R('cfx_sitio').then((s) => { try { if (s && typeof s === 'object') localStorage.setItem('cfx:sitio', JSON.stringify({ dominio: s.dominio || '', url: s.url || '', activo: !!s.activo })); } catch (e) { /* nada */ } }).catch(() => { /* base sin la función todavía */ });
-    if (primera) { pinRevisar(); pushAbri(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pushAbri(); }); }
+    if (primera) { pinRevisar(); pushAbri(); if (window.CFX_PAGOS && window.CFX_PAGOS.mpVolver) window.CFX_PAGOS.mpVolver(R);  // G85 vuelta de Mercado Pago
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pushAbri(); }); }
     Object.assign(CFG, o);
     // G34 · 🧭 Panel universal: las apps con su panel ya en el Centro de Mando no se usan como administrador (public.admin_email()):
     // el admin que entra va directo al CM (su usuario y clave siguen sirviendo allí). Socios, negocios y clientes, normal.
@@ -1512,15 +1513,14 @@
       x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x); pestTira(x);
     });
   }
-  // G82: una tira que se desliza y tiene una opción elegida es un MENÚ de pestañas (Datos · Seguridad · Salud…):
-  // queda marcada .cfx-tira-pest y tema.css la pinta distinta de los botones/chips (banda propia + subrayado del color de la app).
+  // G85: las tiras vuelven a verse como antes de G82 (Josué: "quedó feo"). Solo queda que la opción elegida
+  // se vea siempre (al volver a armarse la tira, partía de nuevo en la primera). Se corre la tira, nunca la página.
   const PEST_ON = '.on, .active, .activo, .sel, [aria-selected=true], [aria-current=page], [aria-current=true]';
   function pestTira(x) {
-    if (x.classList.contains('cfx-tira-pest') || x.classList.contains('cfx-chips') || x.hasAttribute('data-cfx-sin-pest')) return;
+    if (x.dataset.cfxVista === '1' || x.classList.contains('cfx-chips')) return;
     const on = [...x.children].find((h) => h.matches(PEST_ON));
     if (!on) return;
-    x.classList.add('cfx-tira-pest');
-    // La elegida siempre a la vista (al volver a armarse la tira, partía de nuevo en la primera). Solo se corre la tira, nunca la página.
+    x.dataset.cfxVista = '1';
     const r = on.getBoundingClientRect(), rx = x.getBoundingClientRect();
     if (r.right > rx.right - 8 || r.left < rx.left + 8) { x.scrollLeft += r.left - rx.left - (rx.width - r.width) / 2; marcarTira(x); }
   }

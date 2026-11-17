@@ -1,12 +1,15 @@
-/* CodeFix · Núcleo · Pagar Premium (mismo archivo en cada repositorio). Precios, link, tarjeta y transferencia vienen de la base
+/* CodeFix · Núcleo · Pagar Premium (mismo archivo en cada repositorio). Precios, Mercado Pago, link y transferencia vienen de la base
    (cfx_pago_estado), y se editan una sola vez para las 7 apps en el Centro de Mando → Pagos.
    CFX_PAGOS.abrir({ rpc })            → elegir plan (1 mes, 3 meses o 1 año), pagar y subir el comprobante, paso a paso:
                                           1) paga el total  2) saca pantallazo  3) súbelo  4) espera 5–10 min (te avisamos).
-                                          Transferencia = precio exacto. Link o tarjeta = precio + "cargo por pago online (X %)" en una línea aparte.
+                                          Transferencia = precio exacto. Mercado Pago o link = precio + "cargo por pago online (X %)" en una línea aparte.
    CFX_PAGOS.abrir({ rpc, producto })  → G19: comprar un módulo o pack. producto = { clave, nombre, mensual, anual, links: { m, a } } (1 mes o 1 año;
                                           links = link de pago con el monto fijo, si el administrador lo puso). Al aprobarlo se activa solo ese módulo.
                                           G28 (M2): el link general es ABIERTO (sin monto) y sirve para todo: se muestra el total con 📋 Copiar monto.
                                           Un link de monto fijo, si existe para ese plan, se usa en su lugar.
+   G85: ⚡ Mercado Pago automático (si CodeFix lo conectó en CM → Pagos): paga y se activa solo, sin comprobante (aviso push).
+        Solo 3 formas: ⚡ Mercado Pago · 🔗 link general (abierto) · 🏦 transferencia. Cupón a la vista. Ya no hay links de monto fijo ni tarjeta aparte.
+   CFX_PAGOS.mpVolver(rpc)             → al volver de Mercado Pago (lo llama ayuda.js al iniciar): confirma el pago y avisa.
    CFX_PAGOS.revisar({ rpc, salir })   → si es un negocio nuevo que debe su primer pago, muestra la pantalla de activación (no se cierra).
    rpc(nombre, args) debe devolver una promesa con los datos (cada app pasa su propia función). */
 (function () {
@@ -34,7 +37,18 @@
     '.cfx-pago .cp-pasos div::before{counter-increment:p;content:counter(p);display:flex;align-items:center;justify-content:center;width:26px;height:26px;margin:0 auto 4px;border-radius:50%;background:var(--cp-color);color:#fff;font-weight:800;font-size:13px}' +
     '.cfx-pago .cp-linea{display:flex;justify-content:space-between;font-size:14px;padding:2px 0}.cfx-pago .cp-linea.total{font-weight:800;font-size:16px;border-top:1px solid var(--cfx-borde,#e2e7ec);margin-top:4px;padding-top:6px}' +
     '.cfx-pago .cp-ayuda{font-size:13px;background:var(--cfx-campo,#f7f9fb);border-radius:10px;padding:8px 10px;margin:8px 0}.cfx-pago select{width:100%;min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;padding:0 10px}';
+  css.textContent +=
+    '.cfx-pago .cp-cupon{display:flex;align-items:center;gap:8px;border:2px dashed color-mix(in srgb,var(--cp-color) 55%,transparent);background:color-mix(in srgb,var(--cp-color) 7%,transparent);border-radius:14px;padding:8px 10px;margin:10px 0}' +
+    '.cfx-pago .cp-cupon>span{font-size:22px;flex:none}.cfx-pago .cp-cupon input{flex:1 1 auto;min-width:0;min-height:42px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}' +
+    '.cfx-pago .cp-cupon button{flex:none;min-height:42px;padding:0 14px}.cfx-pago .cp-cupon.on{border-style:solid;border-color:var(--cfx-ok,#16a34a);background:color-mix(in srgb,var(--cfx-ok,#16a34a) 12%,transparent)}' +
+    '.cfx-pago .cp-cupon.on b{flex:1;min-width:0;font-size:15px}.cfx-pago .cp-cupon.on small{display:block;font-weight:500;color:var(--cfx-texto-2,#5b6472)}' +
+    '.cfx-pago .cp-plan s{display:block;font-size:12px;font-weight:500;color:var(--cfx-texto-2,#5b6472)}' +
+    '.cfx-pago a.cp-mp,.cfx-pago button.cp-mp{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border:0;border-radius:14px;background:#009ee3;color:#fff;font-weight:800;font-size:16px;text-decoration:none;margin-top:10px;cursor:pointer}' +
+    '.cfx-pago .cp-pasos.tres{grid-template-columns:repeat(3,1fr)}';
   document.head.appendChild(css);
+  const MP_KEY = 'cfx-mp-pago';
+  const mpMarca = (v) => { try { if (v) localStorage.setItem(MP_KEY, String(Date.now())); else localStorage.removeItem(MP_KEY); } catch (e) { /* sin almacenamiento */ } };
+  const mpMarcado = () => { try { const t = +localStorage.getItem(MP_KEY) || 0; return t && Date.now() - t < 2 * 864e5; } catch (e) { return false; } };
 
   const esc = (s) => window.CFX_ESC(s);  // seguro.js (núcleo)
   const pesos = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
@@ -106,14 +120,11 @@
     if (o.comoNegocio && e.yo && e.yo.rol === 'cliente') e.yo.rol = 'negocio';
     const pr = o.producto || null;  // G19: módulo o pack (nunca obligatorio)
     let obligatorio = !pr && !!(o.obligatorio || e.bloqueado || (o.comoNegocio && e.debe_inicio));
-    const c = e.config || {}, t = c.transferencia || {}, tj = c.tarjeta || {};
-    const PCT = { link: Number(c.comision_pct) || 0, tarjeta: Number(tj.comision_pct) || 0, transferencia: 0 };
-    const grupo = (e.yo && e.yo.rol === 'cliente') ? (c.cliente || {}) : (c.negocio || {});
-    // Link propio del plan (monto fijo = precio + cargo online), si el administrador lo puso; si no, el link general.
-    const linkPlan = (pl) => (!pl || cupon_ || pl.k === 'otro') ? '' : pr ? ((pr.links || {})[pl.k === 'anual' ? 'a' : 'm'] || '') : (pl.k === 'anual' ? grupo.link_anual : pl.k === 'meses' ? grupo.link_3meses : grupo.link_mensual) || '';
-    let cupon_ = null;
-    const L = planes(e, pr), medios = [t.numero ? 'transferencia' : null, (c.link || (pr ? (pr.links || {}).m || (pr.links || {}).a : '') || grupo.link_mensual || grupo.link_3meses || grupo.link_anual) ? 'link' : null, tj.link ? 'tarjeta' : null].filter(Boolean);
-    const NOMBRE_MEDIO = { transferencia: '🏦 Transferencia', link: '🔗 Link de pago', tarjeta: '💳 Tarjeta' };
+    const c = e.config || {}, t = c.transferencia || {};
+    // G85: un solo pago general para las 7 apps: ⚡ Mercado Pago automático, 🔗 link general abierto y 🏦 transferencia.
+    const PCT = { mp: Number(c.comision_pct) || 0, link: Number(c.comision_pct) || 0, transferencia: 0 };
+    const L = planes(e, pr), medios = [e.mp ? 'mp' : null, c.link ? 'link' : null, t.numero ? 'transferencia' : null].filter(Boolean);
+    const NOMBRE_MEDIO = { mp: '⚡ Mercado Pago', link: '🔗 Link de pago', transferencia: '🏦 Transferencia' };
     let plan = L[0], medio = medios[0], foto = null;
     const ayudaChat = window.CFX_AYUDA ? '<p style="text-align:center"><a href="#" data-chat>💬 ¿Dudas? Escríbenos por el chat</a></p>' : '';
     const pie = (obligatorio ? (o.salir ? '<button type="button" data-salir style="width:100%;margin-top:10px">' + esc(o.salirTexto || 'Cerrar sesión') + '</button>' : '') : '<button type="button" data-x style="width:100%;margin-top:10px">Ahora no</button>') +
@@ -122,68 +133,102 @@
     const u = e.ultimo;
     const keyHtml = '<details style="margin-top:8px"><summary>🔑 Tengo una key</summary><div class="cp-fila"><input id="cpKey" placeholder="CFX-XXXX-XXXX-XXXX" autocapitalize="characters"><button type="button" data-key>Activar</button></div><p class="cp-err" id="cpKeyErr"></p></details>';
     const lib = e.liberado_hasta ? '<div class="cp-ok">🎁 Registro liberado hasta el <b>' + new Date(e.liberado_hasta).toLocaleDateString('es-CL') + '</b>: puedes usar la app sin pagar.</div>' : '';
-    if (u && u.estado === 'pendiente') {
+    if (u && u.estado === 'pendiente' && u.medio === 'mp') {
+      // G85: abrió Mercado Pago: confirmar (por si ya pagó) o pagar de otra forma.
+      caja.innerHTML = '<h2>⏳ Esperando tu pago</h2><div class="cp-ok">Abriste Mercado Pago por <b>' + pesos(u.monto) + '</b>. Apenas Mercado Pago lo apruebe, tu plan se activa solo y te llega un aviso.</div>' +
+        '<button type="button" class="cp-si" data-mpver style="width:100%;margin-top:10px">🔄 Ya pagué, revisar</button><p class="cp-err" id="cpErr"></p>' +
+        '<button type="button" data-mpotra style="width:100%;margin-top:8px">Pagar de otra forma</button>' + pie;
+      caja.addEventListener('click', async (ev) => {
+        const b = ev.target.closest('[data-mpver],[data-mpotra]'); if (!b) return;
+        b.disabled = true;
+        try {
+          if ('mpotra' in b.dataset) { await o.rpc('cfx_mp_cancelar'); mpMarca(false); return abrir(o); }
+          const r = await o.rpc('cfx_mp_revisar');
+          if (r && r.aprobado) { mpMarca(false); caja.innerHTML = listo(); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
+          caja.querySelector('#cpErr').textContent = 'Mercado Pago aún no lo aprueba. Si ya pagaste, espera 1–2 minutos: se activa solo.'; b.disabled = false;
+        } catch (x) { caja.querySelector('#cpErr').textContent = (x && x.message) || String(x); b.disabled = false; }
+      });
+    } else if (u && u.estado === 'pendiente') {
       caja.innerHTML = '<h2>⏳ Pago en revisión</h2><div class="cp-ok">Recibimos tu comprobante de <b>' + pesos(u.monto) + '</b>. Normalmente lo revisamos en 5 a 10 minutos y te llega un aviso apenas se active.</div>' + pie;
     } else if (!medios.length) {
       caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + '<p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + keyHtml + pie;
     } else {
       let cupon = null;  // { codigo, pct }: descuento sobre el precio del plan (no sobre "otro monto")
-      const base = () => {
-        let b = plan.k === 'otro' ? Math.round(Number((caja.querySelector('#cpOtro') || {}).value || o._otro || 0)) : plan.k === 'meses' ? plan.p * plan.m : plan.p;
-        if (cupon && plan.k !== 'otro') b = Math.round(b * (100 - cupon.pct) / 100);
-        return b;
-      };
+      const conCupon = (p) => cupon ? Math.round(p * (100 - cupon.pct) / 100) : p;
+      const base = () => plan.k === 'otro' ? Math.round(Number((caja.querySelector('#cpOtro') || {}).value || o._otro || 0)) : conCupon(plan.k === 'meses' ? plan.p * plan.m : plan.p);
       const cargo = () => Math.ceil(base() * PCT[medio] / 100);
       const monto = () => base() + cargo();
       const linea = (a, b, cls) => '<div class="cp-linea' + (cls ? ' ' + cls : '') + '"><span>' + a + '</span><b>' + b + '</b></div>';
       const datos = [['Titular', t.titular], ['RUT', t.rut], ['Banco', t.banco], ['Tipo de cuenta', t.tipo], ['N° de cuenta', t.numero], ['Correo', t.correo]].filter((x) => x[1]);
       const pintar = () => {
-        cupon_ = cupon;
-        const pc = PCT[medio], fijo = medio === 'link' ? linkPlan(plan) : '', url = medio === 'tarjeta' ? tj.link : (fijo || c.link);
-        if (medio === 'link' && !url && medios.some((m) => m !== 'link')) { medio = medios.find((m) => m !== 'link'); return pintar(); }
+        const pc = PCT[medio], url = medio === 'link' ? c.link : '', mp = medio === 'mp';
+        const precio = (x) => x.k === 'meses' ? x.p * x.m : x.p;
+        // 🏷️ Cupón bien a la vista (Premium; los módulos traen su propio descuento Premium).
+        const cajaCupon = pr ? '' : cupon
+          ? '<div class="cp-cupon on"><span>🏷️</span><b>Cupón ' + esc(cupon.codigo) + ' · −' + cupon.pct + '%<small>Ya está descontado del total</small></b><button type="button" data-sincupon>Quitar</button></div>'
+          : '<div class="cp-cupon"><span>🏷️</span><input id="cpCupon" placeholder="¿Tienes cupón?" autocapitalize="characters" autocomplete="off" aria-label="Cupón de descuento"><button type="button" data-cupon>Aplicar</button></div>';
         caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib +
           (obligatorio ? '<p>Para empezar a usar la app haz tu primer pago. Te da ' + esc(plan.d) + '; después puedes seguir en Premium o quedar en la versión gratis.</p>' : '') +
-          '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>' +
-          (u && u.estado === 'rechazado' ? '<div class="cp-err">Tu último comprobante fue rechazado: ' + esc(u.motivo || '') + '</div>' : '') +
-          '<div class="cp-planes">' + L.map((x, i) => '<div class="cp-plan' + (x === plan ? ' on' : '') + '" data-p="' + i + '"><b>' + esc(x.t) + '<small>' + esc(x.d) + '</small></b><span class="cp-precio">' + (x.p ? pesos(x.k === 'meses' ? x.p * x.m : x.p) : '') + '</span></div>').join('') + '</div>' +
+          (mp ? '<div class="cp-pasos tres"><div>Toca Pagar</div><div>Paga en Mercado Pago</div><div>Se activa solo</div></div>'
+            : '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>') +
+          (u && u.estado === 'rechazado' && u.medio !== 'mp' ? '<div class="cp-err">Tu último comprobante fue rechazado: ' + esc(u.motivo || '') + '</div>' : '') +
+          '<div class="cp-planes">' + L.map((x, i) => '<div class="cp-plan' + (x === plan ? ' on' : '') + '" data-p="' + i + '"><b>' + esc(x.t) + '<small>' + esc(x.d) + '</small></b><span class="cp-precio">' +
+            (x.p ? (cupon && x.k !== 'otro' ? '<s>' + pesos(precio(x)) + '</s>' + pesos(conCupon(precio(x))) : pesos(precio(x))) : '') + '</span></div>').join('') + '</div>' +
           (plan.k === 'otro' ? '<label for="cpOtro">Monto a pagar</label><input id="cpOtro" type="number" inputmode="numeric" min="1" placeholder="Ej: 10000">' : '') +
+          cajaCupon +
           (medios.length > 1 ? '<div class="cp-tabs">' + medios.map((m) => '<button type="button" data-m="' + m + '" class="' + (m === medio ? 'on' : '') + '">' + NOMBRE_MEDIO[m] + '</button>').join('') + '</div>' : '') +
-          '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div><div class="cp-fila"><button type="button" data-copiar>📋 Copiar monto</button>' +
-            (medio !== 'transferencia' && url ? '<a class="cp-btn" href="' + esc(url) + '" target="_blank" rel="noopener">' + (medio === 'tarjeta' ? '💳 Abrir pago con tarjeta' : '🔗 Abrir link de pago') + '</a>' : '') + '</div>' +
+          (mp ? '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div>' +
+              '<button type="button" class="cp-mp" data-mp>⚡ Pagar con Mercado Pago</button>' +
+              '<div class="cp-ayuda">Pagas con tarjeta, débito o saldo de Mercado Pago. Al terminar vuelves a la app y tu plan <b>se activa solo, al tiro</b> (te llega un aviso). Sin comprobante.</div><p class="cp-err" id="cpErr"></p></div>' + (pr ? '' : keyHtml) + pie
+          : '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div><div class="cp-fila"><button type="button" data-copiar>📋 Copiar monto</button>' +
+            (medio === 'link' && url ? '<a class="cp-btn" href="' + esc(url) + '" target="_blank" rel="noopener">🔗 Abrir link de pago</a>' : '') + '</div>' +
           (medio === 'transferencia'
             ? '<div class="cp-ayuda">Copia cada dato, abre la app de tu banco y pégalo (mantén presionado el campo → <b>Pegar</b>). La transferencia no tiene cargo extra.</div>' +
               datos.map((x, i) => '<div class="cp-dato"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b>' + (/^(Banco|Tipo de cuenta)$/.test(x[0]) ? '' : '<button type="button" data-d="' + i + '">Copiar</button>') + '</div>').join('')
             : !url ? '<div class="cp-err">Este plan aún no tiene link de pago. Elige otro plan o escríbenos por el chat.</div>'
-            : fijo ? '<div class="cp-ayuda">Abre el link: ya trae el monto del plan. Paga y vuelve aquí a subir el pantallazo.</div>'
-            : '<div class="cp-ayuda">Toca <b>Copiar monto</b>, abre el ' + (medio === 'tarjeta' ? 'pago con tarjeta' : 'link') + ' y pega el total donde dice monto.' + (pc ? ' El cargo por pago online (' + String(pc).replace('.', ',') + ' %) lo cobra la plataforma de pago; por transferencia no se cobra.' : '') + '</div>') + '</div>' +
+            : '<div class="cp-ayuda">Toca <b>Copiar monto</b>, abre el link y pega el total donde dice monto.' + (pc ? ' El cargo por pago online (' + String(pc).replace('.', ',') + ' %) lo cobra la plataforma de pago; por transferencia no se cobra.' : '') + '</div>') + '</div>' +
           '<label for="cpFoto">Pantallazo del comprobante</label><input id="cpFoto" type="file" accept="image/*">' + (foto ? '<img class="cp-vista" alt="Comprobante" src="' + foto + '">' : '') +
           '<label for="cpPagado">Monto que pagaste</label><input id="cpPagado" type="number" inputmode="numeric" value="' + (monto() || '') + '">' +
           '<p class="cp-err" id="cpErr"></p><button type="button" class="cp-si" data-enviar style="width:100%">Enviar comprobante</button>' +
-          (pr ? '' : '<details style="margin-top:12px"><summary>🏷️ Tengo un cupón</summary><div class="cp-fila"><input id="cpCupon" placeholder="CUPÓN" autocapitalize="characters" value="' + esc(cupon ? cupon.codigo : '') + '"><button type="button" data-cupon>Aplicar</button></div>' +
-            (cupon ? '<p>Cupón ' + esc(cupon.codigo) + ': ' + cupon.pct + '% de descuento.</p>' : '') + '</details>' + keyHtml) + pie;
+          (pr ? '' : keyHtml) + pie);
         if (plan.k === 'otro') { const i = caja.querySelector('#cpOtro'); i.value = o._otro || ''; i.oninput = () => { o._otro = i.value; refrescar(); }; }
-        if (o._pagado) caja.querySelector('#cpPagado').value = o._pagado;
-        caja.querySelector('#cpPagado').oninput = (ev) => { o._pagado = ev.target.value; };
+        const pg = caja.querySelector('#cpPagado');
+        if (pg) { if (o._pagado) pg.value = o._pagado; pg.oninput = (ev) => { o._pagado = ev.target.value; }; }
+        const ci = caja.querySelector('#cpCupon'); if (ci) ci.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); caja.querySelector('[data-cupon]').click(); } };
       };
       function desglose() {
         const pc = PCT[medio];
         return (pc ? linea('Precio' + (plan.k === 'meses' ? ' (' + plan.m + ' meses)' : ''), pesos(base())) + linea('Cargo por pago online (' + String(pc).replace('.', ',') + ' %)', pesos(cargo())) : '') +
           linea('Total a pagar', '<span class="cp-monto" id="cpMonto" style="font-size:24px">' + pesos(monto()) + '</span>', 'total');
       }
-      function refrescar() { caja.querySelector('#cpDesglose').innerHTML = desglose(); if (!o._pagado) caja.querySelector('#cpPagado').value = monto() || ''; }
+      function refrescar() { caja.querySelector('#cpDesglose').innerHTML = desglose(); const pg = caja.querySelector('#cpPagado'); if (pg && !o._pagado) pg.value = monto() || ''; }
+      // Si "otro monto" no se puede pagar automático, igual queda el link o la transferencia.
+      if (medio === 'mp' && plan.k === 'otro' && medios.length > 1) medio = medios[1];
       pintar();
       caja.addEventListener('change', async (ev) => {
         if (ev.target.id !== 'cpFoto' || !ev.target.files[0]) return;
         try { foto = await achicar(ev.target.files[0]); pintar(); } catch (x) { caja.querySelector('#cpErr').textContent = x.message; }
       });
       caja.addEventListener('click', async (ev) => {
-        const b = ev.target.closest('[data-p],[data-m],[data-copiar],[data-d],[data-enviar],[data-cupon],[data-key]'); if (!b) return;
+        const b = ev.target.closest('[data-p],[data-m],[data-copiar],[data-d],[data-enviar],[data-cupon],[data-sincupon],[data-key],[data-mp]'); if (!b) return;
         if (b.dataset.p) { plan = L[+b.dataset.p]; o._pagado = ''; pintar(); }
         else if ('cupon' in b.dataset) {
           const cod = caja.querySelector('#cpCupon').value.trim().toUpperCase();
-          try { cupon = { codigo: cod, pct: await o.rpc('cfx_cupon_ver', { p_codigo: cod }) }; o._pagado = ''; pintar(); caja.querySelector('details').open = true; }
+          if (!cod) { caja.querySelector('#cpCupon').focus(); return; }
+          try { cupon = { codigo: cod, pct: await o.rpc('cfx_cupon_ver', { p_codigo: cod }) }; o._pagado = ''; pintar(); }
           catch (x) { caja.querySelector('#cpErr').textContent = (x && x.message) || String(x); }
-        } else if ('key' in b.dataset) return;
+        } else if ('sincupon' in b.dataset) { cupon = null; o._pagado = ''; pintar(); }
+        else if ('key' in b.dataset) return;
+        else if ('mp' in b.dataset) {
+          // G85: ⚡ el cobro lo arma la base (mismo total que se ve aquí) y abre Mercado Pago; al volver se confirma solo.
+          const err = caja.querySelector('#cpErr'); b.disabled = true; b.textContent = 'Abriendo Mercado Pago…';
+          try {
+            const r = await o.rpc('cfx_mp_pagar', { p_periodo: plan.k, p_meses: plan.k === 'meses' ? plan.m : null, p_producto: pr ? pr.clave : null, p_cupon: cupon ? cupon.codigo : null, p_volver: location.href.split('#')[0] });
+            if (r && r.aprobado) { caja.innerHTML = listo(); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
+            if (!r || !r.ok) throw new Error((r && r.error) || 'Mercado Pago no respondió');
+            mpMarca(true); location.href = r.url;
+          } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = '⚡ Pagar con Mercado Pago'; }
+        }
         else if (b.dataset.m) { medio = b.dataset.m; o._pagado = ''; pintar(); }
         else if ('copiar' in b.dataset) { await copiar(String(monto())); b.textContent = '✓ Monto copiado'; }
         else if (b.dataset.d) { await copiar(String(datos[+b.dataset.d][1])); caja.querySelectorAll('[data-d]').forEach((x) => { x.textContent = 'Copiar'; }); b.textContent = '✓ Copiado'; }
@@ -234,6 +279,25 @@
     return e;
   }
 
+  const listo = () => '<h2>🎉 ¡Pago aprobado!</h2><div class="cp-ok">Mercado Pago confirmó tu pago: tu plan ya está activo. ¡Gracias!</div><button type="button" data-x style="width:100%;margin-top:10px">Continuar</button>';
+  // G85: al volver de Mercado Pago (la app abre de nuevo): confirma el pago con la base. Reintenta un rato por si Mercado Pago tarda.
+  async function mpVolver(rpc) {
+    if (!rpc || !mpMarcado()) return;
+    for (let n = 0; n < 8; n++) {
+      let r = null;
+      try { r = await rpc('cfx_mp_revisar'); } catch (x) { return; }
+      if (r && r.aprobado) {
+        mpMarca(false); cerrar();
+        const capa = document.createElement('dialog'); capa.className = 'cfx-pago'; capa.style.setProperty('--cp-color', color());
+        capa.innerHTML = '<div>' + listo() + '</div>'; document.body.appendChild(capa); abierta = capa; capa.showModal();
+        capa.querySelector('[data-x]').onclick = () => { cerrar(); location.reload(); };
+        return;
+      }
+      if (!r || !r.pendiente) { mpMarca(false); return; }
+      await new Promise((ok) => setTimeout(ok, 5000));
+    }
+  }
+
   // Al entrar: si es un negocio que debe su primer pago, muestra la activación (y no deja seguir).
   async function revisar(o) {
     try {
@@ -243,5 +307,5 @@
     } catch (x) { return null; }
   }
 
-  window.CFX_PAGOS = { abrir, revisar, cerrar };
+  window.CFX_PAGOS = { abrir, revisar, cerrar, mpVolver };
 })();
