@@ -364,5 +364,47 @@
     } catch (x) { return null; }
   }
 
-  window.CFX_PAGOS = { abrir, revisar, cerrar, mpVolver };
+  // G98 ⚡ Mercado Pago PROPIO del negocio (para cobrar a SUS clientes). CFX_PAGOS.mpNegocio(el, { rpc, para: 'el abono de tus reservas', btn, btnAlt })
+  // (btn/btnAlt = clases de los botones de la app, si sus botones no tienen estilo propio).
+  // pinta en el elemento la tarjeta para conectar / pausar / desconectar (el token queda solo en el servidor: cfx_mp_neg_*).
+  async function mpNegocio(el, o) {
+    if (!el || !o || !o.rpc) return;
+    const para = o.para || 'tus cobros';
+    const avisar = (t) => (window.CFX_DIALOGO ? window.CFX_DIALOGO.avisar(t) : null);
+    let m = {};
+    try { m = await o.rpc('cfx_mp_neg_estado') || {}; } catch (x) { el.innerHTML = '<p class="cp-mpn-nota">⚠️ ' + esc(x.message || x) + '</p>'; return; }
+    if (!m.dueno) { el.innerHTML = ''; el.hidden = true; return; }
+    el.hidden = false; el.classList.add('cfx-mpn');
+    el.innerHTML = '<b>⚡ Tu Mercado Pago' + (m.conectado ? (m.activo ? ' · ✅ Activo' : ' · ⏸️ En pausa') : '') + '</b>' +
+      '<p class="cp-mpn-nota">Tu cliente paga ' + esc(para) + ' con tarjeta o saldo y se aprueba <b>solo</b> (sin comprobante). La plata llega directo a tu cuenta.' +
+      (m.conectado ? ' Conectado como <b>' + esc(m.nick || 'tu cuenta') + '</b> (…' + esc(m.fin || '') + ').' : '') + '</p>' +
+      '<label for="cfxMpnTok">' + (m.conectado ? 'Cambiar Access Token' : 'Access Token') + '</label>' +
+      '<input id="cfxMpnTok" type="password" autocomplete="off" placeholder="APP_USR-…">' +
+      '<details class="cp-mpn-nota"><summary>¿Dónde lo saco?</summary>Mercado Pago → Tu negocio → Configuración → Credenciales → <b>Credenciales de producción</b> → Access Token. Nadie más lo ve.</details>' +
+      (m.conectado ? '<label class="cp-mpn-si"><input type="checkbox" id="cfxMpnOn"' + (m.activo ? ' checked' : '') + '> <span>Cobrar con Mercado Pago</span></label>' : '') +
+      '<div class="cp-mpn-btns"><button type="button" class="' + esc(o.btn || '') + '" data-mpn="guardar">' + (m.conectado ? 'Guardar' : '⚡ Conectar') + '</button>' +
+      (m.conectado ? '<button type="button" class="' + esc(o.btnAlt || 'alt') + '" data-mpn="quitar">Desconectar</button>' : '') + '</div>';
+    el.onclick = async (e) => {
+      const a = e.target.dataset && e.target.dataset.mpn;
+      if (!a) return;
+      if (a === 'quitar' && window.CFX_DIALOGO && !await window.CFX_DIALOGO.confirmar('¿Desconectar tu Mercado Pago? Tus clientes volverán al link y comprobante.')) return;
+      e.target.disabled = true;
+      try {
+        const on = el.querySelector('#cfxMpnOn');
+        await o.rpc('cfx_mp_neg_guardar', a === 'quitar' ? { p_token: null, p_activo: null } : { p_token: el.querySelector('#cfxMpnTok').value, p_activo: on ? on.checked : true });
+        avisar(a === 'quitar' ? 'Mercado Pago desconectado' : '⚡ Mercado Pago guardado');
+        mpNegocio(el, o);
+      } catch (x) { avisar(x.message || String(x)); e.target.disabled = false; }
+    };
+  }
+  if (!document.getElementById('cfx-mpn-css')) {
+    const st = document.createElement('style'); st.id = 'cfx-mpn-css';
+    st.textContent = '.cfx-mpn{display:block;border:1px solid var(--cfx-borde,#e2e7ec);border-radius:14px;padding:12px;margin:10px 0;overflow-wrap:anywhere}' +
+      '.cfx-mpn label{display:block;font-size:13px;font-weight:600;margin:8px 0 4px}.cfx-mpn input[type=password]{width:100%;box-sizing:border-box}' +
+      '.cfx-mpn .cp-mpn-nota{margin:4px 0;font-size:13px;color:var(--cfx-texto-2,#5b6472)}.cfx-mpn .cp-mpn-si{display:flex;gap:8px;align-items:center;font-weight:500}' +
+      '.cfx-mpn .cp-mpn-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.cfx-mpn .cp-mpn-btns button{flex:1 1 120px;min-height:44px}';
+    document.head.appendChild(st);
+  }
+
+  window.CFX_PAGOS = { abrir, revisar, cerrar, mpVolver, mpNegocio };
 })();

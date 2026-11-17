@@ -32,7 +32,7 @@ Tienda online + caja + pedidos para pymes chilenas. Free / Pro / 🧩 módulos (
 profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, boleta_cuentas, boletas_caja, calificaciones, sellos, avisos_stock, publicaciones, publicacion_vistas, subscribers, user_invites, requests, conexiones, webhooks, webhook_envios, negocio_correo, notifications, notification_reads, push_subscriptions, planes, textos, app_settings, app_secrets, actividad_dia.
 
 ## Versiones
-core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.53 · bd 5.73 · enviar 3.6.
+core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.54 · bd 5.74 · enviar 3.6.
 
 ## ✉️ Correo (G42f, 6.19 · bd 5.50 · enviar 3.5)
 - CodeFix → negocios/todos: Gmail de Josué (app_secrets gmail_*), se pone en CM → Control → ✉️ Correo.
