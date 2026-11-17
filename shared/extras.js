@@ -1,5 +1,5 @@
 /* G96 🧩 Módulos de tienda (propio de Despega, no del núcleo): 🎁 Gift cards · 🛒 Carritos olvidados · 🔁 Compras recurrentes ·
-   📦 Stock mínimo y proveedores. Cada uno se abre en su hoja del Más (CFX_MENU → abrir). Todo lo valida el servidor (pro_o_modulo).
+   📦 Stock mínimo y proveedores · 🛒 Mercado Libre (G101). Cada uno se abre en su hoja del Más (CFX_MENU → abrir). Todo lo valida el servidor (pro_o_modulo).
    Sin el módulo: qué hace + ▶️ Probar módulo (demo + 🎁 prueba 7 días + Comprar, núcleo). */
 (function () {
   'use strict';
@@ -251,5 +251,65 @@
   // 📣 Promos en la app de tus clientes (núcleo).
   const promos = (z, o) => window.CFX_ANUNCIOS && CFX_ANUNCIOS.promos ? CFX_ANUNCIOS.promos(z, { rpc: R, probar: o.probar }) : error(z, 'Actualiza la app');
 
-  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores, sucursales, promos };
+  /* ---------- 🛒 Mercado Libre (G101) ---------- */
+  // La vuelta desde Mercado Libre (?code=…&state=ml…) la guarda index.html al partir (cfx-ml-volver); el canje lo hace el servidor.
+  async function mercadolibre(z, o) {
+    if (!puede('mercadolibre')) return candado(z, 'mercadolibre', 'Une tus productos con tus publicaciones de Mercado Libre: cuando vendes allá se descuenta aquí, y si cambias el stock aquí se actualiza allá.', o);
+    let pend = null; try { pend = JSON.parse(sessionStorage.getItem('cfx-ml-volver') || 'null'); sessionStorage.removeItem('cfx-ml-volver'); } catch (e) { /* nada */ }
+    if (pend) { try { const r = await R('ml_volver', { p_state: pend[0], p_code: pend[1] }); Core.toast('✅ Mercado Libre conectado' + (r && r.nick ? ': ' + r.nick : '')); } catch (e) { Core.toast('⚠️ ' + e.message); } }
+    let d; try { d = await R('ml_estado'); } catch (e) { return error(z, e); }
+    const irML = async (b) => { b.disabled = true; try { const u = await R('ml_conectar'); if (/^https:\/\/auth\.mercadolibre\.cl\//.test(u)) location.href = u; } catch (e) { b.disabled = false; Core.toast('⚠️ ' + e.message); } };
+    if (!d.conectado) {
+      const c = caja(z, '<p class="muted">Conecta tu cuenta de Mercado Libre y une cada producto con su publicación: el stock queda igual en los dos lados, sin anotar a mano.</p>' +
+        (d.app ? '<button type="button" class="ok" data-ml="conectar">🔗 Conectar Mercado Libre</button><p><small class="muted">Te lleva a Mercado Libre a dar el permiso y vuelves aquí.</small></p>'
+          : '<button type="button" disabled>🔗 Conectar Mercado Libre</button><p><small class="muted">⏳ CodeFix aún lo está activando. Si lo necesitas ya, escríbenos por 🛟 Soporte.</small></p>') +
+        (d.vinculos.length ? '<p><small class="muted">Tienes ' + d.vinculos.length + ' publicaciones unidas guardadas: vuelven a funcionar al conectar.</small></p>' : ''));
+      const b = c.querySelector('[data-ml=conectar]');
+      if (b) b.onclick = () => irML(b);
+      return;
+    }
+    const prod = (sel) => '<option value="">— Sin unir —</option>' + d.productos.map((p) => '<option value="' + esc(p.clave) + '"' + (p.clave === sel ? ' selected' : '') + '>' +
+      esc(p.nombre) + (p.stock == null ? ' (sin stock)' : ' (' + p.stock + ')') + '</option>').join('');
+    const est = (v) => !v.existe ? '⚠️ El producto ya no está' : v.error ? '⚠️ Mercado Libre: ' + esc(v.error) : v.stock == null ? 'Sin stock en tu tienda: no se manda' :
+      v.enviado === v.stock ? '✅ ' + v.stock + ' en los dos lados' : '⏳ Se manda ' + v.stock + ' a Mercado Libre';
+    const c = caja(z, '<p>✅ Conectado' + (d.nick ? ' como <b>' + esc(d.nick) + '</b>' : '') + (d.activo ? '' : ' · ⏸️ en pausa') + '</p>' +
+      (d.error ? '<p class="gx-err">⚠️ ' + esc(d.error) + '</p><button type="button" class="ok" data-ml="conectar">🔗 Conectar de nuevo</button>' : '') +
+      '<div class="gx-k"><div><small class="muted">Publicaciones unidas</small><b>' + d.vinculos.length + '</b></div><div><small class="muted">Vendidas en ML este mes</small><b>' + d.ventas_mes + '</b></div></div>' +
+      '<div class="gx-row"><button type="button" data-ml="sync"' + (d.activo ? '' : ' disabled') + '>🔄 Sincronizar</button><button type="button" class="alt" data-ml="traer">📥 Unir publicaciones</button></div>' +
+      '<p><small class="muted">Se revisa solo cada 5 minutos' + (d.revisado ? ' · última vez ' + hace(d.revisado) : '') + '.</small></p>' +
+      '<div data-ml="lista"></div>' +
+      '<h3>Unidas</h3>' + (d.vinculos.length ? d.vinculos.map((v) => '<div class="gx-f"><div><b>' + esc(v.nombre || v.titulo || v.item) + '</b><br><small class="muted">' + esc(v.item) +
+        (v.titulo && v.nombre ? ' · ' + esc(v.titulo) : '') + '</small><br><small>' + est(v) + '</small></div><div class="btns"><button type="button" class="small alt" data-soltar="' + esc(v.item) + '">Soltar</button></div></div>').join('')
+        : '<p class="muted">Aún no unes ninguna. Toca 📥 Unir publicaciones.</p>') +
+      '<div class="gx-row" style="margin-top:12px"><button type="button" class="alt" data-ml="pausa">' + (d.activo ? '⏸️ Pausar' : '▶️ Reanudar') + '</button><button type="button" class="alt" data-ml="salir">Desconectar</button></div>');
+    c.onclick = async (ev) => {
+      const b = ev.target.closest('button'); if (!b || b.disabled) return;
+      try {
+        const k = b.dataset.ml;
+        if (k === 'conectar') return irML(b);
+        if (k === 'sync') { b.disabled = true; b.textContent = 'Revisando…'; const n = await R('ml_sincronizar_mio'); Core.toast(n ? '✅ ' + n + ' cambios al día' : '✅ Todo al día'); return mercadolibre(z, o); }
+        if (k === 'pausa') { await R('ml_pausar', { p_activo: !d.activo }); return mercadolibre(z, o); }
+        if (k === 'salir') { if (!(await Core.confirmar('¿Desconectar Mercado Libre? Las publicaciones unidas quedan guardadas para cuando vuelvas a conectar.'))) return; await R('ml_desconectar'); return mercadolibre(z, o); }
+        if (k === 'traer') {
+          const l = c.querySelector('[data-ml=lista]'); b.disabled = true; l.innerHTML = '<p class="muted">Trayendo tus publicaciones…</p>';
+          let P; try { P = await R('ml_publicaciones'); } catch (e) { b.disabled = false; l.innerHTML = '<p class="gx-err">⚠️ ' + esc(e.message) + '</p>'; return; }
+          b.disabled = false;
+          l.innerHTML = '<h3>Tus publicaciones activas</h3>' + (P.length ? '<p><small class="muted">Elige qué producto de tu tienda es cada una.</small></p>' + P.map((p) => '<div class="gx-f">' +
+            (p.foto ? '<img src="' + esc(p.foto) + '" alt="" width="44" height="44" style="border-radius:8px;object-fit:cover;flex:none;background:var(--cfx-suave,#8881)">' : '') +
+            '<div><b>' + esc(p.titulo) + '</b><br><small class="muted">' + esc(p.item) + ' · ' + $$(p.precio) + (p.stock == null ? '' : ' · ' + p.stock + ' disp.') + '</small>' +
+            '<select data-unir="' + esc(p.item) + '" data-tit="' + esc(p.titulo) + '" aria-label="Producto de tu tienda">' + prod(p.clave) + '</select></div></div>').join('')
+            : '<p class="muted">No encontramos publicaciones activas en tu Mercado Libre.</p>');
+          return;
+        }
+        if (b.dataset.soltar) { await R('ml_vincular', { p_item: b.dataset.soltar, p_clave: null }); Core.toast('Soltada'); return mercadolibre(z, o); }
+      } catch (e) { Core.toast('⚠️ ' + e.message); b.disabled = false; }
+    };
+    c.onchange = async (ev) => {
+      const s = ev.target.closest('[data-unir]'); if (!s) return;
+      try { await R('ml_vincular', { p_item: s.dataset.unir, p_clave: s.value || null, p_titulo: s.dataset.tit }); Core.toast(s.value ? '✅ Unida: el stock se manda en unos minutos' : 'Soltada'); return mercadolibre(z, o); }
+      catch (e) { Core.toast('⚠️ ' + e.message); }
+    };
+  }
+
+  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores, sucursales, promos, mercadolibre };
 })();

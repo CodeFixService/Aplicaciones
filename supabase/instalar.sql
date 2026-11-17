@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.75'::text $$;
+language sql immutable as $$ select '5.76'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7769,7 +7769,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -8090,7 +8090,9 @@ language sql immutable as $$
          ('proveedores', '📦 Stock mínimo y proveedores', 'Te avisa cuando un producto baja de su mínimo y arma el pedido a tu proveedor por WhatsApp con un toque.'),
          -- G96 b: 🏬 sucursales (Despega) y 📣 promos en la app de tus clientes (Despega, Barbería, BiciTaller).
          ('sucursales', '🏬 Sucursales y bodegas', 'Stock separado por local o bodega: vendes en la Caja desde cada sucursal y mueves mercadería entre ellas.'),
-         ('promos', '📣 Promo destacada', 'Al abrir la app, tus clientes ven tu oferta en una tarjeta con foto y botón (además de tus ofertas de siempre). Ves cuántos la vieron y la tocaron.')
+         ('promos', '📣 Promo destacada', 'Al abrir la app, tus clientes ven tu oferta en una tarjeta con foto y botón (además de tus ofertas de siempre). Ves cuántos la vieron y la tocaron.'),
+         -- G101: 🛒 Mercado Libre (Despega).
+         ('mercadolibre', '🛒 Mercado Libre', 'Une tus productos con tus publicaciones de Mercado Libre: vendes allá y se descuenta aquí; cambias el stock aquí y se actualiza allá.')
 $$;
 
 create or replace function public.cfx_venta() returns jsonb
@@ -11438,5 +11440,313 @@ grant execute on function public.bodegas_lista(), public.bodega_guardar(uuid, te
   public.bodega_mover(text, uuid, uuid, int), public.caja_descontar(jsonb) to authenticated;
 
 create or replace function public.cfx_modulos_app() returns text[]
-language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio', 'giftcards', 'suscripciones', 'proveedores', 'sucursales', 'promos'] $$;  -- G96 b: +2
+language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio', 'giftcards', 'suscripciones', 'proveedores', 'sucursales', 'promos', 'mercadolibre'] $$;  -- G96 b: +2 · G101: 🛒
 revoke all on function public.cfx_modulos_app() from public, anon, authenticated;
+
+-- =====================================================================
+--  🛒 G101 Mercado Libre (módulo 'mercadolibre'): la tienda conecta SU cuenta de ML (OAuth), une cada producto con su
+--  publicación y el stock queda igual en los dos lados: vende allá → se descuenta aquí; cambia aquí → se manda allá.
+--  Las credenciales de la app de desarrollador (ml_client_id / ml_client_secret / ml_redirect) las pone el admin (CM → Control → 🛒).
+--  Los tokens viven en ml_cuentas sin políticas: nadie los lee desde la app. Todo se valida aquí (pro_o_modulo).
+-- =====================================================================
+create table if not exists public.ml_cuentas (
+  negocio_id uuid primary key references public.profiles (id) on delete cascade,
+  ml_user bigint not null,
+  nick text,
+  access_token text not null,
+  refresh_token text,
+  expira timestamptz not null,
+  activo boolean not null default true,
+  desde timestamptz not null default now(),
+  ordenes_desde timestamptz,
+  revisado_at timestamptz,
+  ultimo_error text
+);
+alter table public.ml_cuentas enable row level security;
+revoke all on public.ml_cuentas from anon, authenticated;
+create table if not exists public.ml_estados (
+  state text primary key,
+  negocio_id uuid not null references public.profiles (id) on delete cascade,
+  creado timestamptz not null default now()
+);
+alter table public.ml_estados enable row level security;
+revoke all on public.ml_estados from anon, authenticated;
+create table if not exists public.ml_vinculos (
+  id uuid primary key default gen_random_uuid(),
+  negocio_id uuid not null references public.profiles (id) on delete cascade,
+  item_id text not null check (item_id ~ '^[A-Z]{3}[0-9]{4,15}$'),
+  clave text not null,
+  titulo text,
+  enviado int,
+  enviado_at timestamptz,
+  error text,
+  creado timestamptz not null default now(),
+  unique (negocio_id, item_id),
+  unique (negocio_id, clave)
+);
+alter table public.ml_vinculos enable row level security;
+revoke all on public.ml_vinculos from anon, authenticated;
+create table if not exists public.ml_ventas (
+  negocio_id uuid not null references public.profiles (id) on delete cascade,
+  orden text not null,
+  item_id text not null,
+  cant int not null,
+  total numeric(12, 2),
+  at timestamptz not null default now(),
+  primary key (negocio_id, orden, item_id)
+);
+alter table public.ml_ventas enable row level security;
+revoke all on public.ml_ventas from anon, authenticated;
+
+-- Codifica para URL (sin depender de la extensión http).
+create or replace function public.ml_cod(t text) returns text
+language sql immutable set search_path = '' as $$
+  select coalesce(string_agg(case when x.ch ~ '^[A-Za-z0-9_.~-]$' then x.ch
+    else upper(regexp_replace(encode(convert_to(x.ch, 'UTF8'), 'hex'), '(..)', '%\1', 'g')) end, '' order by x.i), '')
+  from unnest(regexp_split_to_array(coalesce(t, ''), '')) with ordinality as x(ch, i)
+$$;
+
+-- Llamada a la API de Mercado Libre (solo dentro de la base). Con token = Bearer; sin token y con forma = formulario (OAuth).
+create or replace function public.ml_api(p_token text, p_metodo text, p_ruta text, p_cuerpo jsonb default null, p_forma text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare st int; c text;
+begin
+  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '10');
+  execute 'select status, content from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+    using p_metodo, 'https://api.mercadolibre.com' || p_ruta,
+          case when p_token is null then array[row('Accept', 'application/json')::extensions.http_header]
+               else array[row('Authorization', 'Bearer ' || p_token)::extensions.http_header] end,
+          case when p_forma is not null then 'application/x-www-form-urlencoded' else 'application/json' end,
+          coalesce(p_forma, p_cuerpo::text);
+  return jsonb_build_object('status', st, 'body', case when c ~ '^\s*[\{\[]' then c::jsonb end);
+exception when others then
+  return jsonb_build_object('status', 0, 'error', sqlerrm);
+end $$;
+
+create or replace function public.ml_app() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', (select value from public.app_secrets where name = 'ml_client_id'),
+    'secreto', (select value from public.app_secrets where name = 'ml_client_secret'),
+    'volver', (select value from public.app_secrets where name = 'ml_redirect'))
+$$;
+
+-- Admin (CM → Control → 🛒 Mercado Libre): credenciales de la app de desarrollador. El secreto nunca se vuelve a leer.
+create or replace function public.ml_app_guardar(p_id text, p_secreto text, p_volver text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  if coalesce(p_id, '') !~ '^[0-9]{4,25}$' then raise exception 'El App ID son solo números'; end if;
+  if coalesce(p_volver, '') !~ '^https://[^\s?#]+$' then raise exception 'La URL de redirección empieza con https:// (sin ? ni #)'; end if;
+  insert into public.app_secrets (name, value) values ('ml_client_id', p_id), ('ml_redirect', p_volver)
+  on conflict (name) do update set value = excluded.value;
+  if nullif(trim(coalesce(p_secreto, '')), '') is not null then
+    if length(trim(p_secreto)) < 10 then raise exception 'Revisa la Clave secreta'; end if;
+    insert into public.app_secrets (name, value) values ('ml_client_secret', trim(p_secreto)) on conflict (name) do update set value = excluded.value;
+  end if;
+  return public.ml_app_estado();
+end $$;
+create or replace function public.ml_app_estado() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare a jsonb := public.ml_app();
+begin
+  perform public.cfx_es_admin();
+  return jsonb_build_object('id', a ->> 'id', 'volver', a ->> 'volver', 'secreto', a ->> 'secreto' is not null,
+    'cuentas', (select count(*) from public.ml_cuentas), 'vinculos', (select count(*) from public.ml_vinculos));
+end $$;
+
+-- Token vigente de la tienda (lo renueva si vence en menos de 5 minutos). null = hay que volver a conectar.
+create or replace function public.ml_token(n uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare c public.ml_cuentas; a jsonb := public.ml_app(); r jsonb;
+begin
+  select * into c from public.ml_cuentas where negocio_id = n;
+  if not found then return null; end if;
+  if c.expira > now() + interval '5 minutes' then return c.access_token; end if;
+  if c.refresh_token is null or a ->> 'id' is null or a ->> 'secreto' is null then
+    update public.ml_cuentas set ultimo_error = 'Vuelve a conectar Mercado Libre' where negocio_id = n; return null;
+  end if;
+  r := public.ml_api(null, 'POST', '/oauth/token', null, 'grant_type=refresh_token&client_id=' || public.ml_cod(a ->> 'id') ||
+    '&client_secret=' || public.ml_cod(a ->> 'secreto') || '&refresh_token=' || public.ml_cod(c.refresh_token));
+  if (r ->> 'status')::int = 200 and r #>> '{body,access_token}' is not null then
+    update public.ml_cuentas set access_token = r #>> '{body,access_token}', refresh_token = coalesce(r #>> '{body,refresh_token}', refresh_token),
+      expira = now() + make_interval(secs => coalesce((r #>> '{body,expires_in}')::int, 21600)), ultimo_error = null where negocio_id = n;
+    return r #>> '{body,access_token}';
+  end if;
+  update public.ml_cuentas set ultimo_error = 'Vuelve a conectar Mercado Libre (el permiso venció)' where negocio_id = n;
+  return null;
+end $$;
+
+create or replace function public.ml_negocio() returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  if not public.pro_o_modulo(n, 'mercadolibre') then raise exception '🛒 Mercado Libre es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  return n;
+end $$;
+
+create or replace function public.ml_estado() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.ml_negocio(); c public.ml_cuentas; a jsonb := public.ml_app();
+begin
+  select * into c from public.ml_cuentas where negocio_id = n;
+  return jsonb_build_object('app', a ->> 'id' is not null and a ->> 'secreto' is not null and a ->> 'volver' is not null,
+    'conectado', c.negocio_id is not null, 'nick', c.nick, 'activo', coalesce(c.activo, false), 'error', c.ultimo_error, 'revisado', c.revisado_at,
+    'ventas_mes', (select coalesce(sum(v.cant), 0) from public.ml_ventas v where v.negocio_id = n and v.at >= date_trunc('month', now())),
+    'vinculos', (select coalesce(jsonb_agg(jsonb_build_object('id', l.id, 'item', l.item_id, 'titulo', l.titulo, 'clave', l.clave,
+        'nombre', i.nombre, 'stock', i.stock, 'enviado', l.enviado, 'error', l.error, 'existe', i.id is not null) order by l.creado), '[]')
+      from public.ml_vinculos l left join public.catalog_items i on i.owner_id = n and i.client_key = l.clave where l.negocio_id = n),
+    'productos', (select coalesce(jsonb_agg(jsonb_build_object('clave', i.client_key, 'nombre', i.nombre, 'stock', i.stock) order by i.nombre), '[]')
+      from public.catalog_items i where i.owner_id = n));
+end $$;
+
+-- 1) Conectar: arma el link de autorización de ML (state al azar, vale 15 minutos).
+create or replace function public.ml_conectar() returns text
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.ml_negocio(); a jsonb := public.ml_app(); s text := 'ml' || encode(extensions.gen_random_bytes(16), 'hex');
+begin
+  if a ->> 'id' is null or a ->> 'secreto' is null or a ->> 'volver' is null then raise exception 'CodeFix aún no activa Mercado Libre: avísanos por 🛟 Soporte'; end if;
+  delete from public.ml_estados where negocio_id = n or creado < now() - interval '1 day';
+  insert into public.ml_estados (state, negocio_id) values (s, n);
+  return 'https://auth.mercadolibre.cl/authorization?response_type=code&client_id=' || public.ml_cod(a ->> 'id') ||
+    '&redirect_uri=' || public.ml_cod(a ->> 'volver') || '&state=' || s;
+end $$;
+
+-- 2) Vuelta desde ML (?code=…&state=…): canjea el código por el token aquí (con la clave secreta, que nunca sale de la base).
+create or replace function public.ml_volver(p_state text, p_code text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.ml_negocio(); a jsonb := public.ml_app(); r jsonb; u jsonb;
+begin
+  if coalesce(p_state, '') !~ '^ml[0-9a-f]{32}$' or coalesce(p_code, '') !~ '^[A-Za-z0-9_-]{6,200}$' then raise exception 'Link de Mercado Libre no válido'; end if;
+  delete from public.ml_estados where state = p_state and negocio_id = n and creado > now() - interval '15 minutes';
+  if not found then raise exception 'El permiso venció o no es de esta tienda: toca Conectar de nuevo'; end if;
+  r := public.ml_api(null, 'POST', '/oauth/token', null, 'grant_type=authorization_code&client_id=' || public.ml_cod(a ->> 'id') ||
+    '&client_secret=' || public.ml_cod(a ->> 'secreto') || '&code=' || public.ml_cod(p_code) || '&redirect_uri=' || public.ml_cod(a ->> 'volver'));
+  if coalesce((r ->> 'status')::int, 0) <> 200 or r #>> '{body,access_token}' is null then
+    raise exception 'Mercado Libre no aceptó la conexión (%). Toca Conectar de nuevo', coalesce(r #>> '{body,message}', r ->> 'error', r ->> 'status');
+  end if;
+  u := public.ml_api(r #>> '{body,access_token}', 'GET', '/users/me');
+  if coalesce((u ->> 'status')::int, 0) <> 200 or u #>> '{body,id}' is null then raise exception 'No pudimos leer tu cuenta de Mercado Libre'; end if;
+  if (u #>> '{body,id}')::bigint <> coalesce((r #>> '{body,user_id}')::bigint, (u #>> '{body,id}')::bigint) then raise exception 'La cuenta no coincide'; end if;
+  insert into public.ml_cuentas (negocio_id, ml_user, nick, access_token, refresh_token, expira, activo, desde, ordenes_desde, ultimo_error)
+  values (n, (u #>> '{body,id}')::bigint, left(u #>> '{body,nickname}', 80), r #>> '{body,access_token}', r #>> '{body,refresh_token}',
+          now() + make_interval(secs => coalesce((r #>> '{body,expires_in}')::int, 21600)), true, now(), now(), null)
+  on conflict (negocio_id) do update set ml_user = excluded.ml_user, nick = excluded.nick, access_token = excluded.access_token,
+    refresh_token = excluded.refresh_token, expira = excluded.expira, activo = true, ultimo_error = null,
+    ordenes_desde = case when public.ml_cuentas.ml_user = excluded.ml_user then public.ml_cuentas.ordenes_desde else now() end;
+  return jsonb_build_object('nick', u #>> '{body,nickname}');
+end $$;
+
+create or replace function public.ml_pausar(p_activo boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.ml_negocio();
+begin update public.ml_cuentas set activo = coalesce(p_activo, false) where negocio_id = n; end $$;
+
+-- Desconectar: borra los tokens; las uniones quedan guardadas (🛡️) para cuando vuelva a conectar.
+create or replace function public.ml_desconectar() returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  delete from public.ml_cuentas where negocio_id = n;
+end $$;
+
+-- Tus publicaciones activas en ML (para unirlas con tus productos).
+create or replace function public.ml_publicaciones() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.ml_negocio(); t text := public.ml_token(n); c public.ml_cuentas; r jsonb; ids text; d jsonb;
+begin
+  if t is null then raise exception 'Conecta tu Mercado Libre primero'; end if;
+  select * into c from public.ml_cuentas where negocio_id = n;
+  r := public.ml_api(t, 'GET', '/users/' || c.ml_user || '/items/search?status=active&limit=50');
+  if coalesce((r ->> 'status')::int, 0) <> 200 then raise exception 'Mercado Libre no respondió: prueba en un rato'; end if;
+  select string_agg(x, ',') into ids from (select jsonb_array_elements_text(coalesce(r #> '{body,results}', '[]')) x limit 50) s where x ~ '^[A-Z]{3}[0-9]{4,15}$';
+  if ids is null then return '[]'; end if;
+  d := '[]';
+  for r in select value from jsonb_array_elements(coalesce((public.ml_api(t, 'GET', '/items?ids=' || ids || '&attributes=id,title,price,available_quantity,thumbnail')) -> 'body', '[]')) loop
+    continue when coalesce((r ->> 'code')::int, 200) <> 200;
+    d := d || jsonb_build_array(jsonb_build_object('item', r #>> '{body,id}', 'titulo', r #>> '{body,title}', 'precio', (r #>> '{body,price}')::numeric,
+      'stock', (r #>> '{body,available_quantity}')::int, 'foto', case when r #>> '{body,thumbnail}' ~ '^https://' then r #>> '{body,thumbnail}' end,
+      'clave', (select l.clave from public.ml_vinculos l where l.negocio_id = n and l.item_id = r #>> '{body,id}')));
+  end loop;
+  return d;
+end $$;
+
+-- Unir (o soltar con p_clave = null) una publicación de ML con un producto de la tienda.
+create or replace function public.ml_vincular(p_item text, p_clave text, p_titulo text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.ml_negocio();
+begin
+  if coalesce(p_item, '') !~ '^[A-Z]{3}[0-9]{4,15}$' then raise exception 'Publicación no válida'; end if;
+  if p_clave is null then delete from public.ml_vinculos where negocio_id = n and item_id = p_item; return; end if;
+  if not exists (select 1 from public.catalog_items where owner_id = n and client_key = p_clave) then raise exception 'Producto no encontrado'; end if;
+  if (select count(*) from public.ml_vinculos where negocio_id = n) >= 300 then raise exception 'Máximo 300 publicaciones unidas'; end if;
+  delete from public.ml_vinculos where negocio_id = n and (clave = p_clave or item_id = p_item);
+  insert into public.ml_vinculos (negocio_id, item_id, clave, titulo) values (n, p_item, p_clave, left(nullif(trim(coalesce(p_titulo, '')), ''), 120));
+end $$;
+
+-- El trabajo: ventas pagadas en ML → descuenta aquí (1 vez por orden) · stock distinto al enviado → lo manda a ML.
+create or replace function public.ml_sincronizar(p_negocio uuid default null) returns int
+language plpgsql security definer set search_path = '' as $$
+declare c public.ml_cuentas; t text; r jsonb; o jsonb; it jsonb; l public.ml_vinculos; s int; q int; hechos int := 0; hasta timestamptz; nom text;
+begin
+  for c in select * from public.ml_cuentas m where m.activo and (p_negocio is null or m.negocio_id = p_negocio) order by m.revisado_at nulls first limit 30 loop
+    continue when not public.pro_o_modulo(c.negocio_id, 'mercadolibre');
+    t := public.ml_token(c.negocio_id);
+    if t is null then update public.ml_cuentas set revisado_at = now() where negocio_id = c.negocio_id; continue; end if;
+    hasta := coalesce(c.ordenes_desde, c.desde);
+    r := public.ml_api(t, 'GET', '/orders/search?seller=' || c.ml_user || '&order.status=paid&sort=date_asc&limit=50&order.date_created.from=' ||
+      public.ml_cod(to_char(hasta at time zone 'UTC' - interval '10 minutes', 'YYYY-MM-DD"T"HH24:MI:SS".000-00:00"')));
+    if coalesce((r ->> 'status')::int, 0) = 200 then
+      for o in select value from jsonb_array_elements(coalesce(r #> '{body,results}', '[]')) loop
+        for it in select value from jsonb_array_elements(coalesce(o -> 'order_items', '[]')) loop
+          select * into l from public.ml_vinculos where negocio_id = c.negocio_id and item_id = it #>> '{item,id}';
+          continue when not found;
+          q := greatest(0, coalesce((it ->> 'quantity')::int, 0));
+          continue when q = 0;
+          insert into public.ml_ventas (negocio_id, orden, item_id, cant, total) values (c.negocio_id, o ->> 'id', l.item_id, q, (it ->> 'unit_price')::numeric * q)
+          on conflict do nothing;
+          continue when not found;
+          update public.catalog_items set stock = greatest(0, stock - q) where owner_id = c.negocio_id and client_key = l.clave and stock is not null
+          returning nombre into nom;
+          update public.ml_vinculos set enviado = greatest(0, enviado - q) where id = l.id and enviado is not null;  -- ML ya lo bajó allá
+          insert into public.notifications (owner_id, target_id, audience, channels, title, body, url, send_at)
+          values (c.negocio_id, c.negocio_id, 'direct', '{push}', '🛒 Vendiste en Mercado Libre',
+                  q || ' × ' || coalesce(nom, l.titulo, l.item_id) || ': ya lo descontamos de tu stock.', './#mercadolibre', now());
+          hechos := hechos + 1;
+        end loop;
+        hasta := greatest(hasta, coalesce((o ->> 'date_created')::timestamptz, hasta));
+      end loop;
+      update public.ml_cuentas set ordenes_desde = hasta where negocio_id = c.negocio_id;
+    end if;
+    for l in select v.* from public.ml_vinculos v join public.catalog_items i on i.owner_id = v.negocio_id and i.client_key = v.clave
+             where v.negocio_id = c.negocio_id and i.stock is not null and i.stock is distinct from v.enviado limit 50 loop
+      select stock into s from public.catalog_items where owner_id = c.negocio_id and client_key = l.clave;
+      r := public.ml_api(t, 'PUT', '/items/' || l.item_id, jsonb_build_object('available_quantity', greatest(0, s)));
+      if coalesce((r ->> 'status')::int, 0) = 200 then
+        update public.ml_vinculos set enviado = s, enviado_at = now(), error = null where id = l.id; hechos := hechos + 1;
+      else
+        update public.ml_vinculos set error = left(coalesce(r #>> '{body,message}', r ->> 'error', 'Error ' || (r ->> 'status')), 160) where id = l.id;
+      end if;
+    end loop;
+    update public.ml_cuentas set revisado_at = now() where negocio_id = c.negocio_id;
+  end loop;
+  return hechos;
+end $$;
+
+-- 🔄 Sincronizar ahora (botón de la tienda).
+create or replace function public.ml_sincronizar_mio() returns int
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.ml_negocio();
+begin return public.ml_sincronizar(n); end $$;
+
+revoke all on function public.ml_cod(text), public.ml_api(text, text, text, jsonb, text), public.ml_app(), public.ml_token(uuid), public.ml_sincronizar(uuid), public.ml_negocio()
+  from public, anon, authenticated;
+revoke all on function public.ml_app_guardar(text, text, text), public.ml_app_estado(), public.ml_estado(), public.ml_conectar(), public.ml_volver(text, text),
+  public.ml_pausar(boolean), public.ml_desconectar(), public.ml_publicaciones(), public.ml_vincular(text, text, text), public.ml_sincronizar_mio() from public, anon;
+grant execute on function public.ml_app_guardar(text, text, text), public.ml_app_estado(), public.ml_estado(), public.ml_conectar(), public.ml_volver(text, text),
+  public.ml_pausar(boolean), public.ml_desconectar(), public.ml_publicaciones(), public.ml_vincular(text, text, text), public.ml_sincronizar_mio() to authenticated;
+do $$ begin
+  perform cron.unschedule('ml-sync') where exists (select 1 from cron.job where jobname = 'ml-sync');
+  perform cron.schedule('ml-sync', '*/5 * * * *', 'select public.ml_sincronizar()');
+exception when others then null; end $$;
