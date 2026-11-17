@@ -9,6 +9,7 @@
                                           Un link de monto fijo, si existe para ese plan, se usa en su lugar.
    G85: ⚡ Mercado Pago automático (si CodeFix lo conectó en CM → Pagos): paga y se activa solo, sin comprobante (aviso push).
         Solo 3 formas: ⚡ Mercado Pago · 🔗 link general (abierto) · 🏦 transferencia. Cupón a la vista. Ya no hay links de monto fijo ni tarjeta aparte.
+   G95: arriba de la hoja ⭐ Premium, "🎁 Probar Premium N días gratis" (cfx_pro_probar) si la cuenta nunca lo usó con su correo; al Continuar recarga.
    CFX_PAGOS.mpVolver(rpc)             → al volver de Mercado Pago (lo llama ayuda.js al iniciar): confirma el pago y avisa.
    CFX_PAGOS.revisar({ rpc, salir })   → si es un negocio nuevo que debe su primer pago, muestra la pantalla de activación (no se cierra).
    rpc(nombre, args) debe devolver una promesa con los datos (cada app pasa su propia función). */
@@ -136,6 +137,11 @@
     const misKeys = (e.keys || []).length ? '<details style="margin-top:8px"><summary>🎁 Mis keys compradas (' + e.keys.length + ')</summary>' + e.keys.map((k) =>
       '<div class="cp-dato"><span>' + esc(k.producto ? '🧩 ' + k.producto : '⭐ Premium') + ' · ' + (+k.dias || 0) + ' d' + (k.usada ? ' · ✓ usada' : '') + '</span><b>' + esc(k.key) + '</b><button type="button" data-copkey="' + esc(k.key) + '">Copiar</button></div>').join('') + '</details>' : '';
     const keyHtml = misKeys + '<details style="margin-top:8px"><summary>🔑 Tengo una key</summary><div class="cp-fila"><input id="cpKey" placeholder="CFX-XXXX-XXXX-XXXX" autocapitalize="characters"><button type="button" data-key>Activar</button></div><p class="cp-err" id="cpKeyErr"></p></details>';
+    // G95: 🎁 Probar Premium N días gratis, una sola vez por correo (todos parten gratis). Sin tarjeta.
+    let recargar = false;
+    const prueba = () => !pr && !obligatorio && e.prueba_pro && e.prueba_pro.puede
+      ? '<div class="cp-ok" style="text-align:center"><b>🎁 Prueba Premium ' + e.prueba_pro.dias + ' días gratis</b><br><small>Una sola vez. Sin tarjeta. Al terminar vuelves a gratis sin perder nada.</small>' +
+        '<button type="button" class="cp-si" data-propro style="width:100%;margin-top:8px">🎁 Probar ' + e.prueba_pro.dias + ' días gratis</button><p class="cp-err" id="cpProErr" style="margin:4px 0 0;min-height:0"></p></div>' : '';
     const lib = e.liberado_hasta ? '<div class="cp-ok">🎁 Registro liberado hasta el <b>' + new Date(e.liberado_hasta).toLocaleDateString('es-CL') + '</b>: puedes usar la app sin pagar.</div>' : '';
     if (u && u.estado === 'pendiente' && u.medio === 'mp') {
       // G85: abrió Mercado Pago: confirmar (por si ya pagó) o pagar de otra forma.
@@ -155,7 +161,7 @@
     } else if (u && u.estado === 'pendiente') {
       caja.innerHTML = '<h2>⏳ Pago en revisión</h2><div class="cp-ok">Recibimos tu comprobante de <b>' + pesos(u.monto) + '</b>. Normalmente lo revisamos en 5 a 10 minutos y te llega un aviso apenas se active.</div>' + pie;
     } else if (!medios.length) {
-      caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + '<p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + keyHtml + pie;
+      caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + prueba() + '<p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + keyHtml + pie;
     } else {
       let cupon = null;  // { codigo, pct }: descuento sobre el precio del plan (no sobre "otro monto")
       const conCupon = (p) => cupon ? Math.round(p * (100 - cupon.pct) / 100) : p;
@@ -171,7 +177,7 @@
         const cajaCupon = pr ? '' : cupon
           ? '<div class="cp-cupon on"><span>🏷️</span><b>Cupón ' + esc(cupon.codigo) + ' · −' + cupon.pct + '%<small>Ya está descontado del total</small></b><button type="button" data-sincupon>Quitar</button></div>'
           : '<div class="cp-cupon"><span>🏷️</span><input id="cpCupon" placeholder="¿Tienes cupón?" autocapitalize="characters" autocomplete="off" aria-label="Cupón de descuento"><button type="button" data-cupon>Aplicar</button></div>';
-        caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib +
+        caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + prueba() +
           (obligatorio ? '<p>Para empezar a usar la app haz tu primer pago. Te da ' + esc(plan.d) + '; después puedes seguir en Premium o quedar en la versión gratis.</p>' : '') +
           (mp ? '<div class="cp-pasos tres"><div>Toca Pagar</div><div>Paga en Mercado Pago</div><div>Se activa solo</div></div>'
             : '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>') +
@@ -276,9 +282,20 @@
         } catch (x) { caja.querySelector('#cpKeyErr').textContent = (x && x.message) || String(x); }
         return;
       }
+      const pp = ev.target.closest('[data-propro]');
+      if (pp) {
+        pp.disabled = true;
+        try {
+          const r = await o.rpc('cfx_pro_probar');
+          caja.innerHTML = '<h2>🎉 ¡Listo!</h2><div class="cp-ok">⭐ Premium gratis hasta el <b>' + new Date(r.hasta).toLocaleDateString('es-CL') + '</b>. Al terminar vuelves a gratis y no pierdes nada.</div>' +
+            '<button type="button" class="cp-si" data-x style="width:100%;margin-top:10px">Continuar</button>';
+          recargar = true; if (o.alPrueba) o.alPrueba(r);
+        } catch (x) { pp.disabled = false; const er = caja.querySelector('#cpProErr'); if (er) er.textContent = (x && x.message) || String(x); }
+        return;
+      }
       if (ev.target.closest('[data-chat]')) { ev.preventDefault(); window.CFX_AYUDA.chat({ rpc: o.rpc }); return; }
       if (ev.target.closest('[data-terminos]')) { ev.preventDefault(); window.CFX_AYUDA.terminos(); return; }
-      if (ev.target.closest('[data-x]')) { cerrar(); if (e.bloqueado || e.debe_inicio) location.reload(); }
+      if (ev.target.closest('[data-x]')) { cerrar(); if (e.bloqueado || e.debe_inicio || recargar) location.reload(); }
       if (ev.target.closest('[data-salir]')) { cerrar(); o.salir(); }
     });
     capa.addEventListener('click', (ev) => { if (ev.target === capa && !obligatorio) cerrar(); });

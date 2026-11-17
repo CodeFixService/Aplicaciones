@@ -39,6 +39,8 @@ core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()`
 - Tienda → SUS clientes (pedido_correo, avisos con email): Gmail del negocio en Más → 🏪 Mi tienda → ✉️ Correo (tabla negocio_correo, sin políticas; rpc mi_correo / mi_correo_guardar / mi_correo_quitar). Sin él no se manda correo (nunca cae al de CodeFix).
 - La función "enviar" pregunta notif_correo(id) por cada notificación con email (solo el servidor puede).
 
+- G95 (6.51 · bd 5.71): parte FREE (regalo_nuevo_negocio con d = 0; el trigger queda) · 🎁 Probar Pro en la hoja de pago (núcleo) · cfx_pro_prueba_app marca trial_used · trial_used de antes → cfx_pruebas_usadas. Prueba: SaaS/pruebas/g95.js.
+
 ## 🧠 Del núcleo: falta aplicar aquí
 - ✅ G37 (núcleo 2.76): shared/comprobante.js e impresora.js vienen del núcleo (no editar aquí: SaaS/nucleo). Logo y firma (boleta_estado) los da window.CFX_COMPROBANTE_DATOS al final de shared/cuenta.js. La 🧾 boleta SII (boleta_*) sigue en el SQL de Despega.
 - ✅ G42e (núcleo 2.78, 6.24): utilidades Bootstrap 5.3.8 con los colores de la tienda (--bs-* → --cfx-*), claro/oscuro y Colores a tu gusto. El diseño galáctico es solo del CM.

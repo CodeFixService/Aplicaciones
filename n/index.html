@@ -92,7 +92,8 @@
   try {
     const [abierto, r] = await Promise.all([Cuenta.rpc('registro_negocios_abierto'), Cuenta.rpc('reglas')]);
     if (abierto === false) { $('fReg').classList.add('hidden'); $('cerrado').classList.remove('hidden'); }
-    if (r && r.dias_regalo > 0) { $('regalo').textContent = '🎁 Incluye ' + r.dias_regalo + ' días de Pro gratis'; $('regalo').classList.remove('hidden'); }
+    // G95: ya no hay regalo al registrarse: parte gratis y prueba Pro con un botón (una vez).
+    if (r) { $('regalo').textContent = '🎁 Gratis para siempre · prueba Pro gratis cuando quieras'; $('regalo').classList.remove('hidden'); }
   } catch (e) { /* sin red: el servidor igual valida al crear */ }
 
   $('fReg').onsubmit = async (e) => {
