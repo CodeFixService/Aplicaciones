@@ -1505,12 +1505,24 @@
   function tiras() {
     const padres = new Set(); document.querySelectorAll('button, a, .chip').forEach((b) => { if (b.parentElement) padres.add(b.parentElement); });
     padres.forEach((x) => {
-      if (x.classList.contains('cfx-desliza')) return marcarTira(x);
-      if (x.childElementCount < 2 || x.scrollWidth <= x.clientWidth + 4 || !x.clientWidth || x.closest('.cfx-barra, .cfx-cab, header, dialog')) return;
+      if (x.classList.contains('cfx-desliza')) { pestTira(x); return marcarTira(x); }
+      if (x.childElementCount < 2 || x.scrollWidth <= x.clientWidth + 4 || !x.clientWidth || x.closest('.cfx-barra, .cfx-cab, header, dialog, .cfx-hoja-m, .cfx-el, .cfx-dlg')) return;
       const hijos = [...x.children], botones = hijos.filter((h) => /^(BUTTON|A)$/.test(h.tagName) || h.classList.contains('chip'));
       if (botones.length < hijos.length * 0.7 || getComputedStyle(x).display.indexOf('flex') < 0 || getComputedStyle(x).flexWrap === 'wrap') return; // una fila que baja de línea no es tira (p. ej. Agregar / Preguntar en la vitrina)
-      x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x);
+      x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x); pestTira(x);
     });
+  }
+  // G82: una tira que se desliza y tiene una opción elegida es un MENÚ de pestañas (Datos · Seguridad · Salud…):
+  // queda marcada .cfx-tira-pest y tema.css la pinta distinta de los botones/chips (banda propia + subrayado del color de la app).
+  const PEST_ON = '.on, .active, .activo, .sel, [aria-selected=true], [aria-current=page], [aria-current=true]';
+  function pestTira(x) {
+    if (x.classList.contains('cfx-tira-pest') || x.classList.contains('cfx-chips') || x.hasAttribute('data-cfx-sin-pest')) return;
+    const on = [...x.children].find((h) => h.matches(PEST_ON));
+    if (!on) return;
+    x.classList.add('cfx-tira-pest');
+    // La elegida siempre a la vista (al volver a armarse la tira, partía de nuevo en la primera). Solo se corre la tira, nunca la página.
+    const r = on.getBoundingClientRect(), rx = x.getBoundingClientRect();
+    if (r.right > rx.right - 8 || r.left < rx.left + 8) { x.scrollLeft += r.left - rx.left - (rx.width - r.width) / 2; marcarTira(x); }
   }
   // ---------- Avisos: se borran deslizando hacia el lado (sin ✕) y se juntan los de abajo ----------
   // Cada app deja su botón "Borrar aviso" (aria-label) con su propia lógica: aquí se esconde y el deslizar lo toca.

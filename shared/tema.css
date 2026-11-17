@@ -341,3 +341,20 @@ html.cfx-col-ico :is(nav.tabs, .seg, .segs, .tabs2) button:not(.on):not(.activo)
 .cfx-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
 .cfx-chips .cfx-chip { flex: 1 1 auto; min-width: 0; min-height: 38px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--cfx-borde, #d0d5dd); background: transparent; color: inherit; font: inherit; font-size: 15px; line-height: 1.2; font-weight: 600; cursor: pointer; box-shadow: none; }
 .cfx-chips .cfx-chip.on { background: var(--brand, var(--marca, #2563eb)); border-color: var(--brand, var(--marca, #2563eb)); color: var(--cfx-mas-ink, #fff); }
+
+/* ---------- G82 · Menús que se deslizan al lado = PESTAÑAS (núcleo 2.96) ----------
+   ayuda.js marca .cfx-tira-pest la tira que se corre de lado y tiene una opción elegida (CM → Control: Negocios · Avisar · … · Registro).
+   Se ven distintas de los botones y chips: banda con fondo propio, opciones sin borde, la elegida en tarjeta con subrayado del color de la app.
+   Los selectores que bajan de línea (ej. Centro de Mando · Billetera…) siguen como chips. Para dejar una tira como estaba: data-cfx-sin-pest. */
+.cfx-tira-pest { gap: 2px !important; padding-top: 4px !important; padding-bottom: 4px !important; border-radius: var(--cfx-radio, 14px);
+  background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 9%, var(--cfx-fondo, #f3f5f7)) !important;
+  border: 1px solid color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 18%, var(--cfx-borde, #dce3ea)); box-sizing: border-box; }
+.cfx-tira-pest:not(.cfx-desliza) { padding-left: 4px; padding-right: 4px; }
+.cfx-tira-pest > :is(button, a, .chip) { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 10px !important;
+  color: var(--cfx-texto-2, #5b6472) !important; font-weight: 600; min-height: 40px; padding: 8px 12px !important; margin: 0 !important; text-decoration: none; }
+.cfx-tira-pest > :is(button, a, .chip):is(.on, .active, .activo, .sel, [aria-selected=true], [aria-current=page], [aria-current=true]) {
+  background: var(--cfx-tarjeta, #fff) !important; color: var(--brand, var(--marca, #2563eb)) !important; font-weight: 700;
+  box-shadow: inset 0 -3px 0 var(--brand, var(--marca, #2563eb)), 0 1px 3px rgba(15, 23, 42, .12) !important; }
+.cfx-tira-pest > :is(button, a, .chip):is(.on, .active, .activo, .sel, [aria-selected=true], [aria-current=page], [aria-current=true]) .ic-e { color: inherit !important; }
+html.cfx-col-ico .cfx-tira-pest > :is(button, a, .chip):not(.on):not(.active):not(.activo):not(.sel):not([aria-selected=true]) .ic-e { color: var(--cfx-icono) !important; }
+@media (hover: hover) { .cfx-tira-pest > :is(button, a, .chip):not(.on):not(.active):not(.activo):not(.sel):hover { background: color-mix(in srgb, var(--cfx-tarjeta, #fff) 60%, transparent) !important; } }
