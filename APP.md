@@ -45,3 +45,4 @@ core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()`
 - ✅ G48 (núcleo 2.77): ✋ secciones del Más se mueven completas desde su título (también en el celular); 🎨 Mi perfil → Color y modo → Colores a tu gusto (fondo, texto, íconos y +).
 - ✅ G42 (núcleo 2.75): ⬆️ 🪟 📌 ✋ activos (Más → secciones y opciones se ordenan manteniendo presionado); 🔐 aviso de enlace tapado; links de boleta/pago con CFX_URL.
 - ✅ Núcleo 2.79 (6.25): 💬 avisos propios: usar SIEMPRE `await Core.confirmar(texto)` / `await Core.pedir(texto, valor)` (nunca confirm/prompt de Chrome); pistas Desliza enteras; ▶️ SVG.
+- G89: la Caja del dueño trae de catalog_items lo publicado que el teléfono no tiene (caché borrada/otro teléfono) → aparece para editar o borrar. CM → Apps → 🧹: opción 'productos' (sin nombre o de cuenta que ya no es empresa). Prueba: SaaS/pruebas/g87e.js.

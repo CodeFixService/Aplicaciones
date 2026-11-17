@@ -39,7 +39,7 @@
     const d = document.createElement('dialog'); d.className = 'cfx-qrd'; d.innerHTML = '<div>' + html + '</div>';
     document.body.appendChild(d);
     try { d.showModal(); } catch (e) { d.setAttribute('open', ''); }
-    d.addEventListener('click', (ev) => { if (ev.target === d || ev.target.closest('[data-cerrar]')) d.close(); });
+    d.addEventListener('click', (ev) => { if ((ev.target === d && !d.dataset.fijo) || ev.target.closest('[data-cerrar]')) d.close(); });
     d.addEventListener('close', () => d.remove());
     return d;
   }
@@ -237,10 +237,32 @@
     return s ? trasEnlace(s) : false;
   }
 
+  // G87 C · 🔑 Clave temporal (cuenta creada por el admin y enviada por WhatsApp): al entrar, crear su clave es obligatorio.
+  let enTemporal = false;
+  async function temporal() {
+    if (enTemporal) return; let debo = false;
+    try { debo = await rpc('cfx_clave_debo'); } catch (e) { return; }  // base sin G87 C: nada
+    if (debo !== true) return; enTemporal = true;
+    const d = dialogo('<h2>🔑 Crea tu clave</h2><p>Entraste con una clave temporal. Por seguridad, crea la tuya para seguir.</p>' +
+      '<input type="password" class="cq-clave" data-nueva autocomplete="new-password" placeholder="Nueva clave (mínimo 6)" aria-label="Nueva clave"><p class="cq-err"></p>' +
+      '<div class="cq-pie"><button type="button" data-guardar>Guardar mi clave</button></div>');
+    d.dataset.fijo = '1'; d.addEventListener('cancel', (ev) => ev.preventDefault());  // no se cierra con Esc ni tocando afuera
+    d.querySelector('[data-guardar]').onclick = async (ev) => {
+      const v = d.querySelector('[data-nueva]').value;
+      if (v.length < 6) { d.querySelector('.cq-err').textContent = 'Mínimo 6 caracteres.'; return; }
+      ev.target.disabled = true;
+      const { error } = await O.sb.auth.updateUser({ password: v });
+      if (error) { d.querySelector('.cq-err').textContent = /same|different/i.test(error.message) ? 'Usa una clave distinta a la temporal.' : 'No se pudo guardar. Intenta de nuevo.'; ev.target.disabled = false; return; }
+      try { await rpc('cfx_clave_cambiada'); } catch (e) { /* queda para la próxima */ }
+      enTemporal = false;
+      d.firstChild.innerHTML = '<h2>✅ Clave guardada</h2><p class="cq-ok">La próxima vez entra con tu correo y esta clave.</p><div class="cq-pie"><button type="button" data-cerrar>Listo</button></div>';
+    };
+  }
+
   window.CFX_QR = {
     iniciar(o) {  // se puede llamar de nuevo para sumar opciones (ej. alEntrar en la pantalla de ingreso)
       const ya = !!O; O = Object.assign(O || { funcion: 'enviar', qrLib: 'shared/vendor/qrcode.js' }, o);
-      if (!ya) try { O.sb.auth.onAuthStateChange((ev, s) => { if (s && (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION')) setTimeout(() => trasEnlace(s), 0); }); } catch (e) { /* sin auth */ }
+      if (!ya) try { O.sb.auth.onAuthStateChange((ev, s) => { if (s && (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION')) setTimeout(() => Promise.resolve(trasEnlace(s)).catch(() => {}).then(temporal), 0); }); } catch (e) { /* sin auth */ }
     },
     listo: () => !!O, pc, revisar, celular, confirmar, clave, despues
   };

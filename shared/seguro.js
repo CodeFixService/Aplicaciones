@@ -28,4 +28,9 @@
     .replace(/(\+?56\s?)?9[\s-]?\d{4}[\s-]?\d{4}\b/g, tel);
   window.CFX_ESC = esc; window.CFX_HTML = html; window.CFX_URL = url;
   window.CFX_TAPAR = { correo, tel, rut, texto };
+  // G87 C · Validar datos de Chile: WhatsApp +56 9 XXXX XXXX → '569XXXXXXXX' (o null) · RUT con dígito verificador calculado.
+  const telCL = (v) => { let n = String(v || '').replace(/\D/g, ''); if (n.length === 8) n = '9' + n; if (n.length === 9) n = '56' + n; return /^569\d{8}$/.test(n) ? n : null; };
+  const dvRut = (cuerpo) => { let s = 0, m = 2; for (let i = String(cuerpo).length - 1; i >= 0; i--) { s += +String(cuerpo)[i] * m; m = m === 7 ? 2 : m + 1; } const r = 11 - (s % 11); return r === 11 ? '0' : r === 10 ? 'K' : String(r); };
+  const rutCL = (v) => { const t = String(v || '').toUpperCase().replace(/[^0-9K]/g, ''); if (t.length < 2) return null; const c = t.slice(0, -1), d = t.slice(-1); if (!/^\d{6,8}$/.test(c) || dvRut(c) !== d) return null; return c.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + d; };
+  window.CFX_CL = { tel: telCL, rut: rutCL, dv: dvRut, telVer: (n) => n ? '+56 9 ' + n.slice(3, 7) + ' ' + n.slice(7) : '' };
 })();

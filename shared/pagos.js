@@ -145,7 +145,7 @@
           if ('mpotra' in b.dataset) { await o.rpc('cfx_mp_cancelar'); mpMarca(false); return abrir(o); }
           const r = await o.rpc('cfx_mp_revisar');
           if (r && r.aprobado) { mpMarca(false); caja.innerHTML = listo(); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
-          caja.querySelector('#cpErr').textContent = 'Mercado Pago aún no lo aprueba. Si ya pagaste, espera 1–2 minutos: se activa solo.'; b.disabled = false;
+          caja.querySelector('#cpErr').textContent = 'Mercado Pago aún no lo aprueba. Si ya pagaste, espera 1 minuto: se activa solo.'; b.disabled = false;
         } catch (x) { caja.querySelector('#cpErr').textContent = (x && x.message) || String(x); b.disabled = false; }
       });
     } else if (u && u.estado === 'pendiente') {

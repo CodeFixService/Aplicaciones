@@ -10,6 +10,14 @@
     let suma = 0, m = 2; for (let i = s.length - 2; i >= 0; i--) { suma += Number(s[i]) * m; m = m === 7 ? 2 : m + 1; }
     const d = 11 - (suma % 11); return (d === 11 ? '0' : d === 10 ? 'K' : String(d)) === s.slice(-1);
   };
+  // G87 C · el dígito verificador se calcula solo (si lo escribe con guion, se respeta y se revisa).
+  const rutCompleto = (v) => {
+    const t = String(v || '').toUpperCase();
+    if (/-/.test(t)) { const s = t.replace(/[^0-9K]/g, ''); return rutOk(s) ? s.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + s.slice(-1) : ''; }
+    const c = t.replace(/\D/g, ''); if (!/^\d{6,8}$/.test(c)) return '';
+    let suma = 0, m = 2; for (let i = c.length - 1; i >= 0; i--) { suma += Number(c[i]) * m; m = m === 7 ? 2 : m + 1; }
+    const d = 11 - (suma % 11); return c.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + (d === 11 ? '0' : d === 10 ? 'K' : String(d));
+  };
   function achicar(file) {
     if (window.CFX_ACHICAR) return window.CFX_ACHICAR(file, 'documento'); // núcleo fotos.js (WebP o JPEG)
     const q = (window.CFX_FOTO_DE && window.CFX_FOTO_DE('documento')) || { lado: 1400, calidad: 0.72 };
@@ -46,14 +54,14 @@
     const pintar = () => {
       caja.innerHTML = '<h2>🪪 Verifica tu identidad</h2><p>Así tus clientes saben que eres una persona real. Las fotos solo las ve el administrador y se borran apenas las revisa.</p>' +
         (e && e.estado === 'rechazada' ? '<div class="cp-err">La anterior fue rechazada: ' + esc(e.motivo || '') + '</div>' : '') +
-        '<label for="cvRut">RUT</label><input id="cvRut" placeholder="12.345.678-9" value="' + esc(o._rut || '') + '">' +
+        '<label for="cvRut">RUT (sin el dígito final: lo calculamos)</label><input id="cvRut" inputmode="numeric" placeholder="12.345.678" value="' + esc(o._rutIn || '') + '"><p class="sub" id="cvRutV">' + esc(o._rut ? 'Tu RUT: ' + o._rut : '') + '</p>' +
         '<label for="cvDoc">N° de documento (en tu cédula)</label><input id="cvDoc" placeholder="Ej: 123.456.789" value="' + esc(o._doc || '') + '">' +
         [['frente', 'Cédula: frente'], ['reverso', 'Cédula: reverso'], ['selfie', 'Selfie con tu cédula']].map((f) =>
-          '<label for="cv' + f[0] + '">' + f[1] + (fotos[f[0]] ? ' ✓' : '') + '</label><input id="cv' + f[0] + '" data-f="' + f[0] + '" type="file" accept="image/*"' + (f[0] === 'selfie' ? ' capture="user"' : '') + '>').join('') +
+          '<label for="cv' + f[0] + '">' + f[1] + (fotos[f[0]] ? ' ✓' : '') + '</label><input id="cv' + f[0] + '" data-f="' + f[0] + '" type="file" accept="image/*"' + (f[0] === 'selfie' ? ' capture="user"' : ' capture="environment"') + '>').join('') +
         '<p class="cp-err" id="cvErr"></p><button type="button" class="cp-si" data-enviar style="width:100%">Enviar</button><button type="button" data-x style="width:100%;margin-top:10px">Ahora no</button>';
     };
     pintar();
-    caja.addEventListener('input', (ev) => { if (ev.target.id === 'cvRut') o._rut = ev.target.value; if (ev.target.id === 'cvDoc') o._doc = ev.target.value; });
+    caja.addEventListener('input', (ev) => { if (ev.target.id === 'cvRut') { o._rutIn = ev.target.value; o._rut = rutCompleto(ev.target.value); const v = caja.querySelector('#cvRutV'); if (v) v.textContent = o._rut ? 'Tu RUT: ' + o._rut : ''; } if (ev.target.id === 'cvDoc') o._doc = ev.target.value; });
     caja.addEventListener('change', async (ev) => {
       const f = ev.target.dataset && ev.target.dataset.f; if (!f || !ev.target.files[0]) return;
       try { fotos[f] = await achicar(ev.target.files[0]); pintar(); } catch (x) { caja.querySelector('#cvErr').textContent = x.message; }

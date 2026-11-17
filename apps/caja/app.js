@@ -51,6 +51,17 @@
       db.set('productos', productos);
     } catch (e) { /* sin red: usa la copia */ }
   }
+  // G87 E: lo publicado en la vitrina que este teléfono no tiene (caché borrada u otro teléfono) vuelve a aparecer aquí, para editarlo o borrarlo.
+  if (!equipo && !esCliente) {
+    try {
+      const l = await Cuenta.rpc('catalog_of', { p_negocio: cuenta.id });
+      const faltan = (l || []).filter((x) => !productos.some((p) => p.id === x.clave));
+      if (faltan.length) {
+        faltan.forEach((x) => productos.push({ id: x.clave, nombre: x.nombre, precio: Number(x.precio), premium: x.precio_premium == null ? null : Number(x.precio_premium), costo: 0, stock: '', categoria: x.categoria || '', publicado: true, vip: !!x.solo_premium, desc: x.descripcion || '', ops: x.opciones || '' }));
+        db.set('productos', productos);
+      }
+    } catch (e) { /* sin red: queda la copia del teléfono */ }
+  }
   // Un solo stock: el del servidor (lo descuentan la Caja y los pedidos online aprobados).
   let pendStock = db.get('stockPend', []);
   async function enviarStock() {
