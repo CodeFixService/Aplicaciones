@@ -37,7 +37,7 @@ async function reintentarPush(s: Rpc, preparar: () => Promise<boolean>) {
   return n;
 }
 
-const VERSION = '3.6';
+const VERSION = '3.7';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
 const BRAND = 'Despega Pyme · CodeFix';
@@ -263,6 +263,8 @@ async function run() {
 if (Deno.env.get('SUPABASE_URL')) {
   Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+    // G99 a ⚡ Aviso de Mercado Pago (webhook): no se confía en lo que llega; la base vuelve a preguntarle a MP por esa referencia.
+    { const ref = new URL(req.url).searchParams.get('cfx_mp'); if (ref) { try { await adminDb().rpc('cfx_mp_aviso', { p_ref: ref.slice(0, 80) }); } catch { /* el cron revisa igual */ } return new Response('ok', { headers: CORS }); } }
     try {
       const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
       const json = (o: unknown) => new Response(JSON.stringify(o), { headers: { ...CORS, 'Content-Type': 'application/json' } });

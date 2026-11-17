@@ -5082,6 +5082,7 @@ begin
     'payment_methods', jsonb_build_object('excluded_payment_types', jsonb_build_array(jsonb_build_object('id', 'ticket'))),
     'expires', true,
     'expiration_date_to', to_char(x.retenido_hasta at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS".000+00:00"'))
+    || public.cfx_mp_notif('d:' || x.id::text)
     || case when v is null then '{}'::jsonb else jsonb_build_object('back_urls', jsonb_build_object('success', v, 'pending', v, 'failure', v),
                                                                    'auto_return', 'approved') end);
   if coalesce((r ->> 'status')::int, 0) not in (200, 201) or r #>> '{body,init_point}' is null then
@@ -5121,6 +5122,18 @@ begin
   if x.id is null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
   return jsonb_build_object('ok', true, 'estado', public.mp_confirmar(x.id));
 end $$;
+
+-- G99 a ⚡ Aviso instantáneo de Mercado Pago (núcleo cfx_mp_aviso): la función "enviar" recibe ?cfx_mp=d:<pedido>.
+create or replace function public.cfx_mp_aviso_url_app() returns text language sql immutable as $f$ select 'https://gilsamacgappycibcqhq.supabase.co/functions/v1/enviar' $f$;
+create or replace function public.cfx_mp_aviso_app(p_ref text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+begin
+  if left(p_ref, 2) <> 'd:' then return false; end if;
+  perform public.mp_confirmar(substr(p_ref, 3)::uuid);
+  return exists (select 1 from public.pedidos where id = substr(p_ref, 3)::uuid and mp_pago is not null);
+end $$;
+revoke all on function public.cfx_mp_aviso_url_app() from public, anon, authenticated;
+revoke all on function public.cfx_mp_aviso_app(text) from public, anon, authenticated;
 
 -- Cada 2 minutos: revisa los pedidos que abrieron Mercado Pago (por si el cliente no volvió a la página).
 create or replace function public.mp_revisar_pendientes() returns int
@@ -5419,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.74'::text $$;
+language sql immutable as $$ select '5.75'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -6138,6 +6151,50 @@ exception when others then
   return jsonb_build_object('status', 0, 'error', sqlerrm);
 end $$;
 
+-- G99 a ⚡ AVISO INSTANTÁNEO de Mercado Pago (webhook). Cada cobro lleva notification_url = función de la app + ?cfx_mp=<ref>.
+--   La función solo llama cfx_mp_aviso(ref): NO se confía en lo que manda MP; la base vuelve a preguntarle por ESE cobro.
+--   Si no hay URL (o el aviso no llega), todo sigue igual: se confirma al volver y con el cron de cada 1 min.
+--   URL: cfx_config 'mp_aviso' → {"url": ...} (opcional) · si no, gancho de la app cfx_mp_aviso_url_app().
+create table if not exists public.cfx_mp_avisos (ref text primary key, at timestamptz not null default now());
+alter table public.cfx_mp_avisos enable row level security;
+revoke all on public.cfx_mp_avisos from anon, authenticated;
+
+create or replace function public.cfx_mp_notif(p_ref text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare u text := (select valor ->> 'url' from public.cfx_config where clave = 'mp_aviso');
+begin
+  if coalesce(u, '') = '' and to_regprocedure('public.cfx_mp_aviso_url_app()') is not null then
+    begin execute 'select public.cfx_mp_aviso_url_app()' into u; exception when others then u := null; end;
+  end if;
+  if coalesce(u, '') !~ '^https://[^\s"<>?#]+$' or p_ref is null then return '{}'::jsonb; end if;
+  return jsonb_build_object('notification_url', u || '?cfx_mp=' || p_ref);
+end $$;
+revoke all on function public.cfx_mp_notif(text) from public, anon, authenticated;
+
+-- p:<id> = pago de la app (cfx_pagos) · n:<id> = cobro del negocio (mp_negocio.sql) · otra letra = gancho cfx_mp_aviso_app(ref).
+create or replace function public.cfx_mp_aviso(p_ref text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare r text := lower(left(coalesce(p_ref, ''), 80)); i uuid; ok boolean := false;
+begin
+  if r !~ '^[a-z]:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then return false; end if;
+  i := substr(r, 3)::uuid;
+  -- Freno: el mismo cobro se pregunta a MP como mucho 1 vez cada 5 s (MP manda varios avisos por pago).
+  if exists (select 1 from public.cfx_mp_avisos where ref = r and at > now() - interval '5 seconds') then return false; end if;
+  insert into public.cfx_mp_avisos (ref) values (r) on conflict (ref) do update set at = now();
+  delete from public.cfx_mp_avisos where at < now() - interval '3 days';
+  if left(r, 1) = 'p' then
+    if exists (select 1 from public.cfx_pagos where id = i and medio = 'mp' and estado = 'pendiente') then ok := public.cfx_mp_confirmar(i) = 'aprobado'; end if;
+  elsif left(r, 1) = 'n' then
+    if to_regprocedure('public.cfx_mp_neg_confirmar(uuid)') is not null then execute 'select public.cfx_mp_neg_confirmar($1)' into ok using i; end if;
+  elsif to_regprocedure('public.cfx_mp_aviso_app(text)') is not null then
+    execute 'select public.cfx_mp_aviso_app($1)' into ok using r;
+  end if;
+  return coalesce(ok, false);
+exception when others then return false;
+end $$;
+revoke all on function public.cfx_mp_aviso(text) from public, anon, authenticated;
+grant execute on function public.cfx_mp_aviso(text) to service_role;
+
 -- Lo que cuesta el plan (igual que lo muestra la app): precio (− cupón, o − descuento Premium en módulos) + cargo por pago online.
 create or replace function public.cfx_mp_monto(p_periodo text, p_meses int, p_producto text, p_cupon text) returns int
 language plpgsql stable security definer set search_path = '' as $$
@@ -6239,6 +6296,7 @@ begin
     'external_reference', i::text, 'statement_descriptor', 'CODEFIX',
     'payer', jsonb_build_object('email', coalesce(y ->> 'email', '')),
     'payment_methods', jsonb_build_object('excluded_payment_types', jsonb_build_array(jsonb_build_object('id', 'ticket'))))
+    || public.cfx_mp_notif('p:' || i::text)
     || case when v is null then '{}'::jsonb else jsonb_build_object('back_urls', jsonb_build_object('success', v, 'pending', v, 'failure', v), 'auto_return', 'approved') end);
   if coalesce((r ->> 'status')::int, 0) not in (200, 201) or r #>> '{body,init_point}' is null then
     update public.cfx_pagos set estado = 'rechazado', motivo = 'Mercado Pago no respondió', resuelto = now() where id = i;
@@ -7711,7 +7769,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -9916,6 +9974,7 @@ begin
     'items', jsonb_build_array(jsonb_build_object('id', c.id, 'title', c.titulo, 'quantity', 1, 'currency_id', 'CLP', 'unit_price', c.monto)),
     'external_reference', c.id::text,
     'payment_methods', jsonb_build_object('excluded_payment_types', jsonb_build_array(jsonb_build_object('id', 'ticket'))))
+    || public.cfx_mp_notif('n:' || c.id::text)
     || case when p_vence is null then '{}'::jsonb else jsonb_build_object('expires', true,
          'expiration_date_to', to_char(p_vence at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS".000+00:00"')) end
     || case when v is null then '{}'::jsonb else jsonb_build_object('back_urls', jsonb_build_object('success', v, 'pending', v, 'failure', v), 'auto_return', 'approved') end);
