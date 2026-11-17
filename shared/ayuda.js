@@ -1393,11 +1393,50 @@
     if (CFG.admin) return;
     refRegistrar();
     legal().then(revisar);  // primero los términos (si hay versión nueva) y después la guía
+    if (primera) setTimeout(anuncios, 4000);  // G93 📣 promos propias de CodeFix (con ✕)
     if (primera) {
       setInterval(revisar, 5 * 60 * 1000);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
     }
   }
+
+  // ---------- G93 📣 Anuncios (CM → Control → 📣 Anuncios): solo promos propias, una tarjeta con ✕ abajo; ✕ = no vuelve a salir ----------
+  async function anuncios(intento) {
+    if (!R || CFG.admin || document.querySelector('.cfx-anuncio')) return;
+    // Nunca encima de una ventana abierta (guía, términos, pago…): espera a que se cierre.
+    if (document.querySelector('dialog[open], .cfx-hoja, .cfx-hoja-m')) { if ((intento || 0) < 24) setTimeout(() => anuncios((intento || 0) + 1), 5000); return; }
+    let L; try { L = await R('cfx_anuncios_ver'); } catch (e) { return; }  // base sin anuncios: nada
+    let vistos = []; try { vistos = JSON.parse(sessionStorage.getItem('cfx-anun') || '[]'); } catch (e) { /* nada */ }
+    const a = (L || []).find((x) => !vistos.includes(x.id)); if (!a) return;
+    try { sessionStorage.setItem('cfx-anun', JSON.stringify(vistos.concat(a.id).slice(-20))); } catch (e) { /* nada */ }
+    if (!document.getElementById('cfx-anun-css')) {
+      const st = document.createElement('style'); st.id = 'cfx-anun-css';
+      st.textContent = '.cfx-anuncio{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);z-index:60;max-width:420px;margin:0 auto;display:flex;gap:12px;align-items:center;padding:12px 40px 12px 12px;' +
+        'background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111);border:1px solid var(--cfx-borde,#dce3ea);border-radius:var(--cfx-radio,14px);box-shadow:var(--cfx-sombra);animation:cfxAnun .35s ease both}' +
+        '@keyframes cfxAnun{from{opacity:0;transform:translateY(16px)}}@media(min-width:900px){.cfx-anuncio{left:auto;right:20px;bottom:20px;width:380px}}' +
+        '.cfx-anuncio .cfx-an-img{flex:none;width:64px;height:64px;border-radius:var(--cfx-radio-chico,12px);background:var(--cfx-campo,#f3f5f7);object-fit:cover}' +
+        '.cfx-anuncio .cfx-an-t{flex:1;min-width:0}.cfx-anuncio b{display:block;font-size:15px;line-height:1.25}.cfx-anuncio p{margin:3px 0 0;font-size:13px;color:var(--cfx-texto-2,#5b6472);line-height:1.35}' +
+        '.cfx-anuncio .cfx-an-btn{margin-top:8px;min-height:34px;padding:6px 14px;font-size:13px}.cfx-anuncio .cfx-an-x{position:absolute;top:6px;right:6px;width:30px;height:30px;min-height:0;padding:0;border:0;border-radius:50%;' +
+        'background:var(--cfx-campo,#f3f5f7);color:var(--cfx-texto,#111);display:grid;place-items:center;font-size:15px;line-height:1;box-shadow:none}.cfx-anuncio .cfx-an-tag{font-size:11px;color:var(--cfx-texto-2,#5b6472)}';
+      document.head.appendChild(st);
+    }
+    const d = document.createElement('aside'); d.className = 'cfx-anuncio'; d.setAttribute('role', 'complementary'); d.setAttribute('aria-label', 'Novedad de CodeFix'); d.dataset.id = a.id;
+    d.innerHTML = (a.imagen ? '<img class="cfx-an-img" alt="" src="' + esc(window.CFX_URL(a.imagen)) + '">' : '') +
+      '<div class="cfx-an-t"><span class="cfx-an-tag">📣 Novedad</span><b>' + esc(a.titulo) + '</b>' + (a.texto ? '<p>' + esc(a.texto) + '</p>' : '') +
+      (a.boton && a.link ? '<button type="button" class="cfx-an-btn">' + esc(a.boton) + '</button>' : '') + '</div><button type="button" class="cfx-an-x" aria-label="Cerrar anuncio" data-sin-atras>✕</button>';
+    const img = d.querySelector('img'); if (img) img.onerror = () => { img.removeAttribute('src'); };  // no carga → cuadro neutro
+    document.body.appendChild(d);
+    R('cfx_anuncio_marcar', { p_id: a.id, p_que: 'vista' }).catch(() => {});
+    const fuera = () => { d.style.transition = 'opacity .25s, transform .25s'; d.style.opacity = '0'; d.style.transform = 'translateY(16px)'; setTimeout(() => d.remove(), 260); };
+    d.querySelector('.cfx-an-x').onclick = () => { R('cfx_anuncio_marcar', { p_id: a.id, p_que: 'cierre' }).catch(() => {}); fuera(); };
+    const b = d.querySelector('.cfx-an-btn');
+    if (b) b.onclick = async () => {
+      try { await R('cfx_anuncio_marcar', { p_id: a.id, p_que: 'clic' }); } catch (e) { /* sigue */ }
+      const u = window.CFX_URL(a.link); fuera();
+      if (/^https?:/i.test(u)) window.open(u, '_blank', 'noopener'); else if (u !== '#' || a.link === '#') location.href = u;
+    };
+  }
+  window.CFX_ANUNCIOS = { revisar: anuncios };
 
   // ---------- Flechas siempre al centro de su cuadro ----------
   // Los botones que solo tienen una flecha de texto (‹ › ← →) pasan a un dibujo: así queda centrada en todas las letras y celulares.
