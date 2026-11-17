@@ -1503,6 +1503,25 @@
       }
     });
   }
+  // G87 A: con mouse (computador) la tira no tenía cómo correrse (la barra va escondida): rueda del mouse + arrastrar.
+  // Con el dedo sigue igual (lo corre el navegador). Si se arrastró, ese gesto no cuenta como toque.
+  function tiraMouse(x) {
+    x.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      const antes = x.scrollLeft; x.scrollLeft += e.deltaY;
+      if (x.scrollLeft !== antes) e.preventDefault();
+    }, { passive: false });
+    let m = null, arrastro = false;
+    x.addEventListener('pointerdown', (e) => { arrastro = false; m = e.pointerType === 'mouse' && e.button === 0 ? { x: e.clientX, s: x.scrollLeft } : null; });
+    x.addEventListener('pointermove', (e) => {
+      if (!m) return; const d = e.clientX - m.x;
+      if (!arrastro && Math.abs(d) < 6) return;
+      arrastro = true; x.style.scrollSnapType = 'none'; x.scrollLeft = m.s - d;
+    });
+    const soltar = () => { if (m) { m = null; x.style.scrollSnapType = ''; } };
+    x.addEventListener('pointerup', soltar); x.addEventListener('pointerleave', soltar); x.addEventListener('pointercancel', soltar);
+    x.addEventListener('click', (e) => { if (arrastro) { arrastro = false; e.preventDefault(); e.stopPropagation(); } }, true);
+  }
   function tiras() {
     const padres = new Set(); document.querySelectorAll('button, a, .chip').forEach((b) => { if (b.parentElement) padres.add(b.parentElement); });
     padres.forEach((x) => {
@@ -1510,7 +1529,7 @@
       if (x.childElementCount < 2 || x.scrollWidth <= x.clientWidth + 4 || !x.clientWidth || x.closest('.cfx-barra, .cfx-cab, header, dialog, .cfx-hoja-m, .cfx-el, .cfx-dlg')) return;
       const hijos = [...x.children], botones = hijos.filter((h) => /^(BUTTON|A)$/.test(h.tagName) || h.classList.contains('chip'));
       if (botones.length < hijos.length * 0.7 || getComputedStyle(x).display.indexOf('flex') < 0 || getComputedStyle(x).flexWrap === 'wrap') return; // una fila que baja de línea no es tira (p. ej. Agregar / Preguntar en la vitrina)
-      x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x); pestTira(x);
+      x.classList.add('cfx-desliza'); x.addEventListener('scroll', () => marcarTira(x), { passive: true }); marcarTira(x); pestTira(x); tiraMouse(x);
     });
   }
   // G85: las tiras vuelven a verse como antes de G82 (Josué: "quedó feo"). Solo queda que la opción elegida
