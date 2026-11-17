@@ -38,6 +38,11 @@
 /* Detalles comunes que dan la misma "familia" sin cambiar cómo funciona cada pantalla */
 body { font-family: var(--cfx-letra); -webkit-font-smoothing: antialiased; }
 input, select, textarea, button { font-family: inherit; }
+/* G87 G 🔤 Los textos se quedan dentro de su caja: una palabra o link largo se parte en vez de salirse del borde.
+   La barra de abajo y lo que la app corta con "…" (nowrap) no cambian. */
+body { overflow-wrap: anywhere; }
+:is(h1, h2, h3, h4, p, li, label, td, th, small, b, strong, .card, .tarjeta) { overflow-wrap: anywhere; min-width: 0; }
+pre, code, kbd { white-space: pre-wrap; overflow-wrap: anywhere; }
 :focus-visible { outline: 3px solid color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 45%, transparent); outline-offset: 2px; }
 /* ===== Núcleo 1.2 · Barra de abajo común (nucleo/barra.js): [principal][principal][ + ][principal][Más] =====
    En celulares y tablets. En computador cada app mantiene su menú (barra lateral, etc.). */

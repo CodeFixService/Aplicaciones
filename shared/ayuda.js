@@ -233,6 +233,8 @@
     'html.cfx-col-barra nav.cfx-barra>:is(.on,.activo,[aria-current="page"]):not(.cfx-mas){color:var(--cfx-barra-on)!important}' +
     'html.cfx-col-barra nav.cfx-barra>.cfx-mas>:first-child{box-shadow:0 6px 16px color-mix(in srgb,var(--brand,#2563eb) 45%,transparent),0 0 0 4px var(--cfx-barra)!important}' +
     '.cfx-pf .cfx-pf-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}' +
+    '.cfx-pf-lt{display:flex;align-items:center;gap:12px;margin:2px 0 8px;padding:8px 14px;border:1px solid var(--cfx-borde,#dce3ea);border-radius:16px;background:var(--cfx-tarjeta,#fff)}.cfx-pf-lt>span{font-size:14px;font-weight:600;line-height:1}.cfx-pf-lt>.cfx-pf-ltg{font-size:22px}' +
+    '.cfx-pf-lt input{flex:1;min-width:0;min-height:36px;accent-color:var(--pf,var(--brand,#2563eb))}.cfx-pf .cfx-pf-gros button{min-height:64px!important}.cfx-pf-g-delgada{font-weight:300}.cfx-pf-g-normal{font-weight:500}.cfx-pf-g-gruesa{font-weight:800}' +
     '.cfx-pf .cfx-pf-modos button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:74px!important;width:100%;min-width:0;margin:0!important;padding:10px 4px!important;border-radius:16px!important;' +
     'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1.5px solid var(--pf-borde)!important;box-shadow:none!important;font:700 13.5px/1.2 inherit!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '.cfx-pf .cfx-pf-modos button>span{font-size:22px;line-height:1;display:grid;place-items:center}.cfx-pf .cfx-pf-modos button svg{width:24px;height:24px}' +
@@ -1836,6 +1838,74 @@
   if (document.body) new MutationObserver(() => pintarCols()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => pintarCols()); } catch (e) { /* navegador viejo */ }
   window.CFX_COLORES = { pintar: pintarCols, leer: colLeer, guardar: colGuardar, oscuro: esOscuro, legible, contraste, degradar };
+  // ---------- G87 G 🔤 Letra a tu gusto: tamaño (rango leve) y grosor. Por usuario y por app, en este celular ----------
+  // Tamaño: zoom de toda la pantalla (íconos y cajas crecen juntos: todo sigue cuadrado y centrado). 112 % máx → en 360 px queda ≥ 320 px.
+  // Grosor (de fábrica: delgada, más legible): se reescriben los pesos de las hojas de estilo (delgada: 800/900→700, 700→600 · gruesa: +100). "Aprende": si la persona
+  // agranda con los dedos varias veces, sugiere subir la letra (una sola vez).
+  const LT_TAM = [90, 95, 100, 106, 112], LT_GROS = [['delgada', 'Aa', 'Delgada'], ['normal', 'Aa', 'Normal'], ['gruesa', 'Aa', 'Gruesa']];
+  const ltLlave = () => 'cfx-letra:' + location.pathname.replace(/index\.html$/, '') + ':' + colQuien();
+  const ltLeer = () => { let g; try { g = JSON.parse(localStorage.getItem(ltLlave()) || '{}') || {}; } catch (e) { g = {}; } return { t: LT_TAM.includes(+g.t) ? +g.t : 100, g: ['normal', 'gruesa'].includes(g.g) ? g.g : 'delgada', s: g.s || 0 }; };
+  const ltGuardar = (n) => { try { localStorage.setItem(ltLlave(), JSON.stringify(n)); } catch (e) { /* lleno */ } };
+  let ltFirma = '';
+  function ltPeso(w, g) {
+    const n = w === 'bold' ? 700 : w === 'normal' ? 400 : parseInt(w, 10); if (!n) return 0;
+    if (g === 'delgada') return n >= 800 ? 700 : n === 700 ? 600 : 0;
+    return n >= 400 && n < 900 ? Math.min(900, n + 100) : 0;
+  }
+  function ltReglas(lista, g, out) {
+    for (const r of lista) {
+      if (r.cssRules && r.media) { const d = []; ltReglas(r.cssRules, g, d); if (d.length) out.push('@media ' + r.media.mediaText + '{' + d.join('') + '}'); continue; }
+      if (!r.selectorText || !r.style) continue;
+      // "font: 800 11px var(--x)" (con var) deja fontWeight vacío: se lee del atajo.
+      const fw = r.style.fontWeight || ((/^\s*(?:(?:italic|oblique|small-caps|normal)\s+)*(\d00|bold)\b/.exec(r.style.getPropertyValue('font') || '') || [])[1]);
+      const w = fw && ltPeso(fw, g); if (!w) continue;
+      out.push(':is(' + r.selectorText + '):where(:root[data-cfx-grosor="' + g + '"] *){font-weight:' + w + (r.style.getPropertyPriority('font-weight') || r.style.getPropertyPriority('font') ? '!important' : '') + '}');
+    }
+  }
+  function ltGrosor(g) {
+    let st = document.getElementById('cfx-grosor');
+    if (g === 'normal') { if (st) st.textContent = ''; return; }
+    const out = [];
+    for (const s of document.styleSheets) { if (s.ownerNode && s.ownerNode.id === 'cfx-grosor') continue; try { ltReglas(s.cssRules, g, out); } catch (e) { /* hoja de otro sitio */ } }
+    const raiz = ':root[data-cfx-grosor="' + g + '"]', P = g === 'delgada' ? [[9, 700], [8, 700], [7, 600]] : [[7, 800], [6, 700], [5, 600]];
+    out.push(P.map(([d, w]) => raiz + ' [style*="font-weight:' + d + '00"],' + raiz + ' [style*="font-weight: ' + d + '00"]{font-weight:' + w + '!important}').join(''));
+    out.push(g === 'gruesa' ? raiz + ' body{font-weight:500}' + raiz + ' :is(b,strong,th,h1,h2,h3,h4,h5,h6){font-weight:800}' : raiz + ' :is(b,strong,th,h1,h2,h3,h4,h5,h6){font-weight:600}');
+    if (!st) { st = document.createElement('style'); st.id = 'cfx-grosor'; }
+    st.textContent = out.join('\n');
+    (document.head || document.documentElement).appendChild(st);  // siempre al final: gana a lo de la app
+  }
+  function pintarLetra(prueba) {
+    const L = prueba || ltLeer(), r = document.documentElement;
+    if (L.t === 100) r.style.removeProperty('zoom'); else r.style.setProperty('zoom', String(L.t / 100));
+    if (L.g === 'normal') delete r.dataset.cfxGrosor; else r.dataset.cfxGrosor = L.g;
+    const n = document.styleSheets.length + ':' + L.g;
+    if (n !== ltFirma) { ltFirma = n; ltGrosor(L.g); }
+  }
+  // Las apps cargan estilos después (pantallas nuevas): se reescriben al aparecer hojas nuevas.
+  let ltT = 0;
+  new MutationObserver((ms) => {
+    if (!ms.some((m) => [...m.addedNodes].some((x) => (x.tagName === 'STYLE' && x.id !== 'cfx-grosor') || x.tagName === 'LINK'))) return;
+    clearTimeout(ltT); ltT = setTimeout(() => { if (document.documentElement.dataset.cfxGrosor) { ltFirma = ''; pintarLetra(); } }, 120);
+  }).observe(document.documentElement, { childList: true, subtree: true });
+  // Aprende: 3 veces agrandando con los dedos (en días o pantallas distintas) → sugiere una letra más grande, una sola vez.
+  try {
+    const vv = window.visualViewport; let visto = false;
+    if (vv) vv.addEventListener('resize', () => {
+      if (visto || vv.scale < 1.25) return; visto = true;
+      const L = ltLeer(); if (L.s < 0 || L.t >= 112) return;
+      L.s = (L.s || 0) + 1; ltGuardar(L);
+      if (L.s >= 3) {
+        L.s = -1; ltGuardar(L);
+        setTimeout(async () => {
+          const si = window.CFX_DIALOGO && await window.CFX_DIALOGO.confirmar('🔤 Vi que agrandas la pantalla con los dedos. ¿Subo un poco la letra? (se cambia en Mi perfil → Color y modo)', { si: 'Sí, más grande', no: 'No, gracias' });
+          if (si) { const n = ltLeer(); n.t = LT_TAM[Math.min(LT_TAM.length - 1, LT_TAM.indexOf(n.t) + 1)]; ltGuardar(n); pintarLetra(); aviso('🔤 Letra más grande'); }
+        }, 900);
+      }
+    });
+  } catch (e) { /* sin visualViewport */ }
+  window.CFX_LETRA = { leer: ltLeer, guardar: ltGuardar, pintar: pintarLetra, TAM: LT_TAM };
+  pintarLetra();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ltFirma = ''; pintarLetra(); });
   // Lo guardado por BASE se aplica apenas carga (solo existe en las apps que usan BASE).
   if (lsL('modo')) pintarModo(lsL('modo'));
   if (lsL('color')) pintarColor(lsL('color'));
@@ -1923,6 +1993,13 @@
         }
       };
     }
+    // 🔤 Letra (G87 G): tamaño en rango leve + grosor. Es de este celular (como los colores a tu gusto).
+    function letraHtml() {
+      const L = ltLeer();
+      return '<label>🔤 Tamaño de letra · <span data-lt-v>' + L.t + ' %</span></label><div class="cfx-pf-lt"><span aria-hidden="true">A</span>' +
+        '<input type="range" data-lt min="0" max="' + (LT_TAM.length - 1) + '" step="1" value="' + LT_TAM.indexOf(L.t) + '" aria-label="Tamaño de letra"><span aria-hidden="true" class="cfx-pf-ltg">A</span></div>' +
+        '<label>Grosor de letra</label><div class="cfx-pf-modos cfx-pf-gros">' + LT_GROS.map(([k, i, t]) => '<button type="button" data-lg="' + k + '" aria-pressed="' + (k === L.g) + '" class="' + (k === L.g ? 'on' : '') + '"><span class="cfx-pf-g-' + k + '">' + i + '</span>' + t + '</button>').join('') + '</div>';
+    }
     function verEstilo(z) {
       zAct = z;
       const cols = (valor(P.colores) || []).map((c) => (Array.isArray(c) ? c : [c, c])), act = String(valor(P.color) || '').toLowerCase(), m = valor(P.modo) || 'auto';
@@ -1930,7 +2007,7 @@
       z.innerHTML = '<div class="cfx-pf">' + (P.guardarColor ? '<label>Color de la app</label><div class="cfx-pf-cols">' + cols.map(([n, c]) => '<button type="button" data-c="' + esc(c) + '" title="' + esc(n) + '" aria-label="' + esc(n) + '" style="background:' + esc(c) + '" class="' +
         (c.toLowerCase() === act ? 'on' : '') + (P.bloqueo('color', c) ? ' cfx-pf-lock' : '') + '"></button>').join('') + '</div>' +
         (libre ? '<label class="cfx-pf-libre"><input type="color" value="' + esc(HEX.test(act) ? act : '#2563eb') + '"><span>🎨 Color a tu gusto' + (P.bloqueo('libre') ? ' <i>⭐</i>' : '') + '</span></label>' : '') : '') +
-        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + '<div data-pf-mc></div></div>';
+        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + letraHtml() + '<div data-pf-mc></div></div>';
       // G48 🎨 Colores a tu gusto: fondo, texto e íconos (con el + del centro). Se guardan para el modo que se está viendo.
       const MC = [['fondo', '🖼️', 'Fondo', 'Detrás de todo'], ['tarjeta', '🗂️', 'Tarjetas', 'Cajas y menús'], ['texto', '📝', 'Texto', 'Letras y títulos'], ['icono', '✨', 'Íconos y botón +', 'Menú, ⋯, barra de abajo y el +'],
         ['barra', '📍', 'Barra de abajo', 'Fondo de la barra'], ['marca2', '🌈', 'Degradado', '2º color de botones y el +']];
@@ -1959,13 +2036,22 @@
       // Se marca la opción en su lugar (sin volver a dibujar la sección).
       const marcar = (sel, b) => z.querySelectorAll(sel).forEach((x) => x.classList.toggle('on', x === b));
       z.onclick = (ev) => {
-        const b = ev.target.closest('[data-c], [data-m]'); if (!b) return;
+        const lg = ev.target.closest('[data-lg]');
+        if (lg) { ev.preventDefault(); marcar('[data-lg]', lg); const n = ltLeer(); n.g = lg.dataset.lg; ltGuardar(n); ltFirma = ''; pintarLetra(); aviso('🔤 Grosor guardado'); return; }
+      const b = ev.target.closest('[data-c], [data-m]'); if (!b) return;
         ev.preventDefault();
         if (b.dataset.m) { marcar('[data-m]', b); return listo(() => P.guardarModo(b.dataset.m)).then((ok) => { if (!ok) marcar('[data-m]', z.querySelector('[data-m="' + (valor(P.modo) || 'auto') + '"]')); setTimeout(pintarMC, 60); }); }
         if (pide('color', b.dataset.c)) return;
         marcar('[data-c]', b);
         listo(() => P.guardarColor(b.dataset.c), '🎨 Color guardado');
       };
+      // 🔤 Tamaño: se ve al mover; se guarda al soltar.
+      const lt = z.querySelector('[data-lt]');
+      if (lt) {
+        const val = () => LT_TAM[Math.max(0, Math.min(LT_TAM.length - 1, +lt.value))], txt = z.querySelector('[data-lt-v]');
+        lt.oninput = () => { const n = ltLeer(); n.t = val(); pintarLetra(n); if (txt) txt.textContent = n.t + ' %'; };
+        lt.onchange = () => { const n = ltLeer(); n.t = val(); if (n.s > 0) n.s = -1; ltGuardar(n); pintarLetra(); aviso('🔤 Tamaño guardado'); };
+      }
       const lib = z.querySelector('input[type=color]');
       if (lib) {
         lib.onclick = (ev) => { if (pide('libre')) ev.preventDefault(); };
@@ -2017,7 +2103,7 @@
     let pintarCabeza = () => {};
     const conf = op.menu ? 'Configuración' : '';
     const propias = valor(P.secciones) || [];
-    let L = [{ k: 'yo', ico: '👤', t: 'Foto y nombre', d: 'Cómo te ven', abrir: verYo, grupo: conf }, { k: 'estilo', ico: '🎨', t: 'Color y modo', d: 'Claro, oscuro o automático', abrir: verEstilo, grupo: conf },
+    let L = [{ k: 'yo', ico: '👤', t: 'Foto y nombre', d: 'Cómo te ven', abrir: verYo, grupo: conf }, { k: 'estilo', ico: '🎨', t: 'Color y modo', d: 'Claro u oscuro, tamaño y grosor de letra', abrir: verEstilo, grupo: conf },
       { k: 'avanzado', ico: '⚙️', t: 'Avanzado', d: 'Contraseña, avisos y cuenta', abrir: verAvanzado, grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
     // Menú: primero las opciones de la app; en Configuración van primero las del perfil y después las propias de la app.
     // Menú: una sola fila "Mi perfil" arriba de Configuración que abre la misma ventana en las 7 apps (foto y nombre, color y modo, avanzado).
