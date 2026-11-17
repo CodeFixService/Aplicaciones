@@ -337,3 +337,7 @@ html.cfx-col-ico :is(nav.tabs, .seg, .segs, .tabs2) button:not(.on):not(.activo)
   --bs-success: var(--cfx-ok); --bs-danger: var(--cfx-mal); --bs-warning: var(--cfx-aviso);
   --bs-box-shadow: var(--cfx-sombra); --bs-box-shadow-sm: 0 1px 3px rgba(15, 23, 42, .1); --bs-focus-ring-color: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 30%, transparent);
 }
+/* G81 a · botones de un toque (chips) del núcleo: fila que envuelve, activo con el color de la app. */
+.cfx-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.cfx-chips .cfx-chip { flex: 1 1 auto; min-width: 0; min-height: 38px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--cfx-borde, #d0d5dd); background: transparent; color: inherit; font: inherit; font-size: 15px; line-height: 1.2; font-weight: 600; cursor: pointer; box-shadow: none; }
+.cfx-chips .cfx-chip.on { background: var(--brand, var(--marca, #2563eb)); border-color: var(--brand, var(--marca, #2563eb)); color: var(--cfx-mas-ink, #fff); }

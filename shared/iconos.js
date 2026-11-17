@@ -136,6 +136,8 @@
     numeros: '<path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/>',
     pelota: '<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10zM12 7V3M16 10l4-1M14.5 14.5l2.5 3.5M9.5 14.5L7 18M8 10L4 9"/>',
     dado: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9v.01M15 15v.01M12 12v.01"/>',
+    compartir: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
+    enviar: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
     bicho: '<rect x="7" y="7" width="10" height="13" rx="5"/><path d="M9 7.5a3 3 0 0 1 6 0M12 11v9M7 11H3.5M17 11h3.5M7 15H3M17 15h4M7.5 18.5L4.5 21M16.5 18.5l3 2.5M9.5 4.5L8 2.5M14.5 4.5L16 2.5"/>'
   };
   // emoji (sin variante) → [ícono, color]
@@ -168,6 +170,17 @@
   asignar('🔌', 'enchufe'); asignar('📶', 'senal'); asignar('🔋', 'bateria', 'verde'); asignar('🪫', 'bateriaBaja', 'rojo'); asignar('🎬 🎥 📹', 'video');
   asignar('🤖', 'bot'); asignar('🙈', 'ojoNo'); asignar('🥈 🥉 🏅 🎖', 'medalla', 'oro'); asignar('😕 😞 😩 😐 😬 🙁 😢', 'triste'); asignar('🤔', 'ayuda');
   asignar('🎮', 'control'); asignar('🎧', 'audifonos'); asignar('🔢', 'numeros'); asignar('⚽ 🏀', 'pelota'); asignar('🎲', 'dado');
+
+  // G81 b · El ícono sigue al CONTEXTO: si la palabra que va justo después del emoji es una acción conocida,
+  // manda la palabra (ej. "📣 Compartir" ya no sale con parlante, "⚙️ Imprimir" sale con impresora).
+  const W = {};
+  const palabra = (lista, ic) => lista.split(' ').forEach((w) => { W[w] = ic; });
+  palabra('compartir compartido compartida comparte', 'compartir'); palabra('enviar enviado enviada envía', 'enviar');
+  palabra('imprimir impresora', 'impresora'); palabra('editar', 'lapiz'); palabra('descargar exportar', 'bajar');
+  palabra('actualizar', 'refrescar'); palabra('buscar', 'lupa'); palabra('copiar copiado', 'portapapeles');
+  palabra('eliminar borrar', 'basura'); palabra('salir', 'puerta'); palabra('contraseña', 'llave');
+  palabra('notificaciones', 'campana'); palabra('ajustes configuración', 'ajustes'); palabra('calendario agendar', 'calendario');
+  const LETRA = /^\s*([\p{L}]+)/u, ESTADO = new Set(['ok', 'no', 'alerta', 'punto', 'prohibido', 'arena']);
 
   // Bloque al que pertenece un texto (para saber si el ícono va al inicio, en medio o solo).
   const BLOQUE = 'button, a, li, label, h1, h2, h3, h4, h5, h6, p, td, th, summary, dt, dd, legend, div, section, article, header, footer, nav';
@@ -210,7 +223,11 @@
     let ult = 0, cambio = false, m;
     EMO.lastIndex = 0;
     while ((m = EMO.exec(t.data))) {
-      const d = M[clave(m[0])]; if (!d) continue;
+      let d = M[clave(m[0])]; if (!d) continue;
+      if (!ESTADO.has(d[0])) {
+        const resto = t.data.slice(m.index + m[0].length), w = LETRA.exec(resto.trim() ? resto : bl.textContent.split(m[0]).slice(1).join(' ')), ic = w && W[w[1].toLowerCase()];
+        if (ic && ic !== d[0]) d = [ic, ''];
+      }
       const antes = t.data.slice(ult, m.index), alInicio = inicio && !antes.trim() && !cambio;
       if (antes && !alInicio) frag.appendChild(document.createTextNode(antes));
       const s = document.createElement('span');

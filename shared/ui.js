@@ -374,3 +374,188 @@
   }
   window.CFX_AVISO = aviso;
 })();
+
+/* G81 c 📅📋 Calendario, hora y listas PROPIOS (no los de Android/Chrome): mismo tema claro/oscuro y colores de la app.
+   Reemplaza al tocar: <input type=date|time|datetime-local> y <select> (de una opción). Se abre una hoja desde abajo (al centro en PC).
+   Elegir → pone el valor y avisa input/change como el nativo (el código de cada app no cambia). Respeta min, max, required y disabled.
+   Teclado: sigue el nativo (Tab + flechas o escribir). Para dejar el nativo: class="cfx-nativo" o data-nativo. API: CFX_ELEGIR.abrir(el). */
+(function () {
+  'use strict';
+  if (window.CFX_ELEGIR) return;
+  const d = document;
+  const TIPOS = { date: 1, time: 1, 'datetime-local': 1 };
+  const MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const css = d.createElement('style');
+  css.textContent =
+    'dialog.cfx-el{border:0;padding:0;margin:auto auto 0;width:100%;max-width:440px;max-height:88vh;background:transparent;color:inherit;overflow:visible}dialog.cfx-el::backdrop{background:rgba(15,23,42,.5)}' +
+    '@media(min-width:600px){dialog.cfx-el{margin:auto}}.cfx-el *{box-sizing:border-box}' +
+    '.cfx-el>div{background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);border-radius:22px 22px 0 0;padding:10px 14px calc(14px + env(safe-area-inset-bottom));font-family:var(--cfx-letra,system-ui,sans-serif);' +
+    'max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -10px 40px -10px rgba(15,23,42,.35);animation:cfxElSube .22s cubic-bezier(.2,.9,.3,1)}@media(min-width:600px){.cfx-el>div{border-radius:22px}}' +
+    '@keyframes cfxElSube{from{transform:translateY(30px);opacity:.4}}@media(prefers-reduced-motion:reduce){.cfx-el>div{animation:none}}' +
+    '.cfx-el-asa{width:42px;height:5px;border-radius:9px;background:var(--cfx-borde,#d0d5dd);margin:0 auto 8px}' +
+    '.cfx-el-cab{display:flex;align-items:center;gap:8px;margin:0 0 8px}.cfx-el-cab b{flex:1;min-width:0;font-size:17px;overflow-wrap:anywhere}' +
+    '.cfx-el button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}' +
+    '.cfx-el-x,.cfx-el-nav{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--cfx-borde,#d0d5dd);background:transparent;display:grid;place-items:center;font-size:18px;line-height:1;padding:0}' +
+    '.cfx-el-x:focus-visible,.cfx-el-nav:focus-visible,.cfx-el-d:focus-visible,.cfx-el-op:focus-visible,.cfx-el-ch:focus-visible{outline:2px solid var(--brand,var(--marca,#2563eb));outline-offset:2px}' +
+    '.cfx-el-sem{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;text-align:center;font-size:12px;font-weight:700;opacity:.6;margin:4px 0}' +
+    '.cfx-el-dias{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}' +
+    '.cfx-el-d{aspect-ratio:1;min-height:38px;border-radius:50%;border:0;background:transparent;font-size:15px;font-weight:600;padding:0}' +
+    '.cfx-el-d:hover:not(:disabled){background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 12%,transparent)}' +
+    '.cfx-el-d.hoy{box-shadow:inset 0 0 0 2px var(--brand,var(--marca,#2563eb))}.cfx-el-d.on{background:var(--brand,var(--marca,#2563eb))!important;color:var(--cfx-mas-ink,#fff)}' +
+    '.cfx-el-d:disabled{opacity:.28;cursor:default}.cfx-el-d.fuera{visibility:hidden}' +
+    '.cfx-el-pie{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.cfx-el-pie button{min-height:44px;border-radius:12px;border:1px solid var(--cfx-borde,#d0d5dd);background:transparent;font-weight:700}' +
+    '.cfx-el-pie button.si{background:var(--brand,var(--marca,#2563eb));border-color:transparent;color:var(--cfx-mas-ink,#fff)}.cfx-el-pie button:only-child{grid-column:1/-1}' +
+    '.cfx-el-lista{overflow:auto;margin:0 -14px;padding:0 14px;overscroll-behavior:contain}' +
+    '.cfx-el-op{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:10px 12px;border:0;border-radius:12px;background:transparent;text-align:left;font-size:16px}' +
+    '.cfx-el-op span{flex:1;min-width:0;overflow-wrap:anywhere}.cfx-el-op:hover:not(:disabled){background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 10%,transparent)}' +
+    '.cfx-el-op.on{color:var(--brand,var(--marca,#2563eb));font-weight:700;background:color-mix(in srgb,var(--brand,var(--marca,#2563eb)) 10%,transparent)}.cfx-el-op:disabled{opacity:.4}' +
+    '.cfx-el-op svg{flex:none;width:20px;height:20px}.cfx-el-g{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.6;margin:10px 12px 2px}' +
+    '.cfx-el-bus{width:100%;min-height:44px;margin:0 0 8px;padding:8px 12px;border-radius:12px;border:1px solid var(--cfx-borde,#d0d5dd);background:var(--cfx-campo,transparent);color:inherit;font:inherit}' +
+    '.cfx-el-hr{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.cfx-el-mi{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}' +
+    '.cfx-el-ch{min-height:40px;border-radius:10px;border:1px solid var(--cfx-borde,#d0d5dd);background:transparent;font-weight:700;font-variant-numeric:tabular-nums;padding:0}' +
+    '.cfx-el-ch.on{background:var(--brand,var(--marca,#2563eb));border-color:transparent;color:var(--cfx-mas-ink,#fff)}.cfx-el-ch:disabled{opacity:.3}' +
+    '.cfx-el-sub{font-size:13px;font-weight:700;opacity:.7;margin:8px 0 6px}.cfx-el-vacio{opacity:.6;padding:12px;text-align:center}';
+  (d.head || d.documentElement).appendChild(css);
+
+  const p2 = (n) => String(n).padStart(2, '0');
+  const iso = (y, m, dd) => y + '-' + p2(m + 1) + '-' + p2(dd);
+  const hoyIso = () => { const t = new Date(); return iso(t.getFullYear(), t.getMonth(), t.getDate()); };
+  const OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const ojo = (el) => !el.disabled && !el.readOnly && !el.matches('.cfx-nativo, [data-nativo], .cfx-nativo *, [data-nativo] *');
+  const sirve = (el) => el && el.isConnected && ojo(el) && ((el.tagName === 'SELECT' && !el.multiple && !(el.size > 1)) || (el.tagName === 'INPUT' && TIPOS[el.type]));
+  // Título de la hoja: la etiqueta del campo (sin el texto del propio campo).
+  function titulo(el) {
+    if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
+    const l = el.labels && el.labels[0];
+    if (l) { const c = l.cloneNode(true); c.querySelectorAll('select, input, textarea, .ic-e, small, .sub').forEach((x) => x.remove()); const t = c.textContent.replace(/\s+/g, ' ').trim(); if (t) return t; }
+    return el.title || el.placeholder || (el.tagName === 'SELECT' ? 'Elige una opción' : el.type === 'time' ? 'Elige la hora' : 'Elige la fecha');
+  }
+  function poner(el, v) {
+    if (el.value === v) return;
+    el.value = v;
+    el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  let abierta = null;
+  function hoja(tit, html) {
+    if (abierta) abierta.close();
+    const g = d.createElement('dialog'); g.className = 'cfx-el';
+    g.innerHTML = '<div role="document"><div class="cfx-el-asa"></div><div class="cfx-el-cab"><b>' + esc(tit) + '</b><button type="button" class="cfx-el-x" data-x aria-label="Cerrar">✕</button></div>' + html + '</div>';
+    (d.body || d.documentElement).appendChild(g);
+    g.addEventListener('click', (ev) => { if (ev.target === g || ev.target.closest('[data-x]')) g.close(); });
+    g.addEventListener('close', () => { g.remove(); if (abierta === g) abierta = null; });
+    g.showModal(); abierta = g;
+    return g;
+  }
+  // ---------- 📋 Lista ----------
+  function lista(el) {
+    const ops = []; let n = 0;
+    for (const h of el.children) {
+      if (h.tagName === 'OPTGROUP') { ops.push({ g: h.label }); for (const o of h.children) if (!o.hidden) { ops.push({ o }); n++; } }
+      else if (h.tagName === 'OPTION' && !h.hidden) { ops.push({ o: h }); n++; }
+    }
+    const fila = (x, i) => x.g != null ? '<p class="cfx-el-g">' + esc(x.g) + '</p>'
+      : '<button type="button" class="cfx-el-op' + (x.o.selected ? ' on' : '') + '" data-i="' + i + '"' + (x.o.disabled ? ' disabled' : '') + '><span>' + esc(x.o.textContent.trim() || '—') + '</span>' + (x.o.selected ? OK : '') + '</button>';
+    const g = hoja(titulo(el), (n > 12 ? '<input class="cfx-el-bus cfx-nativo" type="search" placeholder="Buscar…" aria-label="Buscar" autocomplete="off">' : '') +
+      '<div class="cfx-el-lista" role="listbox">' + ops.map(fila).join('') + '</div>');
+    const caja = g.querySelector('.cfx-el-lista');
+    caja.addEventListener('click', (ev) => { const b = ev.target.closest('[data-i]'); if (!b) return; const o = ops[+b.dataset.i].o; g.close(); poner(el, o.value); });
+    const bus = g.querySelector('.cfx-el-bus');
+    if (bus) bus.addEventListener('input', () => {
+      const q = bus.value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+      caja.querySelectorAll('[data-i]').forEach((b) => { b.hidden = !!q && !b.textContent.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().includes(q); });
+      caja.querySelectorAll('.cfx-el-g').forEach((t) => { let s = t.nextElementSibling, v = false; while (s && !s.matches('.cfx-el-g')) { if (!s.hidden) v = true; s = s.nextElementSibling; } t.hidden = !v; });
+    });
+    const on = caja.querySelector('.on'); if (on) on.scrollIntoView({ block: 'center' });
+    (on || caja.querySelector('[data-i]:not(:disabled)') || g.querySelector('[data-x]')).focus({ preventScroll: true });
+  }
+  // ---------- 📅 Calendario (y 🕐 hora) ----------
+  function fecha(el) {
+    const tipo = el.type, conHora = tipo === 'datetime-local';
+    const val = el.value || '', fv = conHora ? val.slice(0, 10) : val, hv = conHora ? val.slice(11, 16) : '';
+    const mn = (el.min || '').slice(0, 10), mx = (el.max || '').slice(0, 10), hoy = hoyIso();
+    let y, m; { const b = fv || (mn && hoy < mn ? mn : mx && hoy > mx ? mx : hoy); y = +b.slice(0, 4); m = +b.slice(5, 7) - 1; }
+    const g = hoja(titulo(el), '<div class="cfx-el-cab"><button type="button" class="cfx-el-nav" data-nav="-1" aria-label="Mes anterior">‹</button><b data-mes style="text-align:center"></b>' +
+      '<button type="button" class="cfx-el-nav" data-nav="1" aria-label="Mes siguiente">›</button></div><div class="cfx-el-sem">' + ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map((x) => '<span>' + x + '</span>').join('') + '</div>' +
+      '<div class="cfx-el-dias" role="grid"></div><div class="cfx-el-pie">' + (!el.required && val ? '<button type="button" data-borrar>Borrar</button>' : '') +
+      ((!mn || hoy >= mn) && (!mx || hoy <= mx) ? '<button type="button" class="si" data-hoy>Hoy</button>' : '') + '</div>');
+    const dias = g.querySelector('.cfx-el-dias');
+    const pintar = () => {
+      g.querySelector('[data-mes]').textContent = MES[m] + ' ' + y;
+      const ini = (new Date(y, m, 1).getDay() + 6) % 7, tot = new Date(y, m + 1, 0).getDate();
+      let h = ''; for (let i = 0; i < ini; i++) h += '<button type="button" class="cfx-el-d fuera" tabindex="-1" disabled></button>';
+      for (let k = 1; k <= tot; k++) { const f = iso(y, m, k), off = (mn && f < mn) || (mx && f > mx);
+        h += '<button type="button" class="cfx-el-d' + (f === hoy ? ' hoy' : '') + (f === fv ? ' on' : '') + '" data-f="' + f + '"' + (off ? ' disabled' : '') + ' aria-label="' + k + ' de ' + MES[m] + '">' + k + '</button>'; }
+      dias.innerHTML = h;
+      const p = g.querySelector('[data-nav="-1"]'), s = g.querySelector('[data-nav="1"]');
+      p.disabled = !!mn && iso(y, m, 1) <= mn; s.disabled = !!mx && iso(y, m, tot) >= mx;
+    };
+    const elegir = (f) => { g.close(); if (conHora) hora(el, f, hv); else poner(el, f); };
+    g.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-nav],[data-f],[data-hoy],[data-borrar]'); if (!b || b.disabled) return;
+      if (b.dataset.nav) { m += +b.dataset.nav; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } pintar(); }
+      else if (b.dataset.f) elegir(b.dataset.f);
+      else if (b.hasAttribute('data-hoy')) elegir(hoy);
+      else { g.close(); poner(el, ''); }
+    });
+    // Deslizar a los lados cambia de mes.
+    let x0 = null; dias.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+    dias.addEventListener('touchend', (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) { const b = g.querySelector('[data-nav="' + (dx < 0 ? 1 : -1) + '"]'); if (!b.disabled) b.click(); } });
+    pintar();
+    (dias.querySelector('.on') || dias.querySelector('.hoy:not(:disabled)') || g.querySelector('[data-x]')).focus({ preventScroll: true });
+  }
+  function hora(el, dia, hv) {
+    const conDia = el.type === 'datetime-local', v = hv || (conDia ? '' : el.value.slice(0, 5));
+    let hh = v ? +v.slice(0, 2) : null, mi = v ? +v.slice(3, 5) : null;
+    const mn = conDia ? (el.min && el.min.slice(0, 10) === dia ? el.min.slice(11, 16) : '') : (el.min || '').slice(0, 5);
+    const mx = conDia ? (el.max && el.max.slice(0, 10) === dia ? el.max.slice(11, 16) : '') : (el.max || '').slice(0, 5);
+    const paso = Math.max(1, Math.round((+el.step || 300) / 60)), mins = [];
+    for (let k = 0; k < 60; k += (paso >= 5 && 60 % paso === 0 ? paso : 5)) mins.push(k);
+    if (mi != null && !mins.includes(mi)) { mins.push(mi); mins.sort((a, b) => a - b); }
+    const t = conDia ? dia.split('-').reverse().join('/') + ' · ' + titulo(el) : titulo(el);
+    const g = hoja(t, '<div class="cfx-el-lista"><p class="cfx-el-sub">Hora</p><div class="cfx-el-hr"></div><p class="cfx-el-sub">Minutos</p><div class="cfx-el-mi"></div></div>' +
+      '<div class="cfx-el-pie">' + (!el.required && el.value ? '<button type="button" data-borrar>Borrar</button>' : '') + '<button type="button" class="si" data-listo>Listo</button></div>');
+    const fuera = (h, m2) => { const s = p2(h) + ':' + p2(m2); return (mn && s < mn) || (mx && s > mx); };
+    const pintar = () => {
+      let a = ''; for (let k = 0; k < 24; k++) { const off = fuera(k, 59) && fuera(k, 0); a += '<button type="button" class="cfx-el-ch' + (k === hh ? ' on' : '') + '" data-h="' + k + '"' + (off ? ' disabled' : '') + '>' + p2(k) + '</button>'; }
+      g.querySelector('.cfx-el-hr').innerHTML = a;
+      g.querySelector('.cfx-el-mi').innerHTML = mins.map((k) => '<button type="button" class="cfx-el-ch' + (k === mi ? ' on' : '') + '" data-m="' + k + '"' + (hh != null && fuera(hh, k) ? ' disabled' : '') + '>' + p2(k) + '</button>').join('');
+      g.querySelector('[data-listo]').disabled = hh == null;
+    };
+    const listo = () => { if (hh == null) return; if (mi == null || fuera(hh, mi)) mi = mins.find((k) => !fuera(hh, k)) ?? 0; g.close(); poner(el, (conDia ? dia + 'T' : '') + p2(hh) + ':' + p2(mi)); };
+    g.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-h],[data-m],[data-listo],[data-borrar]'); if (!b || b.disabled) return;
+      if (b.dataset.h) { hh = +b.dataset.h; if (mi != null && fuera(hh, mi)) mi = null; pintar(); }
+      else if (b.dataset.m) { mi = +b.dataset.m; if (hh != null) listo(); else pintar(); }
+      else if (b.hasAttribute('data-listo')) listo();
+      else { g.close(); poner(el, ''); }
+    });
+    pintar();
+    const on = g.querySelector('.cfx-el-hr .on') || g.querySelector('[data-h="' + (new Date().getHours()) + '"]');
+    if (on) on.scrollIntoView({ block: 'center' });
+  }
+  function abrir(el) {
+    if (!sirve(el)) return false;
+    if (el.tagName === 'SELECT') lista(el); else if (el.type === 'time') hora(el, '', ''); else fecha(el);
+    return true;
+  }
+  // Tocar (dedo o mouse) abre la hoja propia y frena la del sistema. El teclado sigue con el nativo.
+  const objetivo = (ev) => { const el = ev.target && ev.target.closest && ev.target.closest('select, input'); return sirve(el) ? el : null; };
+  let porToque = 0;
+  d.addEventListener('mousedown', (ev) => { if (ev.button === 0 && objetivo(ev)) ev.preventDefault(); }, true);
+  d.addEventListener('touchend', (ev) => { const el = objetivo(ev); if (!el) return; ev.preventDefault(); porToque = Date.now(); abrir(el); }, { capture: true, passive: false });
+  d.addEventListener('click', (ev) => {
+    const el = objetivo(ev); if (!el) return;
+    ev.preventDefault(); if (Date.now() - porToque < 600) return;
+    if (ev.detail === 0 && el.tagName === 'SELECT') return;  // click "falso" del teclado
+    abrir(el);
+  }, true);
+  // Si la app pide el selector por código (input.showPicker()), también sale el propio.
+  try {
+    const orig = HTMLInputElement.prototype.showPicker;
+    if (orig) HTMLInputElement.prototype.showPicker = function () { if (!abrir(this)) return orig.call(this); };
+    const os = HTMLSelectElement.prototype.showPicker;
+    if (os) HTMLSelectElement.prototype.showPicker = function () { if (!abrir(this)) return os.call(this); };
+  } catch (e) { /* navegador antiguo */ }
+  window.CFX_ELEGIR = { abrir };
+})();

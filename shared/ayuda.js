@@ -604,13 +604,13 @@
   const ICO_CLAVE = { perfil: 'usuario', cuenta: 'carnet', estilo: 'paleta', avanzado: 'ajustes', ajustes: 'ajustes', guia: 'brujula', chat: 'chat', plan: 'estrella', premium: 'estrella',
     invitar: 'regalo', terminos: 'documento', privacidad: 'candado', misdatos: 'carpeta', salir: 'puerta', respaldo: 'bajar', equipo: 'usuarios', qr: 'qr', link: 'enlace', pagos: 'tarjeta', avisos: 'campana', empresa: 'tienda',
     agregar: 'mas', tienda: 'tienda', reglas: 'balanza', socios: 'conexion', registro: 'portapapeles', calificaciones: 'corazon', panel: 'escudo', horario: 'reloj', limpieza: 'escoba',
-    instalar: 'celular', reparar: 'herramienta', animo: 'cara', datos: 'bajar', textos: 'lapiz', versiones: 'cohete', servidor: 'servidor' };
+    instalar: 'celular', compartir: 'compartir', imprimir: 'impresora', reparar: 'herramienta', animo: 'cara', datos: 'bajar', textos: 'lapiz', versiones: 'cohete', servidor: 'servidor' };
   const ICO_TITULO = [[/^mi perfil|^foto y nombre/, 'perfil'], [/^mi cuenta$|^cuenta$|^datos de (la )?cuenta/, 'cuenta'], [/^color y modo|^apariencia|^estilo/, 'estilo'], [/^avanzado/, 'avanzado'],
     [/^gu[ií]a/, 'guia'], [/^chat con soporte|^soporte/, 'chat'], [/^mi plan|^pasar a pro|^premium\b|^plan\b/, 'plan'], [/^invita/, 'invitar'], [/^t[ée]rminos/, 'terminos'], [/^pol[ií]tica de privacidad|^privacidad/, 'privacidad'], [/^mis datos/, 'misdatos'],
     [/^cerrar sesi[oó]n/, 'salir'], [/^respaldo/, 'respaldo'], [/^(mi )?equipo\b|^trabajadores/, 'equipo'], [/^enlace y qr|^qr\b|^c[oó]digo qr|^mi qr/, 'qr'], [/^links? de pago/, 'pagos'],
     [/^notificaciones|^avisos/, 'avisos'], [/^otra empresa|^agregar|^nueva empresa/, 'agregar'], [/^(mi )?empresa/, 'empresa'], [/^(mi )?tienda/, 'tienda'], [/^reglas/, 'reglas'],
     [/^socios/, 'socios'], [/^registro\b/, 'registro'], [/calificaciones|^rese[ñn]as/, 'calificaciones'], [/^panel de administraci/, 'panel'], [/^horario/, 'horario'], [/^limpieza/, 'limpieza'],
-    [/^instalar/, 'instalar'], [/^reparar/, 'reparar'], [/^registros de [áa]nimo/, 'animo'], [/^mis datos/, 'datos']];
+    [/^instalar/, 'instalar'], [/^compartir/, 'compartir'], [/^imprimir|^impresora/, 'imprimir'], [/^reparar/, 'reparar'], [/^registros de [áa]nimo/, 'animo'], [/^mis datos/, 'datos']];
   function icono(s) {
     const I = window.CodeFixIconos, ico = s.ico == null ? '' : String(s.ico).trim();
     if (!I || !I.svg) return ico || '•';

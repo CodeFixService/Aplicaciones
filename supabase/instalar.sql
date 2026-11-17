@@ -5360,7 +5360,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.63'::text $$;
+language sql immutable as $$ select '5.64'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -6014,6 +6014,8 @@ create table if not exists public.cfx_keys (
   id uuid primary key default gen_random_uuid(), hash text not null unique, ultimos text not null, rol text not null check (rol in ('negocio', 'cliente')),
   dias int not null check (dias between 1 and 3660), nota text not null default '', creado timestamptz not null default now(),
   usada_por uuid, usada_email text, usada_at timestamptz, revocada boolean not null default false);
+-- G81 d: item '' = Premium · clave de un módulo o de un pack = activa ese módulo/pack (solo negocios). 1 uso cada key.
+alter table public.cfx_keys add column if not exists item text not null default '';
 create table if not exists public.cfx_cupones (
   codigo text primary key check (codigo ~ '^[A-Z0-9-]{3,20}$'), pct int not null check (pct between 1 and 100), usos_max int, usos int not null default 0,
   vence date, activo boolean not null default true, creado timestamptz not null default now());
@@ -6142,21 +6144,48 @@ grant execute on function public.cfx_avisar_version(text, text, text, text) to a
 revoke all on function public.cfx_version_categorias(text) from public, anon, authenticated;
 
 -- ---------- Keys de Premium (de un solo uso). Se guardan cifradas: el código completo solo se ve al crearlas. ----------
-create or replace function public.cfx_keys_crear(p_n int, p_rol text, p_dias int, p_nota text default '') returns jsonb
+drop function if exists public.cfx_keys_crear(int, text, int, text);
+create or replace function public.cfx_keys_crear(p_n int, p_rol text, p_dias int, p_nota text default '', p_item text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare c text; out jsonb := '[]'::jsonb;
+declare c text; out jsonb := '[]'::jsonb; it text := trim(coalesce(p_item, ''));
 begin
   perform public.cfx_es_admin();
   if p_rol not in ('negocio', 'cliente') or coalesce(p_dias, 0) not between 1 and 3660 or coalesce(p_n, 0) not between 1 and 50 then raise exception 'Datos no válidos'; end if;
+  if it <> '' and (p_rol <> 'negocio' or cardinality(public.cfx_venta_modulos(it)) = 0) then raise exception 'Módulo o pack no válido (las keys de módulos son para negocios)'; end if;
   for i in 1..p_n loop
     c := upper(replace(gen_random_uuid()::text, '-', ''));
     c := 'CFX-' || substr(c, 1, 4) || '-' || substr(c, 5, 4) || '-' || substr(c, 9, 4);
-    insert into public.cfx_keys (hash, ultimos, rol, dias, nota) values (encode(sha256(convert_to(c, 'UTF8')), 'hex'), right(c, 4), p_rol, p_dias, left(coalesce(p_nota, ''), 120));
+    insert into public.cfx_keys (hash, ultimos, rol, dias, nota, item) values (encode(sha256(convert_to(c, 'UTF8')), 'hex'), right(c, 4), p_rol, p_dias, left(coalesce(p_nota, ''), 120), it);
     out := out || to_jsonb(c);
   end loop;
-  perform public.cfx_anotar('keys', p_n || ' keys ' || p_rol || ' de ' || p_dias || ' días');
+  perform public.cfx_anotar('keys', p_n || ' keys ' || case when it = '' then 'Premium ' || p_rol else it end || ' de ' || p_dias || ' días');
   return out;
 end $$;
+-- G81 d: aplica una key ya validada a una cuenta (Premium o módulo/pack). Si el negocio ya tiene todo lo de la key activo, no la gasta.
+create or replace function public.cfx_key_dar(k public.cfx_keys, p_cuenta uuid, p_email text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare h timestamptz; n uuid; nom text;
+begin
+  if coalesce(k.item, '') = '' then
+    h := public.cfx_dar_premium(p_cuenta, k.rol, k.dias);
+    if h is null then return jsonb_build_object('error', 'No se encontró la cuenta'); end if;
+    insert into public.cfx_exentos (cuenta, nota) values (p_cuenta, 'Key ' || k.ultimos) on conflict (cuenta) do nothing;
+    nom := 'Premium';
+  else
+    n := public.cfx_negocio_cuenta(p_cuenta);
+    if n is null then return jsonb_build_object('error', 'Esta key es para negocios'); end if;
+    nom := coalesce((select c.nombre from public.cfx_modulos_catalogo() c where c.clave = k.item), public.cfx_venta() #>> array['packs', k.item, 'nombre'], k.item);
+    if cardinality(public.cfx_venta_modulos(k.item)) = 0 then return jsonb_build_object('error', 'Este módulo ya no está disponible'); end if;
+    if not exists (select 1 from unnest(public.cfx_venta_modulos(k.item)) x where not exists (
+        select 1 from public.cfx_modulos_negocio m where m.negocio = n and m.modulo = x and m.hasta > now())) then
+      return jsonb_build_object('error', 'Ya tienes ' || nom || ' activo. Guarda la key para cuando venza o para otro negocio.');
+    end if;
+    h := public.cfx_modulos_dar(n, k.item, k.dias, 'pago');
+  end if;
+  update public.cfx_keys set usada_por = p_cuenta, usada_email = left(coalesce(p_email, ''), 200), usada_at = now() where id = k.id;
+  return jsonb_build_object('hasta', h, 'dias', k.dias, 'item', coalesce(k.item, ''), 'nombre', nom);
+end $$;
+revoke all on function public.cfx_key_dar(public.cfx_keys, uuid, text) from public, anon, authenticated;
 create or replace function public.cfx_keys_lista() returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
@@ -6172,7 +6201,7 @@ begin
 end $$;
 create or replace function public.cfx_key_canjear(p_codigo text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare y jsonb := public.cfx_yo(); k public.cfx_keys; h timestamptz; c text := upper(trim(coalesce(p_codigo, '')));
+declare y jsonb := public.cfx_yo(); k public.cfx_keys; r jsonb; c text := upper(trim(coalesce(p_codigo, '')));
 begin
   if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
   if (select count(*) from public.cfx_registro where accion = 'key fallida' and detalle = (y ->> 'id') and creado > now() - interval '1 hour') >= 10 then
@@ -6185,11 +6214,10 @@ begin
     return jsonb_build_object('error', 'Key no válida o ya usada');
   end if;
   if k.rol <> coalesce(y ->> 'rol', '') then raise exception 'Esta key es para cuentas de %', case when k.rol = 'negocio' then 'negocio' else 'cliente' end; end if;
-  h := public.cfx_dar_premium((y ->> 'id')::uuid, k.rol, k.dias);
-  update public.cfx_keys set usada_por = (y ->> 'id')::uuid, usada_email = y ->> 'email', usada_at = now() where id = k.id;
-  insert into public.cfx_exentos (cuenta, nota) values ((y ->> 'id')::uuid, 'Key ' || k.ultimos) on conflict (cuenta) do nothing;
-  perform public.cfx_avisar_admin('🔑 Key canjeada', coalesce(y ->> 'email', '') || ' · ' || k.dias || ' días');
-  return jsonb_build_object('hasta', h, 'dias', k.dias);
+  r := public.cfx_key_dar(k, (y ->> 'id')::uuid, y ->> 'email');
+  if r ? 'error' then return r; end if;
+  perform public.cfx_avisar_admin('🔑 Key canjeada', coalesce(y ->> 'email', '') || ' · ' || (r ->> 'nombre') || ' · ' || k.dias || ' días');
+  return r;
 end $$;
 
 -- ---------- Cupones de descuento (se aplican al pagar Premium) ----------
@@ -6344,11 +6372,11 @@ grant execute on function public.cfx_humano_guardar(text, text) to authenticated
 
 revoke all on function public.cfx_anotar(text, text), public.cfx_cupon_usado() from public, anon, authenticated;
 revoke all on function public.cfx_registro_lista(int), public.cfx_planes(), public.cfx_plan_guardar(text, text, jsonb, jsonb), public.cfx_textos(), public.cfx_texto_guardar(text, text),
-  public.cfx_aviso_masivo(text, text, text), public.cfx_keys_crear(int, text, int, text), public.cfx_keys_lista(), public.cfx_key_revocar(uuid), public.cfx_key_canjear(text),
+  public.cfx_aviso_masivo(text, text, text), public.cfx_keys_crear(int, text, int, text, text), public.cfx_keys_lista(), public.cfx_key_revocar(uuid), public.cfx_key_canjear(text),
   public.cfx_cupon_ver(text), public.cfx_cupones_lista(), public.cfx_cupon_guardar(text, int, int, date, boolean), public.cfx_cupon_borrar(text),
   public.cfx_verif_estado(), public.cfx_verif_enviar(text, text, text, text, text), public.cfx_verif_lista(text), public.cfx_verif_fotos(uuid), public.cfx_verif_resolver(uuid, boolean, text) from public, anon;
 grant execute on function public.cfx_registro_lista(int), public.cfx_planes(), public.cfx_plan_guardar(text, text, jsonb, jsonb), public.cfx_textos(), public.cfx_texto_guardar(text, text),
-  public.cfx_aviso_masivo(text, text, text), public.cfx_keys_crear(int, text, int, text), public.cfx_keys_lista(), public.cfx_key_revocar(uuid), public.cfx_key_canjear(text),
+  public.cfx_aviso_masivo(text, text, text), public.cfx_keys_crear(int, text, int, text, text), public.cfx_keys_lista(), public.cfx_key_revocar(uuid), public.cfx_key_canjear(text),
   public.cfx_cupon_ver(text), public.cfx_cupones_lista(), public.cfx_cupon_guardar(text, int, int, date, boolean), public.cfx_cupon_borrar(text),
   public.cfx_verif_estado(), public.cfx_verif_enviar(text, text, text, text, text), public.cfx_verif_lista(text), public.cfx_verif_fotos(uuid), public.cfx_verif_resolver(uuid, boolean, text) to authenticated;
 revoke all on function public.cfx_planes_app(), public.cfx_plan_guardar_app(text, text, jsonb, jsonb), public.cfx_textos_app(), public.cfx_texto_guardar_app(text, text),
@@ -6453,20 +6481,18 @@ begin
 end $$;
 create or replace function public.cfx_key_aplicar(p_cuenta uuid, p_rol text, p_email text, p_codigo text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare k public.cfx_keys; h timestamptz; c text := upper(trim(coalesce(p_codigo, '')));
+declare k public.cfx_keys; r jsonb; c text := upper(trim(coalesce(p_codigo, '')));
 begin
   perform public.cfx_es_admin();
   if p_cuenta is null or coalesce(p_rol, '') not in ('negocio', 'cliente') then return jsonb_build_object('error', 'Datos no válidos'); end if;
   select * into k from public.cfx_keys where hash = encode(sha256(convert_to(c, 'UTF8')), 'hex') for update;
   if k.id is null or k.revocada or k.usada_por is not null then return jsonb_build_object('error', 'Key no válida o ya usada'); end if;
   if k.rol <> p_rol then return jsonb_build_object('error', 'Esta key es para cuentas de ' || k.rol); end if;
-  h := public.cfx_dar_premium(p_cuenta, k.rol, k.dias);
-  if h is null then return jsonb_build_object('error', 'No se encontró la cuenta'); end if;
-  update public.cfx_keys set usada_por = p_cuenta, usada_email = left(coalesce(p_email, ''), 200), usada_at = now() where id = k.id;
-  insert into public.cfx_exentos (cuenta, nota) values (p_cuenta, 'Key ' || k.ultimos) on conflict (cuenta) do nothing;
-  perform public.cfx_avisar(p_cuenta, '🔑 Premium activado', 'Tienes Premium por ' || k.dias || ' días.');
-  perform public.cfx_anotar('key aplicada', '…' || k.ultimos || ' a ' || coalesce(p_email, p_cuenta::text));
-  return jsonb_build_object('hasta', h, 'dias', k.dias);
+  r := public.cfx_key_dar(k, p_cuenta, p_email);
+  if r ? 'error' then return r; end if;
+  perform public.cfx_avisar(p_cuenta, '🔑 ' || (r ->> 'nombre') || ' activado', 'Tienes ' || (r ->> 'nombre') || ' por ' || k.dias || ' días.');
+  perform public.cfx_anotar('key aplicada', '…' || k.ultimos || ' (' || (r ->> 'nombre') || ') a ' || coalesce(p_email, p_cuenta::text));
+  return r;
 end $$;
 revoke all on function public.cfx_negocios(text, text), public.cfx_premium_cuenta(uuid, text, int), public.cfx_key_aplicar(uuid, text, text, text) from public, anon;
 grant execute on function public.cfx_negocios(text, text), public.cfx_premium_cuenta(uuid, text, int), public.cfx_key_aplicar(uuid, text, text, text) to authenticated;

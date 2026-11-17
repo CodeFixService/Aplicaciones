@@ -35,6 +35,7 @@
     '.cfxm-btns button:disabled{opacity:.6}.cfxm-ok{color:#15803d;font-weight:700;font-size:13px}.cfxm-prueba{color:#b45309;font-weight:700;font-size:13px}' +
     '.cfxm-mods{display:grid;gap:8px}@media(min-width:760px){.cfxm-mods{grid-template-columns:repeat(2,minmax(0,1fr))}}' +
     '.cfxm-fila{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}.cfxm-fila b{white-space:nowrap}' +
+    '.cfxm-key{margin:12px 0 0}.cfxm-key summary{cursor:pointer;font-weight:600}.cfxm-key .cfxm-fila{margin-top:8px;align-items:center}.cfxm-key input{flex:1;min-width:0}' +
     '.cfxm-aviso{border-radius:12px;padding:10px 12px;background:rgba(217,162,27,.14);font-size:14px}.cfxm-camp{background:rgba(22,163,74,.14);font-weight:600}' +
     '.cfxm-gratis{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border-radius:99px;background:#15803d;color:#fff;margin:4px 0}.cfxm-err{color:#b91c1c;font-size:13px;min-height:1em}';
   document.head.appendChild(css);
@@ -88,6 +89,9 @@
         (sueltos ? '<h3 style="margin:4px 0 0">Módulos sueltos</h3><div class="cfxm-mods">' + sueltos + '</div>' : '') +
         (incluidos.length ? '<p class="cfxm-sub">✓ Incluidos sin costo: ' + incluidos.map((m) => esc(m.nombre)).join(', ') + '</p>' : '') +
         '<p class="cfxm-sub">Se activan apenas revisamos tu pago. Si no renuevas, el módulo se apaga y tus datos quedan guardados: al volver a activarlo está todo.</p>' +
+        // G81 d: key de módulo o pack (1 uso, la crea el CM en Control → 🔑 Keys).
+        (D.dueno ? '<details class="cfxm-key"><summary>🔑 Tengo una key</summary><div class="cfxm-fila"><input id="cfxmKey" placeholder="CFX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" maxlength="20">' +
+          '<button type="button" class="si" data-key>Activar</button></div></details>' : '') +
         '<p class="cfxm-err" id="cfxmErr"></p></div>';
     }
     async function cargar() {
@@ -95,7 +99,17 @@
       return D;
     }
     el.onclick = async (ev) => {
-      const b = ev.target.closest('[data-per],[data-probar],[data-comprar],[data-regalo]'); if (!b || !D) return;
+      const b = ev.target.closest('[data-per],[data-probar],[data-comprar],[data-regalo],[data-key]'); if (!b || !D) return;
+      if (b.dataset.key !== undefined) {
+        const err = el.querySelector('#cfxmErr'); err.textContent = ''; b.disabled = true;
+        try {
+          const r = await o.rpc('cfx_key_canjear', { p_codigo: el.querySelector('#cfxmKey').value });
+          if (r && r.error) throw new Error(r.error);
+          await cargar(); if (o.alCambiar) o.alCambiar(D);
+          if (window.CFX_DIALOGO) window.CFX_DIALOGO.avisar('🎉 ' + (r.nombre || 'Listo') + ' activo por ' + r.dias + ' días.');
+        } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; }
+        return;
+      }
       if (b.dataset.per) { anual = b.dataset.per === 'a'; pintar(); return; }
       if (b.dataset.regalo) { if (await activarRegalo(o.rpc, b.dataset.regalo, b)) { await cargar(); if (o.alCambiar) o.alCambiar(D); } return; }
       if (b.dataset.probar) { probar(b.dataset.probar, { rpc: o.rpc, datos: D, alCambiar: async () => { await cargar(); if (o.alCambiar) o.alCambiar(D); } }); return; }  // demo + prueba gratis + Comprar
