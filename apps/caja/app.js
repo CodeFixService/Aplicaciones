@@ -343,8 +343,18 @@
     } catch (err) { Core.toast('⚠️ ' + err.message); } finally { if (btn) btn.disabled = false; }
   }
   $('bBol').onclick = (e) => boletaVenta(ultimaVenta, e.currentTarget);
-  $('bCobrar').onclick = () => {
+  // G96 🎁 Gift card como medio de pago (módulo): el servidor descuenta el saldo antes de registrar la venta.
+  if (!esCliente && Cuenta.puede('giftcards') && $('mGift')) $('mGift').hidden = false;
+  $('bCobrar').onclick = async () => {
     if (!ticket.length) return Core.toast('La venta está vacía');
+    if (medio === 'giftcard') {
+      const cod = await Core.pedir('🎁 Código de la gift card', '');
+      if (!cod) return;
+      try {
+        const g = await Cuenta.rpc('giftcard_canjear', { p_codigo: cod, p_monto: totalTicket() });
+        Core.toast('🎁 Gift card ' + g.codigo + ': le quedan ' + money(g.saldo));
+      } catch (e) { return Core.toast('⚠️ ' + e.message); }
+    }
     const venta = { id: Core.uid(), t: Date.now(), medio, items: ticket.map((l) => Object.assign({}, l)) };
     ventas.push(venta); ultimaVenta = venta.id; $('bComp').hidden = false; $('bBol').hidden = esCliente;
     ticket.forEach((l) => {
@@ -719,7 +729,7 @@
     if (rango === 'mes') { ini = new Date(y, m - 1, 1).getTime(); fin = new Date(y, m, 1).getTime(); }
     return ventas.filter((v) => v.t >= ini && v.t < fin);
   }
-  const MEDIOS = { efectivo: '💵 Efectivo', tarjeta: '💳 Tarjeta', transferencia: '📲 Transferencia' };
+  const MEDIOS = { efectivo: '💵 Efectivo', tarjeta: '💳 Tarjeta', transferencia: '📲 Transferencia', giftcard: '🎁 Gift card' };
   function renderReporte() {
     const vs = delDia();
     let ingreso = 0, costo = 0;

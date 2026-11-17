@@ -53,6 +53,7 @@
   .qty button { width: 32px; height: 32px; padding: 0; border-radius: 10px; }
   .qty b { min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
   .pago { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+  .pago:has(#mGift:not([hidden])) { grid-template-columns: repeat(2, 1fr); }
   .pago button { padding: 10px 4px; font-size: 13px; }
   /* Celular angosto (320 px): ícono arriba del texto en los medios de pago y precio en su propia fila (placeholders enteros). */
   @media (max-width: 360px) { .pago button { flex-direction: column; gap: 2px; padding: 8px 2px; } .fila-precio { flex-wrap: wrap; } .fila-precio > :first-child { flex-basis: 100%; } }
@@ -129,6 +130,7 @@
           <button class="on" data-m="efectivo">💵 Efectivo</button>
           <button data-m="tarjeta">💳 Tarjeta</button>
           <button data-m="transferencia">📲 Transfer.</button>
+          <button data-m="giftcard" id="mGift" hidden>🎁 Gift card</button>
         </div>
         <div id="rowRecibido">
           <label for="recibido">Recibido (opcional, para calcular el vuelto)</label>

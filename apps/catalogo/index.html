@@ -171,7 +171,7 @@
         <p class="aviso">⚠️ El despacho tiene un <b>costo adicional según la distancia</b>, que paga el cliente. La tienda te confirmará el valor.</p>
         <label for="dir">Dirección de despacho</label><input id="dir" maxlength="200" placeholder="Calle, número, depto, comuna">
       </div>
-      <label for="cupon" class="m-cupones">Cupón de descuento (opcional)</label>
+      <label for="cupon" class="m-cupones">Cupón o gift card (opcional)</label>
       <div class="row m-cupones"><input id="cupon" maxlength="20" autocapitalize="characters" placeholder="VERANO10" style="flex:2"><button class="alt small" id="bCupon" type="button" style="flex:none">Aplicar</button></div>
       <p class="muted m-cupones" id="cuponTxt" style="margin:4px 0 0"></p>
       <label for="nota">Nota para la tienda (opcional)</label>
@@ -192,6 +192,7 @@
       <div class="sellos" id="sellos"></div>
       <p class="muted" id="sellosTxt" style="margin:0"></p>
     </div>
+    <div class="card hidden" id="cRecurrentes"></div>
     <div class="card">
       <h2>🧾 Mis pedidos</h2>
       <ul class="list ped" id="pedidos"></ul>
@@ -204,6 +205,7 @@
 <script src="../../shared/config.js"></script>
 <script src="../../shared/vendor/supabase.js"></script>
 <script src="../../shared/cuenta.js"></script>
+<script src="../../shared/extras.js"></script>
 <script>
 (async function () {
   const $ = (id) => document.getElementById(id);
@@ -525,8 +527,10 @@
       '<div class="linea"><div class="grow"><b>' + Core.esc(i.nombre) + (l.opcion ? ' (' + Core.esc(l.opcion) + ')' : '') + '</b><div class="muted">' + precio(precioDe(i)) + ' c/u</div></div>' +
       '<div class="qty"><button class="alt" data-n="' + carro.indexOf(l) + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
       '</b><button class="alt" data-n="' + carro.indexOf(l) + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('');
-    const t = totalCarro(), d = cupon ? Math.round(t * cupon.pct / 100) : 0;
+    const t = totalCarro();
+    let d = cupon ? Math.round(t * cupon.pct / 100) : 0;
     const dp = premium && descPrem ? Math.min(Math.round(t * descPrem / 100), t - d) : 0;
+    if (cupon && cupon.gift) d = Math.min(cupon.gift, t - dp);
     $('carTotal').textContent = precio(t - d - dp) + (d + dp ? ' (−' + precio(d + dp) + ')' : '');
     $('premTip').classList.toggle('hidden', !descPrem || !comprador);
     $('premTip').innerHTML = !descPrem ? '' : premium ? '⭐ Descuento Premium: <b>−' + precio(dp) + '</b> (' + descPrem + '%)'
@@ -558,10 +562,18 @@
     const c = $('cupon').value.trim();
     if (!c) { cupon = null; $('cuponTxt').textContent = ''; pintarCarro(); return; }
     try {
+      if (/^gc[0-9a-f]{8}$/i.test(c.replace(/[^a-z0-9]/gi, ''))) throw new Error('Cupón o gift card no válido o vencido');  // G96: gift card → directo a su saldo
       const pct = await Cuenta.rpc('cfx_desc_validar', { p_negocio: negocio, p_codigo: c });
       cupon = { codigo: c, pct };
       $('cuponTxt').textContent = '✅ Cupón aplicado: ' + pct + '% de descuento';
-    } catch (err) { cupon = null; $('cuponTxt').textContent = '❌ ' + err.message; }
+    } catch (err) {
+      // G96 🎁 o una gift card de la tienda: su saldo se descuenta del total (lo calcula el servidor).
+      try {
+        const g = await Cuenta.rpc('giftcard_saldo', { p_negocio: negocio, p_codigo: c });
+        cupon = { codigo: g.codigo, pct: 0, gift: +g.saldo };
+        $('cuponTxt').textContent = '🎁 Gift card con ' + precio(g.saldo) + ' de saldo: se descuenta del total';
+      } catch (e2) { cupon = null; $('cuponTxt').textContent = '❌ ' + err.message; }
+    }
     pintarCarro();
   };
 
@@ -620,6 +632,7 @@
   async function cargarPedidos() {
     if (!comprador) return;
     pedidos = await traer('mis_pedidos', { p_negocio: negocio }, 'pedidos', []);
+    if (window.EXTRAS && esCliente) EXTRAS.misRecurrentes($('cRecurrentes')).catch(() => {});
     const links = {};
     await Promise.all(pedidos.filter((p) => p.estado === 'pagando').map((p) => Cuenta.rpc('ver_pedido', { p_ref: p.id }).then((v) => { if (v) links[p.id] = Object.assign({ tk: v.token }, v.link); }).catch(() => {})));
     const quedan = (t) => Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4));

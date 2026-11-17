@@ -4481,11 +4481,50 @@ revoke all on function public.costo_despacho(uuid, text, text, numeric), public.
 revoke all on function public.guardar_despacho(jsonb), public.mi_despacho() from public, anon;
 grant execute on function public.guardar_despacho(jsonb), public.mi_despacho() to authenticated;
 
+-- G96 🎁 Gift cards (módulo 'giftcards'): la tienda las vende y se canjean en la Caja o en el carrito (campo del cupón). Funciones al final (G96).
+create table if not exists public.giftcards (
+  id          uuid primary key default gen_random_uuid(),
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  codigo      text not null unique,
+  monto       int not null check (monto between 1000 and 1000000),
+  saldo       int not null check (saldo >= 0),
+  para        text,
+  de          text,
+  medio       text,
+  vence       date not null,
+  anulada     boolean not null default false,
+  creada_por  uuid references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists giftcards_negocio_idx on public.giftcards (negocio_id, created_at desc);
+alter table public.giftcards enable row level security;
+revoke all on public.giftcards from anon, authenticated;
+create table if not exists public.giftcard_usos (
+  id          uuid primary key default gen_random_uuid(),
+  giftcard_id uuid not null references public.giftcards (id) on delete cascade,
+  monto       int not null,
+  pedido_id   uuid,
+  donde       text not null default 'caja' check (donde in ('caja', 'pedido', 'devuelto')),
+  por         uuid references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists giftcard_usos_idx on public.giftcard_usos (giftcard_id, created_at desc);
+alter table public.giftcard_usos enable row level security;
+revoke all on public.giftcard_usos from anon, authenticated;
+alter table public.pedidos add column if not exists gift_codigo text;
+alter table public.pedidos add column if not exists gift_monto int not null default 0;
+-- Gift card vigente de esa tienda (o fila vacía).
+create or replace function public.giftcard_valida(p_negocio uuid, p_codigo text) returns public.giftcards
+language sql stable security definer set search_path = '' as $$
+  select g.* from public.giftcards g where g.negocio_id = p_negocio and g.codigo = upper(regexp_replace(coalesce(p_codigo, ''), '[^A-Za-z0-9]', '', 'g'))
+    and not g.anulada and g.saldo > 0 and g.vence >= (now() at time zone 'America/Santiago')::date and public.pro_o_modulo(p_negocio, 'giftcards')
+$$;
+revoke all on function public.giftcard_valida(uuid, text) from public, anon, authenticated;
 create or replace function public.guardar_pedido(p_negocio uuid, p_cliente uuid, p_nombre text, p_tel text, p_items jsonb, p_entrega text,
                                                  p_direccion text, p_nota text, p_cupon text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare a jsonb; pct int := 0; desc_ numeric := 0; dp numeric := 0; sub numeric; ped public.pedidos; l jsonb := public.link_activo(p_negocio, 'pedido');
-  quien text; prem boolean := public.es_cliente_premium(p_cliente); dsp jsonb;
+  quien text; prem boolean := public.es_cliente_premium(p_cliente); dsp jsonb; gc public.giftcards; gm int := 0;
 begin
   if public.en_vacaciones(p_negocio) then return jsonb_build_object('ok', false, 'error', 'La tienda está de vacaciones. Podrás pedir a su regreso.'); end if;
   if p_entrega not in ('retiro', 'despacho') then return jsonb_build_object('ok', false, 'error', 'Elige despacho o retiro en tienda'); end if;
@@ -4499,7 +4538,12 @@ begin
   if coalesce(trim(p_cupon), '') <> '' then
     -- 🏷️ Cupón del negocio (núcleo: módulo 'cupones'). El uso se suma cuando el pedido ya quedó guardado.
     pct := public.cfx_desc_pct(p_negocio, p_cupon);
-    if pct is null then return jsonb_build_object('ok', false, 'error', 'Cupón no válido o vencido'); end if;
+    if pct is null then
+      -- G96 🎁 o una gift card de la tienda (módulo 'giftcards'): descuenta su saldo del total.
+      gc := public.giftcard_valida(p_negocio, p_cupon);
+      if gc.id is null then return jsonb_build_object('ok', false, 'error', 'Cupón o gift card no válido o vencido'); end if;
+      pct := 0;
+    end if;
     desc_ := round(sub * pct / 100.0);
   end if;
   if prem then dp := round(sub * coalesce((select desc_premium from public.profiles where id = p_negocio), 0) / 100.0); end if;
@@ -4511,16 +4555,21 @@ begin
     a := jsonb_set(a, '{lineas}', (a -> 'lineas') || jsonb_build_object('nombre', '🚚 Despacho a ' || (dsp ->> 'comuna'), 'cant', 1, 'precio', (dsp ->> 'costo')::numeric,
       'subtotal', (dsp ->> 'costo')::numeric, 'clave', 'despacho', 'opcion', null));
   end if;
+  if gc.id is not null then gm := least(gc.saldo, greatest(0, sub - desc_ - dp + (dsp ->> 'costo')::numeric))::int; end if;
   insert into public.pedidos (negocio_id, cliente_id, invitado_nombre, invitado_tel, lineas, subtotal, descuento, desc_premium, total, cupon, entrega, direccion, nota,
-                              estado, retenido_hasta, token, costo_despacho, comuna)
-  values (p_negocio, p_cliente, p_nombre, p_tel, a -> 'lineas', sub, desc_ + dp, dp, sub - desc_ - dp + (dsp ->> 'costo')::numeric,
+                              estado, retenido_hasta, token, costo_despacho, comuna, gift_codigo, gift_monto)
+  values (p_negocio, p_cliente, p_nombre, p_tel, a -> 'lineas', sub, desc_ + dp + gm, dp, sub - desc_ - dp + (dsp ->> 'costo')::numeric - gm,
           nullif(upper(regexp_replace(coalesce(p_cupon, ''), '[^A-Za-z0-9]', '', 'g')), ''), p_entrega,
           case when p_entrega = 'despacho' then left(trim(p_direccion), 200) end, nullif(left(trim(coalesce(p_nota, '')), 300), ''),
-          case when l is null then 'recibido' else 'pagando' end,
-          case when l is null then null else now() + make_interval(mins => public.regla('retencion_min', 30)) end,
-          left(replace(gen_random_uuid()::text, '-', ''), 24), (dsp ->> 'costo')::numeric, dsp ->> 'comuna')
+          case when l is null or sub - desc_ - dp + (dsp ->> 'costo')::numeric - gm <= 0 then 'recibido' else 'pagando' end,
+          case when l is null or sub - desc_ - dp + (dsp ->> 'costo')::numeric - gm <= 0 then null else now() + make_interval(mins => public.regla('retencion_min', 30)) end,
+          left(replace(gen_random_uuid()::text, '-', ''), 24), (dsp ->> 'costo')::numeric, dsp ->> 'comuna', gc.codigo, gm)
   returning * into ped;
   if pct > 0 then perform public.cfx_desc_usar(p_negocio, p_cupon); end if;
+  if gm > 0 then
+    update public.giftcards set saldo = saldo - gm where id = gc.id;
+    insert into public.giftcard_usos (giftcard_id, monto, pedido_id, donde) values (gc.id, gm, ped.id, 'pedido');
+  end if;
   quien := coalesce(p_nombre, (select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = p_cliente));
   perform public.notify_user(p_negocio, case when prem then '⭐ ' else '' end || case when l is null then '📦 Nuevo pedido de ' else '⏳ Pedido por pagar de ' end || quien,
     'Total $' || to_char(ped.total, 'FM999G999G999') || ' · ' || case when p_entrega = 'despacho' then 'Despacho' else 'Retiro en tienda' end ||
@@ -4531,7 +4580,7 @@ begin
     from public.profiles e where e.role = 'equipo' and e.negocio_id = p_negocio and not e.suspended;
   end if;
   return jsonb_build_object('ok', true, 'id', ped.id, 'token', ped.token, 'subtotal', ped.subtotal, 'descuento', ped.descuento, 'desc_premium', ped.desc_premium,
-    'total', ped.total, 'despacho', ped.costo_despacho, 'estado', ped.estado, 'retenido_hasta', ped.retenido_hasta, 'link', l);
+    'total', ped.total, 'despacho', ped.costo_despacho, 'gift', ped.gift_monto, 'estado', ped.estado, 'retenido_hasta', ped.retenido_hasta, 'link', l);
 end $$;
 
 create or replace function public.tienda_info(p_negocio uuid) returns jsonb
@@ -5370,7 +5419,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.71'::text $$;
+language sql immutable as $$ select '5.72'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7662,7 +7711,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -7977,7 +8026,10 @@ language sql immutable as $$
          ('destacar', '⭐ Destacado en el mapa', 'Tus estacionamientos salen primero y resaltados en el mapa y la lista: más reservas.'),
          ('acceso', '🔑 Control de acceso con QR', 'Cada reserva trae su pase QR: lo escaneas al entrar y salir y ves si está vigente y su patente.'),
          ('descuentos', '🏷️ Descuento por estadía larga', 'Premia a quien reserva más tiempo: un % menos desde las horas, días o meses que elijas.'),
-         ('ganancias', '📊 Ganancias y ocupación', 'Cuánto ganaste por mes, ocupación de cada lugar, mejores días y planilla para Excel.')
+         ('ganancias', '📊 Ganancias y ocupación', 'Cuánto ganaste por mes, ocupación de cada lugar, mejores días y planilla para Excel.'),
+         -- G96: módulos de tienda (Despega primero).
+         ('suscripciones', '🔁 Compras recurrentes', 'Tu cliente recibe su pedido solo cada semana o cada mes (café, alimento, agua…): venta segura sin tener que pedirla.'),
+         ('proveedores', '📦 Stock mínimo y proveedores', 'Te avisa cuando un producto baja de su mínimo y arma el pedido a tu proveedor por WhatsApp con un toque.')
 $$;
 
 create or replace function public.cfx_venta() returns jsonb
@@ -8887,6 +8939,34 @@ begin
   return jsonb_build_object('comuna', z ->> 'comuna', 'costo', case when gratis then 0 else greatest(0, coalesce((z ->> 'precio')::numeric, 0)) end);
 end $$;
 
+-- G96 🛒 Carritos olvidados (módulo 'carrito'): el negocio ve quién dejó productos sin pedir y le escribe por WhatsApp con un toque.
+-- Gancho de la app: cfx_carrito_contacto_app(cliente uuid, negocio uuid) → {"nombre", "tel"} (null = no mostrar a ese cliente).
+alter table public.cfx_carritos add column if not exists wa_at timestamptz;
+create or replace function public.cfx_carritos_mios() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.cfx_negocio_cuenta(auth.uid()); r record; c jsonb; out jsonb := '[]'::jsonb;
+begin
+  if n is null then raise exception 'Solo para negocios'; end if;
+  if not public.cfx_modulo_de('carrito', n) then raise exception '🛒 Recordar carrito es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if to_regprocedure('public.cfx_carrito_contacto_app(uuid,uuid)') is null then return out; end if;
+  for r in select * from public.cfx_carritos where negocio = n and actualizado > now() - interval '14 days' order by actualizado desc limit 100 loop
+    execute 'select public.cfx_carrito_contacto_app($1, $2)' into c using r.cliente, n;
+    continue when c is null;
+    out := out || jsonb_build_object('cliente', r.cliente, 'nombre', c ->> 'nombre', 'tel', c ->> 'tel', 'items', r.items,
+      'actualizado', r.actualizado, 'avisado', r.avisado, 'wa_at', r.wa_at);
+  end loop;
+  return out;
+end $$;
+-- Al tocar 💬 WhatsApp queda anotado (para no escribirle dos veces).
+create or replace function public.cfx_carrito_wa(p_cliente uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.cfx_negocio_cuenta(auth.uid());
+begin
+  if n is null or not public.cfx_modulo_de('carrito', n) then raise exception 'Sin permiso'; end if;
+  update public.cfx_carritos set wa_at = now() where negocio = n and cliente = p_cliente;
+end $$;
+revoke all on function public.cfx_carritos_mios(), public.cfx_carrito_wa(uuid) from public, anon;
+grant execute on function public.cfx_carritos_mios(), public.cfx_carrito_wa(uuid) to authenticated;
 revoke all on function public.cfx_carrito_vaciar(uuid, uuid), public.cfx_carrito_borrar(uuid), public.cfx_carritos_recordar(), public.cfx_comuna_norm(text),
   public.cfx_despacho_limpio(jsonb), public.cfx_despacho_costo(jsonb, text, text, numeric) from public, anon, authenticated;
 revoke all on function public.cfx_carrito_guardar(uuid, jsonb) from public, anon;
@@ -10410,7 +10490,7 @@ $$;
 
 -- Módulos de Órbita (+ 📊 medir anuncios y 🌐 dominio propio).
 create or replace function public.cfx_modulos_app() returns text[]
-language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio'] $$;
+language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio', 'giftcards', 'suscripciones', 'proveedores'] $$;  -- G96: +3
 revoke all on function public.cfx_modulos_app() from public, anon, authenticated;
 
 -- Guía para partir: + 📄 políticas de la tienda; el despacho cuenta también el resto de Chile.
@@ -10561,3 +10641,327 @@ begin
 end $$;
 revoke all on function public.boleta_caja(jsonb) from public, anon;
 grant execute on function public.boleta_caja(jsonb) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.72 · G96 🧩 MÓDULOS DE TIENDA: 🎁 gift cards · 🛒 carritos olvidados por WhatsApp · 🔁 compras recurrentes ·
+--  📦 stock mínimo y proveedores. Todo se valida aquí (pro_o_modulo); lo de antes no cambia.
+-- =====================================================================
+-- 🎁 Gift cards (tablas y giftcard_valida: antes de guardar_pedido).
+create or replace function public.giftcard_json(g public.giftcards) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', g.id, 'codigo', g.codigo, 'monto', g.monto, 'saldo', g.saldo, 'para', g.para, 'de', g.de, 'vence', g.vence,
+    'anulada', g.anulada, 'vigente', not g.anulada and g.saldo > 0 and g.vence >= (now() at time zone 'America/Santiago')::date, 'created_at', g.created_at)
+$$;
+create or replace function public.giftcard_crear(p_monto int, p_para text default null, p_de text default null, p_medio text default 'efectivo') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); g public.giftcards; c text;
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda vende gift cards'; end if;
+  if not public.pro_o_modulo(n, 'giftcards') then raise exception '🎁 Gift cards es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if coalesce(p_monto, 0) not between 1000 and 1000000 then raise exception 'Monto entre $1.000 y $1.000.000'; end if;
+  if (select count(*) from public.giftcards where negocio_id = n and created_at > now() - interval '1 day') >= 50 then raise exception 'Máximo 50 gift cards por día'; end if;
+  loop
+    c := 'GC' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
+    exit when not exists (select 1 from public.giftcards where codigo = c);
+  end loop;
+  insert into public.giftcards (negocio_id, codigo, monto, saldo, para, de, medio, vence, creada_por)
+  values (n, c, p_monto, p_monto, left(nullif(trim(p_para), ''), 60), left(nullif(trim(p_de), ''), 60),
+          case when p_medio in ('efectivo', 'tarjeta', 'transferencia') then p_medio else 'efectivo' end,
+          (now() at time zone 'America/Santiago')::date + 365, auth.uid()) returning * into g;
+  return public.giftcard_json(g);
+end $$;
+create or replace function public.giftcard_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  return jsonb_build_object(
+    'lista', (select coalesce(jsonb_agg(public.giftcard_json(g) order by g.created_at desc), '[]') from
+      (select * from public.giftcards where negocio_id = n order by created_at desc limit 100) g),
+    'vendido_mes', (select coalesce(sum(monto), 0) from public.giftcards where negocio_id = n and not anulada and created_at >= date_trunc('month', now())),
+    'saldo', (select coalesce(sum(saldo), 0) from public.giftcards where negocio_id = n and not anulada and vence >= (now() at time zone 'America/Santiago')::date));
+end $$;
+-- Canje en la Caja (dueño o equipo con Caja): descuenta del saldo.
+create or replace function public.giftcard_canjear(p_codigo text, p_monto int) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); g public.giftcards;
+begin
+  if n is null or not public.equipo_puede('caja') then raise exception 'Sin permiso'; end if;
+  if not public.pro_o_modulo(n, 'giftcards') then raise exception '🎁 Gift cards es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  select * into g from public.giftcards where negocio_id = n and codigo = upper(regexp_replace(coalesce(p_codigo, ''), '[^A-Za-z0-9]', '', 'g')) for update;
+  if g.id is null then raise exception 'No existe una gift card con ese código'; end if;
+  if g.anulada then raise exception 'Esta gift card está anulada'; end if;
+  if g.vence < (now() at time zone 'America/Santiago')::date then raise exception 'Esta gift card venció el %', to_char(g.vence, 'DD/MM/YYYY'); end if;
+  if coalesce(p_monto, 0) <= 0 then raise exception 'Escribe cuánto se descuenta'; end if;
+  if p_monto > g.saldo then raise exception 'Le queda $% de saldo', replace(to_char(g.saldo, 'FM999,999,999'), ',', '.'); end if;
+  update public.giftcards set saldo = saldo - p_monto where id = g.id returning * into g;
+  insert into public.giftcard_usos (giftcard_id, monto, por, donde) values (g.id, p_monto, auth.uid(), 'caja');
+  return public.giftcard_json(g);
+end $$;
+create or replace function public.giftcard_anular(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if public.negocio_de(auth.uid()) is distinct from auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  update public.giftcards set anulada = true where id = p_id and negocio_id = auth.uid();
+  if not found then raise exception 'Gift card no encontrada'; end if;
+end $$;
+-- El cliente revisa el saldo en su carrito (solo de su tienda).
+create or replace function public.giftcard_saldo(p_negocio uuid, p_codigo text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare g public.giftcards;
+begin
+  if not (public.puede_comprar(auth.uid(), p_negocio) or public.negocio_de(auth.uid()) = p_negocio) then raise exception 'No puedes pedirle a esta tienda'; end if;
+  g := public.giftcard_valida(p_negocio, p_codigo);
+  if g.id is null then raise exception 'Cupón o gift card no válido o vencido'; end if;
+  return jsonb_build_object('codigo', g.codigo, 'saldo', g.saldo, 'vence', g.vence);
+end $$;
+-- Si el pedido se cancela, se rechaza o expira, el saldo vuelve a la gift card.
+create or replace function public.giftcard_devolver() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare g uuid;
+begin
+  if new.gift_monto > 0 and new.estado in ('cancelado', 'rechazado', 'expirado') and old.estado not in ('cancelado', 'rechazado', 'expirado') then
+    select id into g from public.giftcards where codigo = new.gift_codigo and negocio_id = new.negocio_id;
+    if g is not null then
+      update public.giftcards set saldo = saldo + new.gift_monto where id = g;
+      insert into public.giftcard_usos (giftcard_id, monto, pedido_id, donde) values (g, -new.gift_monto, new.id, 'devuelto');
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists pedidos_giftcard_devolver on public.pedidos;
+create trigger pedidos_giftcard_devolver after update of estado on public.pedidos for each row execute function public.giftcard_devolver();
+
+-- 🛒 Carritos olvidados (núcleo cfx_carritos_mios): nombre y WhatsApp del cliente de esta tienda.
+create or replace function public.cfx_carrito_contacto_app(p_cliente uuid, p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('nombre', coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1)), 'tel', c.telefono)
+  from public.profiles c where c.id = p_cliente and c.role = 'client' and c.negocio_id = p_negocio and not c.suspended
+    and public.pro_o_modulo(p_negocio, 'carrito')
+$$;
+revoke all on function public.cfx_carrito_contacto_app(uuid, uuid) from public, anon, authenticated;
+
+-- 🔁 Compras recurrentes (módulo 'suscripciones'): la tienda arma el pedido fijo de un cliente y cada X días se crea solo.
+create table if not exists public.suscripciones (
+  id          uuid primary key default gen_random_uuid(),
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  cliente_id  uuid not null references public.profiles (id) on delete cascade,
+  items       jsonb not null,
+  cada        int not null check (cada in (7, 14, 30)),
+  entrega     text not null default 'retiro' check (entrega in ('retiro', 'despacho')),
+  direccion   text,
+  proxima     date not null,
+  activa      boolean not null default true,
+  pedidos     int not null default 0,
+  error       text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists suscripciones_negocio_idx on public.suscripciones (negocio_id, created_at desc);
+create index if not exists suscripciones_proxima_idx on public.suscripciones (proxima) where activa;
+create index if not exists suscripciones_cliente_idx on public.suscripciones (cliente_id);
+alter table public.suscripciones enable row level security;
+revoke all on public.suscripciones from anon, authenticated;
+create or replace function public.suscripcion_json(x public.suscripciones) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('id', x.id, 'cliente', x.cliente_id, 'items', x.items, 'cada', x.cada, 'entrega', x.entrega, 'direccion', x.direccion,
+    'proxima', x.proxima, 'activa', x.activa, 'pedidos', x.pedidos, 'error', x.error,
+    'nombre', (select coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1)) from public.profiles c where c.id = x.cliente_id),
+    'tienda', (select coalesce(nullif(t.empresa, ''), 'Tu tienda') from public.profiles t where t.id = x.negocio_id),
+    'lineas', (select a -> 'lineas' from (select public.armar_pedido(x.negocio_id, x.items) a) z where not (a ? 'error')),
+    'total', (select (a ->> 'sub')::numeric from (select public.armar_pedido(x.negocio_id, x.items) a) z where not (a ? 'error')))
+$$;
+create or replace function public.suscripcion_guardar(p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); x public.suscripciones; it jsonb; l jsonb := '[]'::jsonb; a jsonb;
+  cli uuid := nullif(p ->> 'cliente', '')::uuid; v_cada int := coalesce((p ->> 'cada')::int, 30); ent text := coalesce(p ->> 'entrega', 'retiro');
+  dir text := nullif(left(trim(coalesce(p ->> 'direccion', '')), 200), ''); desde date := coalesce(nullif(p ->> 'proxima', '')::date, (now() at time zone 'America/Santiago')::date);
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  if not public.pro_o_modulo(n, 'suscripciones') then raise exception '🔁 Compras recurrentes es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if not exists (select 1 from public.profiles c where c.id = cli and c.role = 'client' and c.negocio_id = n) then raise exception 'Elige un cliente de tu tienda'; end if;
+  if v_cada not in (7, 14, 30) then raise exception 'Elige cada 7, 14 o 30 días'; end if;
+  if ent not in ('retiro', 'despacho') then raise exception 'Elige retiro o despacho'; end if;
+  if ent = 'despacho' and dir is null then raise exception 'Escribe la dirección de despacho'; end if;
+  if desde < (now() at time zone 'America/Santiago')::date then raise exception 'La primera fecha no puede ser antes de hoy'; end if;
+  for it in select * from jsonb_array_elements(case when jsonb_typeof(p -> 'items') = 'array' then p -> 'items' else '[]' end) limit 30 loop
+    continue when coalesce(it ->> 'clave', '') = '';
+    l := l || jsonb_build_object('clave', left(it ->> 'clave', 60), 'cant', least(greatest(coalesce((it ->> 'cant')::int, 1), 1), 99), 'opcion', nullif(left(it ->> 'opcion', 60), ''));
+  end loop;
+  if jsonb_array_length(l) = 0 then raise exception 'Agrega al menos un producto'; end if;
+  a := public.armar_pedido(n, l);
+  if a ? 'error' then raise exception '%', a ->> 'error'; end if;
+  if nullif(p ->> 'id', '') is null then
+    if (select count(*) from public.suscripciones where negocio_id = n) >= 300 then raise exception 'Máximo 300 compras recurrentes'; end if;
+    insert into public.suscripciones (negocio_id, cliente_id, items, cada, entrega, direccion, proxima)
+    values (n, cli, l, v_cada, ent, case when ent = 'despacho' then dir end, desde) returning * into x;
+    perform public.notify_user(cli, '🔁 Compra recurrente lista',
+      (select coalesce(nullif(empresa, ''), 'Tu tienda') from public.profiles where id = n) || ' te armará este pedido cada ' || v_cada || ' días. Puedes pausarla cuando quieras.', 'apps/catalogo/?v=pedidos');
+  else
+    update public.suscripciones set cliente_id = cli, items = l, cada = v_cada, entrega = ent, direccion = case when ent = 'despacho' then dir end,
+      proxima = desde, error = null where id = (p ->> 'id')::uuid and negocio_id = n returning * into x;
+    if x.id is null then raise exception 'Compra recurrente no encontrada'; end if;
+  end if;
+  return public.suscripcion_json(x);
+end $$;
+create or replace function public.suscripciones_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  return (select coalesce(jsonb_agg(public.suscripcion_json(x) order by x.activa desc, x.proxima), '[]') from public.suscripciones x where x.negocio_id = n);
+end $$;
+-- Pausar o seguir: la tienda o el mismo cliente.
+create or replace function public.suscripcion_estado(p_id uuid, p_activa boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.suscripciones; hoy date := (now() at time zone 'America/Santiago')::date;
+begin
+  update public.suscripciones set activa = coalesce(p_activa, false), error = null,
+    proxima = case when coalesce(p_activa, false) and proxima < hoy then hoy else proxima end
+  where id = p_id and (negocio_id = auth.uid() or cliente_id = auth.uid()) returning * into x;
+  if x.id is null then raise exception 'Compra recurrente no encontrada'; end if;
+  if x.cliente_id = auth.uid() then
+    perform public.notify_user(x.negocio_id, case when x.activa then '🔁 Compra recurrente retomada' else '⏸️ Compra recurrente pausada' end,
+      coalesce((select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = x.cliente_id), 'Un cliente') ||
+      case when x.activa then ' la retomó.' else ' la pausó.' end, './#recurrentes');
+  end if;
+  return public.suscripcion_json(x);
+end $$;
+create or replace function public.suscripcion_borrar(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.suscripciones where id = p_id and negocio_id = auth.uid();
+  if not found then raise exception 'Compra recurrente no encontrada'; end if;
+end $$;
+create or replace function public.mis_suscripciones() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(public.suscripcion_json(x) order by x.proxima), '[]') from public.suscripciones x where x.cliente_id = auth.uid()
+$$;
+-- Cada mañana (pg_cron): crea los pedidos del día con los precios de hoy y avisa. Si no se puede, queda el motivo y avisa a la tienda.
+create or replace function public.suscripciones_correr() returns int
+language plpgsql security definer set search_path = '' as $$
+declare x public.suscripciones; r jsonb; k int := 0; hoy date := (now() at time zone 'America/Santiago')::date; t text;
+begin
+  for x in select * from public.suscripciones where activa and proxima <= hoy order by proxima limit 500 for update skip locked loop
+    if not public.pro_o_modulo(x.negocio_id, 'suscripciones') or not exists (select 1 from public.profiles c where c.id = x.cliente_id and not c.suspended and c.negocio_id = x.negocio_id) then
+      update public.suscripciones set error = 'Sin el módulo 🔁 o el cliente ya no es de la tienda', proxima = hoy + 1 where id = x.id; continue;
+    end if;
+    if public.en_vacaciones(x.negocio_id) then update public.suscripciones set proxima = hoy + 1 where id = x.id; continue; end if;
+    r := public.guardar_pedido(x.negocio_id, x.cliente_id, null, null, x.items, x.entrega, x.direccion, '🔁 Compra recurrente', null);
+    if coalesce((r ->> 'ok')::boolean, false) then
+      update public.suscripciones set pedidos = pedidos + 1, error = null, proxima = greatest(proxima, hoy) + cada where id = x.id;
+      select coalesce(nullif(empresa, ''), 'Tu tienda') into t from public.profiles where id = x.negocio_id;
+      perform public.notify_user(x.cliente_id, '🔁 Tu pedido de ' || t || ' ya está hecho',
+        'Total $' || to_char((r ->> 'total')::numeric, 'FM999G999G999') || case when r ->> 'estado' = 'pagando' then ' · Págalo para que lo preparen.' else ' · Ya lo están preparando.' end,
+        'apps/catalogo/?v=pedidos');
+      k := k + 1;
+    else
+      update public.suscripciones set error = left(r ->> 'error', 200), proxima = greatest(proxima, hoy) + cada where id = x.id;
+      perform public.notify_user(x.negocio_id, '⚠️ No se pudo crear una compra recurrente', left(coalesce(r ->> 'error', ''), 120), './#recurrentes');
+    end if;
+  end loop;
+  return k;
+end $$;
+select cron.schedule('suscripciones', '5 12 * * *', $$ select public.suscripciones_correr(); $$);
+
+-- 📦 Stock mínimo y proveedores (módulo 'proveedores'): cada producto con su mínimo y su proveedor; pedir por WhatsApp con un toque.
+create table if not exists public.proveedores (
+  id          uuid primary key default gen_random_uuid(),
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  nombre      text not null check (length(nombre) between 1 and 60),
+  tel         text,
+  nota        text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists proveedores_negocio_idx on public.proveedores (negocio_id);
+alter table public.proveedores enable row level security;
+revoke all on public.proveedores from anon, authenticated;
+alter table public.catalog_items add column if not exists stock_min int;
+alter table public.catalog_items add column if not exists proveedor_id uuid references public.proveedores (id) on delete set null;
+create or replace function public.proveedores_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso'; end if;
+  if not public.pro_o_modulo(n, 'proveedores') then raise exception '📦 Stock mínimo y proveedores es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  return jsonb_build_object(
+    'proveedores', (select coalesce(jsonb_agg(jsonb_build_object('id', v.id, 'nombre', v.nombre, 'tel', v.tel, 'nota', v.nota,
+        'bajos', (select count(*) from public.catalog_items c where c.proveedor_id = v.id and c.stock_min is not null and coalesce(c.stock, 0) <= c.stock_min)) order by v.nombre), '[]')
+      from public.proveedores v where v.negocio_id = n),
+    'productos', (select coalesce(jsonb_agg(jsonb_build_object('clave', c.client_key, 'nombre', c.nombre, 'stock', c.stock, 'min', c.stock_min, 'proveedor', c.proveedor_id,
+        'bajo', c.stock_min is not null and coalesce(c.stock, 0) <= c.stock_min) order by (c.stock_min is not null and coalesce(c.stock, 0) <= c.stock_min) desc, c.nombre), '[]')
+      from public.catalog_items c where c.owner_id = n));
+end $$;
+create or replace function public.proveedor_guardar(p_id uuid, p_nombre text, p_tel text, p_nota text default null) returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); t text := regexp_replace(coalesce(p_tel, ''), '\D', '', 'g'); r uuid;
+begin
+  if n is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso'; end if;
+  if not public.pro_o_modulo(n, 'proveedores') then raise exception '📦 Stock mínimo y proveedores es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if coalesce(trim(p_nombre), '') = '' then raise exception 'Escribe el nombre del proveedor'; end if;
+  if length(t) = 9 and left(t, 1) = '9' then t := '56' || t; end if;
+  if t <> '' and t !~ '^569\d{8}$' then raise exception 'WhatsApp: +56 9 y 8 números'; end if;
+  if p_id is null then
+    if (select count(*) from public.proveedores where negocio_id = n) >= 100 then raise exception 'Máximo 100 proveedores'; end if;
+    insert into public.proveedores (negocio_id, nombre, tel, nota) values (n, left(trim(p_nombre), 60), nullif(t, ''), nullif(left(trim(coalesce(p_nota, '')), 200), '')) returning id into r;
+  else
+    update public.proveedores set nombre = left(trim(p_nombre), 60), tel = nullif(t, ''), nota = nullif(left(trim(coalesce(p_nota, '')), 200), '')
+    where id = p_id and negocio_id = n returning id into r;
+    if r is null then raise exception 'Proveedor no encontrado'; end if;
+  end if;
+  return r;
+end $$;
+create or replace function public.proveedor_borrar(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if public.negocio_de(auth.uid()) is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso'; end if;
+  delete from public.proveedores where id = p_id and negocio_id = public.negocio_de(auth.uid());
+end $$;
+create or replace function public.producto_minimo(p_clave text, p_min int, p_proveedor uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso'; end if;
+  if not public.pro_o_modulo(n, 'proveedores') then raise exception '📦 Stock mínimo y proveedores es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if p_min is not null and (p_min < 0 or p_min > 100000) then raise exception 'Mínimo entre 0 y 100.000'; end if;
+  if p_proveedor is not null and not exists (select 1 from public.proveedores where id = p_proveedor and negocio_id = n) then raise exception 'Proveedor no encontrado'; end if;
+  update public.catalog_items set stock_min = p_min, proveedor_id = p_proveedor where owner_id = n and client_key = p_clave;
+  if not found then raise exception 'Producto no encontrado (publícalo primero)'; end if;
+end $$;
+-- Texto listo del pedido al proveedor: lo que está en su mínimo o menos, para llegar al doble del mínimo.
+create or replace function public.pedido_proveedor(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); v public.proveedores; l text;
+begin
+  if n is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso'; end if;
+  if not public.pro_o_modulo(n, 'proveedores') then raise exception '📦 Stock mínimo y proveedores es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  select * into v from public.proveedores where id = p_id and negocio_id = n;
+  if v.id is null then raise exception 'Proveedor no encontrado'; end if;
+  select string_agg('• ' || greatest(1, c.stock_min * 2 - coalesce(c.stock, 0)) || ' × ' || c.nombre, E'\n' order by c.nombre) into l
+  from public.catalog_items c where c.owner_id = n and c.proveedor_id = v.id and c.stock_min is not null and coalesce(c.stock, 0) <= c.stock_min;
+  if l is null then raise exception 'Nada bajo el mínimo con este proveedor'; end if;
+  return jsonb_build_object('tel', v.tel, 'texto', 'Hola ' || v.nombre || ' 👋 Soy de ' ||
+    (select coalesce(nullif(empresa, ''), 'mi tienda') from public.profiles where id = n) || '. Necesito:' || E'\n' || l || E'\n' || '¡Gracias!');
+end $$;
+-- Aviso al dueño cuando un producto baja de su mínimo (una vez por bajada).
+create or replace function public.stock_minimo_aviso() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.stock is not null and new.stock_min is not null and new.stock <= new.stock_min and coalesce(old.stock, new.stock_min + 1) > new.stock_min
+     and public.pro_o_modulo(new.owner_id, 'proveedores') then
+    perform public.notify_user(new.owner_id, '📦 ' || new.nombre || ' bajó de su mínimo', 'Quedan ' || new.stock || ' (mínimo ' || new.stock_min || '). Pídelo a tu proveedor con un toque.', './#proveedores');
+  end if;
+  return new;
+end $$;
+drop trigger if exists catalog_stock_minimo on public.catalog_items;
+create trigger catalog_stock_minimo after update of stock on public.catalog_items for each row execute function public.stock_minimo_aviso();
+
+revoke all on function public.giftcard_json(public.giftcards), public.giftcard_devolver(), public.suscripcion_json(public.suscripciones),
+  public.suscripciones_correr(), public.stock_minimo_aviso() from public, anon, authenticated;
+revoke all on function public.giftcard_crear(int, text, text, text), public.giftcard_lista(), public.giftcard_canjear(text, int), public.giftcard_anular(uuid),
+  public.giftcard_saldo(uuid, text), public.suscripcion_guardar(jsonb), public.suscripciones_lista(), public.suscripcion_estado(uuid, boolean),
+  public.suscripcion_borrar(uuid), public.mis_suscripciones(), public.proveedores_lista(), public.proveedor_guardar(uuid, text, text, text),
+  public.proveedor_borrar(uuid), public.producto_minimo(text, int, uuid), public.pedido_proveedor(uuid) from public, anon;
+grant execute on function public.giftcard_crear(int, text, text, text), public.giftcard_lista(), public.giftcard_canjear(text, int), public.giftcard_anular(uuid),
+  public.giftcard_saldo(uuid, text), public.suscripcion_guardar(jsonb), public.suscripciones_lista(), public.suscripcion_estado(uuid, boolean),
+  public.suscripcion_borrar(uuid), public.mis_suscripciones(), public.proveedores_lista(), public.proveedor_guardar(uuid, text, text, text),
+  public.proveedor_borrar(uuid), public.producto_minimo(text, int, uuid), public.pedido_proveedor(uuid) to authenticated;
