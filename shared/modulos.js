@@ -157,7 +157,7 @@
     reservas: { tit: 'Reservas', pasos: [['fila', '📅 Viernes 18:00 libre'], ['izq', '👩 Lucía reserva a las 18:00'], ['aviso', '✅ Queda en tu agenda']] },
     antifalta: { tit: 'Anti-falta', pasos: [['fila', '📅 Pedro reservó y no llegó (2ª vez)'], ['fila', '🔒 Ahora debe pagar el abono para reservar'], ['izq', '💳 Pedro paga $3.000 de abono'], ['aviso', '✅ Llega a la hora: tu agenda no pierde plata']] },
     espera: { tit: 'Lista de espera', pasos: [['fila', '📅 Sábado: todo lleno'], ['izq', '🔔 Lucía: “Avísame si se libera una hora”'], ['fila', '❌ Diego anula su hora de las 12:00'], ['aviso', '🔔 Lucía recibe el aviso y la toma']] },
-    resenas: { tit: 'Reseñas en Google', pasos: [['fila', '⭐⭐⭐⭐⭐ Lucía calificó su corte'], ['izq', '“¿Nos ayudas con tu reseña en Google?”'], ['der', '👍 Lucía la deja en 1 toque'], ['aviso', '📍 Más gente te encuentra en Google Maps']] },
+    resenas: { tit: 'Reseñas en Google', pasos: [['fila', '⭐⭐⭐⭐⭐ Lucía calificó su atención'], ['izq', '“¿Nos ayudas con tu reseña en Google?”'], ['der', '👍 Lucía la deja en 1 toque'], ['aviso', '📍 Más gente te encuentra en Google Maps']] },
     portafolio: { tit: 'Portafolio', pasos: [['fila', '📸 Subes la foto de tu mejor degradado'], ['izq', '👀 Lucía la ve en tu página de reservas'], ['aviso', '📅 “Quiero ese corte” → reserva']] },
     giftcards: { tit: 'Gift cards', pasos: [['fila', '🎁 Ana compra una gift card de $15.000'], ['der', '📲 Se la regala a su papá con código'], ['fila', '✂️ Él la canjea en caja'], ['aviso', '💰 Venta extra + cliente nuevo']] },
     membresia: { tit: 'Membresía', pasos: [['fila', '🔁 Plan 4 cortes al mes · $25.000'], ['izq', '👨 Diego se suscribe'], ['fila', '✂️ Corte 1 de 4 usado'], ['aviso', '💰 Plata segura todos los meses']] },
