@@ -5369,7 +5369,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.69'::text $$;
+language sql immutable as $$ select '5.70'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7889,7 +7889,17 @@ language sql immutable as $$
          ('pasaporte', '🪪 Pasaporte de la bici', 'Sticker QR para el cuadro: historial de mantenciones, dueño y aviso de robo. Quien la escanea sabe si es robada.'),
          ('domicilio', '🚐 Mecánico a domicilio', 'El cliente reserva con su dirección (+ recargo de visita); armas la ruta del día y le avisas “Voy en camino”.'),
          ('garantias', '🛡️ Garantías', 'Garantía del trabajo, repuestos o bici usada, con vencimiento: el cliente la ve en su link y la usa en 1 toque.'),
-         ('plan_mant', '🔁 Plan de mantención', 'Tus clientes pagan al mes y tienen visitas incluidas y descuento: plata segura cada mes y vuelven siempre.')
+         ('plan_mant', '🔁 Plan de mantención', 'Tus clientes pagan al mes y tienen visitas incluidas y descuento: plata segura cada mes y vuelven siempre.'),
+         -- G94: módulos de cobranza (Billetera primero).
+         ('acuerdo', '📝 Acuerdo de pago firmado', 'Armas un plan de pago y el cliente lo acepta desde su link con su nombre: queda firmado, con fecha y calendario.'),
+         ('contador', '🧮 Link para el contador', 'Un link de solo lectura con ventas, gastos y cobros del mes y su planilla: sin mandar pantallazos.'),
+         ('escalonado', '📈 Cobranza escalonada', 'El mensaje de cobro sube de tono solo según los días de atraso: amable → neutral → firme, respetando la ley.'),
+         ('gastos_fijos', '🔁 Gastos fijos automáticos', 'Arriendo, luz o sueldos se anotan solos cada mes en tu caja, el día que elijas.'),
+         -- G94: módulos de estacionamientos (Estaciona primero).
+         ('destacar', '⭐ Destacado en el mapa', 'Tus estacionamientos salen primero y resaltados en el mapa y la lista: más reservas.'),
+         ('acceso', '🔑 Control de acceso con QR', 'Cada reserva trae su pase QR: lo escaneas al entrar y salir y ves si está vigente y su patente.'),
+         ('descuentos', '🏷️ Descuento por estadía larga', 'Premia a quien reserva más tiempo: un % menos desde las horas, días o meses que elijas.'),
+         ('ganancias', '📊 Ganancias y ocupación', 'Cuánto ganaste por mes, ocupación de cada lugar, mejores días y planilla para Excel.')
 $$;
 
 create or replace function public.cfx_venta() returns jsonb
