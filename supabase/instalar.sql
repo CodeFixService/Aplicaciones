@@ -5369,7 +5369,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.66'::text $$;
+language sql immutable as $$ select '5.67'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5811,6 +5811,10 @@ alter table public.cfx_pagos add constraint cfx_pagos_medio_check check (medio i
 -- G85 ⚡ Mercado Pago automático: cuándo se abrió y el n° de pago que lo confirmó (un pago de MP sirve una sola vez).
 alter table public.cfx_pagos add column if not exists mp_desde timestamptz;
 alter table public.cfx_pagos add column if not exists mp_pago text;
+-- G87 K: hasta cuándo quedó activo · 🎁 regalo (en vez de activarse, crea una key de 1 uso) · key_regalo = la key (solo la ve quien pagó y el admin).
+alter table public.cfx_pagos add column if not exists hasta timestamptz;
+alter table public.cfx_pagos add column if not exists regalo boolean not null default false;
+alter table public.cfx_pagos add column if not exists key_regalo text;
 create unique index if not exists cfx_pagos_mp_pago_idx on public.cfx_pagos (mp_pago) where mp_pago is not null;
 alter table public.cfx_pagos drop constraint if exists cfx_pagos_periodo_check;
 alter table public.cfx_pagos add constraint cfx_pagos_periodo_check check (periodo in ('inicio', 'mensual', 'meses', 'anual', 'otro'));
@@ -5847,8 +5851,13 @@ begin
   bloq := debe and y ->> 'rol' = 'negocio';
   return jsonb_build_object('config', c - 'inicio_desde', 'yo', y, 'pagado', pagado, 'bloqueado', bloq, 'debe_inicio', debe,
     'liberado_hasta', case when lh > now() then lh end, 'mp', public.cfx_mp_on(),
-    'ultimo', (select to_jsonb(x) from (select id, periodo, monto, medio, estado, dias, motivo, creado, resuelto from public.cfx_pagos
-               where cuenta = (y ->> 'id')::uuid order by creado desc limit 1) x));
+    'ultimo', (select to_jsonb(x) from (select id, periodo, monto, medio, estado, dias, motivo, creado, resuelto, hasta, producto, regalo from public.cfx_pagos
+               where cuenta = (y ->> 'id')::uuid order by creado desc limit 1) x),
+    -- G87 K: 🔑 keys que compré (🎁 regalo o respaldo), con si ya se usaron.
+    'keys', (select coalesce(jsonb_agg(jsonb_build_object('key', p.key_regalo, 'producto', p.producto, 'dias', p.dias, 'regalo', p.regalo, 'creado', p.resuelto,
+               'usada', k.usada_at is not null) order by p.resuelto desc), '[]') from public.cfx_pagos p
+               left join public.cfx_keys k on k.hash = encode(sha256(convert_to(p.key_regalo, 'UTF8')), 'hex')
+               where p.cuenta = (y ->> 'id')::uuid and p.key_regalo is not null and p.resuelto > now() - interval '1 year'));
 end $$;
 
 drop function if exists public.cfx_pago_pedir(text, int, text, text, text);
@@ -5926,7 +5935,7 @@ language plpgsql stable security definer set search_path = '' as $$
 begin
   perform public.cfx_es_admin();
   return (select coalesce(jsonb_agg(x order by x.creado desc), '[]') from (
-    select id, cuenta, email, nombre, rol, periodo, meses, producto, monto, medio, mp_pago, nota, estado, dias, motivo, creado, resuelto, comprobante is not null as con_comprobante,
+    select id, cuenta, email, nombre, rol, periodo, meses, producto, monto, medio, mp_pago, nota, estado, dias, motivo, creado, resuelto, comprobante is not null as con_comprobante, hasta, regalo, key_regalo,
       public.cfx_dias_sugeridos(g) as sugeridos,
       (select count(*) from public.cfx_pagos z where z.cuenta = g.cuenta and z.estado = 'aprobado') as aprobados
     from public.cfx_pagos g where p_estado = 'todos' or estado = p_estado order by creado desc limit 200) x);
@@ -5956,20 +5965,41 @@ begin
 end $$;
 revoke all on function public.cfx_dias_sugeridos(public.cfx_pagos) from public, anon, authenticated;
 
+-- G87 K · 🔑 Key de 1 uso con lo que se pagó (Premium o módulo/pack, los mismos días). Sirve para 🎁 regalar a otra cuenta y de
+-- respaldo si la activación automática falla: el pago queda aprobado con su key (la persona la canjea en Premium/🧩 Módulos).
+create or replace function public.cfx_pago_key(g public.cfx_pagos, p_dias int, p_estado text, p_motivo text) returns text
+language plpgsql security definer set search_path = '' as $$
+declare c text := upper(replace(gen_random_uuid()::text, '-', ''));
+begin
+  c := 'CFX-' || substr(c, 1, 4) || '-' || substr(c, 5, 4) || '-' || substr(c, 9, 4);
+  insert into public.cfx_keys (hash, ultimos, rol, dias, nota, item)
+  values (encode(sha256(convert_to(c, 'UTF8')), 'hex'), right(c, 4), case when g.producto is not null then 'negocio' when g.rol = 'cliente' then 'cliente' else 'negocio' end,
+          greatest(1, least(3660, p_dias)), left(case when g.regalo then '🎁 Regalo de ' else '🔑 Respaldo de ' end || coalesce(nullif(g.email, ''), g.cuenta::text), 120), coalesce(g.producto, ''));
+  update public.cfx_pagos set estado = p_estado, dias = p_dias, key_regalo = c, motivo = left(coalesce(p_motivo, ''), 200), resuelto = now(), comprobante = null where id = g.id;
+  perform public.cfx_avisar(g.cuenta, case when g.regalo then '🎁 Tu key de regalo está lista' else '🔑 Tu pago quedó con una key' end,
+    'Key ' || c || ' (' || case when g.producto is not null then '🧩 ' || g.producto else 'Premium' end || ', ' || p_dias || ' días). Se canjea en Premium → ¿Tienes una key?');
+  return c;
+end $$;
+revoke all on function public.cfx_pago_key(public.cfx_pagos, int, text, text) from public, anon, authenticated;
+
 -- Aprueba un pago pendiente y activa lo que pagó (lo usan el administrador y el pago automático de Mercado Pago).
 create or replace function public.cfx_pago_aprobar(p_id uuid, p_dias int default null, p_motivo text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare g public.cfx_pagos; d int; hasta timestamptz;
+declare g public.cfx_pagos; d int; h timestamptz;
 begin
   select * into g from public.cfx_pagos where id = p_id and estado = 'pendiente' for update;
   if g.id is null then raise exception 'Pago no encontrado o ya resuelto'; end if;
   d := coalesce(p_dias, public.cfx_dias_sugeridos(g));
   if d < 0 or d > 3660 then raise exception 'Días no válidos'; end if;
-  if d > 0 and g.producto is not null then hasta := public.cfx_modulos_dar(public.cfx_negocio_cuenta(g.cuenta), g.producto, d, 'pago');
-  elsif d > 0 then hasta := public.cfx_dar_premium(g.cuenta, g.rol, d); end if;
-  update public.cfx_pagos set estado = 'aprobado', dias = d, motivo = left(coalesce(p_motivo, ''), 200), resuelto = now(), comprobante = null where id = p_id;
-  perform public.cfx_avisar(g.cuenta, '✅ Pago aprobado', case when hasta is not null then case when g.producto is not null then '🧩 Módulo activo' else 'Premium activo' end || ' hasta el ' || to_char(hasta at time zone 'America/Santiago', 'DD/MM/YYYY') || '. ¡Gracias!' else 'Gracias, tu pago quedó registrado.' end);
-  return jsonb_build_object('estado', 'aprobado', 'dias', d, 'hasta', hasta);
+  if g.regalo and d > 0 then
+    perform public.cfx_pago_key(g, d, 'aprobado', p_motivo);
+    return jsonb_build_object('estado', 'aprobado', 'dias', d, 'hasta', null, 'regalo', true);
+  end if;
+  if d > 0 and g.producto is not null then h := public.cfx_modulos_dar(public.cfx_negocio_cuenta(g.cuenta), g.producto, d, 'pago');
+  elsif d > 0 then h := public.cfx_dar_premium(g.cuenta, g.rol, d); end if;
+  update public.cfx_pagos set estado = 'aprobado', dias = d, hasta = h, motivo = left(coalesce(p_motivo, ''), 200), resuelto = now(), comprobante = null where id = p_id;
+  perform public.cfx_avisar(g.cuenta, '✅ Pago aprobado', case when h is not null then case when g.producto is not null then '🧩 Módulo activo' else 'Premium activo' end || ' hasta el ' || to_char(h at time zone 'America/Santiago', 'DD/MM/YYYY') || '. ¡Gracias!' else 'Gracias, tu pago quedó registrado.' end);
+  return jsonb_build_object('estado', 'aprobado', 'dias', d, 'hasta', h);
 end $$;
 revoke all on function public.cfx_pago_aprobar(uuid, int, text) from public, anon, authenticated;
 
@@ -6100,7 +6130,13 @@ begin
     return g.estado;
   end if;
   update public.cfx_pagos set mp_pago = left(pg ->> 'id', 40) where id = g.id;
-  perform public.cfx_pago_aprobar(g.id, null, '⚡ Mercado Pago n° ' || left(pg ->> 'id', 40));
+  begin
+    perform public.cfx_pago_aprobar(g.id, null, '⚡ Mercado Pago n° ' || left(pg ->> 'id', 40));
+  exception when others then
+    -- G87 K: no se pudo activar solo → el pago igual queda aprobado con una 🔑 key de respaldo (nunca se pierde lo pagado).
+    select * into g from public.cfx_pagos where id = p_id;
+    perform public.cfx_pago_key(g, public.cfx_dias_sugeridos(g), 'aprobado', '⚡ Mercado Pago n° ' || left(pg ->> 'id', 40) || ' · activación falló (' || left(sqlerrm, 80) || '): key de respaldo');
+  end;
   begin
     perform public.cfx_al_cm('⚡ Pago automático aprobado', coalesce(nullif(g.nombre, ''), g.email) || ' · $' || g.monto || coalesce(' · 🧩 ' || g.producto, '') ||
       ' (' || case g.periodo when 'meses' then g.meses || ' meses' else g.periodo end || ', Mercado Pago)' || coalesce(' · cupón ' || g.cupon, ''), 'pago');
@@ -6109,7 +6145,8 @@ begin
 end $$;
 
 -- La persona paga: crea el cobro y devuelve la página de Mercado Pago.
-create or replace function public.cfx_mp_pagar(p_periodo text, p_meses int default null, p_producto text default null, p_cupon text default null, p_volver text default null) returns jsonb
+drop function if exists public.cfx_mp_pagar(text, int, text, text, text);
+create or replace function public.cfx_mp_pagar(p_periodo text, p_meses int default null, p_producto text default null, p_cupon text default null, p_volver text default null, p_regalo boolean default false) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare y jsonb := public.cfx_yo(); m jsonb := (select valor from public.cfx_config where clave = 'mp'); cup text := nullif(upper(trim(coalesce(p_cupon, ''))), '');
         v text := left(coalesce(p_volver, ''), 500); monto int; i uuid; r jsonb; x uuid; tit text;
@@ -6119,8 +6156,13 @@ begin
   if y ->> 'rol' not in ('negocio', 'cliente') then raise exception 'Pide al dueño de la cuenta que haga el pago'; end if;
   if p_periodo not in ('inicio', 'mensual', 'meses', 'anual') then raise exception 'Elige un plan'; end if;
   if p_periodo = 'meses' and coalesce(p_meses, 0) not between 2 and 11 then raise exception 'Elige de 2 a 11 meses'; end if;
-  if p_producto is not null then
+  if coalesce(p_regalo, false) and p_periodo = 'inicio' then raise exception 'El primer pago es para tu cuenta: elige otro plan para regalar'; end if;
+  if coalesce(p_regalo, false) and p_producto is not null and y ->> 'rol' <> 'negocio' then raise exception 'Los módulos se regalan desde una cuenta de negocio'; end if;
+  if p_producto is not null and not coalesce(p_regalo, false) then
     if public.cfx_negocio_cuenta((y ->> 'id')::uuid) is distinct from (y ->> 'id')::uuid then raise exception 'Pide al dueño del negocio que haga el pago'; end if;
+    if p_periodo not in ('mensual', 'anual') or not coalesce((public.cfx_venta() ->> 'activo')::boolean, false) or cardinality(public.cfx_venta_modulos(p_producto)) = 0 then raise exception 'Módulo no válido'; end if;
+    cup := null;
+  elsif p_producto is not null then
     if p_periodo not in ('mensual', 'anual') or not coalesce((public.cfx_venta() ->> 'activo')::boolean, false) or cardinality(public.cfx_venta_modulos(p_producto)) = 0 then raise exception 'Módulo no válido'; end if;
     cup := null;
   end if;
@@ -6133,11 +6175,12 @@ begin
     if public.cfx_mp_confirmar(x) = 'aprobado' then return jsonb_build_object('ok', true, 'aprobado', true); end if;
     update public.cfx_pagos set estado = 'rechazado', motivo = 'Volviste a pagar con Mercado Pago', resuelto = now() where id = x and estado = 'pendiente' and mp_pago is null;
   end loop;
-  insert into public.cfx_pagos (cuenta, email, nombre, rol, periodo, monto, medio, nota, cupon, meses, producto, mp_desde)
-  values ((y ->> 'id')::uuid, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), y ->> 'rol', p_periodo, monto, 'mp', '⚡ Mercado Pago automático', cup,
-          case when p_periodo = 'meses' then p_meses end, p_producto, now())
+  insert into public.cfx_pagos (cuenta, email, nombre, rol, periodo, monto, medio, nota, cupon, meses, producto, mp_desde, regalo)
+  values ((y ->> 'id')::uuid, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), y ->> 'rol', p_periodo, monto, 'mp',
+          case when coalesce(p_regalo, false) then '🎁 Regalo · ' else '' end || '⚡ Mercado Pago automático', cup,
+          case when p_periodo = 'meses' then p_meses end, p_producto, now(), coalesce(p_regalo, false))
   returning id into i;
-  tit := case when p_producto is not null then 'Módulo ' || p_producto else 'Premium' end || ' · ' ||
+  tit := case when coalesce(p_regalo, false) then '🎁 Regalo · ' else '' end || case when p_producto is not null then 'Módulo ' || p_producto else 'Premium' end || ' · ' ||
          case p_periodo when 'anual' then '1 año' when 'meses' then p_meses || ' meses' else '1 mes' end;
   if v !~ '^https://[^\s"<>]+$' then v := null; end if;
   r := public.cfx_mp_api(m ->> 'token', 'POST', '/checkout/preferences', jsonb_build_object(
@@ -6162,7 +6205,10 @@ begin
   for x in select id from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio = 'mp' loop
     e := public.cfx_mp_confirmar(x); ok := ok or e = 'aprobado';
   end loop;
-  return jsonb_build_object('aprobado', ok, 'pendiente', exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio = 'mp'));
+  return jsonb_build_object('aprobado', ok, 'pendiente', exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio = 'mp'),
+    -- G87 K: el último pago automático aprobado (para 🎉 "Activo hasta…", 🧾 comprobante y la 🎁 key).
+    'pago', case when ok then (select to_jsonb(q) from (select id, periodo, meses, monto, producto, hasta, dias, regalo, key_regalo, mp_pago, cupon, resuelto, email, nombre
+      from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'aprobado' and medio = 'mp' order by resuelto desc nulls last limit 1) q) end);
 end $$;
 
 -- "Pagar de otra forma": cierra el cobro de Mercado Pago sin pagar (queda en el historial).
@@ -6228,8 +6274,8 @@ begin
 end $$;
 
 revoke all on function public.cfx_mp_api(text, text, text, jsonb), public.cfx_mp_monto(text, int, text, text), public.cfx_mp_confirmar(uuid), public.cfx_mp_revisar_pendientes() from public, anon, authenticated;
-revoke all on function public.cfx_mp_pagar(text, int, text, text, text), public.cfx_mp_revisar(), public.cfx_mp_cancelar(), public.cfx_mp_estado(), public.cfx_mp_guardar(text, boolean), public.cfx_mp_revisar_admin(uuid) from public, anon;
-grant execute on function public.cfx_mp_pagar(text, int, text, text, text), public.cfx_mp_revisar(), public.cfx_mp_cancelar(), public.cfx_mp_estado(), public.cfx_mp_guardar(text, boolean), public.cfx_mp_revisar_admin(uuid) to authenticated;
+revoke all on function public.cfx_mp_pagar(text, int, text, text, text, boolean), public.cfx_mp_revisar(), public.cfx_mp_cancelar(), public.cfx_mp_estado(), public.cfx_mp_guardar(text, boolean), public.cfx_mp_revisar_admin(uuid) from public, anon;
+grant execute on function public.cfx_mp_pagar(text, int, text, text, text, boolean), public.cfx_mp_revisar(), public.cfx_mp_cancelar(), public.cfx_mp_estado(), public.cfx_mp_guardar(text, boolean), public.cfx_mp_revisar_admin(uuid) to authenticated;
 do $$
 begin
   perform cron.unschedule(jobid) from cron.job where jobname = 'cfx-mp';
@@ -6756,6 +6802,66 @@ begin
 end $$;
 revoke all on function public.cfx_negocios(text, text), public.cfx_premium_cuenta(uuid, text, int), public.cfx_key_aplicar(uuid, text, text, text) from public, anon;
 grant execute on function public.cfx_negocios(text, text), public.cfx_premium_cuenta(uuid, text, int), public.cfx_key_aplicar(uuid, text, text, text) to authenticated;
+
+-- ---------- G38 · 💰 Dinero (CM → Resumen): ingresos del mes por Premium/módulo, pruebas por vencer y morosos con su WhatsApp ----------
+-- Moroso = su último pago aprobado (Premium o módulo) dejó de cubrir en los últimos 60 días, no tiene otro pago en revisión,
+-- no está exento y hoy no tiene Premium activo. Solo lee: no cambia nada.
+create or replace function public.cfx_tel_de(p_cuenta uuid) returns text
+language plpgsql stable security definer set search_path = '' as $$
+declare t text; x record;
+begin
+  for x in select c.table_name, c.column_name from information_schema.columns c
+    where c.table_schema = 'public' and c.table_name in ('perfiles', 'profiles') and c.column_name in ('telefono', 'whatsapp', 'phone') order by c.table_name, c.column_name loop
+    begin
+      execute format('select nullif(trim(%I::text), %L) from public.%I where id = $1', x.column_name, '', x.table_name) into t using p_cuenta;
+    exception when others then t := null; end;
+    if t is not null then return left(t, 30); end if;
+  end loop;
+  select coalesce(nullif(u.phone, ''), u.raw_user_meta_data ->> 'telefono', u.raw_user_meta_data ->> 'whatsapp') into t from auth.users u where u.id = p_cuenta;
+  return left(nullif(trim(t), ''), 30);
+end $$;
+create or replace function public.cfx_dinero() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare z text := 'America/Santiago'; m0 timestamptz := date_trunc('month', now() at time zone z) at time zone z;
+        m1 timestamptz := date_trunc('month', (now() at time zone z) - interval '1 month') at time zone z;
+        d timestamptz := public.cfx_ingresos_desde(); cu jsonb := '[]'; activos uuid[] := '{}'; ve jsonb; mo jsonb;
+begin
+  perform public.cfx_es_admin();
+  if to_regprocedure('public.cfx_cuentas_app(text,text)') is not null then
+    begin
+      execute 'select coalesce(public.cfx_cuentas_app(''negocio'', ''''), ''[]''::jsonb) || coalesce(public.cfx_cuentas_app(''cliente'', ''''), ''[]''::jsonb)' into cu;
+    exception when others then cu := '[]'; end;
+  end if;
+  select coalesce(array_agg((e ->> 'id')::uuid), '{}') into activos from jsonb_array_elements(cu) e
+    where e ->> 'premium_hasta' is not null and (e ->> 'premium_hasta')::timestamptz > now();
+  -- Por vencer en 7 días (sin "para siempre"): prueba = nunca ha pagado; renovación = ya pagó antes.
+  select coalesce(jsonb_agg(jsonb_build_object('id', e ->> 'id', 'nombre', coalesce(nullif(e ->> 'nombre', ''), e ->> 'email'), 'email', e ->> 'email', 'rol', e ->> 'rol',
+      'hasta', e ->> 'premium_hasta', 'tel', public.cfx_tel_de((e ->> 'id')::uuid),
+      'pago', exists (select 1 from public.cfx_pagos p where p.cuenta = (e ->> 'id')::uuid and p.estado = 'aprobado')) order by (e ->> 'premium_hasta')::timestamptz), '[]')
+    into ve from (select e from jsonb_array_elements(cu) e where e ->> 'premium_hasta' is not null and e ->> 'premium_hasta' <> 'infinity'
+      and (e ->> 'premium_hasta')::timestamptz between now() and now() + interval '7 days' and coalesce((e ->> 'suspendido')::boolean, false) = false limit 100) q;
+  select coalesce(jsonb_agg(jsonb_build_object('id', u.cuenta, 'nombre', coalesce(nullif(u.nombre, ''), u.email), 'email', u.email, 'rol', u.rol, 'producto', u.prod,
+      'vencio', u.fin, 'monto', u.monto, 'periodo', u.periodo, 'tel', public.cfx_tel_de(u.cuenta)) order by u.fin desc), '[]') into mo
+  from (select distinct on (p.cuenta, coalesce(p.producto, '')) p.cuenta, p.nombre, p.email, p.rol, p.producto as prod, p.monto, p.periodo,
+          coalesce(p.resuelto, p.creado) + make_interval(days => coalesce(p.dias, 0)) as fin
+        from public.cfx_pagos p where p.estado = 'aprobado' and coalesce(p.dias, 0) > 0 and not coalesce(p.regalo, false) and p.key_regalo is null
+        order by p.cuenta, coalesce(p.producto, ''), coalesce(p.resuelto, p.creado) + make_interval(days => coalesce(p.dias, 0)) desc) u
+  where u.fin between now() - interval '60 days' and now()
+    and not (u.prod is null and u.cuenta = any (activos))
+    and not exists (select 1 from public.cfx_pagos g where g.cuenta = u.cuenta and g.estado = 'pendiente')
+    and not exists (select 1 from public.cfx_exentos x where x.cuenta = u.cuenta);
+  return jsonb_build_object('desde', nullif(d, '-infinity'::timestamptz),
+    'mes', (select jsonb_build_object('monto', coalesce(sum(monto), 0), 'n', count(*)) from public.cfx_pagos where estado = 'aprobado' and creado >= greatest(m0, d)),
+    'anterior', (select jsonb_build_object('monto', coalesce(sum(monto), 0), 'n', count(*)) from public.cfx_pagos where estado = 'aprobado' and creado >= greatest(m1, d) and creado < m0),
+    'por', (select coalesce(jsonb_agg(jsonb_build_object('producto', k, 'monto', s, 'n', n) order by s desc), '[]') from (
+      select coalesce(producto, 'premium') k, sum(monto) s, count(*) n from public.cfx_pagos where estado = 'aprobado' and creado >= greatest(m0, d) group by 1) q),
+    'medios', (select coalesce(jsonb_object_agg(medio, s), '{}') from (select medio, sum(monto) s from public.cfx_pagos where estado = 'aprobado' and creado >= greatest(m0, d) group by 1) q),
+    'pendientes', (select count(*) from public.cfx_pagos where estado = 'pendiente' and medio <> 'mp'),
+    'premium', coalesce(cardinality(activos), 0), 'vencen', ve, 'morosos', mo);
+end $$;
+revoke all on function public.cfx_tel_de(uuid) from public, anon, authenticated;
+revoke all on function public.cfx_dinero() from public, anon;
+grant execute on function public.cfx_dinero() to authenticated;
 -- ---------------------------------------------------------------------
 -- CodeFix · Ayuda (igual en las 6 apps; lo reparte nucleo/sincronizar.py).
 --   1) Puente al Centro de Mando: los avisos importantes (pagos por revisar, mensajes de soporte) le llegan al tiro
@@ -7624,6 +7730,36 @@ begin
 end $$;
 revoke all on function public.cfx_errores_borrar(bigint) from public, anon;
 grant execute on function public.cfx_errores_borrar(bigint) to authenticated;
+
+-- ---------- G38 · 🔔 Alertas al celular del admin (vía Centro de Mando): negocio nuevo y errores nuevos ----------
+-- Cada 15 minutos mira lo nuevo desde la última vez (la primera vez solo marca, no avisa de lo viejo). Un aviso por tipo y vuelta.
+-- Los pagos ya avisan solos (💳 por revisar / ⚡ aprobado). La caída de una app la ve 🩺 salud diaria (GitHub) y el carrusel de servidores.
+create or replace function public.cfx_alertas_revisar() returns int
+language plpgsql security definer set search_path = '' as $$
+declare v jsonb := (select valor from public.cfx_salud where clave = 'alertas'); h timestamptz := now(); desde timestamptz; cu jsonb := '[]';
+        n int := 0; k int; t text;
+begin
+  if v is null or (v ->> 'desde') is null then perform public.cfx_salud_marca('alertas', jsonb_build_object('desde', h)); return 0; end if;
+  desde := (v ->> 'desde')::timestamptz;
+  if to_regprocedure('public.cfx_cuentas_app(text,text)') is not null then
+    begin execute 'select coalesce(public.cfx_cuentas_app(''negocio'', ''''), ''[]''::jsonb)' into cu; exception when others then cu := '[]'; end;
+    select count(*), min(coalesce(nullif(e ->> 'nombre', ''), e ->> 'email')) into k, t from jsonb_array_elements(cu) e
+      where (e ->> 'creado')::timestamptz > desde and (e ->> 'creado')::timestamptz <= h;
+    if k > 0 then perform public.cfx_al_cm('🆕 Negocio nuevo', coalesce(t, '') || case when k > 1 then ' y ' || (k - 1) || ' más' else '' end, 'negocio'); n := n + 1; end if;
+  end if;
+  select count(*), min(left(mensaje, 120)) into k, t from public.cfx_errores where creado > desde and creado <= h;
+  if k > 0 then perform public.cfx_al_cm('🩺 ' || k || case when k = 1 then ' error nuevo' else ' errores nuevos' end, coalesce(t, ''), 'error'); n := n + 1; end if;
+  perform public.cfx_salud_marca('alertas', jsonb_build_object('desde', h));
+  return n;
+end $$;
+revoke all on function public.cfx_alertas_revisar() from public, anon, authenticated;
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'cfx-alertas';
+  perform cron.schedule('cfx-alertas', '*/15 * * * *', 'select public.cfx_alertas_revisar()');
+exception when others then
+  raise notice 'Alertas no programadas (%).', sqlerrm;
+end $$;
 -- ---------- Módulos enchufables (C19): se prenden y apagan desde el Centro de Mando → Mis aplicaciones → 🧩 Módulos ----------
 -- Cada app dice qué módulos tiene con el gancho cfx_modulos_app() → text[] (si no lo tiene: ninguno). Por defecto quedan prendidos.
 insert into public.cfx_config (clave, valor) values ('modulos', '{}') on conflict (clave) do nothing;

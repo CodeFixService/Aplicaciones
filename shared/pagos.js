@@ -15,6 +15,7 @@
 (function () {
   'use strict';
   if (window.CFX_PAGOS) return;
+  const AQUI = ((document.currentScript && document.currentScript.src) || '').replace(/[^/]*$/, '');
   const css = document.createElement('style');
   css.textContent =
     'dialog.cfx-pago{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;z-index:2147483000;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;font-family:var(--cfx-letra,system-ui,sans-serif)}' +
@@ -131,7 +132,10 @@
       ayudaChat + (c.whatsapp ? '<p style="text-align:center"><a href="https://wa.me/' + esc(String(c.whatsapp).replace(/\D/g, '')) + '" target="_blank" rel="noopener">¿Prefieres WhatsApp? Escríbenos</a></p>' : '') +
       (window.CFX_AYUDA ? '<p style="text-align:center;font-size:12px">Al pagar aceptas los <a href="#" data-terminos>Términos y condiciones</a>.</p>' : '');
     const u = e.ultimo;
-    const keyHtml = '<details style="margin-top:8px"><summary>🔑 Tengo una key</summary><div class="cp-fila"><input id="cpKey" placeholder="CFX-XXXX-XXXX-XXXX" autocapitalize="characters"><button type="button" data-key>Activar</button></div><p class="cp-err" id="cpKeyErr"></p></details>';
+    // G87 K: 🔑 keys que compré (🎁 regalo o respaldo): siempre a la vista para copiarlas.
+    const misKeys = (e.keys || []).length ? '<details style="margin-top:8px"><summary>🎁 Mis keys compradas (' + e.keys.length + ')</summary>' + e.keys.map((k) =>
+      '<div class="cp-dato"><span>' + esc(k.producto ? '🧩 ' + k.producto : '⭐ Premium') + ' · ' + (+k.dias || 0) + ' d' + (k.usada ? ' · ✓ usada' : '') + '</span><b>' + esc(k.key) + '</b><button type="button" data-copkey="' + esc(k.key) + '">Copiar</button></div>').join('') + '</details>' : '';
+    const keyHtml = misKeys + '<details style="margin-top:8px"><summary>🔑 Tengo una key</summary><div class="cp-fila"><input id="cpKey" placeholder="CFX-XXXX-XXXX-XXXX" autocapitalize="characters"><button type="button" data-key>Activar</button></div><p class="cp-err" id="cpKeyErr"></p></details>';
     const lib = e.liberado_hasta ? '<div class="cp-ok">🎁 Registro liberado hasta el <b>' + new Date(e.liberado_hasta).toLocaleDateString('es-CL') + '</b>: puedes usar la app sin pagar.</div>' : '';
     if (u && u.estado === 'pendiente' && u.medio === 'mp') {
       // G85: abrió Mercado Pago: confirmar (por si ya pagó) o pagar de otra forma.
@@ -144,7 +148,7 @@
         try {
           if ('mpotra' in b.dataset) { await o.rpc('cfx_mp_cancelar'); mpMarca(false); return abrir(o); }
           const r = await o.rpc('cfx_mp_revisar');
-          if (r && r.aprobado) { mpMarca(false); caja.innerHTML = listo(); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
+          if (r && r.aprobado) { mpMarca(false); armarListo(caja, r.pago); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
           caja.querySelector('#cpErr').textContent = 'Mercado Pago aún no lo aprueba. Si ya pagaste, espera 1 minuto: se activa solo.'; b.disabled = false;
         } catch (x) { caja.querySelector('#cpErr').textContent = (x && x.message) || String(x); b.disabled = false; }
       });
@@ -178,6 +182,7 @@
           cajaCupon +
           (medios.length > 1 ? '<div class="cp-tabs">' + medios.map((m) => '<button type="button" data-m="' + m + '" class="' + (m === medio ? 'on' : '') + '">' + NOMBRE_MEDIO[m] + '</button>').join('') + '</div>' : '') +
           (mp ? '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div>' +
+              (obligatorio || plan.k === 'inicio' ? '' : '<label class="cp-regalo" style="display:flex;gap:8px;align-items:center;margin:8px 0;font-size:14px"><input type="checkbox" id="cpRegalo"' + (o._regalo ? ' checked' : '') + ' style="width:auto;min-height:0"> 🎁 Es para otra cuenta (te damos una key para regalar)</label>') +
               '<button type="button" class="cp-mp" data-mp>⚡ Pagar con Mercado Pago</button>' +
               '<div class="cp-ayuda">Pagas con tarjeta, débito o saldo de Mercado Pago. Al terminar vuelves a la app y tu plan <b>se activa solo, al tiro</b> (te llega un aviso). Sin comprobante.</div><p class="cp-err" id="cpErr"></p></div>' + (pr ? '' : keyHtml) + pie
           : '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div><div class="cp-fila"><button type="button" data-copiar>📋 Copiar monto</button>' +
@@ -223,8 +228,9 @@
           // G85: ⚡ el cobro lo arma la base (mismo total que se ve aquí) y abre Mercado Pago; al volver se confirma solo.
           const err = caja.querySelector('#cpErr'); b.disabled = true; b.textContent = 'Abriendo Mercado Pago…';
           try {
-            const r = await o.rpc('cfx_mp_pagar', { p_periodo: plan.k, p_meses: plan.k === 'meses' ? plan.m : null, p_producto: pr ? pr.clave : null, p_cupon: cupon ? cupon.codigo : null, p_volver: location.href.split('#')[0] });
-            if (r && r.aprobado) { caja.innerHTML = listo(); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
+            const rg = caja.querySelector('#cpRegalo'); o._regalo = !!(rg && rg.checked);
+            const r = await o.rpc('cfx_mp_pagar', { p_periodo: plan.k, p_meses: plan.k === 'meses' ? plan.m : null, p_producto: pr ? pr.clave : null, p_cupon: cupon ? cupon.codigo : null, p_volver: location.href.split('#')[0], ...(o._regalo ? { p_regalo: true } : {}) });
+            if (r && r.aprobado) { armarListo(caja, (await o.rpc('cfx_mp_revisar').catch(() => ({}))).pago); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
             if (!r || !r.ok) throw new Error((r && r.error) || 'Mercado Pago no respondió');
             mpMarca(true); location.href = r.url;
           } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = '⚡ Pagar con Mercado Pago'; }
@@ -259,6 +265,8 @@
       });
     }
     caja.addEventListener('click', async (ev) => {
+      const ck = ev.target.closest('[data-copkey]');
+      if (ck) { await copiar(ck.dataset.copkey); ck.textContent = '✓ Copiada'; return; }
       if (ev.target.closest('[data-key]')) {
         try {
           const r = await o.rpc('cfx_key_canjear', { p_codigo: caja.querySelector('#cpKey').value });
@@ -279,7 +287,39 @@
     return e;
   }
 
-  const listo = () => '<h2>🎉 ¡Pago aprobado!</h2><div class="cp-ok">Mercado Pago confirmó tu pago: tu plan ya está activo. ¡Gracias!</div><button type="button" data-x style="width:100%;margin-top:10px">Continuar</button>';
+  // G87 K: 🎉 lo que quedó activo y hasta cuándo + 🧾 comprobante. Regalo (o respaldo si no se pudo activar solo) = 🔑 key de 1 uso para copiar o enviar.
+  const fechaL = (f) => { try { return new Date(f).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (x) { return ''; } };
+  const queEs = (p) => (p.producto ? '🧩 Módulo ' + p.producto : '⭐ Premium') + ' · ' + (p.periodo === 'anual' ? '1 año' : p.periodo === 'meses' ? (p.meses || 2) + ' meses' : p.periodo === 'inicio' ? 'primer pago' : '1 mes');
+  const listo = (p) => {
+    const fin = '<button type="button" data-comp style="width:100%;margin-top:10px">🧾 Ver comprobante</button><button type="button" data-x class="cp-si" style="width:100%;margin-top:8px">Continuar</button>';
+    if (!p) return '<h2>🎉 ¡Pago aprobado!</h2><div class="cp-ok">Mercado Pago confirmó tu pago: tu plan ya está activo. ¡Gracias!</div><button type="button" data-x style="width:100%;margin-top:10px">Continuar</button>';
+    if (p.key_regalo) {
+      const m = (p.regalo ? '🎁 Te regalo ' : '🔑 Key de ') + queEs(p) + ' (' + (+p.dias || 0) + ' días).\nKey: ' + p.key_regalo + '\nSe activa en la app → Premium → 🔑 Tengo una key (1 uso).';
+      return '<h2>' + (p.regalo ? '🎁 ¡Tu regalo está listo!' : '✅ Pago aprobado') + '</h2><div class="cp-ok">' + (p.regalo ? 'Comparte esta key con quien quieras regalar: la activa en Premium → 🔑 Tengo una key. Sirve 1 vez.'
+        : 'No se pudo activar solo, pero tu pago quedó guardado en esta key: actívala en Premium → 🔑 Tengo una key.') + '</div>' +
+        '<p style="margin:10px 0 2px;text-align:center">' + esc(queEs(p)) + '</p><div style="font:700 19px/1.3 ui-monospace,monospace;text-align:center;white-space:nowrap;overflow-x:auto;padding:12px 8px;border:2px dashed var(--cp-color);border-radius:12px">' + esc(p.key_regalo) + '</div>' +
+        '<button type="button" data-copkey="' + esc(p.key_regalo) + '" style="width:100%;margin-top:8px">📋 Copiar key</button>' +
+        '<a class="cp-btn" style="margin-top:8px" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(m) + '">💬 Enviar por WhatsApp</a>' + fin;
+    }
+    return '<h2>🎉 ¡Pago aprobado!</h2><div class="cp-ok">' + esc(queEs(p)) + (p.hasta ? ' activo hasta el <b>' + fechaL(p.hasta) + '</b>' : ' activo') + '. ¡Gracias!</div>' + fin;
+  };
+  function cargarComprobante() {
+    if (window.CFX_COMPROBANTE) return Promise.resolve(window.CFX_COMPROBANTE);
+    return new Promise((ok) => { const sc = document.createElement('script'); sc.src = AQUI + 'comprobante.js'; sc.onload = () => ok(window.CFX_COMPROBANTE || null); sc.onerror = () => ok(null); document.head.appendChild(sc); });
+  }
+  function armarListo(caja, p) {
+    caja.innerHTML = listo(p);
+    caja.addEventListener('click', async (ev) => {
+      const k = ev.target.closest('[data-copkey]');
+      if (k) { ev.stopPropagation(); await copiar(k.dataset.copkey); k.textContent = '✓ Copiada'; return; }
+      if (!ev.target.closest('[data-comp]') || !p) return;
+      const c = { titulo: 'Comprobante de pago', negocio: 'CodeFix', fecha: p.resuelto || Date.now(), numero: p.mp_pago || String(p.id || '').slice(0, 8), cliente: p.nombre || p.email || '',
+        items: [{ cant: 1, nombre: queEs(p) + (p.regalo ? ' (🎁 regalo)' : ''), precio: +p.monto || 0 }], total: +p.monto || 0, medio: 'mercadopago', cliente_ve: true,
+        entrega: p.key_regalo ? 'Key: ' + p.key_regalo : p.hasta ? 'Activo hasta el ' + fechaL(p.hasta) : '' };
+      const C = await cargarComprobante();
+      if (C) { cerrar(); C.abrir(c); }  // la ventana de pago está encima de todo: se cierra para que el comprobante se vea else { await copiar(c.titulo + '\nCodeFix · ' + c.items[0].nombre + '\nTotal: ' + pesos(c.total) + ' · Mercado Pago N° ' + c.numero + '\n' + c.entrega); ev.target.textContent = '✓ Comprobante copiado'; }
+    });
+  }
   // G85: al volver de Mercado Pago (la app abre de nuevo): confirma el pago con la base. Reintenta un rato por si Mercado Pago tarda.
   async function mpVolver(rpc) {
     if (!rpc || !mpMarcado()) return;
@@ -289,7 +329,7 @@
       if (r && r.aprobado) {
         mpMarca(false); cerrar();
         const capa = document.createElement('dialog'); capa.className = 'cfx-pago'; capa.style.setProperty('--cp-color', color());
-        capa.innerHTML = '<div>' + listo() + '</div>'; document.body.appendChild(capa); abierta = capa; capa.showModal();
+        capa.innerHTML = '<div></div>'; armarListo(capa.firstChild, r.pago); document.body.appendChild(capa); abierta = capa; capa.showModal();
         capa.querySelector('[data-x]').onclick = () => { cerrar(); location.reload(); };
         return;
       }
