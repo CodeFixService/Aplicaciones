@@ -1420,9 +1420,9 @@
         'background:var(--cfx-campo,#f3f5f7);color:var(--cfx-texto,#111);display:grid;place-items:center;font-size:15px;line-height:1;box-shadow:none}.cfx-anuncio .cfx-an-tag{font-size:11px;color:var(--cfx-texto-2,#5b6472)}';
       document.head.appendChild(st);
     }
-    const d = document.createElement('aside'); d.className = 'cfx-anuncio'; d.setAttribute('role', 'complementary'); d.setAttribute('aria-label', 'Novedad de CodeFix'); d.dataset.id = a.id;
+    const d = document.createElement('aside'); d.className = 'cfx-anuncio'; d.setAttribute('role', 'complementary'); d.setAttribute('aria-label', a.de ? 'Promo de ' + a.de : 'Novedad de CodeFix'); d.dataset.id = a.id;
     d.innerHTML = (a.imagen ? '<img class="cfx-an-img" alt="" src="' + esc(window.CFX_URL(a.imagen)) + '">' : '') +
-      '<div class="cfx-an-t"><span class="cfx-an-tag">📣 Novedad</span><b>' + esc(a.titulo) + '</b>' + (a.texto ? '<p>' + esc(a.texto) + '</p>' : '') +
+      '<div class="cfx-an-t"><span class="cfx-an-tag">📣 ' + (a.de ? esc(a.de) : 'Novedad') + '</span><b>' + esc(a.titulo) + '</b>' + (a.texto ? '<p>' + esc(a.texto) + '</p>' : '') +
       (a.boton && a.link ? '<button type="button" class="cfx-an-btn">' + esc(a.boton) + '</button>' : '') + '</div><button type="button" class="cfx-an-x" aria-label="Cerrar anuncio" data-sin-atras>✕</button>';
     const img = d.querySelector('img'); if (img) img.onerror = () => { img.removeAttribute('src'); };  // no carga → cuadro neutro
     document.body.appendChild(d);
@@ -1436,7 +1436,87 @@
       if (/^https?:/i.test(u)) window.open(u, '_blank', 'noopener'); else if (u !== '#' || a.link === '#') location.href = u;
     };
   }
-  window.CFX_ANUNCIOS = { revisar: anuncios };
+    // ---------- G96 b 📣 Promos del negocio a SUS clientes (módulo 'promos'): el dueño las arma aquí; salen con la misma tarjeta de arriba ----------
+  // Uso: CFX_ANUNCIOS.promos(zona, { rpc: (f, a) => ..., probar: (k) => ... }). Sin el módulo: qué hace + ▶️ Probar (sus promos siguen a la vista).
+  function achicarPromo(file) {
+    return new Promise((ok, no) => {
+      const r = new FileReader();
+      r.onload = () => { const im = new Image(); im.onload = () => {
+        const k = Math.min(1, 480 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        for (const q of [0.82, 0.7, 0.55, 0.4]) { const u = c.toDataURL('image/jpeg', q); if (u.length <= 88000) return ok(u); }
+        no(new Error('La imagen es muy pesada: usa una más chica'));
+      }; im.onerror = () => no(new Error('No se pudo leer la imagen')); im.src = r.result; };
+      r.onerror = () => no(new Error('No se pudo leer la imagen')); r.readAsDataURL(file);
+    });
+  }
+  async function promos(z, o) {
+    const rpc = o.rpc, fecha = (x) => x ? new Date(x + 'T12:00:00').toLocaleDateString('es-CL') : '';
+    if (!document.getElementById('cfx-promo-css')) {
+      const st = document.createElement('style'); st.id = 'cfx-promo-css';
+      st.textContent = '.cfx-promo p{margin:4px 0}.cfx-promo label{display:block;margin-top:8px}.cfx-promo input,.cfx-promo textarea{width:100%;box-sizing:border-box}' +
+        '.cfx-promo .cfx-pr-f{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--cfx-borde,#8883)}.cfx-promo .cfx-pr-f>div{flex:1;min-width:0;overflow-wrap:anywhere}' +
+        '.cfx-promo .cfx-pr-img{flex:none;width:52px;height:52px;border-radius:var(--cfx-radio-chico,12px);background:var(--cfx-campo,#f3f5f7);object-fit:cover}' +
+        '.cfx-promo .cfx-pr-b{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.cfx-promo .cfx-pr-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}' +
+        '.cfx-promo .cfx-pr-msg{min-height:1.2em;color:var(--cfx-texto-2,#5b6472)}.cfx-promo .cfx-pr-foto{max-width:120px;max-height:120px;border-radius:var(--cfx-radio-chico,12px);display:block;margin-top:6px}';
+      document.head.appendChild(st);
+    }
+    let d; try { d = await rpc('cfx_promos_mias'); } catch (e) { z.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; return; }
+    let ed = null, foto = '';
+    const hoy = new Date().toISOString().slice(0, 10);
+    const estado = (x) => !x.activo ? '⏸️ Pausada' : x.hasta && x.hasta < hoy ? '⌛ Terminó' : x.desde && x.desde > hoy ? '📅 Desde el ' + fecha(x.desde) : '🟢 Al aire';
+    const fila = (x) => '<div class="cfx-pr-f">' + (x.imagen ? '<img class="cfx-pr-img" alt="" src="' + esc(window.CFX_URL(x.imagen)) + '">' : '<span class="cfx-pr-img"></span>') +
+      '<div><b>' + esc(x.titulo) + '</b><br><small class="muted">' + estado(x) + (x.hasta ? ' · hasta el ' + fecha(x.hasta) : '') + '</small><br>' +
+      '<small>👁️ ' + x.vistas + ' la vieron · 👆 ' + x.clics + ' la tocaron</small>' +
+      (d.puede ? '<div class="cfx-pr-b"><button type="button" class="small alt" data-pr-act="' + esc(x.id) + '">' + (x.activo ? '⏸️ Pausar' : '▶️ Activar') + '</button>' +
+        '<button type="button" class="small alt" data-pr-ed="' + esc(x.id) + '">✏️ Editar</button>' +
+        '<button type="button" class="small alt" data-pr-del="' + esc(x.id) + '" aria-label="Borrar promo">🗑️</button></div>' : '') + '</div></div>';
+    const form = () => '<h3>' + (ed ? '✏️ Editar promo' : '➕ Nueva promo') + '</h3>' +
+      '<label for="cfxPrT">Título</label><input id="cfxPrT" maxlength="80" placeholder="2x1 en cortes este jueves" value="' + esc(ed ? ed.titulo : '') + '">' +
+      '<label for="cfxPrX">Texto (opcional)</label><textarea id="cfxPrX" maxlength="240" rows="2" placeholder="Solo en la tarde, con reserva">' + esc(ed ? ed.texto : '') + '</textarea>' +
+      '<label for="cfxPrF">Foto (opcional)</label><input id="cfxPrF" type="file" accept="image/*"><div id="cfxPrFv"></div>' +
+      '<div class="cfx-pr-2"><div><label for="cfxPrB">Botón</label><input id="cfxPrB" maxlength="30" placeholder="Reservar" value="' + esc(ed ? ed.boton : '') + '"></div>' +
+      '<div><label for="cfxPrL">Link (https://)</label><input id="cfxPrL" inputmode="url" maxlength="500" placeholder="https://…" value="' + esc(ed ? ed.link : '') + '"></div></div>' +
+      '<div class="cfx-pr-2"><div><label for="cfxPrD">Desde</label><input id="cfxPrD" type="date" value="' + esc(ed && ed.desde || '') + '"></div>' +
+      '<div><label for="cfxPrH">Hasta</label><input id="cfxPrH" type="date" value="' + esc(ed && ed.hasta || '') + '"></div></div>' +
+      '<button type="button" class="ok" data-pr="guardar" style="width:100%;margin-top:10px">📣 ' + (ed ? 'Guardar cambios' : 'Publicar promo') + '</button>' +
+      (ed ? '<button type="button" class="alt" data-pr="cancelar" style="width:100%;margin-top:6px">Cancelar</button>' : '') + '<p class="cfx-pr-msg" role="status"></p>';
+    function pintar() {
+      z.innerHTML = '<div class="cfx-promo"><p class="muted">Tu promo destacada aparece como tarjeta al abrir la app de tus clientes (además de tus ofertas). Máx. 3 al aire; cada cliente la ve hasta que la cierra.</p>' +
+        (d.puede ? form() : '<p>🧩 Es un módulo: pruébalo gratis o actívalo.</p><button type="button" class="ok" data-pr="probar">▶️ Probar módulo</button>') +
+        '<h3>Tus promos</h3>' + (d.lista.length ? d.lista.map(fila).join('') : '<p class="muted">Aún no publicas promos.</p>') + '</div>';
+      const v = z.querySelector('#cfxPrFv'), msg = (t) => { const m = z.querySelector('.cfx-pr-msg'); if (m) m.textContent = t; };
+      if (v && foto) v.innerHTML = '<img class="cfx-pr-foto" alt="Foto de la promo" src="' + esc(window.CFX_URL(foto)) + '"> <button type="button" class="small alt" data-pr="sinfoto">Quitar foto</button>';
+      const fi = z.querySelector('#cfxPrF');
+      if (fi) fi.onchange = async () => { const f = fi.files && fi.files[0]; if (!f) return; try { foto = await achicarPromo(f); pintar(); } catch (e) { msg('⚠️ ' + e.message); } };
+      z.querySelector('.cfx-promo').onclick = async (ev) => {
+        const b = ev.target.closest('button'); if (!b) return;
+        const q = (s) => (z.querySelector(s) || {}).value || '';
+        try {
+          if (b.dataset.pr === 'probar') return o.probar && o.probar('promos');
+          if (b.dataset.pr === 'sinfoto') { foto = ''; return pintar(); }
+          if (b.dataset.pr === 'cancelar') { ed = null; foto = ''; return pintar(); }
+          if (b.dataset.pr === 'guardar') {
+            if (!q('#cfxPrT').trim()) return msg('Escribe el título de la promo');
+            b.disabled = true;
+            await rpc('cfx_promo_guardar', { p: { id: ed ? ed.id : null, titulo: q('#cfxPrT'), texto: q('#cfxPrX'), imagen: foto, boton: q('#cfxPrB'), link: q('#cfxPrL').trim(),
+              desde: q('#cfxPrD'), hasta: q('#cfxPrH'), activo: ed ? ed.activo : true } });
+            ed = null; foto = ''; d = await rpc('cfx_promos_mias'); pintar(); return msg('✅ Promo guardada: tus clientes la verán al abrir la app');
+          }
+          const x = d.lista.find((y) => y.id === (b.dataset.prAct || b.dataset.prEd || b.dataset.prDel)); if (!x) return;
+          if (b.dataset.prEd) { ed = x; foto = x.imagen || ''; pintar(); const t = z.querySelector('#cfxPrT'); if (t) t.focus(); return; }
+          if (b.dataset.prDel) {
+            const T = '¿Borrar la promo "' + x.titulo + '"? Se pierden sus números.';
+            if (!(await (window.CFX_DIALOGO ? CFX_DIALOGO.confirmar(T, { si: 'Borrar' }) : Promise.resolve(false)))) return;
+            await rpc('cfx_promo_borrar', { p_id: x.id });
+          } else await rpc('cfx_promo_guardar', { p: Object.assign({}, x, { activo: !x.activo }) });
+          d = await rpc('cfx_promos_mias'); pintar();
+        } catch (e) { b.disabled = false; msg('⚠️ ' + (e.message || e)); }
+      };
+    }
+    pintar();
+  }
+  window.CFX_ANUNCIOS = { revisar: anuncios, promos };
 
   // ---------- Flechas siempre al centro de su cuadro ----------
   // Los botones que solo tienen una flecha de texto (‹ › ← →) pasan a un dibujo: así queda centrada en todas las letras y celulares.

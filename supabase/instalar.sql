@@ -5419,7 +5419,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.72'::text $$;
+language sql immutable as $$ select '5.73'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7711,7 +7711,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -8029,7 +8029,10 @@ language sql immutable as $$
          ('ganancias', '📊 Ganancias y ocupación', 'Cuánto ganaste por mes, ocupación de cada lugar, mejores días y planilla para Excel.'),
          -- G96: módulos de tienda (Despega primero).
          ('suscripciones', '🔁 Compras recurrentes', 'Tu cliente recibe su pedido solo cada semana o cada mes (café, alimento, agua…): venta segura sin tener que pedirla.'),
-         ('proveedores', '📦 Stock mínimo y proveedores', 'Te avisa cuando un producto baja de su mínimo y arma el pedido a tu proveedor por WhatsApp con un toque.')
+         ('proveedores', '📦 Stock mínimo y proveedores', 'Te avisa cuando un producto baja de su mínimo y arma el pedido a tu proveedor por WhatsApp con un toque.'),
+         -- G96 b: 🏬 sucursales (Despega) y 📣 promos en la app de tus clientes (Despega, Barbería, BiciTaller).
+         ('sucursales', '🏬 Sucursales y bodegas', 'Stock separado por local o bodega: vendes en la Caja desde cada sucursal y mueves mercadería entre ellas.'),
+         ('promos', '📣 Promo destacada', 'Al abrir la app, tus clientes ven tu oferta en una tarjeta con foto y botón (además de tus ofertas de siempre). Ves cuántos la vieron y la tocaron.')
 $$;
 
 create or replace function public.cfx_venta() returns jsonb
@@ -9669,6 +9672,9 @@ create index if not exists cfx_anuncios_campana_idx on public.cfx_anuncios (camp
 create table if not exists public.cfx_anuncio_vistos (
   anuncio uuid not null references public.cfx_anuncios (id) on delete cascade, cuenta uuid not null,
   visto timestamptz not null default now(), clic timestamptz, cerrado timestamptz, primary key (anuncio, cuenta));
+-- G96 b 📣 Promos del negocio a SUS clientes: misma tabla, con negocio (null = de CodeFix). Solo las ven sus clientes (gancho de la app).
+alter table public.cfx_anuncios add column if not exists negocio uuid;
+create index if not exists cfx_anuncios_negocio_idx on public.cfx_anuncios (negocio) where negocio is not null;
 alter table public.cfx_anuncios enable row level security;
 alter table public.cfx_anuncio_vistos enable row level security;
 revoke all on public.cfx_anuncios, public.cfx_anuncio_vistos from anon, authenticated;
@@ -9716,8 +9722,76 @@ begin
   return coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'campana', a.campana, 'titulo', a.titulo, 'activo', a.activo,
     'vistas', (select count(*) from public.cfx_anuncio_vistos v where v.anuncio = a.id),
     'clics', (select count(*) from public.cfx_anuncio_vistos v where v.anuncio = a.id and v.clic is not null),
-    'cierres', (select count(*) from public.cfx_anuncio_vistos v where v.anuncio = a.id and v.cerrado is not null)) order by a.creado) from public.cfx_anuncios a), '[]');
+    'cierres', (select count(*) from public.cfx_anuncio_vistos v where v.anuncio = a.id and v.cerrado is not null)) order by a.creado) from public.cfx_anuncios a where a.negocio is null), '[]');
 end $$;
+
+-- G96 b 📣 PROMOS DEL NEGOCIO. Gancho de cada app que tiene clientes con cuenta (y 'promos' en cfx_modulos_app()):
+--   cfx_promo_negocios_app(u) jsonb   [{"n": negocio, "nombre": "Barbería Juan"}] de los que u es cliente (sin gancho: ninguno).
+-- Módulo 'promos' (con la venta de módulos apagada: Premium). Máx. 3 activas y 10 guardadas por negocio. Validado aquí.
+create or replace function public.cfx_promo_negocios(u uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare r jsonb;
+begin
+  if u is null or to_regprocedure('public.cfx_promo_negocios_app(uuid)') is null then return '[]'; end if;
+  execute 'select public.cfx_promo_negocios_app($1)' into r using u;
+  return case when jsonb_typeof(r) = 'array' then r else '[]' end;
+end $$;
+create or replace function public.cfx_promos_puede(n uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select n is not null and case when public.cfx_venta_on() and 'promos' = any (public.cfx_modulos_de_app()) then public.cfx_modulo_de('promos', n)
+    else public.cfx_negocio_premium(n) end
+$$;
+-- El negocio de quien llama, solo si es el dueño (null si no).
+create or replace function public.cfx_promo_mi_negocio() returns uuid
+language sql stable security definer set search_path = '' as $$
+  select n from (select public.cfx_negocio_cuenta(auth.uid()) n) x where n is not null and public.cfx_negocio_dueno(n) = auth.uid()
+$$;
+create or replace function public.cfx_promos_mias() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.cfx_promo_mi_negocio();
+begin
+  if n is null then raise exception 'Solo el dueño del negocio'; end if;
+  return jsonb_build_object('puede', public.cfx_promos_puede(n), 'lista', coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'titulo', a.titulo, 'texto', a.texto,
+    'imagen', a.imagen, 'boton', a.boton, 'link', a.link, 'desde', a.desde, 'hasta', a.hasta, 'activo', a.activo,
+    'vistas', (select count(*) from public.cfx_anuncio_vistos v where v.anuncio = a.id),
+    'clics', (select count(*) from public.cfx_anuncio_vistos v where v.anuncio = a.id and v.clic is not null),
+    'cierres', (select count(*) from public.cfx_anuncio_vistos v where v.anuncio = a.id and v.cerrado is not null)) order by a.creado desc)
+    from public.cfx_anuncios a where a.negocio = n), '[]'));
+end $$;
+create or replace function public.cfx_promo_guardar(p jsonb) returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.cfx_promo_mi_negocio(); i uuid := nullif(p ->> 'id', '')::uuid; r uuid; act boolean := coalesce((p ->> 'activo')::boolean, true);
+  lk text := trim(coalesce(p ->> 'link', '')); de date := nullif(p ->> 'desde', '')::date; ha date := nullif(p ->> 'hasta', '')::date;
+begin
+  if n is null then raise exception 'Solo el dueño del negocio'; end if;
+  if not public.cfx_promos_puede(n) then raise exception '📣 Promo destacada es un módulo 🧩: actívalo en Mi plan y módulos'; end if;
+  if length(trim(coalesce(p ->> 'titulo', ''))) = 0 then raise exception 'Escribe el título de la promo'; end if;
+  if lk <> '' and lk !~ '^https://' then raise exception 'El link debe partir con https://'; end if;
+  if ha is not null and de is not null and ha < de then raise exception 'La fecha de término es antes del inicio'; end if;
+  if i is null and (select count(*) from public.cfx_anuncios where negocio = n) >= 10 then raise exception 'Máximo 10 promos guardadas: borra alguna'; end if;
+  if act and (select count(*) from public.cfx_anuncios where negocio = n and activo and id is distinct from i) >= 3 then raise exception 'Máximo 3 promos activas a la vez: pausa alguna'; end if;
+  if i is null then
+    insert into public.cfx_anuncios (id, campana, negocio, publico, titulo, texto, imagen, boton, link, desde, hasta, activo)
+    values (gen_random_uuid(), gen_random_uuid(), n, 'clientes', left(trim(p ->> 'titulo'), 80), left(trim(coalesce(p ->> 'texto', '')), 240), trim(coalesce(p ->> 'imagen', '')),
+            case when lk = '' then '' else left(trim(coalesce(nullif(p ->> 'boton', ''), 'Ver')), 30) end, lk, de, ha, act) returning id into r;
+  else
+    update public.cfx_anuncios set titulo = left(trim(p ->> 'titulo'), 80), texto = left(trim(coalesce(p ->> 'texto', '')), 240), imagen = trim(coalesce(p ->> 'imagen', '')),
+      boton = case when lk = '' then '' else left(trim(coalesce(nullif(p ->> 'boton', ''), 'Ver')), 30) end, link = lk, desde = de, hasta = ha, activo = act
+    where id = i and negocio = n returning id into r;
+    if r is null then raise exception 'Promo no encontrada'; end if;
+  end if;
+  return r;
+end $$;
+create or replace function public.cfx_promo_borrar(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.cfx_promo_mi_negocio();
+begin
+  if n is null then raise exception 'Solo el dueño del negocio'; end if;
+  delete from public.cfx_anuncios where id = p_id and negocio = n;
+end $$;
+revoke all on function public.cfx_promo_negocios(uuid), public.cfx_promos_puede(uuid), public.cfx_promo_mi_negocio() from public, anon, authenticated;
+revoke all on function public.cfx_promos_mias(), public.cfx_promo_guardar(jsonb), public.cfx_promo_borrar(uuid) from public, anon;
+grant execute on function public.cfx_promos_mias(), public.cfx_promo_guardar(jsonb), public.cfx_promo_borrar(uuid) to authenticated;
 
 -- Lo que ve la persona: anuncios activos, vigentes, de su público y que no cerró (máx. 3). La app no los pide para admin/socio.
 create or replace function public.cfx_anuncios_ver() returns jsonb
@@ -9725,12 +9799,15 @@ language plpgsql security definer set search_path = '' as $$
 declare u uuid := auth.uid(); hoy date := (now() at time zone 'America/Santiago')::date;
 begin
   if u is null then return '[]'; end if;
-  return coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'titulo', a.titulo, 'texto', a.texto, 'imagen', a.imagen, 'boton', a.boton, 'link', a.link) order by a.orden, a.creado)
-    from (select * from public.cfx_anuncios a
+  -- G96 b: + 📣 promos de los negocios de los que es cliente (con el nombre del negocio en 'de'), después de las de CodeFix.
+  return coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'titulo', a.titulo, 'texto', a.texto, 'imagen', a.imagen, 'boton', a.boton, 'link', a.link, 'de', a.de) order by a.k, a.orden, a.creado)
+    from (select a.*, case when a.negocio is null then 0 else 1 end k, (select x ->> 'nombre' from jsonb_array_elements(ng) x where x ->> 'n' = a.negocio::text limit 1) de
+          from public.cfx_anuncios a, (select public.cfx_promo_negocios(u) ng) g
           where a.activo and (a.desde is null or a.desde <= hoy) and (a.hasta is null or a.hasta >= hoy)
             and not exists (select 1 from public.cfx_anuncio_vistos v where v.anuncio = a.id and v.cuenta = u and v.cerrado is not null)
-            and (a.publico = 'todos' or u in (select d from public.cfx_destinatarios(a.publico) d))
-          order by a.orden, a.creado limit 3) a), '[]');
+            and (case when a.negocio is null then a.publico = 'todos' or u in (select d from public.cfx_destinatarios(a.publico) d)
+                      else exists (select 1 from jsonb_array_elements(ng) x where x ->> 'n' = a.negocio::text) and public.cfx_promos_puede(a.negocio) end)
+          order by case when a.negocio is null then 0 else 1 end, a.orden, a.creado limit 3) a), '[]');
 end $$;
 
 -- Marca vista / clic / cierre (una fila por persona y anuncio: no se infla contando de nuevo).
@@ -10965,3 +11042,172 @@ grant execute on function public.giftcard_crear(int, text, text, text), public.g
   public.giftcard_saldo(uuid, text), public.suscripcion_guardar(jsonb), public.suscripciones_lista(), public.suscripcion_estado(uuid, boolean),
   public.suscripcion_borrar(uuid), public.mis_suscripciones(), public.proveedores_lista(), public.proveedor_guardar(uuid, text, text, text),
   public.proveedor_borrar(uuid), public.producto_minimo(text, int, uuid), public.pedido_proveedor(uuid) to authenticated;
+
+-- =====================================================================
+--  VERSIÓN 5.73 · G96 b 🏬 SUCURSALES Y BODEGAS (módulo 'sucursales') · 📣 PROMOS EN LA APP de tus clientes (módulo 'promos', núcleo).
+--  Sucursales: el stock de siempre (catalog_items.stock) sigue siendo el TOTAL que ve la tienda online. Cada sucursal extra guarda
+--  cuánto de ese total está ahí; la principal (Casa matriz) es lo que queda (total − sucursales). Así los pedidos online, la Caja sin
+--  sucursal y "entró mercadería" siguen igual (cuentan en la principal) y nada de lo de antes cambia. Las opciones (talla/color) van en el total.
+-- =====================================================================
+create table if not exists public.bodegas (
+  id          uuid primary key default gen_random_uuid(),
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  nombre      text not null check (length(nombre) between 1 and 40),
+  direccion   text check (length(direccion) <= 120),
+  telefono    text check (length(telefono) <= 16),
+  principal   boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create unique index if not exists bodegas_principal_idx on public.bodegas (negocio_id) where principal;
+create index if not exists bodegas_negocio_idx on public.bodegas (negocio_id, created_at);
+alter table public.bodegas enable row level security;
+revoke all on public.bodegas from anon, authenticated;
+create table if not exists public.stock_bodega (
+  bodega_id   uuid not null references public.bodegas (id) on delete cascade,
+  negocio_id  uuid not null references public.profiles (id) on delete cascade,
+  clave       text not null,
+  cant        int not null default 0 check (cant between 0 and 1000000),
+  primary key (bodega_id, clave)
+);
+create index if not exists stock_bodega_negocio_idx on public.stock_bodega (negocio_id, clave);
+alter table public.stock_bodega enable row level security;
+revoke all on public.stock_bodega from anon, authenticated;
+
+-- Lo que hay en las sucursales que NO son la principal (para calcular la principal).
+create or replace function public.stock_fuera(n uuid, k text) returns int
+language sql stable security definer set search_path = '' as $$
+  select coalesce(sum(s.cant), 0)::int from public.stock_bodega s join public.bodegas b on b.id = s.bodega_id and not b.principal where s.negocio_id = n and s.clave = k
+$$;
+create or replace function public.bodegas_lista() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); inv boolean := public.equipo_puede('inventario');
+begin
+  if n is null or not (inv or public.equipo_puede('caja')) then raise exception 'Sin permiso'; end if;
+  if not public.pro_o_modulo(n, 'sucursales') then raise exception '🏬 Sucursales y bodegas es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  return jsonb_build_object('dueno', n = auth.uid(),
+    'bodegas', coalesce((select jsonb_agg(jsonb_build_object('id', b.id, 'nombre', b.nombre, 'direccion', b.direccion, 'telefono', b.telefono, 'principal', b.principal)
+      order by b.principal desc, b.created_at) from public.bodegas b where b.negocio_id = n), '[]'),
+    'productos', case when inv then coalesce((select jsonb_agg(jsonb_build_object('clave', c.client_key, 'nombre', c.nombre, 'total', c.stock,
+        'principal', case when c.stock is null then null else c.stock - public.stock_fuera(n, c.client_key) end,
+        'en', coalesce((select jsonb_object_agg(s.bodega_id, s.cant) from public.stock_bodega s where s.negocio_id = n and s.clave = c.client_key), '{}'))
+      order by c.nombre) from public.catalog_items c where c.owner_id = n), '[]') else '[]' end);
+end $$;
+-- Crear / editar una sucursal (solo el dueño). La primera vez crea también la principal ("Casa matriz", se puede renombrar).
+create or replace function public.bodega_guardar(p_id uuid, p_nombre text, p_direccion text default null, p_tel text default null) returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); r uuid; t text := regexp_replace(coalesce(p_tel, ''), '\D', '', 'g');
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  if not public.pro_o_modulo(n, 'sucursales') then raise exception '🏬 Sucursales y bodegas es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if coalesce(trim(p_nombre), '') = '' then raise exception 'Escribe el nombre de la sucursal'; end if;
+  if length(t) = 9 and left(t, 1) = '9' then t := '56' || t; end if;
+  if t <> '' and t !~ '^56\d{9}$' then raise exception 'Teléfono: +56 y 9 números'; end if;
+  if not exists (select 1 from public.bodegas where negocio_id = n and principal) then
+    insert into public.bodegas (negocio_id, nombre, principal) values (n, 'Casa matriz', true);
+  end if;
+  if p_id is null then
+    if (select count(*) from public.bodegas where negocio_id = n) >= 20 then raise exception 'Máximo 20 sucursales'; end if;
+    insert into public.bodegas (negocio_id, nombre, direccion, telefono) values (n, left(trim(p_nombre), 40), nullif(left(trim(coalesce(p_direccion, '')), 120), ''), nullif(t, ''))
+    returning id into r;
+  else
+    update public.bodegas set nombre = left(trim(p_nombre), 40), direccion = nullif(left(trim(coalesce(p_direccion, '')), 120), ''), telefono = nullif(t, '')
+    where id = p_id and negocio_id = n returning id into r;
+    if r is null then raise exception 'Sucursal no encontrada'; end if;
+  end if;
+  return r;
+end $$;
+-- Borrar una sucursal: lo que tenía vuelve a la principal (el total no cambia; nada se pierde). La principal no se borra.
+create or replace function public.bodega_borrar(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  if exists (select 1 from public.bodegas where id = p_id and negocio_id = n and principal) then raise exception 'La principal no se borra (puedes cambiarle el nombre)'; end if;
+  delete from public.bodegas where id = p_id and negocio_id = n;
+end $$;
+-- Contar lo que hay en una sucursal: el total sube o baja lo mismo (la principal no cambia).
+create or replace function public.bodega_stock_fijar(p_bodega uuid, p_clave text, p_cant int) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); b public.bodegas; c public.catalog_items; antes int; fuera int;
+begin
+  if n is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso para el inventario'; end if;
+  if not public.pro_o_modulo(n, 'sucursales') then raise exception '🏬 Sucursales y bodegas es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if p_cant is null or p_cant < 0 or p_cant > 1000000 then raise exception 'Cantidad no válida'; end if;
+  select * into b from public.bodegas where id = p_bodega and negocio_id = n;
+  if b.id is null then raise exception 'Sucursal no encontrada'; end if;
+  select * into c from public.catalog_items where owner_id = n and client_key = p_clave for update;
+  if c.id is null then raise exception 'Publica el producto primero'; end if;
+  fuera := public.stock_fuera(n, p_clave);
+  if b.principal then
+    update public.catalog_items set stock = fuera + p_cant, updated_at = now() where id = c.id;
+  else
+    antes := coalesce((select cant from public.stock_bodega where bodega_id = b.id and clave = p_clave), 0);
+    insert into public.stock_bodega (bodega_id, negocio_id, clave, cant) values (b.id, n, p_clave, p_cant)
+    on conflict (bodega_id, clave) do update set cant = excluded.cant;
+    update public.catalog_items set stock = greatest(fuera - antes + p_cant, coalesce(c.stock, 0) - antes + p_cant), updated_at = now() where id = c.id;
+  end if;
+  return jsonb_build_object('total', (select stock from public.catalog_items where id = c.id), 'principal', (select stock from public.catalog_items where id = c.id) - public.stock_fuera(n, p_clave));
+end $$;
+-- Mover mercadería entre sucursales (el total no cambia).
+create or replace function public.bodega_mover(p_clave text, p_de uuid, p_a uuid, p_cant int) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); de public.bodegas; a public.bodegas; hay int;
+begin
+  if n is null or not public.equipo_puede('inventario') then raise exception 'Sin permiso para el inventario'; end if;
+  if not public.pro_o_modulo(n, 'sucursales') then raise exception '🏬 Sucursales y bodegas es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  if p_cant is null or p_cant <= 0 or p_cant > 1000000 then raise exception 'Cantidad no válida'; end if;
+  select * into de from public.bodegas where id = p_de and negocio_id = n;
+  select * into a from public.bodegas where id = p_a and negocio_id = n;
+  if de.id is null or a.id is null or de.id = a.id then raise exception 'Elige de dónde y a dónde'; end if;
+  perform 1 from public.catalog_items where owner_id = n and client_key = p_clave for update;
+  if not found then raise exception 'Producto no encontrado'; end if;
+  hay := case when de.principal then coalesce((select stock from public.catalog_items where owner_id = n and client_key = p_clave), 0) - public.stock_fuera(n, p_clave)
+              else coalesce((select cant from public.stock_bodega where bodega_id = de.id and clave = p_clave), 0) end;
+  if p_cant > hay then raise exception 'En % hay %', de.nombre, greatest(hay, 0); end if;
+  if not de.principal then update public.stock_bodega set cant = cant - p_cant where bodega_id = de.id and clave = p_clave; end if;
+  if not a.principal then
+    insert into public.stock_bodega (bodega_id, negocio_id, clave, cant) values (a.id, n, p_clave, p_cant)
+    on conflict (bodega_id, clave) do update set cant = public.stock_bodega.cant + excluded.cant;
+  end if;
+end $$;
+
+-- Venta en la Caja: igual que antes; si la línea trae "bodega" (Caja de una sucursal), también baja ahí.
+create or replace function public.caja_descontar(p_items jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); it jsonb; c int; bg uuid; mod boolean;
+begin
+  if n is null or not public.equipo_puede('caja') then raise exception 'Sin permiso para vender en la Caja'; end if;
+  if jsonb_typeof(coalesce(p_items, '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p_items, '[]'::jsonb)) > 500 then raise exception 'Lista no válida'; end if;
+  mod := public.pro_o_modulo(n, 'sucursales');
+  for it in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
+    c := least(greatest(coalesce((it ->> 'cant')::int, 0), 0), 999);
+    continue when c = 0;
+    update public.catalog_items set stock = greatest(0, stock - c)
+    where owner_id = n and client_key = it ->> 'clave' and stock is not null;
+    if nullif(trim(coalesce(it ->> 'opcion', '')), '') is not null then
+      update public.variantes set stock = greatest(0, stock - c)
+      where owner_id = n and clave = it ->> 'clave' and lower(nombre) = lower(trim(it ->> 'opcion')) and stock is not null;
+    end if;
+    bg := case when mod and coalesce(it ->> 'bodega', '') ~ '^[0-9a-f-]{36}$' then (it ->> 'bodega')::uuid end;
+    if bg is not null then
+      update public.stock_bodega s set cant = greatest(0, s.cant - c) from public.bodegas b
+      where s.bodega_id = bg and s.clave = it ->> 'clave' and b.id = s.bodega_id and b.negocio_id = n and not b.principal;
+    end if;
+  end loop;
+end $$;
+
+-- 📣 Promos (núcleo): los clientes de Despega son de UNA tienda (profiles.negocio_id).
+create or replace function public.cfx_promo_negocios_app(u uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select jsonb_agg(jsonb_build_object('n', n.id, 'nombre', coalesce(nullif(n.empresa, ''), 'Tu tienda')))
+    from public.profiles c join public.profiles n on n.id = c.negocio_id where c.id = u and c.role = 'client' and not n.suspended), '[]')
+$$;
+revoke all on function public.cfx_promo_negocios_app(uuid), public.stock_fuera(uuid, text) from public, anon, authenticated;
+revoke all on function public.bodegas_lista(), public.bodega_guardar(uuid, text, text, text), public.bodega_borrar(uuid), public.bodega_stock_fijar(uuid, text, int),
+  public.bodega_mover(text, uuid, uuid, int), public.caja_descontar(jsonb) from public, anon;
+grant execute on function public.bodegas_lista(), public.bodega_guardar(uuid, text, text, text), public.bodega_borrar(uuid), public.bodega_stock_fijar(uuid, text, int),
+  public.bodega_mover(text, uuid, uuid, int), public.caja_descontar(jsonb) to authenticated;
+
+create or replace function public.cfx_modulos_app() returns text[]
+language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio', 'giftcards', 'suscripciones', 'proveedores', 'sucursales', 'promos'] $$;  -- G96 b: +2
+revoke all on function public.cfx_modulos_app() from public, anon, authenticated;

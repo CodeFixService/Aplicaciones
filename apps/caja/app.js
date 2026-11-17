@@ -345,6 +345,17 @@
   $('bBol').onclick = (e) => boletaVenta(ultimaVenta, e.currentTarget);
   // G96 🎁 Gift card como medio de pago (módulo): el servidor descuenta el saldo antes de registrar la venta.
   if (!esCliente && Cuenta.puede('giftcards') && $('mGift')) $('mGift').hidden = false;
+  // G96 b 🏬 Sucursales (módulo): elige desde qué sucursal vendes; la venta baja también ahí (la principal = lo de siempre).
+  let sucursal = '';
+  if (!esCliente && Cuenta.puede('sucursales') && $('sucursal')) {
+    Cuenta.rpc('bodegas_lista').then((d) => {
+      const B = (d && d.bodegas) || []; if (B.length < 2) return;
+      const g = db.get('sucursal', ''); sucursal = B.some((b) => b.id === g && !b.principal) ? g : '';
+      $('sucursal').innerHTML = B.map((b) => '<option value="' + (b.principal ? '' : Core.esc(b.id)) + '">' + Core.esc(b.nombre) + '</option>').join('');
+      $('sucursal').value = sucursal; $('rowSucursal').hidden = false;
+      $('sucursal').onchange = () => { sucursal = $('sucursal').value; db.set('sucursal', sucursal); };
+    }).catch(() => { /* base sin sucursales: como siempre */ });
+  }
   $('bCobrar').onclick = async () => {
     if (!ticket.length) return Core.toast('La venta está vacía');
     if (medio === 'giftcard') {
@@ -364,7 +375,7 @@
       if (v && v.stock != null) v.stock = Math.max(0, v.stock - l.cant);
     });
     db.set('ventas', ventas); guardarProductos(); renderInv();
-    ticket.forEach((l) => { const p = productos.find((x) => x.id === l.id); if (p && p.publicado) pendStock.push(l.opcion ? { clave: p.id, cant: l.cant, opcion: l.opcion } : { clave: p.id, cant: l.cant }); });
+    ticket.forEach((l) => { const p = productos.find((x) => x.id === l.id); if (p && p.publicado) pendStock.push(Object.assign(l.opcion ? { clave: p.id, cant: l.cant, opcion: l.opcion } : { clave: p.id, cant: l.cant }, sucursal ? { bodega: sucursal } : {})); });
     db.set('stockPend', pendStock); enviarStock();
     const low = productos.filter((p) => p.stock !== '' && p.stock <= 3);
     if (low.length) Core.notify('Stock bajo', { body: low.map((p) => p.nombre + ' (' + p.stock + ')').join(', ') });

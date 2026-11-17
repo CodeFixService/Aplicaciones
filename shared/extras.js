@@ -191,5 +191,65 @@
     };
   }
 
-  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores };
+  /* ---------- 🏬 Sucursales y bodegas (G96 b) ---------- */
+  // El total de siempre es lo que ve la tienda online; cada sucursal guarda su parte y la principal es lo que queda.
+  async function sucursales(z, o) {
+    if (!puede('sucursales')) return candado(z, 'sucursales', 'Lleva el stock separado por local o bodega: la Caja de cada sucursal descuenta de lo suyo y mueves mercadería entre ellas con un toque.', o);
+    let d; try { d = await R('bodegas_lista'); } catch (e) { return error(z, e); }
+    const B = d.bodegas, otras = B.filter((b) => !b.principal), nom = (id) => (B.find((b) => b.id === id) || {}).nombre || '';
+    const opt = (sel) => B.map((b) => '<option value="' + esc(b.id) + '"' + (b.id === sel ? ' selected' : '') + '>' + esc(b.nombre) + '</option>').join('');
+    const cant = (p, b) => b.principal ? (p.principal == null ? '' : Math.max(0, p.principal)) : (p.en[b.id] == null ? '' : p.en[b.id]);
+    const c = caja(z, '<p class="muted">El stock total es el que ve tu tienda online. Cada sucursal tiene su parte; la principal es lo que queda. En la Caja eliges desde qué sucursal vendes.</p>' +
+      '<h3>Sucursales</h3>' + (B.length ? B.map((b) => '<div class="gx-f"><div><b>' + (b.principal ? '⭐ ' : '🏬 ') + esc(b.nombre) + '</b><br><small class="muted">' +
+        (b.principal ? 'Principal · aquí suman los pedidos online y la mercadería nueva' : esc(b.direccion || 'Sin dirección') + (b.telefono ? ' · +' + esc(b.telefono) : '')) + '</small></div>' +
+        (d.dueno ? '<div class="btns"><button type="button" class="small alt" data-ren="' + esc(b.id) + '" aria-label="Cambiar nombre de ' + esc(b.nombre) + '">✏️</button>' +
+          (b.principal ? '' : '<button type="button" class="small alt" data-borrarb="' + esc(b.id) + '" aria-label="Borrar sucursal ' + esc(b.nombre) + '">🗑️</button>') + '</div>' : '') + '</div>').join('')
+        : '<p class="muted">Aún no tienes sucursales. Agrega la primera: tu stock de hoy queda en la principal (Casa matriz).</p>') +
+      (d.dueno ? '<div class="gx-row" style="margin-top:6px"><input id="gxBn" maxlength="40" placeholder="Nombre" aria-label="Nombre de la sucursal">' +
+        '<input id="gxBd" maxlength="120" placeholder="Dirección" aria-label="Dirección de la sucursal"></div>' +
+        '<button type="button" class="small" data-gx="bodega" style="margin-top:6px">+ Agregar sucursal</button>' : '') +
+      (otras.length && d.productos.length ? '<h3>⇄ Mover mercadería</h3><label for="gxMp">Producto</label><select id="gxMp">' +
+        d.productos.map((p) => '<option value="' + esc(p.clave) + '">' + esc(p.nombre) + '</option>').join('') + '</select>' +
+        '<div class="gx-row"><div><label for="gxMde">Desde</label><select id="gxMde">' + opt(B[0].id) + '</select></div><div><label for="gxMa">Hacia</label><select id="gxMa">' + opt(otras[0].id) + '</select></div></div>' +
+        '<label for="gxMc">Cantidad</label><input id="gxMc" type="number" inputmode="numeric" min="1" placeholder="10">' +
+        '<button type="button" class="ok" data-gx="mover" style="width:100%;margin-top:8px">⇄ Mover</button>' : '') +
+      (otras.length ? '<h3>Stock por sucursal</h3><p class="muted">Escribe lo que contaste en cada una. Las opciones (talla, color) se cuentan en el total.</p>' +
+        (d.productos.length ? d.productos.map((p, i) => '<div class="gx-f"><div><b>' + esc(p.nombre) + '</b><br><small class="muted">Total: ' + (p.total == null ? 'sin contar' : p.total) +
+          (p.principal != null && p.principal < 0 ? ' · <span class="gx-bajo">⚠️ revisa: las sucursales suman más que el total</span>' : '') + '</small>' +
+          '<div class="gx-row">' + B.map((b) => '<div><small>' + esc(b.nombre) + '</small><input type="number" min="0" inputmode="numeric" data-p="' + i + '" data-b="' + esc(b.id) + '" value="' + cant(p, b) +
+            '" aria-label="Stock de ' + esc(p.nombre) + ' en ' + esc(b.nombre) + '"></div>').join('') + '</div></div></div>').join('')
+          : '<p class="muted">Publica tus productos primero (Más → Productos).</p>') : ''));
+    c.onchange = async (ev) => {
+      const t = ev.target; if (t.dataset.p == null || !t.dataset.b) return;
+      const p = d.productos[+t.dataset.p], v = t.value === '' ? 0 : Math.round(+t.value);
+      if (!(v >= 0)) return Core.toast('Cantidad no válida');
+      try { await R('bodega_stock_fijar', { p_bodega: t.dataset.b, p_clave: p.clave, p_cant: v }); Core.toast('✅ ' + p.nombre + ' en ' + nom(t.dataset.b) + ': ' + v); sucursales(z, o); } catch (e) { Core.toast('⚠️ ' + e.message); }
+    };
+    c.onclick = async (ev) => {
+      const b = ev.target.closest('button'); if (!b) return;
+      try {
+        if (b.dataset.gx === 'bodega') {
+          await R('bodega_guardar', { p_id: null, p_nombre: c.querySelector('#gxBn').value, p_direccion: c.querySelector('#gxBd').value, p_tel: null });
+          Core.toast('🏬 Sucursal agregada'); return sucursales(z, o);
+        }
+        if (b.dataset.gx === 'mover') {
+          const n = Math.round(+c.querySelector('#gxMc').value || 0); if (n <= 0) return Core.toast('Escribe cuántos mueves');
+          await R('bodega_mover', { p_clave: c.querySelector('#gxMp').value, p_de: c.querySelector('#gxMde').value, p_a: c.querySelector('#gxMa').value, p_cant: n });
+          Core.toast('⇄ Movidos ' + n); return sucursales(z, o);
+        }
+        if (b.dataset.ren) {
+          const x = B.find((y) => y.id === b.dataset.ren); const nn = await Core.pedir('Nombre de la sucursal', x.nombre); if (!nn) return;
+          await R('bodega_guardar', { p_id: x.id, p_nombre: nn, p_direccion: x.direccion, p_tel: x.telefono }); return sucursales(z, o);
+        }
+        if (b.dataset.borrarb) {
+          if (!(await Core.confirmar('¿Borrar la sucursal ' + nom(b.dataset.borrarb) + '? Lo que tenía vuelve a la principal (no se pierde stock).'))) return;
+          await R('bodega_borrar', { p_id: b.dataset.borrarb }); Core.toast('Sucursal borrada'); return sucursales(z, o);
+        }
+      } catch (e) { Core.toast('⚠️ ' + e.message); }
+    };
+  }
+  // 📣 Promos en la app de tus clientes (núcleo).
+  const promos = (z, o) => window.CFX_ANUNCIOS && CFX_ANUNCIOS.promos ? CFX_ANUNCIOS.promos(z, { rpc: R, probar: o.probar }) : error(z, 'Actualiza la app');
+
+  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores, sucursales, promos };
 })();
