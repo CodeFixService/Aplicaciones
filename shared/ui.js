@@ -348,7 +348,8 @@
     const pausar = () => { if (ido || v.classList.contains('pausa')) return; clearTimeout(fin); resta = Math.max(400, resta - (Date.now() - desde)); v.classList.add('pausa'); };
     const seguir = () => { if (ido || !v.classList.contains('pausa')) return; v.classList.remove('pausa'); correr(); };
     function cerrar(ya) {
-      if (ido) return; ido = true; clearTimeout(fin); v.classList.add('sale');
+      if (ido) { if (ya) v.remove(); return; }  // 🐞 barrido: el 4.º aviso con el más viejo ya saliendo colgaba la página (while sin fin)
+      ido = true; clearTimeout(fin); v.classList.add('sale');
       if (ya || quieto()) v.remove(); else setTimeout(() => v.remove(), 260);
     }
     v._cerrar = cerrar;

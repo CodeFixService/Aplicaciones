@@ -85,6 +85,10 @@
   }
   const CSS = '.cfx-comp{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;padding:0;background:rgba(0,0,0,.45)}' +
     '.cfx-comp>div{width:100%;max-width:520px;max-height:94vh;overflow:auto;display:grid;gap:8px;margin:0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111);border-radius:20px 20px 0 0;box-sizing:border-box}' +
+    // Barrido: estilo de respaldo con especificidad 0 (:where) → si la app ya pinta button/.ok/.alt, gana la app; si no (Estaciona usa .btn), igual se ven botones.
+    ':where(.cfx-comp) :where(button,a.btn){appearance:none;border:0;border-radius:12px;padding:12px 16px;min-height:44px;font:700 15px var(--cfx-letra,system-ui);cursor:pointer;background:var(--cfx-campo,#eef2f6);color:var(--cfx-texto,#111);display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;box-sizing:border-box;box-shadow:inset 0 0 0 1px var(--cfx-borde,#dce3ea)}' +
+    ':where(.cfx-comp) :where(button.ok,a.btn.ok){background:var(--cfx-ok,#16a34a);color:#fff;box-shadow:none}:where(.cfx-comp) :where(button.ghost){background:transparent;box-shadow:none}' +
+    ':where(.cfx-comp) :where(button.small){padding:7px 12px;min-height:34px;font-size:13px;border-radius:10px}' +
     '.cfx-comp>div>b{font-size:16px}.cfx-comp>div>button,.cfx-comp>div>a.btn{width:100%}.cfx-comp input{width:100%;box-sizing:border-box}' +
     '@media(min-width:640px){.cfx-comp{align-items:center}.cfx-comp>div{border-radius:20px}}' +
     '.cfx-comp .cb-papel{background:#fff;color:#111;border-radius:6px;padding:14px 14px 10px;font:13px/1.35 ui-monospace,Menlo,Consolas,monospace;max-height:52vh;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.2)}' +
