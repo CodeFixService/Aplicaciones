@@ -543,7 +543,17 @@
   const objetivo = (ev) => { const el = ev.target && ev.target.closest && ev.target.closest('select, input'); return sirve(el) ? el : null; };
   let porToque = 0;
   d.addEventListener('mousedown', (ev) => { if (ev.button === 0 && objetivo(ev)) ev.preventDefault(); }, true);
-  d.addEventListener('touchend', (ev) => { const el = objetivo(ev); if (!el) return; ev.preventDefault(); porToque = Date.now(); abrir(el); }, { capture: true, passive: false });
+  // Solo un TOQUE abre: si el dedo se movió (deslizar la pantalla), no se abre nada.
+  let t0 = null;
+  d.addEventListener('touchstart', (ev) => { const t = ev.touches[0]; t0 = ev.touches.length === 1 && t ? { x: t.clientX, y: t.clientY } : null; }, { capture: true, passive: true });
+  d.addEventListener('touchmove', (ev) => { const t = ev.touches[0]; if (t0 && t && Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > 10) t0 = null; }, { capture: true, passive: true });
+  d.addEventListener('touchcancel', () => { t0 = null; }, { capture: true, passive: true });
+  d.addEventListener('touchend', (ev) => {
+    const el = objetivo(ev); if (!el) return;
+    const t = ev.changedTouches[0], toque = t0 && t && Math.hypot(t.clientX - t0.x, t.clientY - t0.y) <= 10; t0 = null;
+    porToque = Date.now(); if (!toque) return;  // deslizó: el click que pudiera venir tampoco abre
+    ev.preventDefault(); abrir(el);
+  }, { capture: true, passive: false });
   d.addEventListener('click', (ev) => {
     const el = objetivo(ev); if (!el) return;
     ev.preventDefault(); if (Date.now() - porToque < 600) return;
