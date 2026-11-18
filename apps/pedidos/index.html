@@ -194,10 +194,13 @@
   const PAGADO = ['preparando', 'listo', 'en_camino', 'entregado'];
   const COMPRADO = ['recibido'].concat(PAGADO);  // G25: 🧾 Detalle de compra apenas se confirma el pago
   const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
+  let etiq = new Set();
   async function cargar() {
     document.querySelectorAll('#filtros button').forEach((x) => { x.classList.toggle('on', x.dataset.f === filtro); x.classList.toggle('alt', x.dataset.f !== filtro); });
     try {
       pedidos = await Cuenta.rpc('pedidos_tienda', { p_estado: filtro || null });
+      // G102 🚚 Pedidos que ya tienen etiqueta Chilexpress (para 🖨️).
+      if (Cuenta.puede('courier')) try { etiq = new Set(await Cuenta.rpc('courier_con_etiqueta') || []); } catch (e) { /* sin módulo o base vieja */ }
       await bolP;
       // Sin comprobantes por revisar, se abre en "Activos" para que nunca quede oculto un pedido nuevo.
       if (auto && filtro === 'revisar' && !pedidos.length) { auto = false; filtro = 'activos'; return cargar(); }
@@ -263,6 +266,8 @@
         (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir boleta SII' : 'Anotar N° boleta SII') + '</button>' : '') +
         (p.devolucion === 'pendiente' ? '<button class="small" data-dev="' + p.id + '">💸 Ya devolví</button>' : '') +
         (p.entrega === 'despacho' && ['recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado) ? '<button class="small alt" data-env="' + p.id + '">🚚 ' + (p.envio && p.envio.codigo ? 'Cambiar seguimiento' : 'Seguimiento') + '</button>' : '') +
+        (etiq.has(p.id) ? '<button class="small alt" data-etv="' + p.id + '">🖨️ Etiqueta</button>'
+          : p.entrega === 'despacho' && Cuenta.puede('courier') && ['recibido', 'preparando', 'listo'].includes(p.estado) ? '<button class="small alt" data-etq="' + p.id + '">🏷️ Etiqueta Chilexpress</button>' : '') +
         (p.cliente_id ? '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' : '') +
         (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div>' +
         (p.estado === 'entregado' && !p.calificado ? '<div class="row" style="align-items:center;margin-top:10px"><span class="muted" style="flex:none">Califica al cliente:</span><span class="califica">' +
@@ -319,6 +324,9 @@
           Core.toast('🧾 Boleta anotada: le avisamos al cliente');
         }
       }
+      // G102 🏷️ Etiqueta Chilexpress (shared/extras.js): se abre en su hoja; al crearla, el seguimiento queda puesto solo.
+      if (b.dataset.etq) return EXTRAS.courierEtiqueta(b.dataset.etq, () => { cargar(); Cuenta.contar(); });
+      if (b.dataset.etv) return EXTRAS.verEtiqueta(await Cuenta.rpc('courier_etiqueta_ver', { p_id: b.dataset.etv }));
       if (b.dataset.dev) { await Cuenta.rpc('marcar_devuelto', { p_id: b.dataset.dev }); Core.toast('💸 Marcado como devuelto'); }
       if (b.dataset.env) {
         // 🚚 Courier + código: el cliente lo ve en su pedido y le llega por correo; si estaba preparándose, pasa a "En camino".
@@ -542,5 +550,6 @@
 <script src="../../shared/comprobante.js"></script>
 <script src="../../shared/impresora.js"></script>
 <script src="../../shared/ui.js"></script>
+<script src="../../shared/extras.js"></script>
 </body>
 </html>

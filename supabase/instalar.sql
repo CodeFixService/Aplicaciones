@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.76'::text $$;
+language sql immutable as $$ select '5.77'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7769,7 +7769,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.conexiones', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -8092,7 +8092,9 @@ language sql immutable as $$
          ('sucursales', '🏬 Sucursales y bodegas', 'Stock separado por local o bodega: vendes en la Caja desde cada sucursal y mueves mercadería entre ellas.'),
          ('promos', '📣 Promo destacada', 'Al abrir la app, tus clientes ven tu oferta en una tarjeta con foto y botón (además de tus ofertas de siempre). Ves cuántos la vieron y la tocaron.'),
          -- G101: 🛒 Mercado Libre (Despega).
-         ('mercadolibre', '🛒 Mercado Libre', 'Une tus productos con tus publicaciones de Mercado Libre: vendes allá y se descuenta aquí; cambias el stock aquí y se actualiza allá.')
+         ('mercadolibre', '🛒 Mercado Libre', 'Une tus productos con tus publicaciones de Mercado Libre: vendes allá y se descuenta aquí; cambias el stock aquí y se actualiza allá.'),
+         -- G102: 🚚 Courier Chilexpress (Despega).
+         ('courier', '🚚 Courier Chilexpress', 'Cotiza el envío y saca la etiqueta de Chilexpress desde el pedido: el código de seguimiento le llega solo a tu cliente.')
 $$;
 
 create or replace function public.cfx_venta() returns jsonb
@@ -11440,7 +11442,7 @@ grant execute on function public.bodegas_lista(), public.bodega_guardar(uuid, te
   public.bodega_mover(text, uuid, uuid, int), public.caja_descontar(jsonb) to authenticated;
 
 create or replace function public.cfx_modulos_app() returns text[]
-language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio', 'giftcards', 'suscripciones', 'proveedores', 'sucursales', 'promos', 'mercadolibre'] $$;  -- G96 b: +2 · G101: 🛒
+language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio', 'giftcards', 'suscripciones', 'proveedores', 'sucursales', 'promos', 'mercadolibre', 'courier'] $$;  -- G96 b: +2 · G101: 🛒 · G102: 🚚
 revoke all on function public.cfx_modulos_app() from public, anon, authenticated;
 
 -- =====================================================================
@@ -11750,3 +11752,310 @@ do $$ begin
   perform cron.unschedule('ml-sync') where exists (select 1 from cron.job where jobname = 'ml-sync');
   perform cron.schedule('ml-sync', '*/5 * * * *', 'select public.ml_sincronizar()');
 exception when others then null; end $$;
+
+-- =====================================================================
+--  🚚 G102 a Courier Chilexpress (módulo 'courier'): la tienda pone SUS llaves de la API de Chilexpress
+--  (developers.wschilexpress.com: Cotizador, Coberturas y Envíos) y su N° de cliente (TCC, del contrato).
+--  · 💲 Cotiza el envío a cualquier comuna (calculadora en Más → 🚚 Courier y al hacer la etiqueta).
+--  · 🏷️ Etiqueta desde Pedidos: crea la orden de transporte (OT), guarda la etiqueta para imprimir y pone el
+--    código de seguimiento solo (pedido_seguimiento → el cliente recibe el aviso "En camino").
+--  Las llaves viven en courier_cuentas sin políticas: nadie las lee desde la app. Todo se valida aquí (pro_o_modulo).
+-- =====================================================================
+create table if not exists public.courier_cuentas (
+  negocio_id uuid primary key references public.profiles (id) on delete cascade,
+  prueba boolean not null default false,
+  llave_cot text,
+  llave_cob text,
+  llave_env text,
+  tcc text,
+  origen text,
+  origen_cod text,
+  rem_nombre text,
+  rem_tel text,
+  rem_correo text,
+  rem_calle text,
+  rem_numero text,
+  rem_extra text,
+  peso numeric(6, 2) not null default 1,
+  tamano text not null default 'chica',
+  ultimo_error text,
+  actualizado timestamptz not null default now()
+);
+alter table public.courier_cuentas enable row level security;
+revoke all on public.courier_cuentas from anon, authenticated;
+-- Comunas de Chilexpress (código de cobertura). Datos públicos que se traen 1 vez al día como mucho.
+create table if not exists public.chx_comunas (
+  cod text primary key,
+  nombre text not null,
+  norm text not null,
+  region text,
+  at timestamptz not null default now()
+);
+create index if not exists chx_comunas_norm_idx on public.chx_comunas (norm);
+alter table public.chx_comunas enable row level security;
+revoke all on public.chx_comunas from anon, authenticated;
+create table if not exists public.courier_envios (
+  pedido_id uuid primary key references public.pedidos (id) on delete cascade,
+  negocio_id uuid not null references public.profiles (id) on delete cascade,
+  ot text not null,
+  servicio text,
+  valor int,
+  etiqueta text,
+  tipo text,
+  creado timestamptz not null default now()
+);
+create index if not exists courier_envios_negocio_idx on public.courier_envios (negocio_id, creado desc);
+alter table public.courier_envios enable row level security;
+revoke all on public.courier_envios from anon, authenticated;
+
+-- Llamada a la API de Chilexpress (solo dentro de la base). prueba = ambiente de pruebas (testservices).
+create or replace function public.chx_api(p_llave text, p_prueba boolean, p_metodo text, p_ruta text, p_cuerpo jsonb default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare st int; c text;
+begin
+  if nullif(p_llave, '') is null then return jsonb_build_object('status', 0, 'error', 'Falta la llave'); end if;
+  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '12');
+  execute 'select status, content from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+    using p_metodo, case when p_prueba then 'https://testservices.wschilexpress.com' else 'https://services.wschilexpress.com' end || p_ruta,
+          array[row('Ocp-Apim-Subscription-Key', p_llave)::extensions.http_header, row('Cache-Control', 'no-cache')::extensions.http_header],
+          'application/json', p_cuerpo::text;
+  return jsonb_build_object('status', st, 'body', case when c ~ '^\s*[\{\[]' then c::jsonb end);
+exception when others then
+  return jsonb_build_object('status', 0, 'error', sqlerrm);
+end $$;
+
+-- Mensaje de error de Chilexpress en palabras simples.
+create or replace function public.chx_error(r jsonb) returns text
+language sql immutable set search_path = '' as $$
+  select left(coalesce(case when (r ->> 'status') in ('401', '403') then 'la llave no es válida o no tiene ese servicio' end,
+    r #>> '{body,statusDescription}', r #>> '{body,message}', r #>> '{body,errors,0}', r ->> 'error', 'sin respuesta (' || coalesce(r ->> 'status', '0') || ')'), 200)
+$$;
+
+-- Código de cobertura de una comuna (por nombre). Si no está, trae las comunas de Chilexpress (1 vez al día como mucho).
+create or replace function public.chx_codigo(c public.courier_cuentas, p_comuna text) returns text
+language plpgsql security definer set search_path = '' as $$
+declare k text; nm text := public.cfx_comuna_norm(p_comuna); r jsonb; g jsonb; a jsonb; llave text := coalesce(nullif(c.llave_cob, ''), c.llave_cot);
+begin
+  if nm = '' then return null; end if;
+  select cod into k from public.chx_comunas where norm = nm order by cod limit 1;
+  if k is not null then return k; end if;
+  if exists (select 1 from public.chx_comunas where at > now() - interval '1 day') or llave is null then return null; end if;
+  r := public.chx_api(llave, c.prueba, 'GET', '/georeference/api/v1.0/regions');
+  if coalesce((r ->> 'status')::int, 0) <> 200 then
+    update public.courier_cuentas set ultimo_error = 'Coberturas: ' || public.chx_error(r) where negocio_id = c.negocio_id; return null;
+  end if;
+  for g in select * from jsonb_array_elements(coalesce(r #> '{body,regions}', '[]'::jsonb)) loop
+    continue when coalesce(g ->> 'regionId', '') !~ '^[A-Z0-9]{1,6}$';
+    a := public.chx_api(llave, c.prueba, 'GET', '/georeference/api/v1.0/coverage-areas?RegionCode=' || (g ->> 'regionId') || '&type=0');
+    insert into public.chx_comunas (cod, nombre, norm, region, at)
+    select left(x ->> 'countyCode', 12), left(x ->> 'countyName', 60), public.cfx_comuna_norm(x ->> 'countyName'), g ->> 'regionId', now()
+    from jsonb_array_elements(coalesce(a #> '{body,coverageAreas}', '[]'::jsonb)) x
+    where coalesce(x ->> 'countyCode', '') ~ '^[A-Z0-9]{2,12}$' and coalesce(x ->> 'countyName', '') <> ''
+    on conflict (cod) do update set nombre = excluded.nombre, norm = excluded.norm, region = excluded.region, at = now();
+  end loop;
+  select cod into k from public.chx_comunas where norm = nm order by cod limit 1;
+  return k;
+end $$;
+
+-- Medidas por tamaño (cm): sobre · chica · mediana · grande.
+create or replace function public.chx_medidas(t text) returns jsonb
+language sql immutable set search_path = '' as $$
+  select case coalesce(t, 'chica') when 'sobre' then '{"alto":2,"ancho":25,"largo":35}' when 'mediana' then '{"alto":20,"ancho":25,"largo":30}'
+    when 'grande' then '{"alto":30,"ancho":40,"largo":50}' else '{"alto":10,"ancho":15,"largo":20}' end::jsonb
+$$;
+
+create or replace function public.courier_negocio() returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid());
+begin
+  if n is null or n <> auth.uid() then raise exception 'Solo el dueño de la tienda'; end if;
+  if not public.pro_o_modulo(n, 'courier') then raise exception '🚚 Courier Chilexpress es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  return n;
+end $$;
+
+-- Dueño o equipo con Pedidos (para cotizar y hacer etiquetas).
+create or replace function public.courier_mio() returns public.courier_cuentas
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); c public.courier_cuentas;
+begin
+  if n is null or not public.equipo_puede('pedidos') then raise exception 'Sin permiso'; end if;
+  if not public.pro_o_modulo(n, 'courier') then raise exception '🚚 Courier Chilexpress es un módulo 🧩: actívalo en Más → Mi plan y módulos'; end if;
+  select * into c from public.courier_cuentas where negocio_id = n;
+  if c.negocio_id is null or c.llave_cot is null or c.origen_cod is null then raise exception 'Primero conecta Chilexpress en Más → 🚚 Courier'; end if;
+  return c;
+end $$;
+
+create or replace function public.courier_estado() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.courier_negocio(); c public.courier_cuentas; p public.profiles;
+begin
+  select * into c from public.courier_cuentas where negocio_id = n;
+  select * into p from public.profiles where id = n;
+  return jsonb_build_object('conectado', c.llave_cot is not null and c.origen_cod is not null, 'etiquetas', c.llave_env is not null and c.tcc is not null,
+    'prueba', coalesce(c.prueba, false), 'llave_cot', c.llave_cot is not null, 'llave_cob', c.llave_cob is not null, 'llave_env', c.llave_env is not null,
+    'tcc', case when c.tcc is not null then '•••' || right(c.tcc, 3) end, 'origen', c.origen,
+    'rem_nombre', coalesce(c.rem_nombre, p.empresa), 'rem_tel', coalesce(c.rem_tel, p.telefono), 'rem_correo', c.rem_correo,
+    'rem_calle', c.rem_calle, 'rem_numero', c.rem_numero, 'rem_extra', c.rem_extra,
+    'peso', coalesce(c.peso, 1), 'tamano', coalesce(c.tamano, 'chica'), 'error', c.ultimo_error,
+    'envios_mes', (select count(*) from public.courier_envios e where e.negocio_id = n and e.creado >= date_trunc('month', now())),
+    'ultimos', (select coalesce(jsonb_agg(jsonb_build_object('pedido', e.pedido_id, 'ot', e.ot, 'servicio', e.servicio, 'valor', e.valor, 'creado', e.creado,
+        'cliente', coalesce(nullif(cl.empresa, ''), x.invitado_nombre, split_part(cl.email, '@', 1), 'Cliente')) order by e.creado desc), '[]')
+      from (select * from public.courier_envios where negocio_id = n order by creado desc limit 10) e
+      join public.pedidos x on x.id = e.pedido_id left join public.profiles cl on cl.id = x.cliente_id));
+end $$;
+
+-- Guardar la conexión. Las llaves y el TCC solo se cambian si vienen escritos (nunca se vuelven a leer).
+create or replace function public.courier_guardar(p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.courier_negocio(); c public.courier_cuentas; k text; v text; tel text;
+begin
+  if jsonb_typeof(p) is distinct from 'object' then raise exception 'Datos no válidos'; end if;
+  insert into public.courier_cuentas (negocio_id) values (n) on conflict (negocio_id) do nothing;
+  foreach k in array array['llave_cot', 'llave_cob', 'llave_env'] loop
+    v := nullif(trim(coalesce(p ->> k, '')), '');
+    if v is not null and v !~ '^[A-Za-z0-9]{16,64}$' then raise exception 'Revisa la llave: son 32 letras y números (Chilexpress → Mis suscripciones)'; end if;
+    if v is not null then execute format('update public.courier_cuentas set %I = $1 where negocio_id = $2', k) using v, n; end if;
+  end loop;
+  v := nullif(regexp_replace(coalesce(p ->> 'tcc', ''), '\D', '', 'g'), '');
+  if v is not null and length(v) not between 5 and 12 then raise exception 'El N° de cliente (TCC) son 5 a 12 números'; end if;
+  if v is not null then update public.courier_cuentas set tcc = v where negocio_id = n; end if;
+  if coalesce((p ->> 'borrar_envios')::boolean, false) then update public.courier_cuentas set llave_env = null, tcc = null where negocio_id = n; end if;
+  tel := regexp_replace(coalesce(p ->> 'rem_tel', ''), '\D', '', 'g');
+  if tel <> '' and tel !~ '^(56)?9[0-9]{8}$' and tel !~ '^(56)?[2-8][0-9]{8}$' then raise exception 'Teléfono no válido (ej: +56 9 1234 5678)'; end if;
+  if coalesce(p ->> 'rem_correo', '') <> '' and (p ->> 'rem_correo') !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'Correo no válido'; end if;
+  if coalesce((p ->> 'peso')::numeric, 1) not between 0.1 and 100 then raise exception 'El peso va de 0,1 a 100 kg'; end if;
+  if coalesce(p ->> 'tamano', 'chica') not in ('sobre', 'chica', 'mediana', 'grande') then raise exception 'Tamaño no válido'; end if;
+  update public.courier_cuentas set prueba = coalesce((p ->> 'prueba')::boolean, false),
+    rem_nombre = left(nullif(trim(p ->> 'rem_nombre'), ''), 60), rem_tel = nullif(right(tel, 9), ''), rem_correo = left(nullif(trim(p ->> 'rem_correo'), ''), 80),
+    rem_calle = left(nullif(trim(p ->> 'rem_calle'), ''), 80), rem_numero = left(nullif(trim(p ->> 'rem_numero'), ''), 10), rem_extra = left(nullif(trim(p ->> 'rem_extra'), ''), 40),
+    peso = coalesce((p ->> 'peso')::numeric, 1), tamano = coalesce(p ->> 'tamano', 'chica'), actualizado = now()
+  where negocio_id = n returning * into c;
+  if nullif(trim(coalesce(p ->> 'origen', '')), '') is not null and (c.origen is distinct from trim(p ->> 'origen') or c.origen_cod is null) then
+    if c.llave_cot is null then raise exception 'Escribe la llave del Cotizador'; end if;
+    k := public.chx_codigo(c, p ->> 'origen');
+    if k is null then raise exception 'No encontramos la comuna "%" en Chilexpress. Revisa cómo se escribe (o la llave)', left(trim(p ->> 'origen'), 40); end if;
+    update public.courier_cuentas set origen = left(trim(p ->> 'origen'), 40), origen_cod = k, ultimo_error = null where negocio_id = n;
+  end if;
+  return public.courier_estado();
+end $$;
+
+-- 💲 Cotizar: opciones de servicio [{codigo, nombre, valor}] de la comuna de origen a la de destino.
+create or replace function public.chx_cotizar(c public.courier_cuentas, p_comuna text, p_peso numeric, p_tamano text, p_valor numeric) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare d text := public.chx_codigo(c, p_comuna); m jsonb := public.chx_medidas(p_tamano); r jsonb;
+begin
+  if d is null then raise exception 'Chilexpress no encuentra la comuna "%" (revisa cómo se escribe)', left(coalesce(trim(p_comuna), ''), 40); end if;
+  if coalesce(p_peso, 0) not between 0.1 and 100 then raise exception 'El peso va de 0,1 a 100 kg'; end if;
+  r := public.chx_api(c.llave_cot, c.prueba, 'POST', '/rating/api/v1.0/rates/courier', jsonb_build_object(
+    'originCountyCode', c.origen_cod, 'destinationCountyCode', d,
+    'package', jsonb_build_object('weight', p_peso::text, 'height', m ->> 'alto', 'width', m ->> 'ancho', 'length', m ->> 'largo'),
+    'productType', 3, 'contentType', 1, 'declaredWorth', round(greatest(coalesce(p_valor, 0), 0))::text, 'deliveryTime', 0));
+  if coalesce((r ->> 'status')::int, 0) <> 200 or jsonb_typeof(r #> '{body,data,courierServiceOptions}') is distinct from 'array' then
+    raise exception 'Chilexpress no pudo cotizar: %', public.chx_error(r);
+  end if;
+  return jsonb_build_object('destino', d, 'opciones', (select coalesce(jsonb_agg(jsonb_build_object('codigo', (o ->> 'serviceTypeCode')::int,
+      'nombre', initcap(lower(left(o ->> 'serviceDescription', 40))), 'valor', round((o ->> 'serviceValue')::numeric)) order by (o ->> 'serviceValue')::numeric), '[]')
+    from jsonb_array_elements(r #> '{body,data,courierServiceOptions}') o
+    where coalesce(o ->> 'serviceTypeCode', '') ~ '^[0-9]{1,3}$' and coalesce(o ->> 'serviceValue', '') ~ '^[0-9]+(\.[0-9]+)?$'));
+end $$;
+create or replace function public.courier_cotizar(p_comuna text, p_peso numeric default null, p_tamano text default null, p_valor numeric default 0) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c public.courier_cuentas := public.courier_mio();
+begin
+  return public.chx_cotizar(c, p_comuna, coalesce(p_peso, c.peso), coalesce(p_tamano, c.tamano), p_valor);
+end $$;
+
+-- Datos para la etiqueta de un pedido: destino (comuna, calle y número separados), cliente y cotización.
+create or replace function public.courier_preparar(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c public.courier_cuentas := public.courier_mio(); x public.pedidos; cl public.profiles; com text; dir text; m text[]; q jsonb; e public.courier_envios;
+begin
+  select * into x from public.pedidos where id = p_id and negocio_id = c.negocio_id;
+  if x.id is null then raise exception 'Pedido no encontrado'; end if;
+  if x.entrega <> 'despacho' then raise exception 'Este pedido es con retiro en tienda'; end if;
+  select * into e from public.courier_envios where pedido_id = x.id;
+  if e.pedido_id is not null then return jsonb_build_object('hecha', true, 'ot', e.ot); end if;
+  select * into cl from public.profiles where id = x.cliente_id;
+  com := coalesce(nullif(x.comuna, ''), nullif(trim(regexp_replace(coalesce(x.direccion, ''), '^.*,', '')), ''));
+  dir := trim(case when position(',' in coalesce(x.direccion, '')) > 0 then regexp_replace(x.direccion, ',[^,]*$', '') else coalesce(x.direccion, '') end);
+  m := regexp_match(dir, '^(.*?)\s*(?:#|[Nn][°º.])?\s*([0-9]{1,6})\y\s*(.*)$');
+  begin q := public.chx_cotizar(c, com, c.peso, c.tamano, x.subtotal); exception when others then q := jsonb_build_object('error', sqlerrm); end;
+  return jsonb_build_object('hecha', false, 'etiquetas', c.llave_env is not null and c.tcc is not null,
+    'cliente', coalesce(nullif(cl.empresa, ''), x.invitado_nombre, split_part(cl.email, '@', 1), 'Cliente'), 'tel', coalesce(cl.telefono, x.invitado_tel),
+    'comuna', com, 'calle', coalesce(trim(m[1]), dir), 'numero', m[2], 'extra', nullif(trim(m[3]), ''),
+    'peso', c.peso, 'tamano', c.tamano, 'valor', round(x.subtotal), 'cotizacion', q);
+end $$;
+
+-- 🏷️ Crear la orden de transporte y la etiqueta. Pone el seguimiento solo (el cliente recibe el aviso).
+create or replace function public.courier_etiqueta(p_id uuid, p_servicio int, p_peso numeric, p_tamano text, p_calle text, p_numero text, p_extra text default null, p_comuna text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c public.courier_cuentas := public.courier_mio(); x public.pedidos; cl public.profiles; d text; m jsonb := public.chx_medidas(p_tamano); r jsonb; o jsonb;
+  ot text; tel text; q jsonb; srv jsonb;
+begin
+  if c.llave_env is null or c.tcc is null then raise exception 'Para etiquetas falta la llave de Envíos y tu N° de cliente (TCC) en Más → 🚚 Courier'; end if;
+  if c.rem_calle is null or c.rem_numero is null or c.rem_tel is null then raise exception 'Completa tu dirección y teléfono de retiro en Más → 🚚 Courier'; end if;
+  select * into x from public.pedidos where id = p_id and negocio_id = c.negocio_id for update;
+  if x.id is null then raise exception 'Pedido no encontrado'; end if;
+  if x.entrega <> 'despacho' then raise exception 'Este pedido es con retiro en tienda'; end if;
+  if x.estado in ('cancelado', 'rechazado', 'expirado', 'pagando', 'en_revision', 'entregado') then raise exception 'Este pedido no está para enviar'; end if;
+  if exists (select 1 from public.courier_envios where pedido_id = x.id) then raise exception 'Este pedido ya tiene etiqueta'; end if;
+  if coalesce(trim(p_calle), '') = '' or coalesce(p_numero, '') !~ '^[0-9]{1,6}[A-Za-z]?$' then raise exception 'Escribe la calle y el número del cliente'; end if;
+  if coalesce(p_peso, 0) not between 0.1 and 100 then raise exception 'El peso va de 0,1 a 100 kg'; end if;
+  if coalesce(p_tamano, '') not in ('sobre', 'chica', 'mediana', 'grande') then raise exception 'Tamaño no válido'; end if;
+  q := public.chx_cotizar(c, coalesce(nullif(trim(p_comuna), ''), x.comuna, trim(regexp_replace(coalesce(x.direccion, ''), '^.*,', ''))), p_peso, p_tamano, x.subtotal);
+  d := q ->> 'destino';
+  select s into srv from jsonb_array_elements(q -> 'opciones') s where (s ->> 'codigo')::int = p_servicio;
+  if srv is null then raise exception 'Ese servicio no está disponible para esa comuna: elige otro'; end if;
+  select * into cl from public.profiles where id = x.cliente_id;
+  tel := right(regexp_replace(coalesce(cl.telefono, x.invitado_tel, ''), '\D', '', 'g'), 9);
+  r := public.chx_api(c.llave_env, c.prueba, 'POST', '/transport-orders/api/v1.0/transport-orders', jsonb_build_object(
+    'header', jsonb_build_object('certificateNumber', 0, 'customerCardNumber', c.tcc, 'countyOfOriginCoverageCode', c.origen_cod, 'labelType', 2, 'sellerRut', 'DEFAULT'),
+    'details', jsonb_build_array(jsonb_build_object(
+      'addresses', jsonb_build_array(
+        jsonb_build_object('addressId', 0, 'countyCoverageCode', d, 'streetName', left(trim(p_calle), 60), 'streetNumber', p_numero,
+          'supplement', left(coalesce(trim(p_extra), ''), 40), 'addressType', 'DEST', 'deliveryOnCommercialOffice', false, 'observation', left(coalesce(x.nota, ''), 60)),
+        jsonb_build_object('addressId', 0, 'countyCoverageCode', c.origen_cod, 'streetName', c.rem_calle, 'streetNumber', c.rem_numero,
+          'supplement', coalesce(c.rem_extra, ''), 'addressType', 'DEV', 'deliveryOnCommercialOffice', false, 'observation', '')),
+      'contacts', jsonb_build_array(
+        jsonb_build_object('name', left(coalesce(c.rem_nombre, 'Tienda'), 60), 'phoneNumber', c.rem_tel, 'mail', coalesce(c.rem_correo, ''), 'contactType', 'R'),
+        jsonb_build_object('name', left(coalesce(nullif(cl.empresa, ''), x.invitado_nombre, split_part(cl.email, '@', 1), 'Cliente'), 60), 'phoneNumber', tel, 'mail', coalesce(x.invitado_correo, cl.email, ''), 'contactType', 'D')),
+      'packages', jsonb_build_array(jsonb_build_object('weight', p_peso::text, 'height', m ->> 'alto', 'width', m ->> 'ancho', 'length', m ->> 'largo',
+        'serviceDeliveryCode', p_servicio::text, 'productCode', '3', 'deliveryReference', upper(left(x.id::text, 8)), 'groupReference', 'CODEFIX',
+        'declaredValue', round(x.subtotal)::text, 'declaredContent', '5', 'receivableAmountInDelivery', 0))))));
+  o := r #> '{body,data,detail,0}';
+  ot := o ->> 'transportOrderNumber';
+  if coalesce((r ->> 'status')::int, 0) not in (200, 201) or coalesce(ot, '') !~ '^[0-9A-Za-z-]{4,40}$' then
+    raise exception 'Chilexpress no creó el envío: %', coalesce(o ->> 'statusDescription', public.chx_error(r));
+  end if;
+  insert into public.courier_envios (pedido_id, negocio_id, ot, servicio, valor, etiqueta, tipo)
+  values (x.id, c.negocio_id, ot, srv ->> 'nombre', (srv ->> 'valor')::int,
+    case when coalesce(o #>> '{label,labelData}', '') ~ '^[A-Za-z0-9+/=\s]{20,}$' then regexp_replace(o #>> '{label,labelData}', '\s', '', 'g') end, 'img');
+  perform public.pedido_seguimiento(x.id, 'chilexpress', ot, null);
+  update public.courier_cuentas set ultimo_error = null where negocio_id = c.negocio_id;
+  return jsonb_build_object('ot', ot, 'servicio', srv ->> 'nombre', 'valor', (srv ->> 'valor')::int, 'etiqueta', (select etiqueta from public.courier_envios where pedido_id = x.id));
+end $$;
+
+-- Volver a ver/imprimir la etiqueta (dueño o equipo con Pedidos).
+create or replace function public.courier_etiqueta_ver(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.negocio_de(auth.uid()); e public.courier_envios;
+begin
+  if n is null or not public.equipo_puede('pedidos') then raise exception 'Sin permiso'; end if;
+  select * into e from public.courier_envios where pedido_id = p_id and negocio_id = n;
+  if e.pedido_id is null then raise exception 'Este pedido no tiene etiqueta'; end if;
+  return jsonb_build_object('ot', e.ot, 'servicio', e.servicio, 'valor', e.valor, 'etiqueta', e.etiqueta, 'creado', e.creado);
+end $$;
+
+-- Pedidos con etiqueta (para mostrar 🖨️ en la lista de Pedidos sin traer la imagen).
+create or replace function public.courier_con_etiqueta() returns uuid[]
+language sql stable security definer set search_path = '' as $$
+  select coalesce(array_agg(pedido_id), '{}') from public.courier_envios
+  where negocio_id = public.negocio_de(auth.uid()) and public.equipo_puede('pedidos') and creado > now() - interval '120 days'
+$$;
+
+revoke all on function public.chx_api(text, boolean, text, text, jsonb), public.chx_error(jsonb), public.chx_codigo(public.courier_cuentas, text),
+  public.chx_medidas(text), public.chx_cotizar(public.courier_cuentas, text, numeric, text, numeric), public.courier_negocio(), public.courier_mio() from public, anon, authenticated;
+revoke all on function public.courier_estado(), public.courier_guardar(jsonb), public.courier_cotizar(text, numeric, text, numeric), public.courier_preparar(uuid),
+  public.courier_etiqueta(uuid, int, numeric, text, text, text, text, text), public.courier_etiqueta_ver(uuid), public.courier_con_etiqueta() from public, anon;
+grant execute on function public.courier_estado(), public.courier_guardar(jsonb), public.courier_cotizar(text, numeric, text, numeric), public.courier_preparar(uuid),
+  public.courier_etiqueta(uuid, int, numeric, text, text, text, text, text), public.courier_etiqueta_ver(uuid), public.courier_con_etiqueta() to authenticated;

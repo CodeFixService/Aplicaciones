@@ -32,7 +32,7 @@ Tienda online + caja + pedidos para pymes chilenas. Free / Pro / 🧩 módulos (
 profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, boleta_cuentas, boletas_caja, calificaciones, sellos, avisos_stock, publicaciones, publicacion_vistas, subscribers, user_invites, requests, conexiones, webhooks, webhook_envios, negocio_correo, notifications, notification_reads, push_subscriptions, planes, textos, app_settings, app_secrets, actividad_dia.
 
 ## Versiones
-core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.56 · bd 5.76 · enviar 3.7.
+core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.57 · bd 5.77 · enviar 3.7.
 
 ## ✉️ Correo (G42f, 6.19 · bd 5.50 · enviar 3.5)
 - CodeFix → negocios/todos: Gmail de Josué (app_secrets gmail_*), se pone en CM → Control → ✉️ Correo.
@@ -46,6 +46,7 @@ core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()`
 - G99 a (6.55 · bd 5.75 · enviar 3.7): ⚡ aviso instantáneo de Mercado Pago (núcleo): mp_pagar manda notification_url (d:<pedido>) · cfx_mp_aviso_app(d:) → mp_confirmar · cfx_mp_aviso_url_app · enviar atiende ?cfx_mp=. Prueba: SaaS/pruebas/g99.js.
 
 - G101 (6.56 · bd 5.76): 🛒 Mercado Libre (módulo 'mercadolibre', hoja #mercadolibre en extras.js; tablas ml_cuentas/ml_estados/ml_vinculos/ml_ventas; ml_conectar → ML → /?code&state (index.html, arriba del script) → ml_volver; cron ml-sync 5 min: órdenes pagadas descuentan stock 1 vez, stock distinto → PUT a ML). Credenciales: CM → Control → 🛒. Prueba: SaaS/pruebas/g101.js.
+- G102 a (6.57 · bd 5.77): 🚚 Courier Chilexpress (módulo 'courier', hoja #courier en extras.js + 🏷️ en apps/pedidos (carga extras.js); tablas courier_cuentas/chx_comunas/courier_envios; llaves y TCC de CADA tienda; courier_etiqueta → OT + imagen + pedido_seguimiento). Prueba: SaaS/pruebas/g102.js.
 
 ## 🧠 Del núcleo: falta aplicar aquí
 - ✅ G37 (núcleo 2.76): shared/comprobante.js e impresora.js vienen del núcleo (no editar aquí: SaaS/nucleo). Logo y firma (boleta_estado) los da window.CFX_COMPROBANTE_DATOS al final de shared/cuenta.js. La 🧾 boleta SII (boleta_*) sigue en el SQL de Despega.

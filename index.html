@@ -412,13 +412,13 @@ try {
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre)$/.test(location.hash);
+  const enAjustes = () => /^#(ajustes|plan|premium|tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier)$/.test(location.hash);
   let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta, #redes y #modulos abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -638,7 +638,8 @@ try {
           ['proveedores', '📦', 'Stock mínimo y proveedores', 'Avisos y pedido por WhatsApp', 'proveedores', 'Tu tienda'],
           ['sucursales', '🏬', 'Sucursales y bodegas', 'Stock por local y mover mercadería', 'sucursales', 'Tu tienda'],
           ['promos', '📣', 'Promo destacada', 'Tarjeta al abrir la app de tus clientes', 'promos', 'Vender más'],
-          ['mercadolibre', '🛒', 'Mercado Libre', 'Stock unido con tus publicaciones', 'mercadolibre', 'Vender más']]
+          ['mercadolibre', '🛒', 'Mercado Libre', 'Stock unido con tus publicaciones', 'mercadolibre', 'Vender más'],
+          ['courier', '🚚', 'Courier Chilexpress', 'Cotiza y saca la etiqueta del pedido', 'courier', 'Tu tienda']]
           .map(([k, ico, t, d, m, grupo]) => ({ k, ico, t, d, grupo, dato: Cuenta.puede(m) ? '' : acc.mods ? '🧩' : 'PRO', abrir: (z) => EXTRAS[k](z, { probar: probarMod }) })) : []),
         dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp, Google, Instagram y medir anuncios', grupo: 'Vender más', nodo: $('cRedes') },
         !equipo && { k: 'premium', ico: '⭐', t: dueno && acc.mods ? 'Mi plan y módulos' : 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
@@ -844,6 +845,7 @@ try {
     ['¿Cómo comparto mi tienda?', 'En el inicio, "Tu tienda": 📤 Compartir por WhatsApp o muestra el QR en tu local.'],
     ['¿Cómo sumo a alguien de mi equipo?', 'Ajustes → Mi equipo: escribe su nombre y correo y elige su rol (vendedor, bodega o admin).'],
     ['¿Dónde pongo el seguimiento del envío?', 'Pedidos → un pedido con 🚚 Despacho (ya pagado) → botón 🚚 Seguimiento: eliges el courier y pegas el código. Tu cliente lo ve en Mis pedidos con "Seguir mi envío". Los pedidos con retiro en tienda no lo tienen.'],
+    ['¿Puedo cotizar y sacar la etiqueta de Chilexpress aquí?', 'Sí, con el módulo 🚚 Courier Chilexpress (Más → Tu tienda): pegas tus llaves de Chilexpress, cotizas a cualquier comuna y en Pedidos → 🏷️ Etiqueta Chilexpress se crea la etiqueta y el código le llega solo a tu cliente.'],
     ['¿Qué le llega al cliente cuando compra?', 'Al confirmar el pago, el pedido queda con 🧾 Detalle de compra en Mis pedidos (puede compartirlo). Si emites la boleta SII (Ajustes → 🧾 Boletas), su N° aparece en ese mismo detalle.'],
     ['¿Cómo emito la boleta?', 'Ajustes → 🧾 Boletas: automática con tu cuenta OpenFactura o manual gratis en sii.cl. En Caja: después de cobrar, 🧾 Boleta SII.'],
     ['¿Necesito boleta?', 'Sin inicio de actividades vendes igual con comprobante. Con inicio de actividades das boleta por cada venta. Ajustes → 🧾 Boletas → ❓ ¿Necesito boleta?'],

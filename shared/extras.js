@@ -1,5 +1,5 @@
 /* G96 🧩 Módulos de tienda (propio de Despega, no del núcleo): 🎁 Gift cards · 🛒 Carritos olvidados · 🔁 Compras recurrentes ·
-   📦 Stock mínimo y proveedores · 🛒 Mercado Libre (G101). Cada uno se abre en su hoja del Más (CFX_MENU → abrir). Todo lo valida el servidor (pro_o_modulo).
+   📦 Stock mínimo y proveedores · 🛒 Mercado Libre (G101) · 🚚 Courier Chilexpress (G102). Cada uno se abre en su hoja del Más (CFX_MENU → abrir). Todo lo valida el servidor (pro_o_modulo).
    Sin el módulo: qué hace + ▶️ Probar módulo (demo + 🎁 prueba 7 días + Comprar, núcleo). */
 (function () {
   'use strict';
@@ -311,5 +311,120 @@
     };
   }
 
-  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores, sucursales, promos, mercadolibre };
+  /* ---------- 🚚 Courier Chilexpress (G102) ---------- */
+  const TAM = [['sobre', 'Sobre'], ['chica', 'Chica 20 cm'], ['mediana', 'Mediana 30 cm'], ['grande', 'Grande 50 cm']];  // cm del lado largo (chx_medidas)
+  const tamOpc = (v) => TAM.map(([k, n]) => '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + n + '</option>').join('');
+  const opciones = (q, nom) => !q ? '' : q.error ? '<p class="gx-err">⚠️ ' + esc(q.error) + '</p>' : !(q.opciones || []).length ? '<p class="muted">Chilexpress no tiene servicio a esa comuna.</p>' :
+    q.opciones.map((s, i) => nom ? '<label class="gx-f" style="cursor:pointer"><input type="radio" name="' + nom + '" value="' + s.codigo + '"' + (i === 0 ? ' checked' : '') + ' style="width:auto;flex:none">' +
+      '<div><b>' + esc(s.nombre) + '</b></div><b>' + $$(s.valor) + '</b></label>' : '<div class="gx-f"><div>' + esc(s.nombre) + '</div><b>' + $$(s.valor) + '</b></div>').join('');
+  // 🖨️ Etiqueta: se ve, se descarga o se imprime (sola en la hoja impresa).
+  function verEtiqueta(e) {
+    const h = window.CFX_MENU.hoja('🏷️ Etiqueta Chilexpress'); estilo();
+    const src = e.etiqueta ? 'data:image/jpeg;base64,' + e.etiqueta : '';
+    h.zona.insertAdjacentHTML('afterbegin', '<div class="gx"><p>OT N° <b class="gx-cod">' + esc(e.ot) + '</b></p>' + (e.servicio ? '<p class="muted">' + esc(e.servicio) + (e.valor ? ' · ' + $$(e.valor) : '') + '</p>' : '') +
+      (src ? '<img alt="Etiqueta" style="max-width:100%;background:#fff;border-radius:8px;border:1px solid var(--cfx-borde,#8883)">' +
+        '<div class="gx-row" style="margin-top:8px"><button type="button" class="ok" data-et="imp">🖨️ Imprimir</button><button type="button" class="alt" data-et="dl">⬇️ Descargar</button></div>'
+        : '<p class="muted">Chilexpress no mandó la imagen: búscala con el N° de OT en tu cuenta de Chilexpress.</p>') +
+      '<p><small class="muted">Pégala en el paquete y llévalo a una sucursal Chilexpress (o espera el retiro). Tu cliente ya tiene el código.</small></p></div>');
+    if (!src) return;
+    const img = h.zona.querySelector('img'); img.src = src;
+    img.onerror = () => { img.replaceWith(Object.assign(document.createElement('p'), { className: 'muted', textContent: 'No pudimos mostrar la etiqueta: descárgala.' })); };
+    h.zona.querySelector('[data-et=dl]').onclick = () => fetch(src).then((r) => r.blob()).then((b) => Core.download('etiqueta-' + e.ot + '.jpg', b));
+    h.zona.querySelector('[data-et=imp]').onclick = () => {
+      const w = window.open('', '_blank'); if (!w) return Core.toast('Permite las ventanas para imprimir, o toca ⬇️ Descargar');
+      w.document.write('<!doctype html><title>Etiqueta</title><style>body{margin:0}img{width:100%;max-width:10cm}</style><img alt="">');
+      w.document.close(); const i = w.document.querySelector('img'); i.onload = () => { w.focus(); w.print(); }; i.src = src;
+    };
+  }
+  // 🏷️ Desde Pedidos: revisa destino y paquete, elige el servicio con su precio y crea la etiqueta.
+  async function courierEtiqueta(id, alListo) {
+    let d; try { d = await R('courier_preparar', { p_id: id }); } catch (e) { return Core.toast('⚠️ ' + e.message); }
+    if (d.hecha) { try { return verEtiqueta(await R('courier_etiqueta_ver', { p_id: id })); } catch (e) { return Core.toast('⚠️ ' + e.message); } }
+    const h = window.CFX_MENU.hoja('🏷️ Etiqueta Chilexpress'); estilo();
+    h.zona.insertAdjacentHTML('afterbegin', '<div class="gx"><p>Para <b>' + esc(d.cliente) + '</b>' + (d.tel ? ' · ' + esc(d.tel) : '') + '</p>' +
+      '<label for="cxCom">Comuna</label><input id="cxCom" maxlength="40" value="' + esc(d.comuna || '') + '">' +
+      '<div class="gx-row"><div><label for="cxCalle">Calle</label><input id="cxCalle" maxlength="60" value="' + esc(d.calle || '') + '"></div>' +
+      '<div style="flex:0 0 90px;min-width:90px"><label for="cxNum">Número</label><input id="cxNum" maxlength="7" inputmode="numeric" value="' + esc(d.numero || '') + '"></div></div>' +
+      '<label for="cxExtra">Depto / casa (opcional)</label><input id="cxExtra" maxlength="40" value="' + esc(d.extra || '') + '">' +
+      '<div class="gx-row"><div><label for="cxPeso">Peso (kg)</label><input id="cxPeso" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" value="' + esc(d.peso) + '"></div>' +
+      '<div><label for="cxTam">Tamaño</label><select id="cxTam">' + tamOpc(d.tamano) + '</select></div></div>' +
+      '<h3>Servicio</h3><div data-cx="ops">' + opciones(d.cotizacion, 'cxSrv') + '</div><button type="button" class="alt small" data-cx="cot">💲 Cotizar de nuevo</button>' +
+      (d.etiquetas ? '<button type="button" class="ok" data-cx="crear" style="margin-top:12px;width:100%">🏷️ Crear etiqueta</button>'
+        : '<button type="button" disabled style="margin-top:12px;width:100%">🏷️ Crear etiqueta</button><p><small class="muted">Para etiquetas falta tu llave de Envíos y N° de cliente (TCC) en Más → 🚚 Courier. Mientras, cotiza aquí y usa 🚚 Seguimiento.</small></p>') +
+      '<p><small class="muted">Se descuenta de tu cuenta Chilexpress. El código de seguimiento le llega solo a tu cliente.</small></p></div>');
+    const z = h.zona, v = (k) => z.querySelector('#' + k).value;
+    z.querySelector('[data-cx=cot]').onclick = async (ev) => {
+      const b = ev.currentTarget; b.disabled = true; const ops = z.querySelector('[data-cx=ops]'); ops.innerHTML = '<p class="muted">Cotizando…</p>';
+      let q; try { q = await R('courier_cotizar', { p_comuna: v('cxCom'), p_peso: Number(v('cxPeso')), p_tamano: v('cxTam'), p_valor: d.valor }); } catch (e) { q = { error: e.message }; }
+      ops.innerHTML = opciones(q, 'cxSrv'); b.disabled = false;
+    };
+    const cr = z.querySelector('[data-cx=crear]');
+    if (cr) cr.onclick = async () => {
+      const s = z.querySelector('input[name=cxSrv]:checked'); if (!s) return Core.toast('Elige un servicio (toca 💲 Cotizar de nuevo)');
+      cr.disabled = true; cr.textContent = 'Creando…';
+      try {
+        const r = await R('courier_etiqueta', { p_id: id, p_servicio: Number(s.value), p_peso: Number(v('cxPeso')), p_tamano: v('cxTam'),
+          p_calle: v('cxCalle'), p_numero: v('cxNum').trim(), p_extra: v('cxExtra') || null, p_comuna: v('cxCom') });
+        Cuenta.sb.functions.invoke('enviar').catch(() => {});
+        Core.toast('🏷️ Etiqueta lista · OT ' + r.ot); h.cerrar(); if (alListo) alListo();
+        setTimeout(() => verEtiqueta(r), 250);
+      } catch (e) { Core.toast('⚠️ ' + e.message); cr.disabled = false; cr.textContent = '🏷️ Crear etiqueta'; }
+    };
+  }
+  async function courier(z, o) {
+    if (!puede('courier')) return candado(z, 'courier', 'Cotiza el envío con Chilexpress y saca la etiqueta desde el pedido. El código de seguimiento le llega solo a tu cliente.', o);
+    let d; try { d = await R('courier_estado'); } catch (e) { return error(z, e); }
+    const llave = (k, t, on, ph) => '<label for="cx_' + k + '">' + t + (on ? ' <small class="muted">✅ guardada</small>' : '') + '</label><input id="cx_' + k + '" autocomplete="off" spellcheck="false" maxlength="64" placeholder="' + (on ? 'Escribe solo para cambiarla' : ph) + '">';
+    const c = caja(z, (d.conectado ? '<p>✅ Chilexpress conectado' + (d.prueba ? ' · 🧪 modo prueba' : '') + (d.etiquetas ? ' · 🏷️ etiquetas activas' : ' · solo cotizar') + '</p>'
+      : '<p class="muted">Conecta tu cuenta de Chilexpress: cotizas cualquier envío y sacas la etiqueta desde Pedidos.</p>') +
+      (d.error ? '<p class="gx-err">⚠️ ' + esc(d.error) + '</p>' : '') +
+      (d.conectado ? '<div class="gx-k"><div><small class="muted">Etiquetas este mes</small><b>' + d.envios_mes + '</b></div><div><small class="muted">Sale desde</small><b>' + esc(d.origen) + '</b></div></div>' +
+        '<h3>💲 Cotizar un envío</h3><div class="gx-row"><div><label for="cxqCom">Comuna de destino</label><input id="cxqCom" maxlength="40" placeholder="Ej: Temuco"></div>' +
+        '<div style="flex:0 0 90px;min-width:90px"><label for="cxqPeso">Kg</label><input id="cxqPeso" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" value="' + esc(d.peso) + '"></div></div>' +
+        '<label for="cxqTam">Tamaño</label><select id="cxqTam">' + tamOpc(d.tamano) + '</select><button type="button" class="ok" data-cx="cotizar" style="margin-top:8px">💲 Cotizar</button><div data-cx="res"></div>' : '') +
+      (d.ultimos.length ? '<h3>Últimas etiquetas</h3>' + d.ultimos.map((e) => '<div class="gx-f"><div><b>' + esc(e.cliente) + '</b><br><small class="muted">OT ' + esc(e.ot) + ' · ' + fecha(e.creado) +
+        (e.valor ? ' · ' + $$(e.valor) : '') + '</small></div><div class="btns"><button type="button" class="small alt" data-ver="' + esc(e.pedido) + '" aria-label="Ver etiqueta">🖨️</button></div></div>').join('') : '') +
+      '<details' + (d.conectado ? '' : ' open') + '><summary><b>⚙️ Conexión y datos de retiro</b></summary>' +
+      '<details><summary>¿Dónde consigo las llaves?</summary><ol><li>Entra a <b>developers.wschilexpress.com</b> y crea tu cuenta.</li><li>Productos → suscríbete a <b>Cotizador</b>, <b>Coberturas</b> y <b>Envíos</b>.</li>' +
+      '<li>Perfil → copia la <b>Primary key</b> de cada uno y pégala aquí.</li><li>El <b>N° de cliente (TCC)</b> te lo da tu ejecutivo de Chilexpress (sin contrato puedes solo cotizar).</li></ol></details>' +
+      llave('llave_cot', 'Llave Cotizador', d.llave_cot, 'Primary key del Cotizador') + llave('llave_cob', 'Llave Coberturas (si es otra)', d.llave_cob, 'Opcional') +
+      llave('llave_env', 'Llave Envíos (para etiquetas)', d.llave_env, 'Opcional') +
+      '<label for="cx_tcc">N° de cliente TCC' + (d.tcc ? ' <small class="muted">✅ ' + esc(d.tcc) + '</small>' : '') + '</label><input id="cx_tcc" inputmode="numeric" maxlength="12" placeholder="' + (d.tcc ? 'Escribe solo para cambiarlo' : 'Ej: 18578680') + '">' +
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="cx_prueba" style="width:auto"' + (d.prueba ? ' checked' : '') + '> 🧪 Llaves de prueba (ambiente de pruebas de Chilexpress)</label>' +
+      '<h3>Desde dónde envías</h3><label for="cx_origen">Comuna</label><input id="cx_origen" maxlength="40" placeholder="Ej: Ñuñoa" value="' + esc(d.origen || '') + '">' +
+      '<div class="gx-row"><div><label for="cx_calle">Calle</label><input id="cx_calle" maxlength="80" value="' + esc(d.rem_calle || '') + '"></div>' +
+      '<div style="flex:0 0 90px;min-width:90px"><label for="cx_num">Número</label><input id="cx_num" maxlength="10" inputmode="numeric" value="' + esc(d.rem_numero || '') + '"></div></div>' +
+      '<label for="cx_extra">Local / depto (opcional)</label><input id="cx_extra" maxlength="40" value="' + esc(d.rem_extra || '') + '">' +
+      '<label for="cx_nom">Nombre de quien envía</label><input id="cx_nom" maxlength="60" value="' + esc(d.rem_nombre || '') + '">' +
+      '<div class="gx-row"><div><label for="cx_tel">Teléfono</label><input id="cx_tel" type="tel" maxlength="16" placeholder="+56 9 1234 5678" value="' + esc(d.rem_tel || '') + '"></div>' +
+      '<div><label for="cx_mail">Correo</label><input id="cx_mail" type="email" maxlength="80" value="' + esc(d.rem_correo || '') + '"></div></div>' +
+      '<h3>Paquete de siempre</h3><div class="gx-row"><div><label for="cx_peso">Peso (kg)</label><input id="cx_peso" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" value="' + esc(d.peso) + '"></div>' +
+      '<div><label for="cx_tam">Tamaño</label><select id="cx_tam">' + tamOpc(d.tamano) + '</select></div></div>' +
+      '<button type="button" class="ok" data-cx="guardar" style="margin-top:10px;width:100%">💾 Guardar</button>' +
+      (d.llave_env ? '<button type="button" class="alt small" data-cx="quitar" style="margin-top:8px">Quitar llave de Envíos y TCC</button>' : '') + '</details>' +
+      '<p><small class="muted">Las llaves quedan guardadas en el servidor y nadie las puede ver. Las etiquetas salen en Pedidos → pedido con 🚚 Despacho → 🏷️ Etiqueta.</small></p>');
+    const v = (k) => (c.querySelector('#' + k) || {}).value || '';
+    c.onclick = async (ev) => {
+      const b = ev.target.closest('button'); if (!b || b.disabled) return;
+      try {
+        if (b.dataset.ver) return verEtiqueta(await R('courier_etiqueta_ver', { p_id: b.dataset.ver }));
+        const k = b.dataset.cx;
+        if (k === 'cotizar') {
+          const res = c.querySelector('[data-cx=res]'); b.disabled = true; res.innerHTML = '<p class="muted">Cotizando…</p>';
+          let q; try { q = await R('courier_cotizar', { p_comuna: v('cxqCom'), p_peso: Number(v('cxqPeso')), p_tamano: v('cxqTam'), p_valor: 0 }); } catch (e) { q = { error: e.message }; }
+          res.innerHTML = opciones(q); b.disabled = false; return;
+        }
+        if (k === 'guardar' || k === 'quitar') {
+          if (k === 'quitar' && !(await Core.confirmar('¿Quitar la llave de Envíos y el TCC? Sigues pudiendo cotizar.'))) return;
+          b.disabled = true;
+          await R('courier_guardar', { p: { llave_cot: v('cx_llave_cot'), llave_cob: v('cx_llave_cob'), llave_env: v('cx_llave_env'), tcc: v('cx_tcc'),
+            prueba: c.querySelector('#cx_prueba').checked, origen: v('cx_origen'), rem_calle: v('cx_calle'), rem_numero: v('cx_num'), rem_extra: v('cx_extra'),
+            rem_nombre: v('cx_nom'), rem_tel: v('cx_tel'), rem_correo: v('cx_mail'), peso: Number(v('cx_peso')) || 1, tamano: v('cx_tam'), borrar_envios: k === 'quitar' } });
+          Core.toast('✅ Guardado'); return courier(z, o);
+        }
+      } catch (e) { Core.toast('⚠️ ' + e.message); b.disabled = false; }
+    };
+  }
+
+  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores, sucursales, promos, mercadolibre, courier, courierEtiqueta, verEtiqueta };
 })();
