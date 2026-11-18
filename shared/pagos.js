@@ -377,6 +377,7 @@
     let m = {};
     try { m = await o.rpc('cfx_mp_neg_estado') || {}; } catch (x) { el.innerHTML = '<p class="cp-mpn-nota">⚠️ ' + esc(x.message || x) + '</p>'; return; }
     if (!m.dueno) { el.innerHTML = ''; el.hidden = true; return; }
+    flowNegocio(el, o);
     el.hidden = false; el.classList.add('cfx-mpn');
     el.innerHTML = '<b>⚡ Tu Mercado Pago' + (m.conectado ? (m.activo ? ' · ✅ Activo' : ' · ⏸️ En pausa') : '') + '</b>' +
       '<p class="cp-mpn-nota">Tu cliente paga ' + esc(para) + ' con tarjeta o saldo y se aprueba <b>solo</b> (sin comprobante). La plata llega directo a tu cuenta.' +
@@ -400,6 +401,49 @@
       } catch (x) { avisar(x.message || String(x)); e.target.disabled = false; }
     };
   }
+  // G107 💳 Flow PROPIO del negocio (Webpay): tarjeta hermana, justo debajo de la de Mercado Pago (las llaves quedan solo en el servidor).
+  async function flowNegocio(mpEl, o, propio) {
+    let el = propio ? mpEl : mpEl.nextElementSibling;
+    if (propio) el.classList.add('cfx-mpn', 'cfx-fln');
+    if (!el || !el.classList.contains('cfx-fln')) { el = document.createElement('div'); el.className = 'cfx-mpn cfx-fln'; mpEl.insertAdjacentElement('afterend', el); }
+    const para = o.para || 'tus cobros';
+    const avisar = (t) => (window.CFX_DIALOGO ? window.CFX_DIALOGO.avisar(t) : null);
+    let m = {};
+    try { m = await o.rpc('cfx_flow_neg_estado') || {}; } catch (x) { el.hidden = true; return; }  // base sin G107: no se muestra
+    if (!m.dueno) { el.innerHTML = ''; el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = '<b>💳 Tu Webpay con Flow' + (m.conectado ? (m.activo ? ' · ✅ Activo' : ' · ⏸️ En pausa') : '') + (m.sandbox ? ' · 🧪 Pruebas' : '') + '</b>' +
+      '<p class="cp-mpn-nota">Tu cliente paga ' + esc(para) + ' con débito, crédito o transferencia y se aprueba <b>solo</b>. La plata llega a tu cuenta Flow.' +
+      (m.conectado ? ' Conectado (…' + esc(m.fin || '') + ').' : '') + '</p>' +
+      '<label for="cfxFlnKey">API Key</label><input id="cfxFlnKey" type="password" autocomplete="off" placeholder="' + (m.conectado ? 'Igual que antes' : 'XXXX-XXXX-…') + '">' +
+      '<label for="cfxFlnSec">Secret Key</label><input id="cfxFlnSec" type="password" autocomplete="off">' +
+      '<details class="cp-mpn-nota"><summary>¿Dónde las saco?</summary>flow.cl → entra a tu cuenta → Mis datos → <b>Integración</b> → API Key y Secret Key. Nadie más las ve.</details>' +
+      '<label class="cp-mpn-si"><input type="checkbox" id="cfxFlnSb"' + (m.sandbox ? ' checked' : '') + '> <span>🧪 Son llaves de pruebas (sandbox)</span></label>' +
+      (m.conectado ? '<label class="cp-mpn-si"><input type="checkbox" id="cfxFlnOn"' + (m.activo ? ' checked' : '') + '> <span>Cobrar con Webpay</span></label>' : '') +
+      '<div class="cp-mpn-btns"><button type="button" class="' + esc(o.btn || '') + '" data-fln="guardar">' + (m.conectado ? 'Guardar' : '💳 Conectar') + '</button>' +
+      (m.conectado ? '<button type="button" class="' + esc(o.btnAlt || 'alt') + '" data-fln="quitar">Desconectar</button>' : '') + '</div>';
+    el.onclick = async (e) => {
+      const a = e.target.dataset && e.target.dataset.fln;
+      if (!a) return;
+      if (a === 'quitar' && window.CFX_DIALOGO && !await window.CFX_DIALOGO.confirmar('¿Desconectar tu Flow? Tus clientes dejarán de ver Webpay.')) return;
+      e.target.disabled = true;
+      try {
+        const on = el.querySelector('#cfxFlnOn'), k = el.querySelector('#cfxFlnKey').value, sc = el.querySelector('#cfxFlnSec').value;
+        await o.rpc('cfx_flow_neg_guardar', a === 'quitar' ? { p_apikey: null, p_secret: null, p_activo: null }
+          : { p_apikey: k || null, p_secret: sc || null, p_activo: on ? on.checked : true, p_sandbox: el.querySelector('#cfxFlnSb').checked });
+        avisar(a === 'quitar' ? 'Flow desconectado' : '💳 Webpay con Flow guardado');
+        flowNegocio(mpEl, o, propio);
+      } catch (x) { avisar(x.message || String(x)); e.target.disabled = false; }
+    };
+  }
+  // G107: botones para el CLIENTE según lo que tenga el negocio (medios = { mp, flow }; sin medios = base vieja → solo MP).
+  //   CFX_PAGOS.botonesNegocio(medios, clase) → html con data-mp="mp" | data-mp="flow".
+  function botonesNegocio(md, clase) {
+    md = md || { mp: true };
+    const c = esc(clase || '');
+    return (md.mp ? '<button class="' + c + '" data-mp="mp">⚡ Pagar con Mercado Pago</button>' : '') +
+      (md.flow ? '<button class="' + c + '" data-mp="flow">💳 Pagar con Webpay</button>' : '');
+  }
   if (!document.getElementById('cfx-mpn-css')) {
     const st = document.createElement('style'); st.id = 'cfx-mpn-css';
     st.textContent = '.cfx-mpn{display:block;border:1px solid var(--cfx-borde,#e2e7ec);border-radius:14px;padding:12px;margin:10px 0;overflow-wrap:anywhere}' +
@@ -409,5 +453,5 @@
     document.head.appendChild(st);
   }
 
-  window.CFX_PAGOS = { abrir, revisar, cerrar, mpVolver, mpNegocio };
+  window.CFX_PAGOS = { abrir, revisar, cerrar, mpVolver, mpNegocio, botonesNegocio, flowNegocio: (el, o) => flowNegocio(el, o, true) };
 })();

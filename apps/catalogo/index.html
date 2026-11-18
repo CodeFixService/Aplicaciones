@@ -664,7 +664,8 @@
         [1, 2, 3, 4, 5].map((k) => '<button type="button" data-cal="' + p.id + '" data-n="' + k + '" aria-label="' + k + ' estrellas">★</button>').join('') + '</span></div>' : '') +
       '</div><div class="acc" style="display:flex;gap:6px;flex-wrap:wrap">' +
       (p.estado === 'pagando' ? '<button class="small alt" data-monto="' + Math.round(Number(p.total)) + '">📋 Copiar monto</button>' : '') +
-      (p.estado === 'pagando' && links[p.id] && links[p.id].mp ? '<button class="small ok" data-mp="' + p.id + '" data-tk="' + Core.esc(links[p.id].tk) + '">⚡ Pagar con Mercado Pago</button>' : '') +
+      (p.estado === 'pagando' && links[p.id] && links[p.id].mp ? [['mp', '⚡ Pagar con Mercado Pago'], ['flow', '💳 Pagar con Webpay']].filter((m) => (links[p.id].medios || { mp: true })[m[0]])
+        .map((m) => '<button class="small ok" data-mp="' + p.id + '" data-medio="' + m[0] + '" data-tk="' + Core.esc(links[p.id].tk) + '">' + m[1] + '</button>').join('') : '') +
       (p.estado === 'pagando' && links[p.id] && links[p.id].url ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(links[p.id].url)) + '">💳 Pagar ' + precio(p.total) + '</a>' : '') +
       (p.estado === 'pagando' && !(links[p.id] && links[p.id].mp && !links[p.id].url) ? '<button class="small" data-comp="' + p.id + '">📷 Subir comprobante</button>' : '') +
       (['pagando', 'en_revision', 'recibido', 'preparando'].includes(p.estado) ? '<button class="small alt" data-can="' + p.id + '">Cancelar</button>' : '') +
@@ -700,7 +701,7 @@
       if (b.dataset.monto) { Core.copiar(b.dataset.monto, '📋 Monto copiado: ' + precio(b.dataset.monto)); return; }
       if (b.dataset.mp) {
         b.disabled = true;
-        const r = await Cuenta.rpc('mp_pagar', { p_ref: b.dataset.mp, p_volver: Core.rootUrl() + 'r/?t=' + b.dataset.tk });
+        const r = await Cuenta.rpc('mp_pagar', { p_ref: b.dataset.mp, p_volver: Core.rootUrl() + 'r/?t=' + b.dataset.tk, ...(b.dataset.medio === 'flow' ? { p_medio: 'flow' } : {}) });
         if (!r.ok) { b.disabled = false; throw new Error(r.error); }
         location.href = r.url; return;
       }

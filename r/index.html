@@ -37,7 +37,7 @@
       <span class="muted">Monto a pagar</span>
       <div class="montoPagar"><b id="monto"></b><button class="small alt" id="bCopiarMonto" type="button">📋 Copiar monto</button></div>
       <p class="muted" style="margin-top:0">Tu pedido y su stock quedan apartados por:</p><div class="reloj" id="reloj"></div>
-      <div class="btns hidden" id="rowMp"><button class="ok" id="bMp" type="button" style="flex:1">⚡ Pagar con Mercado Pago</button></div>
+      <div class="btns hidden" id="rowMp" style="flex-wrap:wrap"><button class="ok" id="bMp" data-medio="mp" type="button" style="flex:1 1 140px">⚡ Pagar con Mercado Pago</button><button class="ok hidden" id="bFlow" data-medio="flow" type="button" style="flex:1 1 140px">💳 Pagar con Webpay</button></div>
       <div class="btns"><a class="btn ok" id="bPagar" target="_blank" rel="noopener" style="flex:1">💳 Pagar</a></div>
       <div class="btns" id="rowComp"><label class="btn" for="fComp" style="flex:1">📷 Subir foto del comprobante</label><input type="file" accept="image/*" id="fComp" class="hidden"></div>
     </div>
@@ -109,9 +109,11 @@
     // ⚡ Mercado Pago automático: paga ahí y el pedido se aprueba solo (sin comprobante si la tienda no tiene otro link).
     const mp = !!(p.link && p.link.mp), soloMp = mp && !p.link.url;
     $('rowMp').classList.toggle('hidden', !mp);
+    const md = (p.link && p.link.medios) || { mp: true };  // G107 ⚡ MP / 💳 Webpay (Flow)
+    $('bMp').classList.toggle('hidden', !md.mp); $('bFlow').classList.toggle('hidden', !md.flow);
     $('rowComp').classList.toggle('hidden', soloMp);
     $('pagarT').textContent = soloMp ? '💳 Paga tu pedido' : '💳 Paga y sube tu comprobante';
-    if (p.estado === 'pagando' && mp) $('estadoTxt').textContent = soloMp ? 'Paga con Mercado Pago antes de que se acabe el tiempo: el pedido se confirma solo.' : 'Paga con Mercado Pago (se confirma solo) o con el link y sube la foto del comprobante.';
+    if (p.estado === 'pagando' && mp) $('estadoTxt').textContent = soloMp ? 'Paga en línea antes de que se acabe el tiempo: el pedido se confirma solo.' : 'Paga en línea (se confirma solo) o con el link y sube la foto del comprobante.';
     $('bPagar').classList.toggle('hidden', !(p.link && p.link.url));
     if (p.link && p.link.url) { $('bPagar').href = CFX_URL(p.link.url); $('bPagar').textContent = '💳 Pagar ' + precio(p.total) + (p.link.titulo ? ' · ' + p.link.titulo : ''); }
     $('cDatos').classList.toggle('hidden', !t.datos_pago || !['pagando', 'recibido'].includes(p.estado));
@@ -129,14 +131,14 @@
       tic(); timer = setInterval(tic, 1000);
     }
   }
-  $('bMp').onclick = async () => {
-    $('bMp').disabled = true;
+  [$('bMp'), $('bFlow')].forEach((bt) => { bt.onclick = async () => {
+    bt.disabled = true;
     try {
-      const r = await Cuenta.rpc('mp_pagar', { p_ref: tk, p_volver: location.origin + location.pathname + '?t=' + encodeURIComponent(tk) });
+      const r = await Cuenta.rpc('mp_pagar', { p_ref: tk, p_volver: location.origin + location.pathname + '?t=' + encodeURIComponent(tk), ...(bt.dataset.medio === 'flow' ? { p_medio: 'flow' } : {}) });
       if (!r.ok) throw new Error(r.error);
       location.href = r.url;
-    } catch (err) { Core.toast(err.message); $('bMp').disabled = false; }
-  };
+    } catch (err) { Core.toast(err.message); bt.disabled = false; }
+  }; });
   $('envio').onclick = (e) => { const b = e.target.closest('[data-copiar]'); if (b) Core.copiar(b.dataset.copiar, '📋 Código copiado'); };
   $('bMail').onclick = async () => {
     $('bMail').disabled = true;

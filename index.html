@@ -265,6 +265,7 @@
     <div class="card hidden" id="cLinks"><span id="links"></span>
       <h2>💳 Links de pago</h2>
       <div class="slotpago" id="mpBody"></div>
+      <div class="slotpago" id="flowBody" hidden></div>
       <p class="muted">O pega el link de tu Mercado Pago (o similar). El cliente ve el total de su pedido en grande con un botón <b>📋 Copiar monto</b>,
         paga ahí y sube la foto del comprobante: el pedido y el stock quedan apartados mientras lo revisas. Si rechazas el comprobante, puede subir otro.
         Tienes 2 espacios; solo uno queda activo.</p>
@@ -534,7 +535,7 @@ try {
     Cuenta.revisarActualizacion();
     if (acc.role === 'user') cargarTienda(acc);
     if (acc.role !== 'client') cargarHoy(acc);
-    if (acc.role === 'user') { cargarLinks(); cargarMp(); cargarBoleta(); cargarEquipo(); cargarRedes(); }
+    if (acc.role === 'user') { cargarLinks(); cargarMp(); cargarFlow(); cargarBoleta(); cargarEquipo(); cargarRedes(); }
     cargarPagos();
     // Núcleo (pagos.js): tienda nueva que debe su primer pago → pantalla de activación.
     // Núcleo (ayuda.js): cabecera común, guía para partir, chat con soporte y términos.
@@ -945,6 +946,8 @@ try {
       Core.toast(a === 'quitar' ? 'Mercado Pago desconectado' : '⚡ Mercado Pago guardado'); cargarMp();
     } catch (err) { Core.toast(err.message); e.target.disabled = false; }
   };
+  /* ---------- G107 💳 Webpay con el Flow de la tienda (núcleo pagos.js; las llaves quedan solo en el servidor) ---------- */
+  function cargarFlow() { if (window.CFX_PAGOS && CFX_PAGOS.flowNegocio) CFX_PAGOS.flowNegocio($('flowBody'), { rpc: (n, a) => Cuenta.rpc(n, a), para: 'su pedido', btn: 'small', btnAlt: 'small alt' }); }
   /* ---------- 🧾 Boleta SII: manual (folio del portal del SII) o automática con OpenFactura (la API key queda solo en el servidor) ---------- */
   async function cargarBoleta() {
     let b = {};
