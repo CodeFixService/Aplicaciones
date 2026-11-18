@@ -366,7 +366,14 @@
         Core.toast('🎁 Gift card ' + g.codigo + ': le quedan ' + money(g.saldo));
       } catch (e) { return Core.toast('⚠️ ' + e.message); }
     }
-    const venta = { id: Core.uid(), t: Date.now(), medio, items: ticket.map((l) => Object.assign({}, l)) };
+    // G32 e 📲 Tarjeta en el celular (Tap on Phone): se cobra en la app del proveedor; aquí queda como 💳 Tarjeta.
+    let tap = null;
+    if (medio === 'tap') {
+      if (!window.CFX_TAP) return Core.toast('⚠️ Recarga la página e intenta de nuevo');
+      tap = await CFX_TAP.cobrar(totalTicket(), { titulo: 'Cobrar con el celular' });
+      if (!tap) return;
+    }
+    const venta = Object.assign({ id: Core.uid(), t: Date.now(), medio: tap ? 'tarjeta' : medio, items: ticket.map((l) => Object.assign({}, l)) }, tap ? { tap: tap.proveedor } : {});
     ventas.push(venta); ultimaVenta = venta.id; $('bComp').hidden = false; $('bBol').hidden = esCliente;
     ticket.forEach((l) => {
       const p = productos.find((x) => x.id === l.id);
