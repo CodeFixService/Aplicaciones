@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.77'::text $$;
+language sql immutable as $$ select '5.78'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5870,7 +5870,7 @@ alter table public.cfx_pagos add column if not exists meses int check (meses is 
 -- G19: pago de un módulo o pack (null = Premium).
 alter table public.cfx_pagos add column if not exists producto text check (producto is null or producto ~ '^[a-z_]{2,30}$');
 alter table public.cfx_pagos drop constraint if exists cfx_pagos_medio_check;
-alter table public.cfx_pagos add constraint cfx_pagos_medio_check check (medio in ('link', 'transferencia', 'tarjeta', 'mp'));
+alter table public.cfx_pagos add constraint cfx_pagos_medio_check check (medio in ('link', 'transferencia', 'tarjeta', 'mp', 'flow'));
 -- G85 ⚡ Mercado Pago automático: cuándo se abrió y el n° de pago que lo confirmó (un pago de MP sirve una sola vez).
 alter table public.cfx_pagos add column if not exists mp_desde timestamptz;
 alter table public.cfx_pagos add column if not exists mp_pago text;
@@ -5894,6 +5894,13 @@ language sql stable security definer set search_path = '' as $$
   select coalesce((select coalesce(valor ->> 'token', '') <> '' and coalesce((valor ->> 'activo')::boolean, false) from public.cfx_config where clave = 'mp'), false)
 $$;
 revoke all on function public.cfx_mp_on() from public, anon, authenticated;
+-- G38 ⚡ Flow (Webpay + transferencia + MACH en una sola cuenta): ¿está prendido? (las llaves nunca salen de la base)
+create or replace function public.cfx_flow_on() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select coalesce(valor ->> 'apikey', '') <> '' and coalesce(valor ->> 'secret', '') <> '' and coalesce((valor ->> 'activo')::boolean, false)
+    from public.cfx_config where clave = 'flow'), false)
+$$;
+revoke all on function public.cfx_flow_on() from public, anon, authenticated;
 
 -- ¿Cómo estoy? Precios, mi rol, si debo el primer pago y mi último pago.
 create or replace function public.cfx_pago_estado() returns jsonb
@@ -5907,13 +5914,13 @@ begin
   -- debe_inicio: cuenta nueva (desde que activaste la regla) sin primer pago. bloqueado: además es un negocio.
   -- Solo si ya hay una forma de pago configurada (si no, nadie podría pagar).
   debe := coalesce((c #>> '{negocio,exigir_inicio}')::boolean, false) and not pagado
-     and (coalesce(c ->> 'link', '') <> '' or coalesce(c #>> '{transferencia,numero}', '') <> '' or coalesce(c #>> '{tarjeta,link}', '') <> '' or public.cfx_mp_on())
+     and (coalesce(c ->> 'link', '') <> '' or coalesce(c #>> '{transferencia,numero}', '') <> '' or coalesce(c #>> '{tarjeta,link}', '') <> '' or public.cfx_mp_on() or public.cfx_flow_on())
      and (y ->> 'creado')::timestamptz > coalesce((c ->> 'inicio_desde')::timestamptz, now())
      -- Liberado: mientras dure nadie queda bloqueado; las cuentas creadas en ese tiempo quedan en gratis sin primer pago.
      and not (lh is not null and (now() < lh or (y ->> 'creado')::timestamptz between coalesce(ld, '-infinity') and lh));
   bloq := debe and y ->> 'rol' = 'negocio';
   return jsonb_build_object('config', c - 'inicio_desde', 'yo', y, 'pagado', pagado, 'bloqueado', bloq, 'debe_inicio', debe,
-    'liberado_hasta', case when lh > now() then lh end, 'mp', public.cfx_mp_on(),
+    'liberado_hasta', case when lh > now() then lh end, 'mp', public.cfx_mp_on(), 'flow', public.cfx_flow_on(),
     'prueba_pro', public.cfx_pro_prueba(y),  -- G95
     'ultimo', (select to_jsonb(x) from (select id, periodo, monto, medio, estado, dias, motivo, creado, resuelto, hasta, producto, regalo from public.cfx_pagos
                where cuenta = (y ->> 'id')::uuid order by creado desc limit 1) x),
@@ -5944,8 +5951,8 @@ begin
   if coalesce(p_monto, 0) < 1 then raise exception 'Escribe el monto que pagaste'; end if;
   if coalesce(length(p_comprobante), 0) < 200 then raise exception 'Sube la foto del comprobante'; end if;
   if cup is not null then perform public.cfx_cupon_ver(cup); end if;
-  if exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio <> 'mp') then raise exception 'Ya tienes un pago en revisión. Te avisamos apenas se apruebe.'; end if;
-  if (select count(*) from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and creado > now() - interval '1 day' and medio <> 'mp') >= 5 then raise exception 'Demasiados intentos hoy. Escribe a soporte.'; end if;
+  if exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio not in ('mp', 'flow')) then raise exception 'Ya tienes un pago en revisión. Te avisamos apenas se apruebe.'; end if;
+  if (select count(*) from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and creado > now() - interval '1 day' and medio not in ('mp', 'flow')) >= 5 then raise exception 'Demasiados intentos hoy. Escribe a soporte.'; end if;
   insert into public.cfx_pagos (cuenta, email, nombre, rol, periodo, monto, medio, nota, comprobante, cupon, meses, producto)
   values ((y ->> 'id')::uuid, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), case when y ->> 'rol' in ('negocio', 'cliente') then y ->> 'rol' else 'otro' end,
           p_periodo, p_monto, p_medio, left(coalesce(p_nota, ''), 300), p_comprobante, cup, case when p_periodo = 'meses' then p_meses end, p_producto)
@@ -6182,8 +6189,8 @@ begin
   if exists (select 1 from public.cfx_mp_avisos where ref = r and at > now() - interval '5 seconds') then return false; end if;
   insert into public.cfx_mp_avisos (ref) values (r) on conflict (ref) do update set at = now();
   delete from public.cfx_mp_avisos where at < now() - interval '3 days';
-  if left(r, 1) = 'p' then
-    if exists (select 1 from public.cfx_pagos where id = i and medio = 'mp' and estado = 'pendiente') then ok := public.cfx_mp_confirmar(i) = 'aprobado'; end if;
+  if left(r, 1) in ('p', 'f') then
+    if exists (select 1 from public.cfx_pagos where id = i and medio in ('mp', 'flow') and estado = 'pendiente') then ok := public.cfx_mp_confirmar(i) = 'aprobado'; end if;
   elsif left(r, 1) = 'n' then
     if to_regprocedure('public.cfx_mp_neg_confirmar(uuid)') is not null then execute 'select public.cfx_mp_neg_confirmar($1)' into ok using i; end if;
   elsif to_regprocedure('public.cfx_mp_aviso_app(text)') is not null then
@@ -6222,6 +6229,7 @@ language plpgsql security definer set search_path = '' as $$
 declare g public.cfx_pagos; tk text := (select valor ->> 'token' from public.cfx_config where clave = 'mp'); r jsonb; pg jsonb;
 begin
   select * into g from public.cfx_pagos where id = p_id for update;
+  if g.medio = 'flow' and g.estado = 'pendiente' then return public.cfx_flow_confirmar(p_id); end if;  -- G38
   if g.id is null or g.medio <> 'mp' or g.estado <> 'pendiente' then return g.estado; end if;
   if coalesce(tk, '') = '' then return g.estado; end if;
   r := public.cfx_mp_api(tk, 'GET', '/v1/payments/search?sort=date_created&criteria=desc&external_reference=' || g.id::text);
@@ -6252,15 +6260,16 @@ begin
   return 'aprobado';
 end $$;
 
--- La persona paga: crea el cobro y devuelve la página de Mercado Pago.
+-- La persona paga: crea el cobro y devuelve la página de Mercado Pago (G38: o la de Flow; p_medio 'mp' | 'flow').
 drop function if exists public.cfx_mp_pagar(text, int, text, text, text);
-create or replace function public.cfx_mp_pagar(p_periodo text, p_meses int default null, p_producto text default null, p_cupon text default null, p_volver text default null, p_regalo boolean default false) returns jsonb
+create or replace function public.cfx_auto_pagar(p_medio text, p_periodo text, p_meses int, p_producto text, p_cupon text, p_volver text, p_regalo boolean) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare y jsonb := public.cfx_yo(); m jsonb := (select valor from public.cfx_config where clave = 'mp'); cup text := nullif(upper(trim(coalesce(p_cupon, ''))), '');
         v text := left(coalesce(p_volver, ''), 500); monto int; i uuid; r jsonb; x uuid; tit text;
 begin
   if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
-  if not public.cfx_mp_on() then raise exception 'El pago automático no está disponible. Usa el link de pago o la transferencia.'; end if;
+  if p_medio not in ('mp', 'flow') or (p_medio = 'mp' and not public.cfx_mp_on()) or (p_medio = 'flow' and not public.cfx_flow_on()) then
+    raise exception 'El pago automático no está disponible. Usa el link de pago o la transferencia.'; end if;
   if y ->> 'rol' not in ('negocio', 'cliente') then raise exception 'Pide al dueño de la cuenta que haga el pago'; end if;
   if p_periodo not in ('inicio', 'mensual', 'meses', 'anual') then raise exception 'Elige un plan'; end if;
   if p_periodo = 'meses' and coalesce(p_meses, 0) not between 2 and 11 then raise exception 'Elige de 2 a 11 meses'; end if;
@@ -6274,23 +6283,24 @@ begin
     if p_periodo not in ('mensual', 'anual') or not coalesce((public.cfx_venta() ->> 'activo')::boolean, false) or cardinality(public.cfx_venta_modulos(p_producto)) = 0 then raise exception 'Módulo no válido'; end if;
     cup := null;
   end if;
-  if exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio <> 'mp') then raise exception 'Ya tienes un pago en revisión. Te avisamos apenas se apruebe.'; end if;
-  if (select count(*) from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and medio = 'mp' and creado > now() - interval '1 day') >= 10 then raise exception 'Demasiados intentos hoy. Escribe a soporte.'; end if;
+  if exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio not in ('mp', 'flow')) then raise exception 'Ya tienes un pago en revisión. Te avisamos apenas se apruebe.'; end if;
+  if (select count(*) from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and medio in ('mp', 'flow') and creado > now() - interval '1 day') >= 10 then raise exception 'Demasiados intentos hoy. Escribe a soporte.'; end if;
   monto := public.cfx_mp_monto(p_periodo, p_meses, p_producto, cup);
   if monto < 1 then raise exception 'Este plan aún no tiene precio'; end if;
   -- Un intento anterior sin pagar: se revisa (por si sí pagó) y se cierra; nunca se borra.
-  for x in select id from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio = 'mp' loop
+  for x in select id from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio in ('mp', 'flow') loop
     if public.cfx_mp_confirmar(x) = 'aprobado' then return jsonb_build_object('ok', true, 'aprobado', true); end if;
-    update public.cfx_pagos set estado = 'rechazado', motivo = 'Volviste a pagar con Mercado Pago', resuelto = now() where id = x and estado = 'pendiente' and mp_pago is null;
+    update public.cfx_pagos set estado = 'rechazado', motivo = 'Volviste a pagar en línea', resuelto = now() where id = x and estado = 'pendiente' and mp_pago is null;
   end loop;
   insert into public.cfx_pagos (cuenta, email, nombre, rol, periodo, monto, medio, nota, cupon, meses, producto, mp_desde, regalo)
-  values ((y ->> 'id')::uuid, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), y ->> 'rol', p_periodo, monto, 'mp',
-          case when coalesce(p_regalo, false) then '🎁 Regalo · ' else '' end || '⚡ Mercado Pago automático', cup,
+  values ((y ->> 'id')::uuid, coalesce(y ->> 'email', ''), left(coalesce(y ->> 'nombre', ''), 80), y ->> 'rol', p_periodo, monto, p_medio,
+          case when coalesce(p_regalo, false) then '🎁 Regalo · ' else '' end || case p_medio when 'flow' then '⚡ Flow automático' else '⚡ Mercado Pago automático' end, cup,
           case when p_periodo = 'meses' then p_meses end, p_producto, now(), coalesce(p_regalo, false))
   returning id into i;
   tit := case when coalesce(p_regalo, false) then '🎁 Regalo · ' else '' end || case when p_producto is not null then 'Módulo ' || p_producto else 'Premium' end || ' · ' ||
          case p_periodo when 'anual' then '1 año' when 'meses' then p_meses || ' meses' else '1 mes' end;
   if v !~ '^https://[^\s"<>]+$' then v := null; end if;
+  if p_medio = 'flow' then return public.cfx_flow_cobro(i, tit, monto, coalesce(y ->> 'email', ''), v); end if;
   r := public.cfx_mp_api(m ->> 'token', 'POST', '/checkout/preferences', jsonb_build_object(
     'items', jsonb_build_array(jsonb_build_object('id', i, 'title', left('CodeFix · ' || tit, 120), 'quantity', 1, 'currency_id', 'CLP', 'unit_price', monto)),
     'external_reference', i::text, 'statement_descriptor', 'CODEFIX',
@@ -6304,6 +6314,11 @@ begin
   end if;
   return jsonb_build_object('ok', true, 'url', r #>> '{body,init_point}', 'id', i, 'monto', monto);
 end $$;
+revoke all on function public.cfx_auto_pagar(text, text, int, text, text, text, boolean) from public, anon, authenticated;
+create or replace function public.cfx_mp_pagar(p_periodo text, p_meses int default null, p_producto text default null, p_cupon text default null, p_volver text default null, p_regalo boolean default false) returns jsonb
+language sql security definer set search_path = '' as $$ select public.cfx_auto_pagar('mp', p_periodo, p_meses, p_producto, p_cupon, p_volver, p_regalo) $$;
+create or replace function public.cfx_flow_pagar(p_periodo text, p_meses int default null, p_producto text default null, p_cupon text default null, p_volver text default null, p_regalo boolean default false) returns jsonb
+language sql security definer set search_path = '' as $$ select public.cfx_auto_pagar('flow', p_periodo, p_meses, p_producto, p_cupon, p_volver, p_regalo) $$;
 
 -- Al volver de Mercado Pago (o al tocar "Ya pagué"): revisa mis cobros abiertos.
 create or replace function public.cfx_mp_revisar() returns jsonb
@@ -6311,13 +6326,13 @@ language plpgsql security definer set search_path = '' as $$
 declare y jsonb := public.cfx_yo(); x uuid; e text; ok boolean := false;
 begin
   if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
-  for x in select id from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio = 'mp' loop
+  for x in select id from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio in ('mp', 'flow') loop
     e := public.cfx_mp_confirmar(x); ok := ok or e = 'aprobado';
   end loop;
-  return jsonb_build_object('aprobado', ok, 'pendiente', exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio = 'mp'),
+  return jsonb_build_object('aprobado', ok, 'pendiente', exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio in ('mp', 'flow')),
     -- G87 K: el último pago automático aprobado (para 🎉 "Activo hasta…", 🧾 comprobante y la 🎁 key).
     'pago', case when ok then (select to_jsonb(q) from (select id, periodo, meses, monto, producto, hasta, dias, regalo, key_regalo, mp_pago, cupon, resuelto, email, nombre
-      from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'aprobado' and medio = 'mp' order by resuelto desc nulls last limit 1) q) end);
+      from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'aprobado' and medio in ('mp', 'flow') order by resuelto desc nulls last limit 1) q) end);
 end $$;
 
 -- "Pagar de otra forma": cierra el cobro de Mercado Pago sin pagar (queda en el historial).
@@ -6328,7 +6343,7 @@ begin
   if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
   perform public.cfx_mp_revisar();
   update public.cfx_pagos set estado = 'rechazado', motivo = 'Elegiste otra forma de pago', resuelto = now()
-  where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio = 'mp' and mp_pago is null;
+  where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio in ('mp', 'flow') and mp_pago is null;
 end $$;
 
 -- Cada 2 minutos: por si la persona pagó y no volvió a la app.
@@ -6336,8 +6351,8 @@ create or replace function public.cfx_mp_revisar_pendientes() returns int
 language plpgsql security definer set search_path = '' as $$
 declare x uuid; n int := 0;
 begin
-  if not public.cfx_mp_on() then return 0; end if;
-  for x in select id from public.cfx_pagos where estado = 'pendiente' and medio = 'mp' order by creado desc limit 60 loop
+  if not (public.cfx_mp_on() or public.cfx_flow_on()) then return 0; end if;
+  for x in select id from public.cfx_pagos where estado = 'pendiente' and medio in ('mp', 'flow') order by creado desc limit 60 loop
     begin if public.cfx_mp_confirmar(x) = 'aprobado' then n := n + 1; end if; exception when others then null; end;
   end loop;
   return n;
@@ -6384,6 +6399,8 @@ end $$;
 
 revoke all on function public.cfx_mp_api(text, text, text, jsonb), public.cfx_mp_monto(text, int, text, text), public.cfx_mp_confirmar(uuid), public.cfx_mp_revisar_pendientes() from public, anon, authenticated;
 revoke all on function public.cfx_mp_pagar(text, int, text, text, text, boolean), public.cfx_mp_revisar(), public.cfx_mp_cancelar(), public.cfx_mp_estado(), public.cfx_mp_guardar(text, boolean), public.cfx_mp_revisar_admin(uuid) from public, anon;
+revoke all on function public.cfx_flow_pagar(text, int, text, text, text, boolean) from public, anon;
+grant execute on function public.cfx_flow_pagar(text, int, text, text, text, boolean) to authenticated;
 grant execute on function public.cfx_mp_pagar(text, int, text, text, text, boolean), public.cfx_mp_revisar(), public.cfx_mp_cancelar(), public.cfx_mp_estado(), public.cfx_mp_guardar(text, boolean), public.cfx_mp_revisar_admin(uuid) to authenticated;
 do $$
 begin
@@ -6392,6 +6409,150 @@ begin
 exception when others then
   raise notice 'Revisión de Mercado Pago no programada (%).', sqlerrm;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- G38 ⚡ FLOW (flow.cl): segundo pago automático para pagar la app, igual que Mercado Pago. Decisión Claude (G33): Flow trae en
+--   UNA sola cuenta Webpay (débito/crédito/prepago), transferencia (Khipu) y MACH → Khipu y Webpay directo no hacen falta aparte.
+--   CodeFix pega su API Key + Secret Key en CM → Pagos (se guardan en las 7; nadie los lee después). Cobro: medio 'flow' en cfx_pagos;
+--   se confirma preguntándole a Flow (getStatusByCommerceId: pagado + monto completo + n° de Flow usado 1 vez) al volver, con el
+--   aviso de Flow (función de la app ?cfx_mp=f:<id>, el mismo de MP) y con el cron de cada 1 min. Flow vuelve con POST: la función
+--   de la app lo pasa a la página con ?cfx_volver=1 (cfx_pago_volver); si no hay función, vuelve directo a la app.
+-- ---------------------------------------------------------------------
+alter table public.cfx_pagos add column if not exists volver text;
+
+create or replace function public.cfx_url_cod(p text) returns text
+language sql immutable set search_path = '' as $$
+  select coalesce(string_agg(case when ch ~ '^[A-Za-z0-9_.~-]$' then ch else regexp_replace(upper(encode(convert_to(ch, 'UTF8'), 'hex')), '(..)', '%\1', 'g') end, '' order by n), '')
+  from regexp_split_to_table(coalesce(p, ''), '') with ordinality t(ch, n)
+$$;
+
+-- Llama a Flow firmando (HMAC-SHA256 de los parámetros ordenados: nombre+valor). p_cfg: llaves a probar (si no, las guardadas).
+create or replace function public.cfx_flow_api(p_metodo text, p_ruta text, p_params jsonb, p_cfg jsonb default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare f jsonb := coalesce(p_cfg, (select valor from public.cfx_config where clave = 'flow')); pr jsonb; firma text; q text; st int; c text;
+        base text := case when coalesce((f ->> 'sandbox')::boolean, false) then 'https://sandbox.flow.cl/api' else 'https://www.flow.cl/api' end;
+begin
+  if coalesce(f ->> 'apikey', '') = '' or coalesce(f ->> 'secret', '') = '' then return jsonb_build_object('status', 0, 'error', 'Flow sin llaves'); end if;
+  pr := coalesce(p_params, '{}'::jsonb) || jsonb_build_object('apiKey', f ->> 'apikey');
+  select string_agg(k || v, '' order by k collate "C"), string_agg(k || '=' || public.cfx_url_cod(v), '&' order by k collate "C") into firma, q from jsonb_each_text(pr) t(k, v);
+  q := q || '&s=' || encode(extensions.hmac(convert_to(firma, 'UTF8'), convert_to(f ->> 'secret', 'UTF8'), 'sha256'), 'hex');
+  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '10');
+  if upper(p_metodo) = 'GET' then
+    execute 'select status, content from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+      using 'GET', base || p_ruta || '?' || q, array[]::extensions.http_header[], null::text, null::text;
+  else
+    execute 'select status, content from extensions.http(row($1, $2, $3, $4, $5)::extensions.http_request)' into st, c
+      using 'POST', base || p_ruta, array[]::extensions.http_header[], 'application/x-www-form-urlencoded', q;
+  end if;
+  return jsonb_build_object('status', st, 'body', case when c ~ '^\s*[\{\[]' then c::jsonb end);
+exception when others then
+  return jsonb_build_object('status', 0, 'error', sqlerrm);
+end $$;
+
+-- Crea el cobro en Flow (lo llama cfx_auto_pagar con el cobro ya anotado) y devuelve la página de pago.
+create or replace function public.cfx_flow_cobro(p_id uuid, p_titulo text, p_monto int, p_email text, p_volver text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n text := public.cfx_mp_notif('f:' || p_id::text) ->> 'notification_url'; r jsonb;
+begin
+  if coalesce(p_email, '') !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    update public.cfx_pagos set estado = 'rechazado', motivo = 'Falta un correo válido para Flow', resuelto = now() where id = p_id;
+    return jsonb_build_object('ok', false, 'error', 'Tu cuenta no tiene un correo válido. Usa otra forma de pago.');
+  end if;
+  if n is null and p_volver is null then
+    update public.cfx_pagos set estado = 'rechazado', motivo = 'Sin dirección de regreso', resuelto = now() where id = p_id;
+    return jsonb_build_object('ok', false, 'error', 'Flow no está listo en esta app. Usa otra forma de pago.');
+  end if;
+  update public.cfx_pagos set volver = p_volver where id = p_id;
+  r := public.cfx_flow_api('POST', '/payment/create', jsonb_build_object('commerceOrder', p_id::text, 'subject', left('CodeFix · ' || p_titulo, 120),
+    'currency', 'CLP', 'amount', p_monto::text, 'email', p_email, 'paymentMethod', '9',
+    'urlConfirmation', coalesce(n, p_volver), 'urlReturn', coalesce(n || '&cfx_volver=1', p_volver)));
+  if coalesce((r ->> 'status')::int, 0) <> 200 or coalesce(r #>> '{body,url}', '') !~ '^https://' or coalesce(r #>> '{body,token}', '') = '' then
+    update public.cfx_pagos set estado = 'rechazado', motivo = 'Flow no respondió', resuelto = now() where id = p_id;
+    return jsonb_build_object('ok', false, 'error', 'Flow no respondió. Intenta de nuevo o usa otra forma de pago.');
+  end if;
+  return jsonb_build_object('ok', true, 'url', (r #>> '{body,url}') || '?token=' || public.cfx_url_cod(r #>> '{body,token}'), 'id', p_id, 'monto', p_monto);
+end $$;
+
+-- Pregunta a Flow por ESTE cobro; pagado (status 2) con el monto completo y un n° de Flow no usado → aprueba y avisa.
+create or replace function public.cfx_flow_confirmar(p_id uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare g public.cfx_pagos; r jsonb; b jsonb; nro text;
+begin
+  select * into g from public.cfx_pagos where id = p_id for update;
+  if g.id is null or g.medio <> 'flow' or g.estado <> 'pendiente' then return g.estado; end if;
+  r := public.cfx_flow_api('GET', '/payment/getStatusByCommerceId', jsonb_build_object('commerceId', g.id::text));
+  b := r -> 'body';
+  if coalesce((r ->> 'status')::int, 0) <> 200 or b is null or coalesce((b ->> 'status')::int, 0) <> 2 or b ->> 'commerceOrder' is distinct from g.id::text
+     or coalesce(b ->> 'currency', 'CLP') <> 'CLP' or coalesce((b ->> 'amount')::numeric, 0) < g.monto
+     or exists (select 1 from public.cfx_pagos z where z.mp_pago = 'flow:' || (b ->> 'flowOrder')) then
+    if g.creado < now() - interval '2 days' then
+      update public.cfx_pagos set estado = 'rechazado', motivo = 'No se completó el pago en Flow', resuelto = now() where id = g.id;
+      return 'rechazado';
+    end if;
+    return g.estado;
+  end if;
+  nro := left(b ->> 'flowOrder', 30);
+  update public.cfx_pagos set mp_pago = 'flow:' || nro where id = g.id;
+  begin
+    perform public.cfx_pago_aprobar(g.id, null, '⚡ Flow n° ' || nro);
+  exception when others then
+    select * into g from public.cfx_pagos where id = p_id;
+    perform public.cfx_pago_key(g, public.cfx_dias_sugeridos(g), 'aprobado', '⚡ Flow n° ' || nro || ' · activación falló (' || left(sqlerrm, 80) || '): key de respaldo');
+  end;
+  begin
+    perform public.cfx_al_cm('⚡ Pago automático aprobado', coalesce(nullif(g.nombre, ''), g.email) || ' · $' || g.monto || coalesce(' · 🧩 ' || g.producto, '') ||
+      ' (' || case g.periodo when 'meses' then g.meses || ' meses' else g.periodo end || ', Flow)' || coalesce(' · cupón ' || g.cupon, ''), 'pago');
+  exception when others then null; end;
+  return 'aprobado';
+end $$;
+
+-- La función de la app: a dónde vuelve la persona después de Flow (solo cobros de Flow de los últimos 2 días).
+create or replace function public.cfx_pago_volver(p_ref text) returns text
+language plpgsql stable security definer set search_path = '' as $$
+declare r text := lower(left(coalesce(p_ref, ''), 80));
+begin
+  if r !~ '^f:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then return null; end if;
+  return (select volver from public.cfx_pagos where id = substr(r, 3)::uuid and medio = 'flow' and creado > now() - interval '2 days' and volver ~ '^https://[^\s"<>]+$');
+end $$;
+
+-- ---------- Administrador (CM → Pagos → ⚡ Flow) ----------
+create or replace function public.cfx_flow_estado() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare f jsonb := (select valor from public.cfx_config where clave = 'flow');
+begin
+  perform public.cfx_es_admin();
+  return jsonb_build_object('conectado', coalesce(f ->> 'apikey', '') <> '', 'activo', public.cfx_flow_on(), 'sandbox', coalesce((f ->> 'sandbox')::boolean, false), 'fin', right(f ->> 'apikey', 4));
+end $$;
+
+-- Conecta (llaves), prende/pausa (p_activo) o desconecta (sin llaves y p_activo null). p_sandbox = cuenta de pruebas de Flow.
+create or replace function public.cfx_flow_guardar(p_apikey text, p_secret text, p_activo boolean, p_sandbox boolean default false) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare k text := nullif(regexp_replace(coalesce(p_apikey, ''), '\s', '', 'g'), ''); sc text := nullif(regexp_replace(coalesce(p_secret, ''), '\s', '', 'g'), '');
+        f jsonb := (select valor from public.cfx_config where clave = 'flow'); cfg jsonb; r jsonb;
+begin
+  perform public.cfx_es_admin();
+  if k is null and sc is null then
+    if p_activo is null then delete from public.cfx_config where clave = 'flow';
+    elsif coalesce(f ->> 'apikey', '') = '' then raise exception 'Pega tu API Key y tu Secret Key de Flow';
+    else update public.cfx_config set valor = valor || jsonb_build_object('activo', p_activo) where clave = 'flow'; end if;
+    return public.cfx_flow_estado();
+  end if;
+  if k is null or sc is null then raise exception 'Pega las 2 llaves: API Key y Secret Key'; end if;
+  if k !~ '^[A-Za-z0-9-]{20,80}$' then raise exception 'Esa no parece una API Key de Flow (Integración → API Keys)'; end if;
+  if sc !~ '^[A-Za-z0-9]{20,100}$' then raise exception 'Esa no parece una Secret Key de Flow'; end if;
+  cfg := jsonb_build_object('apikey', k, 'secret', sc, 'activo', coalesce(p_activo, true), 'sandbox', coalesce(p_sandbox, false));
+  -- Prueba las llaves con un cobro que no existe: 401/403 = llaves malas; cualquier otra respuesta = Flow las aceptó.
+  r := public.cfx_flow_api('GET', '/payment/getStatusByCommerceId', jsonb_build_object('commerceId', 'cfx-prueba'), cfg);
+  if coalesce((r ->> 'status')::int, 0) = 0 then raise exception 'No se pudo conectar con Flow. Intenta de nuevo.'; end if;
+  if (r ->> 'status')::int in (401, 403) then raise exception 'Flow no aceptó las llaves: cópialas de nuevo (¿son de producción o de pruebas?)'; end if;
+  insert into public.cfx_config (clave, valor) values ('flow', cfg) on conflict (clave) do update set valor = excluded.valor;
+  return public.cfx_flow_estado();
+end $$;
+
+revoke all on function public.cfx_url_cod(text), public.cfx_flow_api(text, text, jsonb, jsonb), public.cfx_flow_cobro(uuid, text, int, text, text), public.cfx_flow_confirmar(uuid), public.cfx_pago_volver(text) from public, anon, authenticated;
+grant execute on function public.cfx_pago_volver(text) to service_role;
+revoke all on function public.cfx_flow_estado(), public.cfx_flow_guardar(text, text, boolean, boolean) from public, anon;
+grant execute on function public.cfx_flow_estado(), public.cfx_flow_guardar(text, text, boolean, boolean) to authenticated;
 
 -- G87 E · ↺ Volver a cero los ingresos (solo admin, con registro). NO borra pagos: los ingresos de los resúmenes se cuentan
 -- desde esta fecha (los de prueba quedan en el historial). "Contar todo" lo deshace.
@@ -7041,7 +7202,7 @@ begin
     'por', (select coalesce(jsonb_agg(jsonb_build_object('producto', k, 'monto', s, 'n', n) order by s desc), '[]') from (
       select coalesce(producto, 'premium') k, sum(monto) s, count(*) n from public.cfx_pagos where estado = 'aprobado' and creado >= greatest(m0, d) group by 1) q),
     'medios', (select coalesce(jsonb_object_agg(medio, s), '{}') from (select medio, sum(monto) s from public.cfx_pagos where estado = 'aprobado' and creado >= greatest(m0, d) group by 1) q),
-    'pendientes', (select count(*) from public.cfx_pagos where estado = 'pendiente' and medio <> 'mp'),
+    'pendientes', (select count(*) from public.cfx_pagos where estado = 'pendiente' and medio not in ('mp', 'flow')),
     'premium', coalesce(cardinality(activos), 0), 'vencen', ve, 'morosos', mo);
 end $$;
 revoke all on function public.cfx_tel_de(uuid) from public, anon, authenticated;
@@ -12059,3 +12220,197 @@ revoke all on function public.courier_estado(), public.courier_guardar(jsonb), p
   public.courier_etiqueta(uuid, int, numeric, text, text, text, text, text), public.courier_etiqueta_ver(uuid), public.courier_con_etiqueta() from public, anon;
 grant execute on function public.courier_estado(), public.courier_guardar(jsonb), public.courier_cotizar(text, numeric, text, numeric), public.courier_preparar(uuid),
   public.courier_etiqueta(uuid, int, numeric, text, text, text, text, text), public.courier_etiqueta_ver(uuid), public.courier_con_etiqueta() to authenticated;
+
+-- =====================================================================
+--  🧾 G38 FACTURA ELECTRÓNICA (tipo 33) en Despega (G67: la factura es solo de Despega; las demás apps dan boleta).
+--  · El comprador marca "🧾 Necesito factura" al pedir (RUT, razón social, giro, dirección, comuna) → pedidos.factura.
+--    También la tienda puede ponerla desde Pedidos (si el cliente la pide por chat). Se cambia hasta que se emite.
+--  · Al emitir (OpenFactura o folio anotado a mano) sale FACTURA 33 en vez de boleta 39 (montos con IVA: MntBruto).
+--  · pedidos.boleta_tipo = 33 cuando el documento emitido es factura (null/39 = boleta). Vender con o sin RUT sigue igual (G31).
+-- =====================================================================
+alter table public.pedidos add column if not exists factura jsonb;
+alter table public.pedidos add column if not exists boleta_tipo int;
+-- Código de actividad económica del SII (6 dígitos): la factura lo exige; la boleta no.
+alter table public.boleta_cuentas add column if not exists acteco int;
+
+create or replace function public.boleta_estado() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('conectado', b.owner_id is not null, 'modo', b.modo, 'rut', b.rut, 'razon', b.razon, 'giro', b.giro,
+    'direccion', b.direccion, 'comuna', b.comuna, 'auto', coalesce(b.auto, true), 'acteco', b.acteco,
+    'fin', case when b.owner_id = auth.uid() then right(b.apikey, 4) end)
+  from (select 1) x left join public.boleta_cuentas b on b.owner_id = public.negocio_de(auth.uid())
+$$;
+
+-- Igual que antes + acteco (opcional; vacío = sin facturas automáticas).
+create or replace function public.boleta_guardar(p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  md text := coalesce(p ->> 'modo', 'manual');
+  rt text := public.rut_normal(p ->> 'rut');
+  k text := nullif(regexp_replace(coalesce(p ->> 'apikey', ''), '\s', '', 'g'), '');
+  ac text := nullif(regexp_replace(coalesce(p ->> 'acteco', ''), '\D', '', 'g'), '');
+  t text;
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and role = 'user' and not suspended) then raise exception 'Solo el dueño de la tienda'; end if;
+  if p is null then delete from public.boleta_cuentas where owner_id = auth.uid(); return public.boleta_estado(); end if;
+  if md not in ('manual', 'openfactura') then raise exception 'Modo no válido'; end if;
+  if rt is null then raise exception 'RUT no válido: revisa el número y el dígito verificador'; end if;
+  foreach t in array array['razon', 'giro', 'direccion', 'comuna'] loop
+    if length(trim(coalesce(p ->> t, ''))) < 2 then
+      raise exception 'Falta %', case t when 'razon' then 'la razón social' when 'giro' then 'el giro' when 'direccion' then 'la dirección' else 'la comuna' end;
+    end if;
+  end loop;
+  if ac is not null and length(ac) not between 5 and 6 then raise exception 'El código de actividad (Acteco) tiene 6 números: búscalo en sii.cl → Mi SII'; end if;
+  if k is not null and (k !~ '^[A-Za-z0-9_-]{16,120}$') then raise exception 'Esa no parece una API key de OpenFactura'; end if;
+  if md = 'openfactura' and k is null and not exists (select 1 from public.boleta_cuentas where owner_id = auth.uid() and apikey is not null) then
+    raise exception 'Pega tu API key de OpenFactura';
+  end if;
+  insert into public.boleta_cuentas (owner_id, modo, apikey, rut, razon, giro, direccion, comuna, auto, acteco)
+  values (auth.uid(), md, k, rt, left(trim(p ->> 'razon'), 100), left(trim(p ->> 'giro'), 80), left(trim(p ->> 'direccion'), 70),
+          left(trim(p ->> 'comuna'), 20), coalesce((p ->> 'auto')::boolean, true), ac::int)
+  on conflict (owner_id) do update set modo = excluded.modo, apikey = coalesce(excluded.apikey, public.boleta_cuentas.apikey),
+    rut = excluded.rut, razon = excluded.razon, giro = excluded.giro, direccion = excluded.direccion, comuna = excluded.comuna,
+    auto = excluded.auto, acteco = excluded.acteco, updated_at = now();
+  perform public.auditar('Boleta SII configurada', md || ' · ' || rt);
+  return public.boleta_estado();
+end $$;
+revoke all on function public.boleta_estado(), public.boleta_guardar(jsonb) from public, anon;
+grant execute on function public.boleta_estado(), public.boleta_guardar(jsonb) to authenticated;
+
+-- Datos del receptor revisados (RUT con dígito verificador; largos del SII). Error claro si falta algo.
+create or replace function public.factura_datos(p jsonb) returns jsonb
+language plpgsql immutable set search_path = '' as $$
+declare rt text := public.rut_normal(p ->> 'rut'); t text; c text := lower(trim(coalesce(p ->> 'correo', '')));
+begin
+  if rt is null then raise exception 'RUT de la empresa no válido: revisa el número y el dígito verificador'; end if;
+  foreach t in array array['razon', 'giro', 'direccion', 'comuna'] loop
+    if length(trim(coalesce(p ->> t, ''))) < 2 then
+      raise exception 'Para la factura falta %', case t when 'razon' then 'la razón social' when 'giro' then 'el giro' when 'direccion' then 'la dirección' else 'la comuna' end;
+    end if;
+  end loop;
+  if c <> '' and (c !~ '^[^@\s<>"]+@[^@\s<>"]+\.[a-z]{2,}$' or length(c) > 80) then raise exception 'Correo de la factura no válido'; end if;
+  return jsonb_build_object('rut', rt, 'razon', left(trim(p ->> 'razon'), 100), 'giro', left(trim(p ->> 'giro'), 40),
+    'direccion', left(trim(p ->> 'direccion'), 70), 'comuna', left(trim(p ->> 'comuna'), 20)) || case when c <> '' then jsonb_build_object('correo', c) else '{}'::jsonb end;
+end $$;
+
+-- Comprador (con el token del pedido o su id) o la tienda (id + permiso Pedidos) ponen, cambian o quitan (p null) los datos de factura.
+create or replace function public.pedido_factura_guardar(p_ref text, p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref); d jsonb;
+begin
+  if x.id is null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
+  if x.negocio_id = public.negocio_de(auth.uid()) and x.cliente_id is distinct from auth.uid() and not public.equipo_puede('pedidos') then raise exception 'Sin permiso'; end if;
+  if x.boleta_folio is not null then return jsonb_build_object('ok', false, 'error', 'El documento ya se emitió: pide a la tienda una nota de crédito'); end if;
+  if x.estado in ('cancelado', 'rechazado', 'expirado') then return jsonb_build_object('ok', false, 'error', 'Este pedido ya no está activo'); end if;
+  d := case when p is null then null else public.factura_datos(p) end;
+  update public.pedidos set factura = d, boleta_error = null, boleta_intentos = 0 where id = x.id;
+  return jsonb_build_object('ok', true, 'factura', d);
+end $$;
+revoke all on function public.factura_datos(jsonb) from public, anon, authenticated;
+revoke all on function public.pedido_factura_guardar(text, jsonb) from public;
+grant execute on function public.pedido_factura_guardar(text, jsonb) to anon, authenticated;
+
+-- Boleta 39 (como antes) o FACTURA 33 si el pedido trae datos de factura (montos con IVA → MntBruto = 1).
+create or replace function public.boleta_dte(x public.pedidos, c public.boleta_cuentas) returns jsonb
+language plpgsql stable set search_path = '' as $$
+declare det jsonb := '[]'::jsonb; l jsonb; n int := 0; suma numeric := 0; m numeric; q numeric; tot numeric := round(x.total); neto numeric; d numeric;
+        f jsonb := x.factura; idd jsonb; rec jsonb;
+begin
+  for l in select * from jsonb_array_elements(x.lineas) loop
+    exit when n >= 59;
+    q := greatest(coalesce((l ->> 'cant')::numeric, 1), 1); m := round(coalesce((l ->> 'subtotal')::numeric, 0));
+    if m <= 0 then continue; end if;
+    n := n + 1; suma := suma + m;
+    det := det || jsonb_build_object('NroLinDet', n, 'NmbItem', left(coalesce(nullif(trim(l ->> 'nombre'), ''), 'Producto'), 80),
+      'QtyItem', q, 'PrcItem', round(m / q, 2), 'MontoItem', m);
+  end loop;
+  if suma < tot then n := n + 1; det := det || jsonb_build_object('NroLinDet', n, 'NmbItem', 'Otros', 'QtyItem', 1, 'PrcItem', tot - suma, 'MontoItem', tot - suma); suma := tot; end if;
+  d := suma - tot; neto := round(tot / 1.19);
+  if f is null then
+    idd := jsonb_build_object('TipoDTE', 39, 'Folio', 0, 'FchEmis', to_char(now() at time zone 'America/Santiago', 'YYYY-MM-DD'), 'IndServicio', 3);
+    rec := jsonb_build_object('RUTRecep', '66666666-6');
+  else
+    idd := jsonb_build_object('TipoDTE', 33, 'Folio', 0, 'FchEmis', to_char(now() at time zone 'America/Santiago', 'YYYY-MM-DD'), 'MntBruto', 1, 'FmaPago', 1);
+    rec := jsonb_build_object('RUTRecep', f ->> 'rut', 'RznSocRecep', f ->> 'razon', 'GiroRecep', f ->> 'giro', 'DirRecep', f ->> 'direccion', 'CmnaRecep', f ->> 'comuna')
+        || case when f ->> 'correo' is not null then jsonb_build_object('CorreoRecep', f ->> 'correo') else '{}'::jsonb end;
+  end if;
+  return jsonb_build_object('response', jsonb_build_array('FOLIO', 'SELF_SERVICE'), 'dte', jsonb_build_object(
+    'Encabezado', jsonb_build_object('IdDoc', idd,
+      'Emisor', case when f is null then jsonb_build_object('RUTEmisor', c.rut, 'RznSocEmisor', c.razon, 'GiroEmisor', c.giro, 'DirOrigen', c.direccion, 'CmnaOrigen', c.comuna)
+        else jsonb_build_object('RUTEmisor', c.rut, 'RznSoc', c.razon, 'GiroEmis', c.giro, 'Acteco', coalesce(c.acteco, 0), 'DirOrigen', c.direccion, 'CmnaOrigen', c.comuna) end,
+      'Receptor', rec,
+      'Totales', jsonb_build_object('MntNeto', neto, 'TasaIVA', 19, 'IVA', tot - neto, 'MntTotal', tot) - case when f is null then 'TasaIVA' else '' end),
+    'Detalle', det) || case when d > 0 then jsonb_build_object('DscRcgGlobal', jsonb_build_array(
+      jsonb_build_object('NroLinDR', 1, 'TpoMov', 'D', 'GlosaDR', 'Descuento', 'TpoValor', '$', 'ValorDR', d))) else '{}'::jsonb end);
+end $$;
+
+-- Igual que antes; además anota si salió factura (33) y el aviso al cliente dice "Factura" o "Boleta".
+create or replace function public.boleta_intentar(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; c public.boleta_cuentas; r jsonb; f text; e text; doc text;
+begin
+  select * into x from public.pedidos where id = p_id for update;
+  if x.id is null then return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado'); end if;
+  if x.boleta_folio is not null then return jsonb_build_object('ok', true, 'folio', x.boleta_folio, 'url', x.boleta_url, 'tipo', coalesce(x.boleta_tipo, 39)); end if;
+  if x.estado not in ('preparando', 'listo', 'en_camino', 'entregado') then return jsonb_build_object('ok', false, 'error', 'El pedido aún no está pagado'); end if;
+  if round(x.total) < 1 then return jsonb_build_object('ok', false, 'error', 'Pedido sin monto'); end if;
+  select * into c from public.boleta_cuentas where owner_id = x.negocio_id;
+  if c.owner_id is null or c.modo <> 'openfactura' or c.apikey is null then return jsonb_build_object('ok', false, 'error', 'Configura la boleta automática en Ajustes'); end if;
+  doc := case when x.factura is not null then 'Factura' else 'Boleta' end;
+  if x.factura is not null and c.acteco is null then
+    update public.pedidos set boleta_error = 'Para facturar pon tu código de actividad (Acteco) en Ajustes → Boleta SII' where id = x.id;
+    return jsonb_build_object('ok', false, 'error', 'Para facturar pon tu código de actividad (Acteco) en Ajustes → Boleta SII');
+  end if;
+  r := public.of_api(c.apikey, public.boleta_dte(x, c), 'cfx-' || x.id::text || case when x.factura is not null then '-33' else '' end);
+  f := nullif(coalesce(r #>> '{body,FOLIO}', r #>> '{body,folio}'), '');
+  if coalesce((r ->> 'status')::int, 0) in (200, 201) and f is not null then
+    update public.pedidos set boleta_folio = left(f, 20), boleta_url = case when r #>> '{body,SELF_SERVICE,url}' ~ '^https://[^\s"<>]+$' then left(r #>> '{body,SELF_SERVICE,url}', 500) end,
+      boleta_at = now(), boleta_error = null, boleta_tipo = case when x.factura is not null then 33 end where id = x.id returning * into x;
+    perform public.aviso_cliente(x, '🧾 Tu ' || lower(doc), doc || ' electrónica N° ' || f || ' de tu pedido');
+    return jsonb_build_object('ok', true, 'folio', x.boleta_folio, 'url', x.boleta_url, 'tipo', coalesce(x.boleta_tipo, 39));
+  end if;
+  e := left(coalesce(case when (r ->> 'status')::int = 0 then 'No se pudo conectar con OpenFactura' end,
+                     r #>> '{body,error,message}', r #>> '{body,message}', 'OpenFactura respondió ' || coalesce(r ->> 'status', '?')), 200);
+  if (r ->> 'status')::int in (401, 403) then e := 'OpenFactura no aceptó la API key'; end if;
+  update public.pedidos set boleta_error = e, boleta_intentos = boleta_intentos + 1 where id = x.id;
+  return jsonb_build_object('ok', false, 'error', e);
+end $$;
+
+-- Modo manual: anota el folio (de la boleta o, si el pedido pide factura, de la factura emitida en sii.cl).
+create or replace function public.boleta_anotar(p_id uuid, p_folio text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos; f text := nullif(regexp_replace(coalesce(p_folio, ''), '\D', '', 'g'), ''); doc text;
+begin
+  select * into x from public.pedidos where id = p_id and negocio_id = public.negocio_de(auth.uid()) for update;
+  if x.id is null or not public.equipo_puede('pedidos') then raise exception 'Sin permiso'; end if;
+  if x.estado not in ('preparando', 'listo', 'en_camino', 'entregado') then raise exception 'El pedido aún no está pagado'; end if;
+  if f is not null and length(f) > 10 then raise exception 'Folio no válido'; end if;
+  if x.boleta_url is not null then raise exception 'Este documento lo emitió OpenFactura: no se cambia'; end if;
+  doc := case when x.factura is not null then 'Factura' else 'Boleta' end;
+  update public.pedidos set boleta_folio = f, boleta_at = case when f is null then null else now() end, boleta_error = null,
+    boleta_tipo = case when f is not null and x.factura is not null then 33 end
+  where id = x.id returning * into x;
+  if f is not null then perform public.aviso_cliente(x, '🧾 Tu ' || lower(doc), doc || ' electrónica N° ' || f || ' de tu pedido'); end if;
+  return jsonb_build_object('ok', true, 'folio', f, 'tipo', coalesce(x.boleta_tipo, 39));
+end $$;
+
+-- Lo que ve el cliente y la tienda: documento emitido (con tipo 33/39), error, o los datos de factura pedidos.
+create or replace function public.boleta_de(x public.pedidos) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when x.boleta_folio is not null then jsonb_build_object('folio', x.boleta_folio, 'url', x.boleta_url, 'fecha', x.boleta_at,
+    'rut', c.rut, 'razon', c.razon, 'tipo', coalesce(x.boleta_tipo, 39))
+    when x.boleta_error is not null then jsonb_build_object('error', x.boleta_error) else '{}'::jsonb end
+    || case when x.factura is not null then jsonb_build_object('factura', x.factura) else '{}'::jsonb end
+  from (select 1) z left join public.boleta_cuentas c on c.owner_id = x.negocio_id
+$$;
+revoke all on function public.boleta_dte(public.pedidos, public.boleta_cuentas), public.boleta_intentar(uuid), public.boleta_de(public.pedidos) from public, anon, authenticated;
+revoke all on function public.boleta_anotar(uuid, text) from public, anon;
+grant execute on function public.boleta_anotar(uuid, text) to authenticated;
+
+-- ¿Esta tienda puede dar factura? (tiene sus datos de emisor en Ajustes → Boleta SII). Para mostrar "🧾 Necesito factura".
+create or replace function public.factura_disponible(p_negocio uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.boleta_cuentas where owner_id = p_negocio)
+$$;
+revoke all on function public.factura_disponible(uuid) from public;
+grant execute on function public.factura_disponible(uuid) to anon, authenticated;

@@ -176,6 +176,7 @@
       <p class="muted m-cupones" id="cuponTxt" style="margin:4px 0 0"></p>
       <label for="nota">Nota para la tienda (opcional)</label>
       <textarea id="nota" maxlength="200" placeholder="Ej: lo retiro el sábado en la mañana"></textarea>
+      <div id="facWrap" class="hidden"></div>
       <div class="btns"><button id="bEnviarPed" style="flex:1">📨 Enviar pedido</button>
         <button class="ok hidden" id="bWspPed" style="flex:1">💬 Enviar por WhatsApp</button></div>
       <div class="btns"><button class="alt small" id="bVaciar">Vaciar pedido</button></div>
@@ -219,6 +220,9 @@
   const comprador = esCliente;
   const premium = !!yo.is_pro;
   const negocio = esCliente ? yo.negocio_id : yo.id;
+  // G38 🧾 Factura: el comprador la pide al enviar el pedido (solo si la tienda tiene sus datos de emisor).
+  const FAC_MEM = Core.store('cfx-factura');
+  if (comprador) Cuenta.rpc('factura_disponible', { p_negocio: negocio }).then((si) => { if (si) { $('facWrap').innerHTML = Core.facturaHtml(FAC_MEM.get('fac', null)); $('facWrap').classList.remove('hidden'); } }).catch(() => {});
   $('titulo').textContent = esCliente ? (yo.negocio || 'Tienda') : 'Mi tienda (vista del cliente)';
   if (premium) { $('tag').textContent = esCliente ? 'PREMIUM' : 'PRO'; $('tag').classList.add('pro'); $('tag').classList.remove('hidden'); }
   const precio = (n) => '$' + Math.round(Number(n)).toLocaleString('es-CL');
@@ -592,6 +596,7 @@
     if (entrega === 'despacho' && !$('dir').value.trim()) { $('dir').focus(); return Core.toast('Escribe la dirección de despacho'); }
     let dirFinal = $('dir').value;
     if (entrega === 'despacho') { try { dirFinal = Despacho.direccion($('dir').value); } catch (e) { return Core.toast(e.message); } }
+    let fac = null; try { fac = Core.facturaLeer($('facWrap')); } catch (e) { return Core.toast(e.message); }
     const btn = porWsp ? $('bWspPed') : $('bEnviarPed');
     btn.disabled = true;
     try {
@@ -600,6 +605,7 @@
         p_direccion: dirFinal, p_nota: $('nota').value, p_cupon: cupon ? cupon.codigo : null
       });
       if (!r.ok) throw new Error(r.error);
+      if (fac) { FAC_MEM.set('fac', fac); try { const g = await Cuenta.rpc('pedido_factura_guardar', { p_ref: r.token || r.id, p: fac }); if (!g.ok) throw new Error(g.error); } catch (e) { Core.toast('🧾 Factura: ' + e.message); } }
       if (porWsp) window.open('https://wa.me/' + wspTienda + '?text=' + encodeURIComponent(textoPedido(r)), '_blank');
       Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato a la tienda
       carro = []; carroEnviado = '[]'; $('nota').value = ''; $('cupon').value = ''; cupon = null; $('cuponTxt').textContent = '';
@@ -651,7 +657,7 @@
         (p.envio.link ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.envio.link)) + '">Seguir mi envío</a>' : '') + '</p>' : '') +
       (p.estado === 'en_revision' ? '<p class="muted" style="margin:6px 0 0">🧾 La tienda está revisando tu comprobante.</p>' : '') +
       (p.devolucion === 'pendiente' ? '<p class="muted" style="margin:6px 0 0">💸 La tienda te devolverá el pago.</p>' : '') +
-      (p.boleta && p.boleta.folio ? '<p class="muted" style="margin:6px 0 0">🧾 Boleta electrónica N° ' + Core.esc(p.boleta.folio) + (p.boleta.razon ? ' · ' + Core.esc(p.boleta.razon) + ' (' + Core.esc(p.boleta.rut || '') + ')' : '') +
+      (p.boleta && p.boleta.folio ? '<p class="muted" style="margin:6px 0 0">🧾 ' + (p.boleta.tipo === 33 ? 'Factura' : 'Boleta') + ' electrónica N° ' + Core.esc(p.boleta.folio) + (p.boleta.razon ? ' · ' + Core.esc(p.boleta.razon) + ' (' + Core.esc(p.boleta.rut || '') + ')' : '') +
         (p.boleta.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.boleta.url)) + '">Ver boleta</a>' : '') + '</p>' : '') +
       (p.estado === 'entregado' && !p.calificado ? '<div style="margin-top:8px"><span class="muted">Califica tu compra: </span><span class="califica">' +
         [1, 2, 3, 4, 5].map((k) => '<button type="button" data-cal="' + p.id + '" data-n="' + k + '" aria-label="' + k + ' estrellas">★</button>').join('') + '</span></div>' : '') +

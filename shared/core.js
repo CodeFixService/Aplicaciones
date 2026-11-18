@@ -348,8 +348,8 @@
 
   // Pie de página con la marca (solo "CodeFix") en todas las pantallas.
   // Versión visible al pie de cada pantalla (para saber si el celular ya se actualizó).
-  const APP_VERSION = '6.57';
-  const DB_VERSION = '5.77'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
+  const APP_VERSION = '6.58';
+  const DB_VERSION = '5.78'; // versión que debe tener la base (supabase/instalar.sql → db_version y version.json → bd)
 
   function marca() {
     const cfg = global.CFX_CONFIG || {};
@@ -403,9 +403,53 @@
     }));
   }
 
+  // G38 🧾 FACTURA (tipo 33): datos del receptor. facturaHtml() = bloque contraíble "🧾 Necesito factura" del carrito;
+  // facturaLeer(raiz) = datos revisados (null si no la pidió; error claro si falta algo); facturaHoja(prev) = ventana de la tienda (Pedidos).
+  const FAC = [['rut', 'RUT de la empresa', '76.123.456-7', 12], ['razon', 'Razón social', 'Mi Empresa SpA', 100], ['giro', 'Giro', 'Comercio', 40],
+    ['direccion', 'Dirección', 'Calle 123, oficina', 70], ['comuna', 'Comuna', 'Santiago', 20], ['correo', 'Correo (opcional)', 'facturas@empresa.cl', 80]];
+  function rutOk(r) {
+    const x = String(r || '').toUpperCase().replace(/[^0-9K]/g, ''); if (!/^[0-9]{7,8}[0-9K]$/.test(x)) return false;
+    let s = 0, m = 2; for (let i = x.length - 2; i >= 0; i--) { s += +x[i] * m; m = m === 7 ? 2 : m + 1; }
+    const d = 11 - (s % 11); return (d === 11 ? '0' : d === 10 ? 'K' : String(d)) === x.slice(-1);
+  }
+  const facturaCampos = (v) => FAC.map((f) => '<label>' + f[1] + '<input data-fac="' + f[0] + '" maxlength="' + f[3] + '" placeholder="' + esc(f[2]) + '"' +
+    (f[0] === 'correo' ? ' type="email" inputmode="email"' : f[0] === 'rut' ? ' autocapitalize="characters"' : '') + ' value="' + esc((v || {})[f[0]] || '') + '"></label>').join('');
+  const facturaHtml = (v) => '<details class="factura"><summary>🧾 Necesito factura</summary><p class="muted" style="font-size:13px;margin:6px 0">La tienda te emite factura con estos datos (si no, va boleta).</p>' + facturaCampos(v) + '</details>';
+  function facturaRevisar(o) {
+    if (!rutOk(o.rut)) throw new Error('🧾 Revisa el RUT de la factura');
+    const F = { razon: 'la razón social', giro: 'el giro', direccion: 'la dirección', comuna: 'la comuna' };
+    for (const k in F) if (String(o[k] || '').trim().length < 2) throw new Error('🧾 Para la factura falta ' + F[k]);
+    if (o.correo && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(o.correo)) throw new Error('🧾 Revisa el correo de la factura');
+    return o;
+  }
+  function facturaLeer(raiz) {
+    const d = (raiz || document).querySelector('details.factura'); if (!d || !d.open || d.closest('.hidden')) return null;
+    const o = {}; d.querySelectorAll('[data-fac]').forEach((i) => { o[i.dataset.fac] = i.value.trim(); });
+    return facturaRevisar(o);
+  }
+  // Devuelve { datos } al guardar, { quitar: true } o null si cierra.
+  function facturaHoja(prev) {
+    return new Promise((resolve) => {
+      const d = document.createElement('div'); d.className = 'elegir';
+      d.innerHTML = '<div role="dialog" aria-label="Datos de factura" style="max-height:90vh;overflow:auto"><b>🧾 Datos de factura</b>' + facturaCampos(prev) +
+        '<p class="aviso hidden" data-err></p><button type="button" data-g>Guardar</button>' + (prev ? '<button type="button" class="alt" data-q>Quitar factura (va boleta)</button>' : '') +
+        '<button type="button" class="small" data-x>Cancelar</button></div>';
+      const fin = (v) => { d.remove(); resolve(v); };
+      d.onclick = (e) => {
+        const b = e.target.closest('button');
+        if (e.target === d || (b && 'x' in b.dataset)) return fin(null);
+        if (b && 'q' in b.dataset) return fin({ quitar: true });
+        if (!b || !('g' in b.dataset)) return;
+        const o = {}; d.querySelectorAll('[data-fac]').forEach((i) => { o[i.dataset.fac] = i.value.trim(); });
+        try { fin({ datos: facturaRevisar(o) }); } catch (x) { const er = d.querySelector('[data-err]'); er.textContent = x.message; er.classList.remove('hidden'); }
+      };
+      document.body.appendChild(d);
+    });
+  }
+
   global.Core = {
     RUBROS, plantilla, colorRubro, script,
     store, uid, money, precioNum, precioTxt, esc, toast, registerSW, askNotify, notify, download,
-    backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, confirmar, pedir, copiar, rootUrl, linkUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
+    backup, restore, readImage, logoChico, fotoChica, comprobante, elegir, confirmar, pedir, copiar, rutOk, facturaHtml, facturaLeer, facturaHoja, rootUrl, linkUrl, marca, tema, ico, ponerIconos, version: APP_VERSION, dbVersion: DB_VERSION
   };
 })(window);

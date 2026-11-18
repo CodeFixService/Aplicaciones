@@ -26,7 +26,7 @@
     l.push('', '*TOTAL: ' + money(c.total) + '*');
     if (c.medio) l.push('Pago: ' + (MEDIOS[c.medio] || c.medio));
     if (c.entrega) l.push(c.entrega);
-    if (c.boleta && c.boleta.folio) l.push('Boleta electrónica N° ' + c.boleta.folio + (c.boleta.url ? ': ' + c.boleta.url : ''));
+    if (c.boleta && c.boleta.folio) l.push((c.boleta.tipo === 33 ? 'Factura' : 'Boleta') + ' electrónica N° ' + c.boleta.folio + (c.boleta.url ? ': ' + c.boleta.url : ''));
     l.push('', 'Gracias por tu compra 🙌');
     if (!(c.boleta && c.boleta.folio)) l.push('_No es boleta electrónica._');
     return l.join('\n');
@@ -67,7 +67,7 @@
       (c.descuento > 0 ? fila('Descuento', '−' + esc(money(c.descuento))) : '') +
       fila('<b>TOTAL</b>', '<b>' + esc(money(c.total)) + '</b>', 'cb-tot') +
       (c.medio ? fila('Pago', esc(MEDIOS[c.medio] || c.medio)) : '') + (c.entrega ? '<div class="cb-c" style="margin-top:4px">' + esc(c.entrega) + '</div>' : '') +
-      (c.boleta && c.boleta.folio ? '<hr><div class="cb-c"><b>Boleta electrónica SII N° ' + esc(c.boleta.folio) + '</b></div>' : '') +
+      (c.boleta && c.boleta.folio ? '<hr><div class="cb-c"><b>' + (c.boleta.tipo === 33 ? 'Factura' : 'Boleta') + ' electrónica SII N° ' + esc(c.boleta.folio) + '</b></div>' : '') +
       '<div class="cb-firma"><div class="cb-raya">' + esc(fi.razon || c.negocio || 'Mi tienda') + '</div><div class="cb-c">Firma y timbre' + (fi.rut ? ' · RUT ' + esc(rutF(fi.rut)) : '') + '</div></div>' +
       '<div class="cb-c">Gracias por tu compra 🙌</div>' +
       (c.boleta && c.boleta.folio ? '' : '<div class="cb-c cb-chico">No es boleta electrónica</div>') + '</div>';

@@ -959,6 +959,9 @@ try {
       campo('bRut', 'RUT de la empresa', 'rut', '76.123.456-7', 12) + campo('bRazon', 'Razón social', 'razon', 'Mi Tienda SpA', 100) +
       campo('bGiro', 'Giro', 'giro', 'Venta al por menor de vestuario', 80) + campo('bDir', 'Dirección', 'direccion', 'Av. Siempre Viva 123', 70) +
       campo('bComuna', 'Comuna', 'comuna', 'Santiago', 20) +
+      // G38 🧾 factura 33: el SII exige el código de actividad del emisor (la boleta no).
+      '<label for="bActeco">Código de actividad (solo para facturas)</label><input id="bActeco" inputmode="numeric" maxlength="6" placeholder="479100" value="' + v('acteco') + '">' +
+      '<p class="muted" style="margin:4px 0 0;font-size:13px">Tus clientes pueden pedir 🧾 factura al comprar. El código (6 números) está en sii.cl → Mi SII → Datos de la empresa.</p>' +
       '<div id="bOf"' + (of ? '' : ' class="hidden"') + '><label for="bKey">' + (b.fin ? 'Cambiar API key' : 'API key de OpenFactura') + '</label>' +
       '<input id="bKey" type="password" autocomplete="off" placeholder="' + (b.fin ? '…' + v('fin') : 'Pega tu API key') + '">' +
       '<p class="muted" style="margin:4px 0 0;font-size:13px">La sacas en OpenFactura (Haulmer) → Configuración → API. Nadie más la ve.</p>' +
@@ -972,7 +975,7 @@ try {
     e.target.disabled = true;
     try {
       await Cuenta.rpc('boleta_guardar', { p: a === 'quitar' ? null : { modo: document.querySelector('[name=bModo]:checked').value, rut: $('bRut').value, razon: $('bRazon').value,
-        giro: $('bGiro').value, direccion: $('bDir').value, comuna: $('bComuna').value, apikey: $('bKey').value, auto: $('bAuto').checked } });
+        giro: $('bGiro').value, direccion: $('bDir').value, comuna: $('bComuna').value, apikey: $('bKey').value, auto: $('bAuto').checked, acteco: $('bActeco').value } });
       Core.toast(a === 'quitar' ? 'Boleta quitada' : '🧾 Datos de boleta guardados'); cargarBoleta();
     } catch (err) { Core.toast(err.message); e.target.disabled = false; }
   };

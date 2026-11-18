@@ -73,6 +73,7 @@
         <div id="rowDir" class="hidden"><p class="muted" style="font-size:13px">⚠️ El despacho tiene un costo según la distancia; la tienda te lo confirma.</p>
           <label for="dir">Dirección</label><input id="dir" maxlength="200" placeholder="Calle, número, comuna"></div>
         <label for="nota">Nota (opcional)</label><textarea id="nota" maxlength="200"></textarea>
+        <div id="facWrap" class="hidden"></div>
         <p class="muted" id="pagoTip" style="font-size:13px"></p>
         <div class="btns"><button id="bPedir" style="flex:1">📨 Enviar pedido</button></div>
         <p class="muted" style="font-size:12.5px;margin:8px 0 0">Al enviar aceptas las <a href="#politicas" id="lPol">políticas de la tienda</a> (cambios, retracto y garantía).</p>
@@ -263,12 +264,15 @@
   };
   Despacho.montar({ cfg: t.despacho, monto: () => lineas().reduce((a, x) => a + (Number(x.i.precio) || 0) * (Number(x.l.cant) || 0), 0) });
   $('nom').value = mem.get('nom', ''); $('tel').value = mem.get('tel', ''); $('mail').value = mem.get('mail', '');
+  // G38 🧾 Factura: solo si la tienda tiene sus datos de emisor (Ajustes → Boleta SII).
+  Cuenta.rpc('factura_disponible', { p_negocio: t.id }).then((si) => { if (si) { $('facWrap').innerHTML = Core.facturaHtml(mem.get('fac', null)); $('facWrap').classList.remove('hidden'); } }).catch(() => {});
   $('bPedir').onclick = async () => {
     if (!lineas().length) return Core.toast('Tu pedido está vacío');
     let dirFinal = $('dir').value;
     const correo = $('mail').value.trim();
     if (correo && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(correo)) { $('mail').focus(); return Core.toast('✉️ Revisa tu correo (o déjalo vacío)'); }
     if (entrega === 'despacho') { try { dirFinal = Despacho.direccion($('dir').value); } catch (e) { return Core.toast(e.message); } }
+    let fac = null; try { fac = Core.facturaLeer($('facWrap')); } catch (e) { return Core.toast(e.message); }
     $('bPedir').disabled = true;
     try {
       const r = await Cuenta.rpc('crear_pedido_invitado', { p_slug: slug, p_nombre: $('nom').value, p_tel: $('tel').value,
@@ -276,6 +280,7 @@
       if (!r.ok) throw new Error(r.error);
       mem.set('nom', $('nom').value); mem.set('tel', $('tel').value); mem.set('mail', correo);
       if (correo) { try { await Cuenta.rpc('pedido_correo_guardar', { p_ref: r.token, p_correo: correo }); } catch (e) { /* el pedido ya quedó */ } }
+      if (fac) { mem.set('fac', fac); try { await Cuenta.rpc('pedido_factura_guardar', { p_ref: r.token, p: fac }); } catch (e) { /* el pedido ya quedó: la factura se pide a la tienda */ } }
       medir('InitiateCheckout', { value: Number(r.total) || 0, currency: 'CLP' });
       tokens.push({ t: r.token, f: Date.now(), total: r.total }); mem.set('tokens', tokens.slice(-20));
       carro = []; mem.set('carro', []);

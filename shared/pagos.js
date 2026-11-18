@@ -9,6 +9,7 @@
                                           Un link de monto fijo, si existe para ese plan, se usa en su lugar.
    G85: ⚡ Mercado Pago automático (si CodeFix lo conectó en CM → Pagos): paga y se activa solo, sin comprobante (aviso push).
         Solo 3 formas: ⚡ Mercado Pago · 🔗 link general (abierto) · 🏦 transferencia. Cupón a la vista. Ya no hay links de monto fijo ni tarjeta aparte.
+   G38: ⚡ Flow (Webpay débito/crédito, transferencia o MACH) como 2.º pago automático, igual que Mercado Pago (cfx_flow_pagar).
    G95: arriba de la hoja ⭐ Premium, "🎁 Probar Premium N días gratis" (cfx_pro_probar) si la cuenta nunca lo usó con su correo; al Continuar recarga.
    CFX_PAGOS.mpVolver(rpc)             → al volver de Mercado Pago (lo llama ayuda.js al iniciar): confirma el pago y avisa.
    CFX_PAGOS.revisar({ rpc, salir })   → si es un negocio nuevo que debe su primer pago, muestra la pantalla de activación (no se cierra).
@@ -46,9 +47,11 @@
     '.cfx-pago .cp-cupon.on b{flex:1;min-width:0;font-size:15px}.cfx-pago .cp-cupon.on small{display:block;font-weight:500;color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-pago .cp-plan s{display:block;font-size:12px;font-weight:500;color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-pago a.cp-mp,.cfx-pago button.cp-mp{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border:0;border-radius:14px;background:#009ee3;color:#fff;font-weight:800;font-size:16px;text-decoration:none;margin-top:10px;cursor:pointer}' +
-    '.cfx-pago .cp-pasos.tres{grid-template-columns:repeat(3,1fr)}';
+    '.cfx-pago .cp-pasos.tres{grid-template-columns:repeat(3,1fr)}.cfx-pago button.cp-flow{background:var(--cp-color)}' +
+    '.cfx-pago .cp-tabs:has(>:nth-child(4)){grid-template-columns:repeat(2,minmax(0,1fr))}.cfx-pago .cp-tabs:has(>:nth-child(4)) button{min-height:48px;flex-direction:row;gap:6px}';
   document.head.appendChild(css);
   const MP_KEY = 'cfx-mp-pago';
+  const AUTO = { mp: 'Mercado Pago', flow: 'Flow' };  // G38: pagos que se activan solos
   const mpMarca = (v) => { try { if (v) localStorage.setItem(MP_KEY, String(Date.now())); else localStorage.removeItem(MP_KEY); } catch (e) { /* sin almacenamiento */ } };
   const mpMarcado = () => { try { const t = +localStorage.getItem(MP_KEY) || 0; return t && Date.now() - t < 2 * 864e5; } catch (e) { return false; } };
 
@@ -124,9 +127,9 @@
     let obligatorio = !pr && !!(o.obligatorio || e.bloqueado || (o.comoNegocio && e.debe_inicio));
     const c = e.config || {}, t = c.transferencia || {};
     // G85: un solo pago general para las 7 apps: ⚡ Mercado Pago automático, 🔗 link general abierto y 🏦 transferencia.
-    const PCT = { mp: Number(c.comision_pct) || 0, link: Number(c.comision_pct) || 0, transferencia: 0 };
-    const L = planes(e, pr), medios = [e.mp ? 'mp' : null, c.link ? 'link' : null, t.numero ? 'transferencia' : null].filter(Boolean);
-    const NOMBRE_MEDIO = { mp: '⚡ Mercado Pago', link: '🔗 Link de pago', transferencia: '🏦 Transferencia' };
+    const PCT = { mp: Number(c.comision_pct) || 0, flow: Number(c.comision_pct) || 0, link: Number(c.comision_pct) || 0, transferencia: 0 };
+    const L = planes(e, pr), medios = [e.mp ? 'mp' : null, e.flow ? 'flow' : null, c.link ? 'link' : null, t.numero ? 'transferencia' : null].filter(Boolean);
+    const NOMBRE_MEDIO = { mp: '⚡ Mercado Pago', flow: '💳 Webpay', link: '🔗 Link de pago', transferencia: '🏦 Transferencia' };
     let plan = L[0], medio = medios[0], foto = null;
     const ayudaChat = window.CFX_AYUDA ? '<p style="text-align:center"><a href="#" data-chat>💬 ¿Dudas? Escríbenos por el chat</a></p>' : '';
     const pie = (obligatorio ? (o.salir ? '<button type="button" data-salir style="width:100%;margin-top:10px">' + esc(o.salirTexto || 'Cerrar sesión') + '</button>' : '') : '<button type="button" data-x style="width:100%;margin-top:10px">Ahora no</button>') +
@@ -143,9 +146,9 @@
       ? '<div class="cp-ok" style="text-align:center"><b>🎁 Prueba Premium ' + e.prueba_pro.dias + ' días gratis</b><br><small>Una sola vez. Sin tarjeta. Al terminar vuelves a gratis sin perder nada.</small>' +
         '<button type="button" class="cp-si" data-propro style="width:100%;margin-top:8px">🎁 Probar ' + e.prueba_pro.dias + ' días gratis</button><p class="cp-err" id="cpProErr" style="margin:4px 0 0;min-height:0"></p></div>' : '';
     const lib = e.liberado_hasta ? '<div class="cp-ok">🎁 Registro liberado hasta el <b>' + new Date(e.liberado_hasta).toLocaleDateString('es-CL') + '</b>: puedes usar la app sin pagar.</div>' : '';
-    if (u && u.estado === 'pendiente' && u.medio === 'mp') {
-      // G85: abrió Mercado Pago: confirmar (por si ya pagó) o pagar de otra forma.
-      caja.innerHTML = '<h2>⏳ Esperando tu pago</h2><div class="cp-ok">Abriste Mercado Pago por <b>' + pesos(u.monto) + '</b>. Apenas Mercado Pago lo apruebe, tu plan se activa solo y te llega un aviso.</div>' +
+    if (u && u.estado === 'pendiente' && AUTO[u.medio]) {
+      // G85: abrió Mercado Pago (G38: o Flow): confirmar (por si ya pagó) o pagar de otra forma.
+      caja.innerHTML = '<h2>⏳ Esperando tu pago</h2><div class="cp-ok">Abriste ' + AUTO[u.medio] + ' por <b>' + pesos(u.monto) + '</b>. Apenas ' + AUTO[u.medio] + ' lo apruebe, tu plan se activa solo y te llega un aviso.</div>' +
         '<button type="button" class="cp-si" data-mpver style="width:100%;margin-top:10px">🔄 Ya pagué, revisar</button><p class="cp-err" id="cpErr"></p>' +
         '<button type="button" data-mpotra style="width:100%;margin-top:8px">Pagar de otra forma</button>' + pie;
       caja.addEventListener('click', async (ev) => {
@@ -155,7 +158,7 @@
           if ('mpotra' in b.dataset) { await o.rpc('cfx_mp_cancelar'); mpMarca(false); return abrir(o); }
           const r = await o.rpc('cfx_mp_revisar');
           if (r && r.aprobado) { mpMarca(false); armarListo(caja, r.pago); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
-          caja.querySelector('#cpErr').textContent = 'Mercado Pago aún no lo aprueba. Si ya pagaste, espera 1 minuto: se activa solo.'; b.disabled = false;
+          caja.querySelector('#cpErr').textContent = AUTO[u.medio] + ' aún no lo aprueba. Si ya pagaste, espera 1 minuto: se activa solo.'; b.disabled = false;
         } catch (x) { caja.querySelector('#cpErr').textContent = (x && x.message) || String(x); b.disabled = false; }
       });
     } else if (u && u.estado === 'pendiente') {
@@ -171,7 +174,7 @@
       const linea = (a, b, cls) => '<div class="cp-linea' + (cls ? ' ' + cls : '') + '"><span>' + a + '</span><b>' + b + '</b></div>';
       const datos = [['Titular', t.titular], ['RUT', t.rut], ['Banco', t.banco], ['Tipo de cuenta', t.tipo], ['N° de cuenta', t.numero], ['Correo', t.correo]].filter((x) => x[1]);
       const pintar = () => {
-        const pc = PCT[medio], url = medio === 'link' ? c.link : '', mp = medio === 'mp';
+        const pc = PCT[medio], url = medio === 'link' ? c.link : '', mp = !!AUTO[medio];
         const precio = (x) => x.k === 'meses' ? x.p * x.m : x.p;
         // 🏷️ Cupón bien a la vista (Premium; los módulos traen su propio descuento Premium).
         const cajaCupon = pr ? '' : cupon
@@ -179,9 +182,9 @@
           : '<div class="cp-cupon"><span>🏷️</span><input id="cpCupon" placeholder="¿Tienes cupón?" autocapitalize="characters" autocomplete="off" aria-label="Cupón de descuento"><button type="button" data-cupon>Aplicar</button></div>';
         caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + prueba() +
           (obligatorio ? '<p>Para empezar a usar la app haz tu primer pago. Te da ' + esc(plan.d) + '; después puedes seguir en Premium o quedar en la versión gratis.</p>' : '') +
-          (mp ? '<div class="cp-pasos tres"><div>Toca Pagar</div><div>Paga en Mercado Pago</div><div>Se activa solo</div></div>'
+          (mp ? '<div class="cp-pasos tres"><div>Toca Pagar</div><div>Paga en ' + AUTO[medio] + '</div><div>Se activa solo</div></div>'
             : '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>') +
-          (u && u.estado === 'rechazado' && u.medio !== 'mp' ? '<div class="cp-err">Tu último comprobante fue rechazado: ' + esc(u.motivo || '') + '</div>' : '') +
+          (u && u.estado === 'rechazado' && !AUTO[u.medio] ? '<div class="cp-err">Tu último comprobante fue rechazado: ' + esc(u.motivo || '') + '</div>' : '') +
           '<div class="cp-planes">' + L.map((x, i) => '<div class="cp-plan' + (x === plan ? ' on' : '') + '" data-p="' + i + '"><b>' + esc(x.t) + '<small>' + esc(x.d) + '</small></b><span class="cp-precio">' +
             (x.p ? (cupon && x.k !== 'otro' ? '<s>' + pesos(precio(x)) + '</s>' + pesos(conCupon(precio(x))) : pesos(precio(x))) : '') + '</span></div>').join('') + '</div>' +
           (plan.k === 'otro' ? '<label for="cpOtro">Monto a pagar</label><input id="cpOtro" type="number" inputmode="numeric" min="1" placeholder="Ej: 10000">' : '') +
@@ -189,8 +192,8 @@
           (medios.length > 1 ? '<div class="cp-tabs">' + medios.map((m) => '<button type="button" data-m="' + m + '" class="' + (m === medio ? 'on' : '') + '">' + NOMBRE_MEDIO[m] + '</button>').join('') + '</div>' : '') +
           (mp ? '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div>' +
               (obligatorio || plan.k === 'inicio' ? '' : '<label class="cp-regalo" style="display:flex;gap:8px;align-items:center;margin:8px 0;font-size:14px"><input type="checkbox" id="cpRegalo"' + (o._regalo ? ' checked' : '') + ' style="width:auto;min-height:0"> 🎁 Es para otra cuenta (te damos una key para regalar)</label>') +
-              '<button type="button" class="cp-mp" data-mp>⚡ Pagar con Mercado Pago</button>' +
-              '<div class="cp-ayuda">Pagas con tarjeta, débito o saldo de Mercado Pago. Al terminar vuelves a la app y tu plan <b>se activa solo, al tiro</b> (te llega un aviso). Sin comprobante.</div><p class="cp-err" id="cpErr"></p></div>' + (pr ? '' : keyHtml) + pie
+              (medio === 'flow' ? '<button type="button" class="cp-mp cp-flow" data-mp>💳 Pagar con Webpay</button>' : '<button type="button" class="cp-mp" data-mp>⚡ Pagar con Mercado Pago</button>') +
+              '<div class="cp-ayuda">' + (medio === 'flow' ? 'Pagas en Flow con Webpay (débito, crédito o prepago), transferencia o MACH.' : 'Pagas con tarjeta, débito o saldo de Mercado Pago.') + ' Al terminar vuelves a la app y tu plan <b>se activa solo, al tiro</b> (te llega un aviso). Sin comprobante.</div><p class="cp-err" id="cpErr"></p></div>' + (pr ? '' : keyHtml) + pie
           : '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div><div class="cp-fila"><button type="button" data-copiar>📋 Copiar monto</button>' +
             (medio === 'link' && url ? '<a class="cp-btn" href="' + esc(url) + '" target="_blank" rel="noopener">🔗 Abrir link de pago</a>' : '') + '</div>' +
           (medio === 'transferencia'
@@ -214,7 +217,7 @@
       }
       function refrescar() { caja.querySelector('#cpDesglose').innerHTML = desglose(); const pg = caja.querySelector('#cpPagado'); if (pg && !o._pagado) pg.value = monto() || ''; }
       // Si "otro monto" no se puede pagar automático, igual queda el link o la transferencia.
-      if (medio === 'mp' && plan.k === 'otro' && medios.length > 1) medio = medios[1];
+      if (AUTO[medio] && plan.k === 'otro') medio = medios.find((m) => !AUTO[m]) || medio;
       pintar();
       caja.addEventListener('change', async (ev) => {
         if (ev.target.id !== 'cpFoto' || !ev.target.files[0]) return;
@@ -232,14 +235,14 @@
         else if ('key' in b.dataset) return;
         else if ('mp' in b.dataset) {
           // G85: ⚡ el cobro lo arma la base (mismo total que se ve aquí) y abre Mercado Pago; al volver se confirma solo.
-          const err = caja.querySelector('#cpErr'); b.disabled = true; b.textContent = 'Abriendo Mercado Pago…';
+          const err = caja.querySelector('#cpErr'), txt = b.textContent; b.disabled = true; b.textContent = 'Abriendo ' + AUTO[medio] + '…';
           try {
             const rg = caja.querySelector('#cpRegalo'); o._regalo = !!(rg && rg.checked);
-            const r = await o.rpc('cfx_mp_pagar', { p_periodo: plan.k, p_meses: plan.k === 'meses' ? plan.m : null, p_producto: pr ? pr.clave : null, p_cupon: cupon ? cupon.codigo : null, p_volver: location.href.split('#')[0], ...(o._regalo ? { p_regalo: true } : {}) });
+            const r = await o.rpc(medio === 'flow' ? 'cfx_flow_pagar' : 'cfx_mp_pagar', { p_periodo: plan.k, p_meses: plan.k === 'meses' ? plan.m : null, p_producto: pr ? pr.clave : null, p_cupon: cupon ? cupon.codigo : null, p_volver: location.href.split('#')[0], ...(o._regalo ? { p_regalo: true } : {}) });
             if (r && r.aprobado) { armarListo(caja, (await o.rpc('cfx_mp_revisar').catch(() => ({}))).pago); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; }
-            if (!r || !r.ok) throw new Error((r && r.error) || 'Mercado Pago no respondió');
+            if (!r || !r.ok) throw new Error((r && r.error) || AUTO[medio] + ' no respondió');
             mpMarca(true); location.href = r.url;
-          } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = '⚡ Pagar con Mercado Pago'; }
+          } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = txt; }
         }
         else if (b.dataset.m) { medio = b.dataset.m; o._pagado = ''; pintar(); }
         else if ('copiar' in b.dataset) { await copiar(String(monto())); b.textContent = '✓ Monto copiado'; }
@@ -331,10 +334,10 @@
       if (k) { ev.stopPropagation(); await copiar(k.dataset.copkey); k.textContent = '✓ Copiada'; return; }
       if (!ev.target.closest('[data-comp]') || !p) return;
       const c = { titulo: 'Comprobante de pago', negocio: 'CodeFix', fecha: p.resuelto || Date.now(), numero: p.mp_pago || String(p.id || '').slice(0, 8), cliente: p.nombre || p.email || '',
-        items: [{ cant: 1, nombre: queEs(p) + (p.regalo ? ' (🎁 regalo)' : ''), precio: +p.monto || 0 }], total: +p.monto || 0, medio: 'mercadopago', cliente_ve: true,
+        items: [{ cant: 1, nombre: queEs(p) + (p.regalo ? ' (🎁 regalo)' : ''), precio: +p.monto || 0 }], total: +p.monto || 0, medio: /^flow:/.test(p.mp_pago || '') ? 'Flow' : 'mercadopago', cliente_ve: true,
         entrega: p.key_regalo ? 'Key: ' + p.key_regalo : p.hasta ? 'Activo hasta el ' + fechaL(p.hasta) : '' };
       const C = await cargarComprobante();
-      if (C) { cerrar(); C.abrir(c); }  // la ventana de pago está encima de todo: se cierra para que el comprobante se vea else { await copiar(c.titulo + '\nCodeFix · ' + c.items[0].nombre + '\nTotal: ' + pesos(c.total) + ' · Mercado Pago N° ' + c.numero + '\n' + c.entrega); ev.target.textContent = '✓ Comprobante copiado'; }
+      if (C) { cerrar(); C.abrir(c); }  // la ventana de pago está encima de todo: se cierra para que el comprobante se vea else { await copiar(c.titulo + '\nCodeFix · ' + c.items[0].nombre + '\nTotal: ' + pesos(c.total) + ' · ' + (/^flow:/.test(p.mp_pago || '') ? 'Flow' : 'Mercado Pago') + ' N° ' + c.numero + '\n' + c.entrega); ev.target.textContent = '✓ Comprobante copiado'; }
     });
   }
   // G85: al volver de Mercado Pago (la app abre de nuevo): confirma el pago con la base. Reintenta un rato por si Mercado Pago tarda.

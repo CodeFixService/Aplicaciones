@@ -254,8 +254,10 @@
           (p.estado === 'pagando' && p.motivo ? ' (' + Core.esc(p.motivo) + ')' : '') + (p.estado === 'en_revision' ? ': este es el reintento' : ': esperando otro comprobante') + '</div>' : '') +
         (p.estado === 'rechazado' && p.motivo ? '<div class="muted">❌ ' + Core.esc(p.motivo) + '</div>' : '') +
         (p.devolucion === 'pendiente' ? '<div class="aviso">💸 <b>Devuelve el pago</b>: canceló a tiempo.</div>' : p.devolucion === 'hecha' ? '<div class="muted">💸 Devuelto</div>' : '') +
-        (p.boleta && p.boleta.folio ? '<div class="muted">🧾 Boleta N° ' + Core.esc(p.boleta.folio) + (p.boleta.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.boleta.url)) + '">Ver</a>' : '') + '</div>'
-          : p.boleta && p.boleta.error && PAGADO.includes(p.estado) ? '<div class="aviso">🧾 Boleta no emitida: ' + Core.esc(p.boleta.error) + '</div>' : '') +
+        // G38 🧾 el cliente pidió FACTURA: la tienda la emite con estos datos (en vez de boleta).
+        (p.boleta && p.boleta.factura && !p.boleta.folio ? '<div class="aviso">🧾 Pide <b>factura</b>: ' + Core.esc(p.boleta.factura.razon) + ' · RUT ' + Core.esc(p.boleta.factura.rut) + '</div>' : '') +
+        (p.boleta && p.boleta.folio ? '<div class="muted">🧾 ' + (p.boleta.tipo === 33 ? 'Factura' : 'Boleta') + ' N° ' + Core.esc(p.boleta.folio) + (p.boleta.url ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.boleta.url)) + '">Ver</a>' : '') + '</div>'
+          : p.boleta && p.boleta.error && PAGADO.includes(p.estado) ? '<div class="aviso">🧾 ' + (p.boleta.factura ? 'Factura' : 'Boleta') + ' no emitida: ' + Core.esc(p.boleta.error) + '</div>' : '') +
         '<div data-img="' + p.id + '"></div>' +
         '<div class="acc">' +
         (COMPRADO.includes(p.estado) ? '<button class="alt small" data-recibo="' + p.id + '">🧾 Detalle de compra</button>' : '') +
@@ -263,7 +265,8 @@
         (p.estado === 'en_revision' ? '<button class="ok small" data-rev="' + p.id + '" data-si="1">✅ Aprobar pago</button><button class="danger small" data-rev="' + p.id + '" data-si="0">Rechazar</button>' : '') +
         sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
         (abierto && p.estado !== 'en_revision' ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
-        (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir boleta SII' : 'Anotar N° boleta SII') + '</button>' : '') +
+        (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir ' : 'Anotar N° ') + (p.boleta && p.boleta.factura ? 'factura SII' : 'boleta SII') + '</button>' : '') +
+        (BOL.conectado && !(p.boleta && p.boleta.folio) && !['cancelado', 'rechazado', 'expirado'].includes(p.estado) ? '<button class="small alt" data-fac="' + p.id + '">🧾 ' + (p.boleta && p.boleta.factura ? 'Datos de factura' : 'Dar factura') + '</button>' : '') +
         (p.devolucion === 'pendiente' ? '<button class="small" data-dev="' + p.id + '">💸 Ya devolví</button>' : '') +
         (p.entrega === 'despacho' && ['recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado) ? '<button class="small alt" data-env="' + p.id + '">🚚 ' + (p.envio && p.envio.codigo ? 'Cambiar seguimiento' : 'Seguimiento') + '</button>' : '') +
         (etiq.has(p.id) ? '<button class="small alt" data-etv="' + p.id + '">🖨️ Etiqueta</button>'
@@ -311,17 +314,27 @@
         await Cuenta.rpc('actualizar_pedido', { p_id: b.dataset.id, p_estado: b.dataset.e });
         Core.toast('Pedido: ' + ESTADOS[b.dataset.e]);
       }
+      if (b.dataset.fac) {
+        // G38 🧾 la tienda pone, cambia o quita los datos de factura (si el cliente la pidió por chat o WhatsApp).
+        const p = pedidos.find((x) => x.id === b.dataset.fac), r = await Core.facturaHoja(p && p.boleta && p.boleta.factura);
+        if (!r) return;
+        const g = await Cuenta.rpc('pedido_factura_guardar', { p_ref: b.dataset.fac, p: r.quitar ? null : r.datos });
+        if (!g.ok) throw new Error(g.error);
+        Core.toast(r.quitar ? '🧾 Sin factura: va boleta' : '🧾 Datos de factura guardados');
+      }
       if (b.dataset.bol) {
+        const p = pedidos.find((x) => x.id === b.dataset.bol), doc = p && p.boleta && p.boleta.factura ? 'Factura' : 'Boleta';
         if (BOL.modo === 'openfactura') {
           b.disabled = true;
           const r = await Cuenta.rpc('boleta_emitir', { p_id: b.dataset.bol });
           if (!r.ok) throw new Error(r.error);
-          Core.toast('🧾 Boleta N° ' + r.folio + ' emitida');
+          Core.toast('🧾 ' + (r.tipo === 33 ? 'Factura' : 'Boleta') + ' N° ' + r.folio + ' emitida');
         } else {
-          const f = await Core.pedir('Emite la boleta en sii.cl (Boleta electrónica) y escribe aquí su folio (N°):');
+          const f = await Core.pedir(doc === 'Factura' ? 'Emite la factura en sii.cl (Factura electrónica) con los datos del cliente y escribe aquí su folio (N°):'
+            : 'Emite la boleta en sii.cl (Boleta electrónica) y escribe aquí su folio (N°):');
           if (!f) return;
           await Cuenta.rpc('boleta_anotar', { p_id: b.dataset.bol, p_folio: f });
-          Core.toast('🧾 Boleta anotada: le avisamos al cliente');
+          Core.toast('🧾 ' + doc + ' anotada: le avisamos al cliente');
         }
       }
       // G102 🏷️ Etiqueta Chilexpress (shared/extras.js): se abre en su hoja; al crearla, el seguimiento queda puesto solo.
