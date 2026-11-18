@@ -11,6 +11,8 @@
         Solo 3 formas: ⚡ Mercado Pago · 🔗 link general (abierto) · 🏦 transferencia. Cupón a la vista. Ya no hay links de monto fijo ni tarjeta aparte.
    G38: ⚡ Flow (Webpay débito/crédito, transferencia o MACH) como 2.º pago automático, igual que Mercado Pago (cfx_flow_pagar).
    G95: arriba de la hoja ⭐ Premium, "🎁 Probar Premium N días gratis" (cfx_pro_probar) si la cuenta nunca lo usó con su correo; al Continuar recarga.
+   G108: 🔁 "Renovar solo cada mes/año" (1 mes o 1 año con ⚡ Mercado Pago): cfx_mp_suscribir → MP autoriza la tarjeta 1 vez y cobra solo;
+        arriba se ve "🔁 Se renueva solo · Quitar" (cfx_mp_sub_quitar). Cada cobro = pago aprobado (cfx_mp_sub_cobro).
    CFX_PAGOS.mpVolver(rpc)             → al volver de Mercado Pago (lo llama ayuda.js al iniciar): confirma el pago y avisa.
    CFX_PAGOS.revisar({ rpc, salir })   → si es un negocio nuevo que debe su primer pago, muestra la pantalla de activación (no se cierra).
    rpc(nombre, args) debe devolver una promesa con los datos (cada app pasa su propia función). */
@@ -136,6 +138,15 @@
       ayudaChat + (c.whatsapp ? '<p style="text-align:center"><a href="https://wa.me/' + esc(String(c.whatsapp).replace(/\D/g, '')) + '" target="_blank" rel="noopener">¿Prefieres WhatsApp? Escríbenos</a></p>' : '') +
       (window.CFX_AYUDA ? '<p style="text-align:center;font-size:12px">Al pagar aceptas los <a href="#" data-terminos>Términos y condiciones</a>.</p>' : '');
     const u = e.ultimo;
+    // G108 🔁 renovación automática (preapproval de MP) de ESTE producto (null = Premium).
+    const miSub = (e.subs || []).find((s) => (s.producto || null) === (pr ? pr.clave : null)) || null;
+    const cada = (k) => k === 'anual' ? 'cada año' : 'cada mes';
+    const subHtml = () => !miSub ? '' : miSub.estado === 'pendiente'
+      ? '<div class="cp-ok cp-sub"><b>⏳ Falta autorizar tu tarjeta</b><br><small>Renovación automática ' + cada(miSub.periodo) + ' · ' + pesos(miSub.monto) + '. Si ya la autorizaste en Mercado Pago, toca Revisar.</small>' +
+        '<div class="cp-fila"><button type="button" class="cp-si" data-subrev>🔄 Ya autoricé, revisar</button><button type="button" data-subq>Quitar</button></div><p class="cp-err" id="cpSubErr" style="margin:4px 0 0;min-height:0"></p></div>'
+      : '<div class="cp-ok cp-sub"><b>🔁 Se renueva solo ' + cada(miSub.periodo) + '</b> · ' + pesos(miSub.monto) + '<br><small>' + (miSub.estado === 'pausada' ? '⏸️ Pausada en Mercado Pago. ' : '') +
+        (miSub.cobros ? miSub.cobros + (miSub.cobros === 1 ? ' cobro' : ' cobros') + ' · último el ' + fechaL(miSub.ultimo) : '1.er cobro el ' + fechaL(miSub.inicio)) + '. Si la quitas, lo pagado sigue activo hasta que venza.</small>' +
+        '<div class="cp-fila"><button type="button" data-subq>Quitar renovación automática</button></div><p class="cp-err" id="cpSubErr" style="margin:4px 0 0;min-height:0"></p></div>';
     // G87 K: 🔑 keys que compré (🎁 regalo o respaldo): siempre a la vista para copiarlas.
     const misKeys = (e.keys || []).length ? '<details style="margin-top:8px"><summary>🎁 Mis keys compradas (' + e.keys.length + ')</summary>' + e.keys.map((k) =>
       '<div class="cp-dato"><span>' + esc(k.producto ? '🧩 ' + k.producto : '⭐ Premium') + ' · ' + (+k.dias || 0) + ' d' + (k.usada ? ' · ✓ usada' : '') + '</span><b>' + esc(k.key) + '</b><button type="button" data-copkey="' + esc(k.key) + '">Copiar</button></div>').join('') + '</details>' : '';
@@ -167,7 +178,7 @@
       caja.innerHTML = '<h2>' + (obligatorio ? 'Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + prueba() + '<p>Los pagos aún no están configurados. Escríbenos y te ayudamos.</p>' + keyHtml + pie;
     } else {
       let cupon = null;  // { codigo, pct }: descuento sobre el precio del plan (no sobre "otro monto")
-      const conCupon = (p) => cupon ? Math.round(p * (100 - cupon.pct) / 100) : p;
+      const conCupon = (p) => cupon && !o._renovar ? Math.round(p * (100 - cupon.pct) / 100) : p;
       const base = () => plan.k === 'otro' ? Math.round(Number((caja.querySelector('#cpOtro') || {}).value || o._otro || 0)) : conCupon(plan.k === 'meses' ? plan.p * plan.m : plan.p);
       const cargo = () => Math.ceil(base() * PCT[medio] / 100);
       const monto = () => base() + cargo();
@@ -175,12 +186,14 @@
       const datos = [['Titular', t.titular], ['RUT', t.rut], ['Banco', t.banco], ['Tipo de cuenta', t.tipo], ['N° de cuenta', t.numero], ['Correo', t.correo]].filter((x) => x[1]);
       const pintar = () => {
         const pc = PCT[medio], url = medio === 'link' ? c.link : '', mp = !!AUTO[medio];
+        const ren = medio === 'mp' && (plan.k === 'mensual' || plan.k === 'anual') && !obligatorio && !miSub;
+        if (!ren) o._renovar = false;
         const precio = (x) => x.k === 'meses' ? x.p * x.m : x.p;
         // 🏷️ Cupón bien a la vista (Premium; los módulos traen su propio descuento Premium).
         const cajaCupon = pr ? '' : cupon
           ? '<div class="cp-cupon on"><span>🏷️</span><b>Cupón ' + esc(cupon.codigo) + ' · −' + cupon.pct + '%<small>Ya está descontado del total</small></b><button type="button" data-sincupon>Quitar</button></div>'
           : '<div class="cp-cupon"><span>🏷️</span><input id="cpCupon" placeholder="¿Tienes cupón?" autocapitalize="characters" autocomplete="off" aria-label="Cupón de descuento"><button type="button" data-cupon>Aplicar</button></div>';
-        caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + prueba() +
+        caja.innerHTML = '<h2>' + (obligatorio ? '🚀 Activa tu cuenta' : pr ? esc(pr.nombre) : '⭐ Hazte Premium') + '</h2>' + lib + subHtml() + prueba() +
           (obligatorio ? '<p>Para empezar a usar la app haz tu primer pago. Te da ' + esc(plan.d) + '; después puedes seguir en Premium o quedar en la versión gratis.</p>' : '') +
           (mp ? '<div class="cp-pasos tres"><div>Toca Pagar</div><div>Paga en ' + AUTO[medio] + '</div><div>Se activa solo</div></div>'
             : '<div class="cp-pasos"><div>Paga el total</div><div>Saca un pantallazo</div><div>Súbelo aquí</div><div>Espera 5–10 min</div></div>') +
@@ -191,9 +204,12 @@
           cajaCupon +
           (medios.length > 1 ? '<div class="cp-tabs">' + medios.map((m) => '<button type="button" data-m="' + m + '" class="' + (m === medio ? 'on' : '') + '">' + NOMBRE_MEDIO[m] + '</button>').join('') + '</div>' : '') +
           (mp ? '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div>' +
-              (obligatorio || plan.k === 'inicio' ? '' : '<label class="cp-regalo" style="display:flex;gap:8px;align-items:center;margin:8px 0;font-size:14px"><input type="checkbox" id="cpRegalo"' + (o._regalo ? ' checked' : '') + ' style="width:auto;min-height:0"> 🎁 Es para otra cuenta (te damos una key para regalar)</label>') +
-              (medio === 'flow' ? '<button type="button" class="cp-mp cp-flow" data-mp>💳 Pagar con Webpay</button>' : '<button type="button" class="cp-mp" data-mp>⚡ Pagar con Mercado Pago</button>') +
-              '<div class="cp-ayuda">' + (medio === 'flow' ? 'Pagas en Flow con Webpay (débito, crédito o prepago), transferencia o MACH.' : 'Pagas con tarjeta, débito o saldo de Mercado Pago.') + ' Al terminar vuelves a la app y tu plan <b>se activa solo, al tiro</b> (te llega un aviso). Sin comprobante.</div><p class="cp-err" id="cpErr"></p></div>' + (pr ? '' : keyHtml) + pie
+              (ren ? '<label class="cp-renovar" style="display:flex;gap:8px;align-items:center;margin:8px 0;font-size:14px"><input type="checkbox" id="cpRenovar"' + (o._renovar ? ' checked' : '') + ' style="width:auto;min-height:0"> 🔁 Renovar solo ' + cada(plan.k) + ' (se cobra a tu tarjeta; lo quitas cuando quieras)</label>' +
+                (o._renovar ? '<label for="cpMpCorreo">Correo de tu cuenta de Mercado Pago</label><input id="cpMpCorreo" type="email" inputmode="email" autocomplete="email" value="' + esc(o._mpCorreo || (e.yo && e.yo.email) || '') + '">' : '') : '') +
+              (obligatorio || plan.k === 'inicio' || o._renovar ? '' : '<label class="cp-regalo" style="display:flex;gap:8px;align-items:center;margin:8px 0;font-size:14px"><input type="checkbox" id="cpRegalo"' + (o._regalo ? ' checked' : '') + ' style="width:auto;min-height:0"> 🎁 Es para otra cuenta (te damos una key para regalar)</label>') +
+              (medio === 'flow' ? '<button type="button" class="cp-mp cp-flow" data-mp>💳 Pagar con Webpay</button>' : (o._renovar ? '<button type="button" class="cp-mp" data-mp>🔁 Autorizar en Mercado Pago</button>' : '<button type="button" class="cp-mp" data-mp>⚡ Pagar con Mercado Pago</button>')) +
+              (o._renovar ? '<div class="cp-ayuda">Autorizas tu tarjeta <b>1 vez</b> en Mercado Pago (entra con la cuenta de ese correo). Se cobra sola ' + cada(plan.k) + ' y tu plan se extiende solo (te llega un aviso).' + (cupon ? ' El cupón es solo para un pago suelto.' : '') + '</div><p class="cp-err" id="cpErr"></p></div>' + (pr ? '' : keyHtml) + pie : '') +
+              (o._renovar ? '' : '<div class="cp-ayuda">' + (medio === 'flow' ? 'Pagas en Flow con Webpay (débito, crédito o prepago), transferencia o MACH.' : 'Pagas con tarjeta, débito o saldo de Mercado Pago.') + ' Al terminar vuelves a la app y tu plan <b>se activa solo, al tiro</b> (te llega un aviso). Sin comprobante.</div><p class="cp-err" id="cpErr"></p></div>' + (pr ? '' : keyHtml) + pie)
           : '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div><div class="cp-fila"><button type="button" data-copiar>📋 Copiar monto</button>' +
             (medio === 'link' && url ? '<a class="cp-btn" href="' + esc(url) + '" target="_blank" rel="noopener">🔗 Abrir link de pago</a>' : '') + '</div>' +
           (medio === 'transferencia'
@@ -208,6 +224,7 @@
         if (plan.k === 'otro') { const i = caja.querySelector('#cpOtro'); i.value = o._otro || ''; i.oninput = () => { o._otro = i.value; refrescar(); }; }
         const pg = caja.querySelector('#cpPagado');
         if (pg) { if (o._pagado) pg.value = o._pagado; pg.oninput = (ev) => { o._pagado = ev.target.value; }; }
+        const mc = caja.querySelector('#cpMpCorreo'); if (mc) mc.oninput = () => { o._mpCorreo = mc.value; };
         const ci = caja.querySelector('#cpCupon'); if (ci) ci.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); caja.querySelector('[data-cupon]').click(); } };
       };
       function desglose() {
@@ -220,11 +237,12 @@
       if (AUTO[medio] && plan.k === 'otro') medio = medios.find((m) => !AUTO[m]) || medio;
       pintar();
       caja.addEventListener('change', async (ev) => {
+        if (ev.target.id === 'cpRenovar') { o._renovar = ev.target.checked; o._pagado = ''; pintar(); return; }
         if (ev.target.id !== 'cpFoto' || !ev.target.files[0]) return;
         try { foto = await achicar(ev.target.files[0]); pintar(); } catch (x) { caja.querySelector('#cpErr').textContent = x.message; }
       });
       caja.addEventListener('click', async (ev) => {
-        const b = ev.target.closest('[data-p],[data-m],[data-copiar],[data-d],[data-enviar],[data-cupon],[data-sincupon],[data-key],[data-mp]'); if (!b) return;
+        const b = ev.target.closest('[data-p],[data-m],[data-copiar],[data-d],[data-enviar],[data-cupon],[data-sincupon],[data-key],[data-mp],[data-subq],[data-subrev]'); if (!b) return;
         if (b.dataset.p) { plan = L[+b.dataset.p]; o._pagado = ''; pintar(); }
         else if ('cupon' in b.dataset) {
           const cod = caja.querySelector('#cpCupon').value.trim().toUpperCase();
@@ -233,6 +251,27 @@
           catch (x) { caja.querySelector('#cpErr').textContent = (x && x.message) || String(x); }
         } else if ('sincupon' in b.dataset) { cupon = null; o._pagado = ''; pintar(); }
         else if ('key' in b.dataset) return;
+        else if ('subq' in b.dataset || 'subrev' in b.dataset) {
+          // G108 🔁 quitar la renovación automática / revisar si ya autorizó.
+          const err = caja.querySelector('#cpSubErr');
+          if ('subq' in b.dataset && window.CFX_DIALOGO && !await window.CFX_DIALOGO.confirmar('¿Quitar la renovación automática? Lo que pagaste sigue activo hasta que venza.')) return;
+          b.disabled = true;
+          try {
+            if ('subq' in b.dataset) { const r = await o.rpc('cfx_mp_sub_quitar', { p_producto: pr ? pr.clave : null }); if (!r || !r.ok) throw new Error((r && r.error) || 'Mercado Pago no respondió'); }
+            else { const r = await o.rpc('cfx_mp_revisar'); if (r && r.aprobado) { armarListo(caja, r.pago); obligatorio = false; clearInterval(vigia); if (o.alPagar) o.alPagar(); return; } }
+            return abrir(o);
+          } catch (x) { if (err) err.textContent = (x && x.message) || String(x); b.disabled = false; }
+        }
+        else if ('mp' in b.dataset && o._renovar) {
+          const err = caja.querySelector('#cpErr'), txt = b.textContent, correo = ((caja.querySelector('#cpMpCorreo') || {}).value || '').trim();
+          if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(correo)) { err.textContent = 'Escribe el correo de tu cuenta de Mercado Pago'; return; }
+          b.disabled = true; b.textContent = 'Abriendo Mercado Pago…';
+          try {
+            const r = await o.rpc('cfx_mp_suscribir', { p_periodo: plan.k, p_producto: pr ? pr.clave : null, p_email: correo, p_volver: location.href.split('#')[0] });
+            if (!r || !r.ok) throw new Error((r && r.error) || 'Mercado Pago no respondió');
+            mpMarca(true); location.href = r.url;
+          } catch (x) { err.textContent = (x && x.message) || String(x); b.disabled = false; b.textContent = txt; }
+        }
         else if ('mp' in b.dataset) {
           // G85: ⚡ el cobro lo arma la base (mismo total que se ve aquí) y abre Mercado Pago; al volver se confirma solo.
           const err = caja.querySelector('#cpErr'), txt = b.textContent; b.disabled = true; b.textContent = 'Abriendo ' + AUTO[medio] + '…';
@@ -353,7 +392,17 @@
         capa.querySelector('[data-x]').onclick = () => { cerrar(); location.reload(); };
         return;
       }
-      if (!r || !r.pendiente) { mpMarca(false); return; }
+      if (!r || !r.pendiente) {
+        mpMarca(false);
+        // G108: volvió de autorizar la 🔁 renovación automática.
+        const sv = r && (r.subs || []).find((s) => s.estado === 'activa' && !s.cobros);
+        if (sv && !abierta) {
+          const capa = document.createElement('dialog'); capa.className = 'cfx-pago'; capa.style.setProperty('--cp-color', color());
+          capa.innerHTML = '<div><h2>🔁 ¡Listo!</h2><div class="cp-ok">' + esc(sv.producto ? '🧩 ' + sv.producto : '⭐ Premium') + ' se renueva solo ' + (sv.periodo === 'anual' ? 'cada año' : 'cada mes') + ' (' + pesos(sv.monto) + '). 1.er cobro el <b>' + fechaL(sv.inicio) + '</b>; te avisamos en cada cobro.</div><button type="button" class="cp-si" data-x style="width:100%">Entendido</button></div>';
+          document.body.appendChild(capa); abierta = capa; capa.showModal(); capa.querySelector('[data-x]').onclick = cerrar;
+        }
+        return;
+      }
       await new Promise((ok) => setTimeout(ok, 5000));
     }
   }
