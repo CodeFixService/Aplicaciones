@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.83'::text $$;
+language sql immutable as $$ select '5.84'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -12150,6 +12150,9 @@ grant execute on function public.bodegas_lista(), public.bodega_guardar(uuid, te
 create or replace function public.cfx_modulos_app() returns text[]
 language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks', 'medicion', 'dominio', 'giftcards', 'suscripciones', 'proveedores', 'sucursales', 'promos', 'mercadolibre', 'courier'] $$;  -- G96 b: +2 · G101: 🛒 · G102: 🚚
 revoke all on function public.cfx_modulos_app() from public, anon, authenticated;
+-- G112 b: 3 packs iguales en todas las apps (🌱 Básico · ⭐ Normal · 💎 Completo). Solo si sigue el de fábrica.
+update public.cfx_config set valor = jsonb_set(valor, '{packs,crecer,nombre}', '"⭐ Normal"')
+where clave = 'modulos_venta' and valor #>> '{packs,crecer,nombre}' = '🚀 Crecer';
 
 -- =====================================================================
 --  🛒 G101 Mercado Libre (módulo 'mercadolibre'): la tienda conecta SU cuenta de ML (OAuth), une cada producto con su

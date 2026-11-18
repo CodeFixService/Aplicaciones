@@ -60,3 +60,5 @@ core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()`
 - G89: la Caja del dueño trae de catalog_items lo publicado que el teléfono no tiene (caché borrada/otro teléfono) → aparece para editar o borrar. CM → Apps → 🧹: opción 'productos' (sin nombre o de cuenta que ya no es empresa). Prueba: SaaS/pruebas/g87e.js.
 
 - G107 (6.63 · bd 5.82): 💳 WEBPAY CON EL FLOW DE LA TIENDA (núcleo cfx_flow_neg_*): Ajustes → 💳 Links de pago → #flowBody (CFX_PAGOS.flowNegocio) · link_activo (pedido) → mp = hay pago automático + medios {mp, flow} · mp_pagar(ref, volver, p_medio): sin MP o p_medio flow → cfx_flow_neg_cobro ref 'pedido:<id>' · gancho cfx_mp_neg_pagado_app → pedido_pagado_auto (preparando + stock + avisos) · mp_revisar también pregunta a Flow · r/ #bMp/#bFlow · catálogo data-medio. Prueba: SaaS/pruebas/g107.js.
+
+- 🧩 G112 b · Packs 🌱 Básico · ⭐ Normal (clave `crecer`, destacado) · 💎 Completo, iguales en las 6; precios y módulos: SaaS/LANZAMIENTO.md (Módulos, paso 3). Solo cambian si siguen de fábrica.
