@@ -608,7 +608,7 @@ try {
     $('titulo').textContent = cliente && acc.negocio ? acc.negocio : (acc.role === 'equipo' ? (acc.negocio || 'Despega Pyme') : (acc.empresa || 'Despega Pyme'));
     const dueno = acc.role === 'user';
     ['cTienda', 'cLinks', 'cDespacho', 'cBoleta', 'cDominio', 'cEquipo', 'cRespaldo'].forEach((id) => $(id).classList.toggle('hidden', !dueno));
-    if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x)); }
+    if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x), { courier: true }); }
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
     $('cMiCaja').classList.toggle('hidden', !cliente);

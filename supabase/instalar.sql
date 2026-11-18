@@ -4552,7 +4552,7 @@ begin
   dsp := public.costo_despacho(p_negocio, p_entrega, p_direccion, sub - desc_ - dp);
   if dsp ? 'error' then return jsonb_build_object('ok', false, 'error', dsp ->> 'error'); end if;
   if (dsp ->> 'costo')::numeric > 0 then
-    a := jsonb_set(a, '{lineas}', (a -> 'lineas') || jsonb_build_object('nombre', '🚚 Despacho a ' || (dsp ->> 'comuna'), 'cant', 1, 'precio', (dsp ->> 'costo')::numeric,
+    a := jsonb_set(a, '{lineas}', (a -> 'lineas') || jsonb_build_object('nombre', '🚚 ' || coalesce(dsp ->> 'servicio', 'Despacho') || ' a ' || (dsp ->> 'comuna'), 'cant', 1, 'precio', (dsp ->> 'costo')::numeric,
       'subtotal', (dsp ->> 'costo')::numeric, 'clave', 'despacho', 'opcion', null));
   end if;
   if gc.id is not null then gm := least(gc.saldo, greatest(0, sub - desc_ - dp + (dsp ->> 'costo')::numeric))::int; end if;
@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.80'::text $$;
+language sql immutable as $$ select '5.81'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7930,7 +7930,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -9145,17 +9145,19 @@ begin
   end loop;
   if jsonb_array_length(l) > 80 then raise exception 'Máximo 80 comunas'; end if;
   -- Resto de Chile (regiones y comunas que no están en la lista): 'no' | 'fijo' (un precio) | 'por_pagar' (lo paga quien recibe al courier).
+  -- G102 b 'courier' = la app cotiza con el courier (Despega: Chilexpress); precio = respaldo si el courier no responde (0 = por pagar).
   rm := coalesce(nullif(p #>> '{resto,modo}', ''), 'no');
-  if rm not in ('no', 'fijo', 'por_pagar') then raise exception 'Elige cómo despachas al resto de Chile'; end if;
+  if rm not in ('no', 'fijo', 'por_pagar', 'courier') then raise exception 'Elige cómo despachas al resto de Chile'; end if;
   if rm = 'fijo' and coalesce((p #>> '{resto,precio}')::numeric, -1) not between 0 and 200000 then raise exception 'El despacho al resto de Chile debe costar entre $0 y $200.000'; end if;
+  if rm = 'courier' and coalesce((p #>> '{resto,precio}')::numeric, 0) not between 0 and 200000 then raise exception 'El precio de respaldo debe ser entre $0 y $200.000'; end if;
   if not coalesce((p ->> 'retiro')::boolean, true) and jsonb_array_length(l) = 0 and rm = 'no' then raise exception 'Activa el retiro en tienda o agrega al menos una comuna de despacho'; end if;
   if coalesce((p ->> 'gratis_desde')::numeric, 0) not between 0 and 10000000 then raise exception 'Monto de despacho gratis no válido'; end if;
   return jsonb_build_object('retiro', coalesce((p ->> 'retiro')::boolean, true), 'gratis_desde', round(coalesce((p ->> 'gratis_desde')::numeric, 0)), 'zonas', l,
-    'resto', jsonb_build_object('modo', rm, 'precio', case when rm = 'fijo' then round((p #>> '{resto,precio}')::numeric) else 0 end));
+    'resto', jsonb_build_object('modo', rm, 'precio', case when rm in ('fijo', 'courier') then round(coalesce((p #>> '{resto,precio}')::numeric, 0)) else 0 end));
 end $$;
 
 -- La comuna va al final de la dirección ("…, Ñuñoa"). Sin zonas ni resto de Chile: se coordina con el negocio ($0 aquí).
--- Comuna fuera de la lista: con resto 'fijo' cobra ese precio; con 'por_pagar' $0 y por_pagar = true (lo paga quien recibe).
+-- Comuna fuera de la lista: con resto 'fijo' cobra ese precio; con 'por_pagar' $0 y por_pagar = true (lo paga quien recibe); con 'courier' la app cotiza (G102 b).
 create or replace function public.cfx_despacho_costo(p_cfg jsonb, p_entrega text, p_direccion text, p_monto numeric) returns jsonb
 language plpgsql immutable set search_path = '' as $$
 declare c jsonb := coalesce(p_cfg, '{}'::jsonb); com text; z jsonb; rm text := coalesce(nullif(p_cfg #>> '{resto,modo}', ''), 'no'); orig text;
@@ -9169,6 +9171,10 @@ begin
     if com = '' or position(',' in coalesce(p_direccion, '')) = 0 then return jsonb_build_object('error', 'Escribe la dirección y la comuna de despacho'); end if;
     if rm = 'fijo' then return jsonb_build_object('comuna', orig, 'costo', case when gratis then 0 else greatest(0, coalesce((c #>> '{resto,precio}')::numeric, 0)) end); end if;
     if rm = 'por_pagar' then return jsonb_build_object('comuna', orig, 'costo', 0, 'por_pagar', true); end if;
+    -- 'courier': la app reemplaza el costo con la tarifa (cotizar = true). Si la app no cotiza, vale el respaldo (o por pagar si es $0).
+    if rm = 'courier' then return jsonb_build_object('comuna', orig, 'cotizar', not gratis, 'respaldo', greatest(0, coalesce((c #>> '{resto,precio}')::numeric, 0)),
+      'costo', case when gratis then 0 else greatest(0, coalesce((c #>> '{resto,precio}')::numeric, 0)) end,
+      'por_pagar', not gratis and coalesce((c #>> '{resto,precio}')::numeric, 0) = 0); end if;
     return jsonb_build_object('error', 'Esta tienda no despacha a esa comuna. Elige otra comuna o retiro en tienda.');
   end if;
   return jsonb_build_object('comuna', z ->> 'comuna', 'costo', case when gratis then 0 else greatest(0, coalesce((z ->> 'precio')::numeric, 0)) end);
@@ -10842,7 +10848,7 @@ language plpgsql security definer set search_path = '' as $$
 begin
   begin
     if new.entrega = 'despacho' and coalesce(new.costo_despacho, 0) = 0 then
-      new.envio_por_pagar := coalesce((public.cfx_despacho_costo((select despacho from public.profiles where id = new.negocio_id), new.entrega, new.direccion, new.subtotal) ->> 'por_pagar')::boolean, false);
+      new.envio_por_pagar := coalesce((public.costo_despacho(new.negocio_id, new.entrega, new.direccion, new.subtotal) ->> 'por_pagar')::boolean, false);
     end if;
   exception when others then null;
   end;
@@ -12396,6 +12402,105 @@ revoke all on function public.courier_estado(), public.courier_guardar(jsonb), p
   public.courier_etiqueta(uuid, int, numeric, text, text, text, text, text), public.courier_etiqueta_ver(uuid), public.courier_con_etiqueta() from public, anon;
 grant execute on function public.courier_estado(), public.courier_guardar(jsonb), public.courier_cotizar(text, numeric, text, numeric), public.courier_preparar(uuid),
   public.courier_etiqueta(uuid, int, numeric, text, text, text, text, text), public.courier_etiqueta_ver(uuid), public.courier_con_etiqueta() to authenticated;
+
+-- =====================================================================
+--  💲 G102 b TARIFA CHILEXPRESS EN EL CARRITO (Ajustes → Despacho → Resto de Chile = "💲 Tarifa Chilexpress").
+--  · El cliente escribe su comuna y ve el costo antes de pedir; guardar_pedido cobra ESA tarifa (la calcula el servidor, nunca la app).
+--  · Usa el peso y tamaño de siempre de la tienda (Más → 🚚 Courier) y el servicio más barato.
+--  · Caché por comuna 12 h y máximo 120 consultas a Chilexpress por hora por tienda (la llave es de la tienda).
+--  · Si Chilexpress no responde (o el módulo venció): cobra el respaldo; con respaldo $0 = envío por pagar. 🛡️ Nunca bloquea el pedido.
+-- =====================================================================
+create table if not exists public.chx_tarifas (
+  negocio_id uuid not null references public.profiles (id) on delete cascade,
+  norm text not null,
+  peso numeric(6, 2) not null,
+  tamano text not null,
+  valor int not null,
+  servicio text,
+  at timestamptz not null default now(),
+  primary key (negocio_id, norm)
+);
+alter table public.chx_tarifas enable row level security;
+revoke all on public.chx_tarifas from anon, authenticated;
+alter table public.courier_cuentas add column if not exists cot_desde timestamptz;
+alter table public.courier_cuentas add column if not exists cot_n int not null default 0;
+
+-- {costo, servicio} · {error} (Chilexpress no llega a esa comuna) · {fallo} (sin respuesta, sin módulo o sin conexión → respaldo).
+create or replace function public.courier_tarifa(p_negocio uuid, p_comuna text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c public.courier_cuentas; t public.chx_tarifas; nm text := public.cfx_comuna_norm(p_comuna); d text; q jsonb;
+begin
+  if nm = '' then return jsonb_build_object('error', 'Escribe tu comuna'); end if;
+  if not public.pro_o_modulo(p_negocio, 'courier') then return jsonb_build_object('fallo', 'sin módulo'); end if;
+  select * into c from public.courier_cuentas where negocio_id = p_negocio;
+  if c.negocio_id is null or c.llave_cot is null or c.origen_cod is null then return jsonb_build_object('fallo', 'sin conexión'); end if;
+  select * into t from public.chx_tarifas where negocio_id = p_negocio and norm = nm and peso = c.peso and tamano = c.tamano and at > now() - interval '12 hours';
+  if t.negocio_id is not null then return jsonb_build_object('costo', t.valor, 'servicio', t.servicio); end if;
+  -- Tope de consultas por hora (cuenta solo las que van a Chilexpress).
+  if c.cot_desde is null or c.cot_desde < now() - interval '1 hour' then
+    update public.courier_cuentas set cot_desde = now(), cot_n = 1 where negocio_id = p_negocio;
+  elsif c.cot_n >= 120 then return jsonb_build_object('fallo', 'tope por hora');
+  else update public.courier_cuentas set cot_n = cot_n + 1 where negocio_id = p_negocio;
+  end if;
+  d := public.chx_codigo(c, p_comuna);
+  if d is null then
+    if exists (select 1 from public.chx_comunas) then return jsonb_build_object('error', 'Chilexpress no encuentra la comuna "' || left(trim(p_comuna), 40) || '": revisa cómo se escribe'); end if;
+    return jsonb_build_object('fallo', 'sin comunas');
+  end if;
+  begin q := public.chx_cotizar(c, p_comuna, c.peso, c.tamano, 0);
+  exception when others then
+    update public.courier_cuentas set ultimo_error = left('Tarifa del carrito: ' || sqlerrm, 200) where negocio_id = p_negocio;
+    return jsonb_build_object('fallo', 'cotizar');
+  end;
+  if jsonb_array_length(coalesce(q -> 'opciones', '[]'::jsonb)) = 0 then return jsonb_build_object('error', 'Chilexpress no tiene envío a esa comuna'); end if;
+  insert into public.chx_tarifas (negocio_id, norm, peso, tamano, valor, servicio, at)
+  values (p_negocio, nm, c.peso, c.tamano, (q #>> '{opciones,0,valor}')::int, 'Chilexpress', now())
+  on conflict (negocio_id, norm) do update set peso = excluded.peso, tamano = excluded.tamano, valor = excluded.valor, servicio = excluded.servicio, at = now();
+  return jsonb_build_object('costo', (q #>> '{opciones,0,valor}')::int, 'servicio', 'Chilexpress');
+end $$;
+
+-- Costo del despacho (reemplaza al de arriba): igual que antes + la tarifa de Chilexpress cuando la tienda la eligió.
+create or replace function public.costo_despacho(p_negocio uuid, p_entrega text, p_direccion text, p_monto numeric) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare d jsonb := public.cfx_despacho_costo((select despacho from public.profiles where id = p_negocio), p_entrega, p_direccion, p_monto); q jsonb;
+begin
+  if not coalesce((d ->> 'cotizar')::boolean, false) then return d - 'cotizar' - 'respaldo'; end if;
+  q := public.courier_tarifa(p_negocio, d ->> 'comuna');
+  if q ? 'error' then return jsonb_build_object('error', q ->> 'error'); end if;
+  if q ? 'costo' then return jsonb_build_object('comuna', d ->> 'comuna', 'costo', (q ->> 'costo')::numeric, 'servicio', q ->> 'servicio'); end if;
+  return d - 'cotizar' - 'respaldo';
+end $$;
+revoke all on function public.courier_tarifa(uuid, text), public.costo_despacho(uuid, text, text, numeric) from public, anon, authenticated;
+
+-- 🛒 El carrito pregunta el costo antes de pedir (también el invitado de la tienda pública). Solo devuelve el costo.
+create or replace function public.despacho_cotizar(p_negocio uuid, p_comuna text, p_monto numeric default 0) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare d jsonb; c text := left(trim(replace(coalesce(p_comuna, ''), ',', ' ')), 40);
+begin
+  if not exists (select 1 from public.profiles where id = p_negocio and public.is_business(id)) then return jsonb_build_object('error', 'Tienda no encontrada'); end if;
+  if length(c) < 2 then return jsonb_build_object('error', 'Escribe tu comuna'); end if;
+  d := public.costo_despacho(p_negocio, 'despacho', 'x, ' || c, greatest(coalesce(p_monto, 0), 0));
+  if d ? 'error' then return jsonb_build_object('error', d ->> 'error'); end if;
+  return jsonb_build_object('costo', round(coalesce((d ->> 'costo')::numeric, 0)), 'por_pagar', coalesce((d ->> 'por_pagar')::boolean, false), 'servicio', d ->> 'servicio');
+end $$;
+revoke all on function public.despacho_cotizar(uuid, text, numeric) from public;
+grant execute on function public.despacho_cotizar(uuid, text, numeric) to anon, authenticated;
+
+-- Ajustes → Despacho: elegir la tarifa de Chilexpress exige el módulo y Chilexpress conectado.
+create or replace function public.guardar_despacho(p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo el dueño de la tienda'; end if;
+  if p #>> '{resto,modo}' = 'courier' and coalesce((select despacho #>> '{resto,modo}' from public.profiles where id = auth.uid()), '') <> 'courier'
+     and not (public.pro_o_modulo(auth.uid(), 'courier') and exists (select 1 from public.courier_cuentas where negocio_id = auth.uid() and llave_cot is not null and origen_cod is not null)) then
+    raise exception 'Para la tarifa de Chilexpress primero conecta 🚚 Courier Chilexpress (Más → Tu tienda)';
+  end if;
+  update public.profiles set despacho = public.cfx_despacho_limpio(p) where id = auth.uid();
+  delete from public.chx_tarifas where negocio_id = auth.uid();
+  return (select despacho from public.profiles where id = auth.uid());
+end $$;
+revoke all on function public.guardar_despacho(jsonb) from public, anon;
+grant execute on function public.guardar_despacho(jsonb) to authenticated;
 
 -- =====================================================================
 --  🧾 G38 FACTURA ELECTRÓNICA (tipo 33) en Despega (G67: la factura es solo de Despega; las demás apps dan boleta).

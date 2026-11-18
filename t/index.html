@@ -262,7 +262,8 @@
     $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     $('rowDir').classList.toggle('hidden', entrega !== 'despacho');
   };
-  Despacho.montar({ cfg: t.despacho, monto: () => lineas().reduce((a, x) => a + (Number(x.i.precio) || 0) * (Number(x.l.cant) || 0), 0) });
+  const montoCarro = () => lineas().reduce((a, x) => a + (Number(x.i.precio) || 0) * (Number(x.l.cant) || 0), 0);
+  Despacho.montar({ cfg: t.despacho, monto: montoCarro, cotizar: (c) => Cuenta.rpc('despacho_cotizar', { p_negocio: t.id, p_comuna: c, p_monto: montoCarro() }) });
   $('nom').value = mem.get('nom', ''); $('tel').value = mem.get('tel', ''); $('mail').value = mem.get('mail', '');
   // G38 🧾 Factura: solo si la tienda tiene sus datos de emisor (Ajustes → Boleta SII).
   Cuenta.rpc('factura_disponible', { p_negocio: t.id }).then((si) => { if (si) { $('facWrap').innerHTML = Core.facturaHtml(mem.get('fac', null)); $('facWrap').classList.remove('hidden'); } }).catch(() => {});

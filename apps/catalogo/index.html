@@ -628,7 +628,8 @@
     $('pagoTxt').textContent = tienda.datos_pago;
   }
   // Despacho por comuna (lo configura la tienda en Ajustes → Despacho).
-  Despacho.montar({ cfg: tienda.despacho, monto: () => totalCarro(), alCambiar: pintarCarro });
+  Despacho.montar({ cfg: tienda.despacho, monto: () => totalCarro(), alCambiar: pintarCarro,
+    cotizar: (c) => Cuenta.rpc('despacho_cotizar', { p_negocio: negocio, p_comuna: c, p_monto: totalCarro() }) });
   $('bCopiarPago').onclick = () => navigator.clipboard.writeText(tienda.datos_pago || '').then(() => Core.toast('📋 Datos copiados'));
 
   /* ---------- Mis pedidos (con estado) y tarjeta de sellos ---------- */
