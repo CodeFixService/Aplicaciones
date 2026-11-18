@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.79'::text $$;
+language sql immutable as $$ select '5.80'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7930,7 +7930,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -10224,6 +10224,173 @@ begin
   perform cron.schedule('cfx-mp-neg', '* * * * *', 'select public.cfx_mp_neg_revisar_pendientes()');
 exception when others then
   raise notice 'Revisión de Mercado Pago de los negocios no programada (%).', sqlerrm;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- G106 ⚡ PAGO AUTOMÁTICO CON TARJETA (suscripción "preapproval" de Mercado Pago, con el MP PROPIO del negocio).
+--   La persona autoriza su tarjeta 1 vez en Mercado Pago; MP la cobra sola cada mes, sin que nadie toque nada.
+--   La app crea la suscripción con cfx_mp_neg_suscribir(negocio, ref, título, monto, correo, volver, inicio) → url de MP.
+--   La BASE pregunta a MP (al volver y con el cron 'cfx-mp-neg'): estado de la suscripción + cobros aprobados (CLP, monto
+--   completo, cada cobro 1 sola vez) → gancho de la app cfx_mp_neg_sub_app(ref, evento, pago, monto); evento = 'activa' | 'cobro' | 'cancelada'.
+--   cfx_mp_neg_sub_cancelar(ref) la apaga EN Mercado Pago (si MP no responde, no se marca: se reintenta).
+-- ---------------------------------------------------------------------
+create table if not exists public.cfx_mp_neg_subs (
+  id          uuid primary key default gen_random_uuid(),
+  negocio     uuid not null,
+  ref         text not null,
+  titulo      text,
+  monto       int not null check (monto > 0),
+  preapproval text unique,
+  estado      text not null default 'pendiente' check (estado in ('pendiente', 'activa', 'pausada', 'cancelada')),
+  cobros      int not null default 0,
+  ultimo_at   timestamptz,
+  revisado_at timestamptz,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists cfx_mp_neg_subs_ref on public.cfx_mp_neg_subs (ref, created_at desc);
+create index if not exists cfx_mp_neg_subs_viva on public.cfx_mp_neg_subs (revisado_at) where estado <> 'cancelada';
+alter table public.cfx_mp_neg_subs enable row level security;
+revoke all on public.cfx_mp_neg_subs from anon, authenticated;
+
+create table if not exists public.cfx_mp_neg_sub_pagos (
+  id    text primary key,          -- n° del cobro autorizado de MP (1 sola vez)
+  sub   uuid not null,
+  pago  text,
+  monto int not null,
+  at    timestamptz not null default now()
+);
+alter table public.cfx_mp_neg_sub_pagos enable row level security;
+revoke all on public.cfx_mp_neg_sub_pagos from anon, authenticated;
+
+create or replace function public._cfx_mp_neg_sub_gancho(p_ref text, p_evento text, p_pago text, p_monto int) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if to_regprocedure('public.cfx_mp_neg_sub_app(text, text, text, integer)') is not null then
+    execute 'select public.cfx_mp_neg_sub_app($1, $2, $3, $4)' using p_ref, p_evento, p_pago, p_monto;
+  end if;
+end $$;
+
+-- La app pide la suscripción (solo desde sus funciones). Devuelve { ok, url } o { ok: false, error }.
+create or replace function public.cfx_mp_neg_suscribir(p_negocio uuid, p_ref text, p_titulo text, p_monto int, p_email text, p_volver text, p_inicio timestamptz default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare tk text; s public.cfx_mp_neg_subs; r jsonb; v text := left(coalesce(p_volver, ''), 500); m text := lower(trim(coalesce(p_email, '')));
+  ini timestamptz := greatest(coalesce(p_inicio, now()), now() + interval '5 minutes');
+begin
+  select token into tk from public.cfx_mp_negocio where negocio = p_negocio and activo;
+  if tk is null then return jsonb_build_object('ok', false, 'error', 'Este negocio no tiene Mercado Pago activo'); end if;
+  if coalesce(p_monto, 0) < 1 then return jsonb_build_object('ok', false, 'error', 'Monto no válido'); end if;
+  if m !~ '^[^@\s"<>]+@[^@\s"<>]+\.[a-z]{2,}$' or length(m) > 120 then return jsonb_build_object('ok', false, 'error', 'Escribe el correo de tu cuenta de Mercado Pago'); end if;
+  if v !~ '^https://[^\s"<>]+$' then return jsonb_build_object('ok', false, 'error', 'Falta la dirección de regreso'); end if;
+  if exists (select 1 from public.cfx_mp_neg_subs where ref = p_ref and estado in ('activa', 'pausada')) then
+    return jsonb_build_object('ok', false, 'error', 'Ya tienes el pago automático');
+  end if;
+  update public.cfx_mp_neg_subs set estado = 'cancelada', updated_at = now() where ref = p_ref and estado = 'pendiente';  -- intento anterior sin autorizar
+  insert into public.cfx_mp_neg_subs (negocio, ref, titulo, monto) values (p_negocio, left(p_ref, 120), left(coalesce(p_titulo, 'Pago mensual'), 120), p_monto)
+  returning * into s;
+  r := public.cfx_mp_api(tk, 'POST', '/preapproval', jsonb_build_object(
+    'reason', s.titulo, 'external_reference', s.id::text, 'payer_email', m, 'back_url', v, 'status', 'pending',
+    'auto_recurring', jsonb_build_object('frequency', 1, 'frequency_type', 'months', 'currency_id', 'CLP', 'transaction_amount', s.monto,
+      'start_date', to_char(ini at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS".000+00:00"'))));
+  if coalesce((r ->> 'status')::int, 0) not in (200, 201) or r #>> '{body,init_point}' is null or r #>> '{body,id}' is null then
+    delete from public.cfx_mp_neg_subs where id = s.id;
+    return jsonb_build_object('ok', false, 'error', coalesce('Mercado Pago: ' || left(r #>> '{body,message}', 160), 'Mercado Pago no respondió. Intenta de nuevo.'));
+  end if;
+  update public.cfx_mp_neg_subs set preapproval = left(r #>> '{body,id}', 60), revisado_at = now() where id = s.id;
+  return jsonb_build_object('ok', true, 'url', r #>> '{body,init_point}');
+end $$;
+
+-- Pregunta a MP por UNA suscripción: estado + cobros nuevos. Devuelve cuántos cobros nuevos encontró.
+create or replace function public.cfx_mp_neg_sub_revisar(p_id uuid) returns int
+language plpgsql security definer set search_path = '' as $$
+declare s public.cfx_mp_neg_subs; tk text; r jsonb; e jsonb; nuevo text; n int := 0;
+begin
+  select * into s from public.cfx_mp_neg_subs where id = p_id for update skip locked;
+  if s.id is null or s.preapproval is null or s.estado = 'cancelada' then return 0; end if;
+  select token into tk from public.cfx_mp_negocio where negocio = s.negocio;
+  if tk is null then return 0; end if;
+  update public.cfx_mp_neg_subs set revisado_at = now() where id = s.id;
+  r := public.cfx_mp_api(tk, 'GET', '/preapproval/' || s.preapproval);
+  if coalesce((r ->> 'status')::int, 0) = 200 then
+    nuevo := case r #>> '{body,status}' when 'authorized' then 'activa' when 'paused' then 'pausada' when 'cancelled' then 'cancelada' else s.estado end;
+    if nuevo <> s.estado then
+      update public.cfx_mp_neg_subs set estado = nuevo, updated_at = now() where id = s.id;
+      if nuevo in ('activa', 'cancelada') then perform public._cfx_mp_neg_sub_gancho(s.ref, nuevo, null, s.monto); end if;
+    end if;
+  end if;
+  r := public.cfx_mp_api(tk, 'GET', '/authorized_payments/search?preapproval_id=' || s.preapproval);
+  for e in select x from jsonb_array_elements(coalesce(r #> '{body,results}', '[]'::jsonb)) x
+           where coalesce(x #>> '{payment,status}', '') = 'approved' and coalesce(x ->> 'preapproval_id', s.preapproval) = s.preapproval
+             and coalesce(x ->> 'currency_id', 'CLP') = 'CLP' and coalesce((x ->> 'transaction_amount')::numeric, 0) >= s.monto
+             and x ->> 'id' is not null loop
+    insert into public.cfx_mp_neg_sub_pagos (id, sub, pago, monto) values (left(e ->> 'id', 40), s.id, left(e #>> '{payment,id}', 40), s.monto)
+    on conflict do nothing;
+    if found then
+      n := n + 1;
+      update public.cfx_mp_neg_subs set cobros = cobros + 1, ultimo_at = now(), estado = case when estado = 'pendiente' then 'activa' else estado end, updated_at = now() where id = s.id;
+      perform public._cfx_mp_neg_sub_gancho(s.ref, 'cobro', left(coalesce(e #>> '{payment,id}', e ->> 'id'), 40), s.monto);
+    end if;
+  end loop;
+  return n;
+end $$;
+
+-- La app revisa las suscripciones de una referencia (al volver de MP), dentro de su propia función con su control de acceso.
+create or replace function public.cfx_mp_neg_sub_revisar_ref(p_ref text) returns int
+language plpgsql security definer set search_path = '' as $$
+declare i uuid; n int := 0;
+begin
+  for i in select id from public.cfx_mp_neg_subs where ref = p_ref and estado <> 'cancelada' order by created_at desc limit 3 loop
+    n := n + public.cfx_mp_neg_sub_revisar(i);
+  end loop;
+  return n;
+end $$;
+
+-- Lo que la app muestra: la suscripción viva más nueva de esa referencia (o null).
+create or replace function public.cfx_mp_neg_sub_ver(p_ref text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('estado', estado, 'monto', monto, 'cobros', cobros, 'ultimo', ultimo_at, 'desde', created_at)
+  from public.cfx_mp_neg_subs where ref = p_ref and estado <> 'cancelada' order by created_at desc limit 1
+$$;
+
+-- Apaga en Mercado Pago todas las suscripciones vivas de esa referencia. false = MP no respondió (no se marca; se reintenta).
+create or replace function public.cfx_mp_neg_sub_cancelar(p_ref text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare s public.cfx_mp_neg_subs; tk text; r jsonb; todo boolean := true;
+begin
+  for s in select * from public.cfx_mp_neg_subs where ref = p_ref and estado <> 'cancelada' for update loop
+    select token into tk from public.cfx_mp_negocio where negocio = s.negocio;
+    if s.preapproval is not null and tk is not null then
+      r := public.cfx_mp_api(tk, 'PUT', '/preapproval/' || s.preapproval, jsonb_build_object('status', 'cancelled'));
+      if coalesce((r ->> 'status')::int, 0) not in (200, 201) and coalesce(r #>> '{body,status}', '') <> 'cancelled' then todo := false; continue; end if;
+    end if;
+    update public.cfx_mp_neg_subs set estado = 'cancelada', updated_at = now() where id = s.id;
+  end loop;
+  return todo;
+end $$;
+
+-- Cron: pendientes (cada 1 min, 2 días; después se dan por abandonadas) · vivas (cada 30 min).
+create or replace function public.cfx_mp_neg_subs_revisar() returns int
+language plpgsql security definer set search_path = '' as $$
+declare i uuid; n int := 0;
+begin
+  update public.cfx_mp_neg_subs set estado = 'cancelada', updated_at = now() where estado = 'pendiente' and created_at < now() - interval '2 days' and cobros = 0;
+  for i in select id from public.cfx_mp_neg_subs where estado <> 'cancelada' and preapproval is not null
+             and (revisado_at is null or revisado_at < now() - case when estado = 'pendiente' then interval '1 minute' else interval '30 minutes' end)
+           order by revisado_at nulls first limit 30 loop
+    n := n + public.cfx_mp_neg_sub_revisar(i);
+  end loop;
+  return n;
+end $$;
+
+revoke all on function public._cfx_mp_neg_sub_gancho(text, text, text, int), public.cfx_mp_neg_suscribir(uuid, text, text, int, text, text, timestamptz),
+  public.cfx_mp_neg_sub_revisar(uuid), public.cfx_mp_neg_sub_revisar_ref(text), public.cfx_mp_neg_sub_ver(text), public.cfx_mp_neg_sub_cancelar(text),
+  public.cfx_mp_neg_subs_revisar() from public, anon, authenticated;
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'cfx-mp-neg-subs';
+  perform cron.schedule('cfx-mp-neg-subs', '* * * * *', 'select public.cfx_mp_neg_subs_revisar()');
+exception when others then
+  raise notice 'Revisión de pagos automáticos no programada (%).', sqlerrm;
 end $$;
 -- <<< CFX núcleo
 
