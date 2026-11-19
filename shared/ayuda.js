@@ -145,7 +145,7 @@
     '.cfx-mm-tab{flex:none;min-height:38px;padding:6px 14px;border-radius:999px;border:1px solid var(--cfx-borde,#dce3ea);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font:700 14px/1.2 var(--cfx-letra,system-ui,sans-serif);cursor:pointer;white-space:nowrap}' +
     '.cfx-mm-tab.on{background:var(--pf);border-color:var(--pf);color:var(--brand-ink,#fff)}' +
     '.cfx-mm-ord{flex:none;width:40px;height:40px;border-radius:12px;border:1px solid var(--cfx-borde,#dce3ea);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:18px;cursor:pointer;padding:0}' +
-    '.cfx-mm-pags{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;align-items:flex-start;-webkit-overflow-scrolling:touch}.cfx-mm-pags::-webkit-scrollbar{display:none}' +
+    '.cfx-mm-pags{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;align-items:flex-start;-webkit-overflow-scrolling:touch}.cfx-mm-pags::-webkit-scrollbar{display:none}' +
     '.cfx-mm-pags>.cfx-mm-pag{flex:0 0 100%;min-width:0;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;padding:0 1px}' +
     '.cfx-mm-pag>.cfx-aj-g{margin-top:4px;display:flex;align-items:baseline;gap:8px}.cfx-mm-pag>.cfx-aj-g small{font-weight:600;letter-spacing:0;opacity:.7}' +
     '.cfx-mm-pts{display:flex;justify-content:center;gap:6px;margin:8px 0 4px}.cfx-mm-pts i{width:7px;height:7px;border-radius:50%;background:var(--cfx-borde,#dce3ea)}.cfx-mm-pts i.on{background:var(--pf);width:18px;border-radius:4px}' +
@@ -154,6 +154,8 @@
     '.cfx-mm-of button{flex:none;width:40px;height:40px;border-radius:10px;border:1px solid var(--cfx-borde,#dce3ea);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:17px;cursor:pointer;padding:0}.cfx-mm-of button:disabled{opacity:.35;cursor:default}' +
     '.cfx-mm-fab{align-self:flex-start;margin-top:4px;min-height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--cfx-borde,#dce3ea);background:transparent;color:var(--cfx-texto-2,#5b6472);font:600 14px var(--cfx-letra,system-ui,sans-serif);cursor:pointer}' +
     '@media (prefers-reduced-motion:reduce){.cfx-mm-pags{scroll-behavior:auto}}' +
+    // G126: en celular el vertical lo hace siempre el navegador (antes el menú "se pegaba"); el de lado lo maneja deslizarPags.
+    '@media (hover:none),(pointer:coarse){.cfx-mm-pags{overflow-x:hidden;scroll-snap-type:none;touch-action:pan-y}}' +
     '.cfx-lista{display:flex!important;flex-direction:column;gap:0!important;margin:0 0 6px!important;padding:0!important;border-radius:20px;overflow:hidden;background:var(--cfx-tarjeta,#fff);' +
     'border:1.5px solid color-mix(in srgb,var(--pf) 18%,var(--cfx-borde,#e2e7ec));box-shadow:0 1px 2px rgba(15,23,42,.05),0 8px 24px -12px rgba(15,23,42,.18)}' +
     '.cfx-lista>.cfx-fila{display:flex!important;align-items:center;gap:12px;width:100%!important;min-height:62px!important;margin:0!important;padding:10px 14px!important;border:0!important;border-radius:0!important;' +
@@ -774,7 +776,8 @@
         const b = T.children[i]; if (b) { const r = b.getBoundingClientRect(), rg = T.getBoundingClientRect(); if (r.left < rg.left) T.scrollLeft -= rg.left - r.left + 12; else if (r.right > rg.right) T.scrollLeft += r.right - rg.right + 12; } };
       // G116: con la pantalla escondida la página mide 0 → sin alto fijo (antes quedaba en 0 px y el menú no se veía).
       let corriendo = false;
-      const alto = () => { const pg = P.children[pag]; if (!pg) return; const h = pg.offsetHeight; P.style.height = h ? h + 'px' : ''; };
+      const alto = () => { const pg = P.children[pag]; if (!pg) return; const h = pg.offsetHeight; P.style.height = h ? h + 'px' : ''; if (P.scrollTop) P.scrollTop = 0; };
+      // G126: las páginas más altas de al lado quedan recortadas (overflow-y:hidden): antes el dedo vertical se "pegaba" a ese sobrante y la pantalla no bajaba.
       if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (!corriendo) alto(); }); [...P.children].forEach((x) => ro.observe(x)); }
       const marcar0 = marcar; const marcar2 = (i) => { marcar0(i); alto(); };
       const ir = (i, suave) => { P.scrollTo({ left: i * P.clientWidth, behavior: suave ? 'smooth' : 'auto' }); marcar2(i); };
@@ -782,8 +785,47 @@
       let tm = 0; P.addEventListener('scroll', () => { corriendo = true; P.style.height = ''; clearTimeout(tm); tm = setTimeout(() => { corriendo = false; const i = Math.round(P.scrollLeft / Math.max(1, P.clientWidth)); marcar2(i); }, 80); }, { passive: true });
       T.onclick = (e) => { const b = e.target.closest('[data-mm-i]'); if (b) ir(+b.dataset.mmI, true); };
       w.querySelector('[data-mm-ord]').onclick = () => ordenar(grupos, ck);
+      w._mm = { P, ir, n: grupos.length, ini: () => { corriendo = true; P.style.height = ''; } };
+      if (!w._mmDesl) { w._mmDesl = 1; deslizarPags(w); }
       w.querySelectorAll('.cfx-aj > [data-k]').forEach((b) => { b.onclick = () => abrir(b.dataset.k); });
       if (o.alPintar) o.alPintar(w);
+    }
+    // G126 · 👆 Deslizar de lado cambia de página: sobre el menú Y en el espacio vacío bajo los puntitos hasta la barra de abajo
+    //   (aunque la página sea corta). El dedo arrastra la página; al soltar va a la vecina. El vertical nunca se traba.
+    function deslizarPags(w) {
+      let d = null;
+      const corre = (el, hasta) => { for (let e = el; e && e !== hasta && e !== document.body; e = e.parentElement) if (e.scrollWidth > e.clientWidth + 4 && /auto|scroll/.test(getComputedStyle(e).overflowX)) return true; return false; };
+      const zona = (e) => {
+        const m = w._mm, t = e.touches[0], el = e.target;
+        if (!m || !w.isConnected || !m.P.isConnected || !w.offsetParent || m.n < 2 || !el || !el.closest) return false;
+        if (el.closest('input, textarea, select, [contenteditable], .cfx-mm-cab, nav.cfx-barra, header, .cfx-cab')) return false;
+        if (t.clientX < 18 || t.clientX > innerWidth - 18) return false;
+        const caja = w.closest('.cfx-hoja-m, dialog');
+        if (caja ? !caja.contains(el) : (el.closest('.cfx-hoja-m, dialog, .cfx-hm-zona') || document.documentElement.classList.contains('cfx-hoja-on'))) return false;
+        if (el.closest('.cfx-mm-pags, .cfx-mm-pts')) return !corre(el, m.P);
+        const pts = w.querySelector('.cfx-mm-pts'), r = pts && pts.getBoundingClientRect(); if (!r || !r.height) return false;
+        const b = document.querySelector('nav.cfx-barra'), rb = b && b.getClientRects().length ? b.getBoundingClientRect() : null;  // es fija: offsetParent es null
+        const fin = caja ? caja.getBoundingClientRect().bottom : (rb && rb.top > innerHeight / 2 ? rb.top : innerHeight);
+        return t.clientY > r.top - 6 && t.clientY < fin && !corre(el);
+      };
+      document.addEventListener('touchstart', (e) => {
+        d = null; if (e.touches.length !== 1 || !zona(e)) return;
+        e.cfxPropio = true;  // barra.js no cambia de pantalla con este gesto
+        const t = e.touches[0]; d = { x: t.clientX, y: t.clientY, sl: w._mm.P.scrollLeft, t: Date.now(), eje: null };
+      }, { capture: true, passive: true });
+      document.addEventListener('touchmove', (e) => {
+        if (!d) return; const t = e.touches[0], dx = t.clientX - d.x, dy = t.clientY - d.y, P = w._mm.P;
+        if (!d.eje) { if (Math.hypot(dx, dy) < 10) return; d.eje = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y'; if (d.eje === 'y') { d = null; return; } w._mm.ini(); }
+        P.scrollLeft = Math.max(0, Math.min(P.scrollWidth - P.clientWidth, d.sl - dx));
+      }, { capture: true, passive: true });
+      const soltar = (e) => {
+        if (!d) return; const x = d; d = null; if (x.eje !== 'x') return;
+        const m = w._mm, cw = Math.max(1, m.P.clientWidth), t = e.changedTouches && e.changedTouches[0], dx = t ? t.clientX - x.x : 0;
+        let i = Math.round(x.sl / cw); if (Math.abs(dx) > cw * 0.18 || Math.abs(dx) / Math.max(1, Date.now() - x.t) > 0.35) i += dx < 0 ? 1 : -1;
+        m.ir(Math.max(0, Math.min(m.n - 1, i)), true);
+      };
+      document.addEventListener('touchend', soltar, { capture: true, passive: true });
+      document.addEventListener('touchcancel', soltar, { capture: true, passive: true });
     }
     function ordenar(grupos, ck) {
       const N = (OR() && OR().leer(ck + ':nombres')) || {};

@@ -316,7 +316,7 @@
   let dz = null;
   addEventListener('touchstart', (e) => {
     dz = null;
-    if (e.touches.length !== 1) return;
+    if (e.touches.length !== 1 || e.cfxPropio) return;  // G126: el gesto ya lo tomó otro (páginas del menú)
     const t = e.touches[0], el = e.target;
     if (!el || !el.closest || el.closest('input, textarea, select, [contenteditable], canvas, video, iframe, dialog, .cfx-hoja-m, .cfx-pnl, .cfx-mv, .cfx-aviso-desl, .cfx-emerg, [data-cfx-sin-deslizar]')) return;
     if (document.documentElement.classList.contains('cfx-hoja-on') || document.querySelector('dialog[open]')) return;
