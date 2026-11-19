@@ -577,6 +577,7 @@
   }
   // Núcleo 2.53: nunca se pega a <main> si hay una vista abierta (quedaba abajo de TODAS las pantallas, p. ej. Hoy del CM),
   // y se quita sola al salir de Más o cuando aparece el menú común (CFX_MENU), que ya trae "Cuenta y ayuda".
+  let MENU_USADO = false;  // G130: la app usa el menú común → "Cuenta y ayuda" vive en ⚙️ Ajustes, nunca suelta
   function cuentaEnMas() {
     if (!R || (CFG.admin && !CFG.socio)) return;
     const vis = (x) => x.offsetParent && !x.closest('.cfx-cuenta-g, dialog, .cfx-oc, [hidden]');
@@ -586,6 +587,9 @@
     const h = location.hash.replace(/^#\/?/, '').split(/[/?]/)[0];
     // G52c: si la dirección nombra OTRA pantalla (ej. #clientes abierta desde Más), no va: antes salía abajo de Clientes en Barbería.
     if (h && !MAS.test(h) && document.getElementById('v-' + h)) return quitar();
+    // G130: con el menú común (CFX_MENU) todo esto ya está en ⚙️ Ajustes; y nunca se pega bajo otra pantalla abierta desde Más
+    //   (Billetera: salía abajo de Billeteras conectadas, Comprobantes, Reportes…).
+    if (MENU_USADO || (h && !MAS.test(h))) return quitar();
     if (!(on && MAS.test((on.getAttribute('aria-label') || on.textContent || '').replace(/[0-9+]/g, '').trim())) && !MAS.test(h)) return quitar();
     // Si la pantalla ya tiene el menú común (CFX_MENU), "Cuenta y ayuda" ya viene adentro.
     if ([...document.querySelectorAll('.cfx-mmas')].some(vis)) return quitar();
@@ -738,8 +742,11 @@
       if (o.menu) deBarra(L);
       const grupos = [];
       const rep = o.menu && enBarra();
-      L.forEach((s) => { if (rep && rep(s)) return; const g = s.grupo || ''; let x = grupos.find((y) => y.g === g); if (!x) grupos.push(x = { g, l: [] }); x.l.push(s); });
+      // G130: el Más termina SOLO en ⚙️ Ajustes: lo de "Cuenta y ayuda" (soporte, guía, falla, términos, cerrar sesión) va dentro, al final.
+      //   Lo del núcleo nunca se esconde por parecerse a un botón de la barra (Barbería/Estaciona perdían 💬 Chat con soporte).
+      L.forEach((s) => { if (rep && !s.cfxNucleo && rep(s)) return; const g = o.menu && s.grupo === 'Cuenta y ayuda' ? 'Configuración' : s.grupo || ''; let x = grupos.find((y) => y.g === g); if (!x) grupos.push(x = { g, l: [] }); x.l.push(s); });
       ['Configuración', 'Cuenta y ayuda'].forEach((g) => { const i = grupos.findIndex((x) => x.g === g); if (i >= 0) grupos.push(grupos.splice(i, 1)[0]); });
+      if (o.menu) { const c = grupos.find((x) => x.g === 'Configuración'); if (c) { const fin = c.l.filter((s) => s.k === 'salir'); c.l = c.l.filter((s) => s.k !== 'salir').concat(fin); } }  // 🚪 siempre al final
       // G42c ✋ Cada sección y cada opción se ordena manteniendo presionado (núcleo ui.js: data-cfx-orden / data-cfx-oi, se guarda por usuario).
       const ck = 'aj:' + (o.clave || (o.menu ? 'menu' : el.id || 'ajustes'));
       if (o.menu && grupos.length > 1) { paginas(grupos, ck); return anchoPar(); }
@@ -758,7 +765,7 @@
     //   ⇅ Ordenar → hoja con ↑ ↓ por categoría y ✏️ para cambiarle el nombre (solo para esta persona; misma llave que el orden con el dedo).
     let pag = 0;
     const OR = () => window.CFX_ORDEN;
-    const nomG = (g, N) => (N && N[g || '-']) || g || 'General';
+    const nomG = (g, N) => (N && N[g || '-']) || (g === 'Configuración' ? '⚙️ Ajustes' : g) || 'General';  // G130
     function paginas(grupos, ck) {
       delete w.dataset.cfxOrden;
       const ord = (OR() && OR().leer(ck)) || [], N = (OR() && OR().leer(ck + ':nombres')) || {};
@@ -903,7 +910,7 @@
       // G32 d · 🔑 Celular con sesión → aprueba el QR del computador (núcleo qr.js, si la app lo activó).
       window.CFX_QR && CFX_QR.listo() && !matchMedia('(pointer:fine)').matches && { k: 'computador', ico: 'qr', t: 'Entrar en un computador', accion: () => CFX_QR.celular() },
       { k: 'salir', ico: '🚪', t: 'Cerrar sesión', rojo: true, accion: confirmarSalir }
-    ].filter((x) => x && !(yaEstan || []).includes(x.k)).map((x) => Object.assign(x, { grupo: g }));
+    ].filter((x) => x && !(yaEstan || []).includes(x.k)).map((x) => Object.assign(x, { grupo: g, cfxNucleo: true }));
   }
 
   // ---------- Registro de cambios: botones para borrarlo (igual en las 7 apps) ----------
@@ -1279,7 +1286,7 @@
       [(propio ? '6' : '5') + '. Cuánto tiempo se guardan', 'Mientras tengas la cuenta. Avisos y mensajes entre usuarios: 30 días. Chat de soporte: hasta 1 año. Comprobantes y fotos de identidad: se borran apenas se revisan. ' +
         'Lo que la ley exige guardar (por ejemplo, registros de pagos) se guarda el plazo legal y luego se borra. Las fotos que solo ves tú quedan en tu teléfono.'],
       [(propio ? '7' : '6') + '. Tus derechos', 'Puedes pedir acceso a tus datos, rectificarlos, suprimirlos, oponerte a su uso, pedir una copia para llevarla a otro servicio (portabilidad) y el bloqueo temporal mientras revisamos una solicitud. ' +
-        'También a no quedar sujeto a decisiones tomadas solo de forma automática. Pídelo en Cuenta y ayuda → Mis datos y privacidad (ahí también descargas tu copia al instante) o por el chat de soporte: respondemos dentro de 30 días corridos (prorrogables una vez por otros 30, avisándote). Es gratis. Si eres cliente de un negocio, también puedes pedírselo a él.'],
+        'También a no quedar sujeto a decisiones tomadas solo de forma automática. Pídelo en Más → ⚙️ Ajustes → Mis datos y privacidad (ahí también descargas tu copia al instante) o por el chat de soporte: respondemos dentro de 30 días corridos (prorrogables una vez por otros 30, avisándote). Es gratis. Si eres cliente de un negocio, también puedes pedírselo a él.'],
       [(propio ? '8' : '7') + '. Seguridad', 'Los datos viajan cifrados, cada cuenta solo ve lo suyo (reglas de acceso en la base de datos) y respaldamos la información. Si ocurre una vulneración que pueda afectarte, la informamos a la Agencia de Protección de Datos Personales y te avisamos sin demora.'],
       [(propio ? '9' : '8') + '. Menores de edad', 'Las cuentas de negocio son para mayores de 18 años. Los datos de menores de 14 años solo se tratan con autorización de su madre, padre o representante legal.'],
       [(propio ? '10' : '9') + '. Almacenamiento en tu teléfono', 'La app guarda en tu teléfono solo lo necesario para funcionar (sesión, preferencias, fotos propias y la app para usarla sin internet). No usamos cookies de publicidad ni rastreadores de terceros.'],
@@ -2389,7 +2396,7 @@
     if (op.menu) L = [{ k: 'perfil', ico: '👤', t: 'Mi perfil', d: 'Foto, nombre, color y contraseña', accion: () => abrirPerfil(), grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
     const PROPIO = /^(mi perfil|perfil|foto y nombre|color y modo|apariencia|estilo)$/i;
     if (op.menu) op.items = (op.items || []).filter((x) => x && !['perfil', 'yo', 'estilo'].includes(x.k) && !PROPIO.test(String(x.t || '').trim()));
-    if (op.menu) { const app = (op.items || []).filter(Boolean), esConf = (x) => x.grupo === 'Configuración'; L = app.filter((x) => !esConf(x)).concat(L, app.filter(esConf), [{ k: 'reparar', ico: '🛠️', t: 'Reparar la app', d: 'Si algo falla o no se actualiza', accion: reparar, grupo: conf }]); L = L.concat(cuentaItems(L.map((x) => x.k))); }
+    if (op.menu) { const app = (op.items || []).filter(Boolean), esConf = (x) => x.grupo === 'Configuración'; L = app.filter((x) => !esConf(x)).concat(L, app.filter(esConf), app.some((x) => x.k === 'reparar') ? [] : [{ k: 'reparar', ico: '🛠️', t: 'Reparar la app', d: 'Si algo falla o no se actualiza', accion: reparar, grupo: conf }]); L = L.concat(cuentaItems(L.map((x) => x.k))); }
     el.classList.add('cfx-pf-w');
     const h = ajustes(el, L, { menu: op.menu, arriba: '<div data-pf-cab' + (op.menu ? ' role="button" tabindex="0" aria-label="Mi perfil"' : '') + '></div>' + (valor(P.arriba) || ''),
       alPintar: (w) => { pintarCabeza(); const c = w.querySelector('[data-pf-cab]'); if (c && op.menu) c.onclick = () => abrirPerfil(); } });
@@ -2408,7 +2415,7 @@
   window.CFX_PERFIL = { montar: perfil, abrir: abrirPerfil, BASE, pintarModo, pintarColor };
   // Menú "Más" común: CFX_MENU.montar(el, [opciones de la app con grupo], { perfil: extra del adaptador }) → perfil compacto arriba (toca y abre Foto y nombre),
   // las opciones de la app por grupo, Configuración (Foto y nombre, Color y modo, Avanzado y las propias) y Cuenta y ayuda (sin repetidos).
-  window.CFX_MENU = { montar: (el, items, o) => perfil(el, (o || {}).perfil, { items, menu: true }), hoja, cerrar: cerrarHojas };
+  window.CFX_MENU = { montar: (el, items, o) => { MENU_USADO = true; return perfil(el, (o || {}).perfil, { items, menu: true }); }, hoja, cerrar: cerrarHojas };
 
   window.CFX_AJUSTES = { montar: ajustes, registro };
   // 🧩 Módulos que el Centro de Mando tiene prendidos en esta app (cfx_modulos). Si la base aún no lo tiene, todo queda prendido.

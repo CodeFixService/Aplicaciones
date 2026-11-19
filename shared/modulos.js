@@ -35,7 +35,7 @@
     '.cfxm-per button.on{background:var(--cfx-tarjeta,#fff);box-shadow:0 1px 4px rgba(0,0,0,.12)}' +
     '.cfxm-packs{display:grid;gap:10px}@media(min-width:760px){.cfxm-packs{grid-template-columns:repeat(3,minmax(0,1fr))}}' +
     '.cfxm-pack,.cfxm-mod{border:1px solid var(--cfx-borde,rgba(100,116,139,.3));border-radius:14px;padding:12px;background:var(--cfx-tarjeta,#fff);min-width:0}' +
-    '.cfxm-pack.top{border:2px solid var(--brand,#2563eb)}.cfxm-pack h3,.cfxm-mod h3{margin:0;font-size:16px;overflow-wrap:anywhere}' +
+    '.cfxm-pack.cfxm-top{border:2px solid var(--brand,#2563eb)}.cfxm-pack h3,.cfxm-mod h3{margin:0;font-size:16px;overflow-wrap:anywhere}' +
     '.cfxm-tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:var(--brand,#2563eb);color:#fff;margin-bottom:4px}' +
     '.cfxm-precio{font-size:22px;font-weight:800;margin:6px 0 0}.cfxm-precio small{font-size:13px;font-weight:600;color:var(--cfx-texto-2,#5b6472)}' +
     '.cfxm-antes{text-decoration:line-through;color:var(--cfx-texto-2,#5b6472);font-size:13px;margin-left:6px}' +
@@ -71,7 +71,7 @@
       const packs = D.packs.filter((p) => !(p.modulos.length && p.modulos.every(enPlan))).map((p) => {  // G53: sin packs que el plan ya trae
         const activo = p.modulos.length && p.modulos.every((k) => (D.modulos.find((m) => m.clave === k) || {}).activo);
         const ahorro = p.suelto > p.lista ? Math.round(100 - p.lista * 100 / p.suelto) : 0;
-        return '<div class="cfxm-pack' + (p.destacado ? ' top' : '') + '">' + (p.destacado ? '<span class="cfxm-tag">⭐ Más elegido</span>' : '') +
+        return '<div class="cfxm-pack' + (p.destacado ? ' cfxm-top' : '')  /* G129: 'top' chocaba con el encabezado fijo de Estaciona */ + '">' + (p.destacado ? '<span class="cfxm-tag">⭐ Más elegido</span>' : '') +
           '<h3>' + esc(p.nombre) + '</h3><p class="cfxm-sub">' + esc(p.detalle) + '</p>' +
           '<p class="cfxm-precio">' + pesos(precio(p)) + '<small>' + per() + '</small>' + (D.descuento ? '<span class="cfxm-antes">' + pesos(anual ? p.lista * D.anual_meses : p.lista) + '</span>' : '') + '</p>' +
           (ahorro ? '<p class="cfxm-sub">Sueltos costarían ' + pesos(anual ? p.suelto * D.anual_meses : p.suelto) + ': ahorras ' + ahorro + '%</p>' : '') +
