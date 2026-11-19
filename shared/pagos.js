@@ -348,6 +348,9 @@
 
   // G87 K: 🎉 lo que quedó activo y hasta cuándo + 🧾 comprobante. Regalo (o respaldo si no se pudo activar solo) = 🔑 key de 1 uso para copiar o enviar.
   const fechaL = (f) => { try { return new Date(f).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (x) { return ''; } };
+  // G112 c2 · 🔄 Desde cuándo está la llave; con más de 1 año: "Cámbiala" (si alguien la vio, la nueva la deja sin uso).
+  const llaveDesde = (m) => (m.conectado && m.desde ? ' Pegada el ' + esc(fechaL(m.desde)) + '.' : '');
+  const llaveRotar = (m, donde) => (m.conectado && m.rotar ? '<p class="cp-mpn-nota" data-cfx-rotar style="color:var(--cfx-aviso)">🔄 Esta llave tiene más de 1 año: crea una nueva en ' + esc(donde) + ' y pégala aquí.</p>' : '');
   const queEs = (p) => (p.producto ? '🧩 Módulo ' + p.producto : '⭐ Premium') + ' · ' + (p.periodo === 'anual' ? '1 año' : p.periodo === 'meses' ? (p.meses || 2) + ' meses' : p.periodo === 'inicio' ? 'primer pago' : '1 mes');
   const listo = (p) => {
     const fin = '<button type="button" data-comp style="width:100%;margin-top:10px">🧾 Ver comprobante</button><button type="button" data-x class="cp-si" style="width:100%;margin-top:8px">Continuar</button>';
@@ -430,7 +433,7 @@
     el.hidden = false; el.classList.add('cfx-mpn');
     el.innerHTML = '<b>⚡ Tu Mercado Pago' + (m.conectado ? (m.activo ? ' · ✅ Activo' : ' · ⏸️ En pausa') : '') + '</b>' +
       '<p class="cp-mpn-nota">Tu cliente paga ' + esc(para) + ' con tarjeta o saldo y se aprueba <b>solo</b> (sin comprobante). La plata llega directo a tu cuenta.' +
-      (m.conectado ? ' Conectado como <b>' + esc(m.nick || 'tu cuenta') + '</b> (…' + esc(m.fin || '') + ').' : '') + '</p>' +
+      (m.conectado ? ' Conectado como <b>' + esc(m.nick || 'tu cuenta') + '</b> (…' + esc(m.fin || '') + ').' : '') + llaveDesde(m) + '</p>' + llaveRotar(m, 'Mercado Pago → Credenciales') +
       '<label for="cfxMpnTok">' + (m.conectado ? 'Cambiar Access Token' : 'Access Token') + '</label>' +
       '<input id="cfxMpnTok" type="password" autocomplete="off" placeholder="APP_USR-…">' +
       '<details class="cp-mpn-nota"><summary>¿Dónde lo saco?</summary>Mercado Pago → Tu negocio → Configuración → Credenciales → <b>Credenciales de producción</b> → Access Token. Nadie más lo ve.</details>' +
@@ -463,7 +466,7 @@
     el.hidden = false;
     el.innerHTML = '<b>💳 Tu Webpay con Flow' + (m.conectado ? (m.activo ? ' · ✅ Activo' : ' · ⏸️ En pausa') : '') + (m.sandbox ? ' · 🧪 Pruebas' : '') + '</b>' +
       '<p class="cp-mpn-nota">Tu cliente paga ' + esc(para) + ' con débito, crédito o transferencia y se aprueba <b>solo</b>. La plata llega a tu cuenta Flow.' +
-      (m.conectado ? ' Conectado (…' + esc(m.fin || '') + ').' : '') + '</p>' +
+      (m.conectado ? ' Conectado (…' + esc(m.fin || '') + ').' : '') + llaveDesde(m) + '</p>' + llaveRotar(m, 'Flow → Integración → API Keys') +
       '<label for="cfxFlnKey">API Key</label><input id="cfxFlnKey" type="password" autocomplete="off" placeholder="' + (m.conectado ? 'Igual que antes' : 'XXXX-XXXX-…') + '">' +
       '<label for="cfxFlnSec">Secret Key</label><input id="cfxFlnSec" type="password" autocomplete="off">' +
       '<details class="cp-mpn-nota"><summary>¿Dónde las saco?</summary>flow.cl → entra a tu cuenta → Mis datos → <b>Integración</b> → API Key y Secret Key. Nadie más las ve.</details>' +

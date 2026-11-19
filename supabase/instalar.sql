@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.84'::text $$;
+language sql immutable as $$ select '5.85'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5839,6 +5839,62 @@ revoke all on function public.cfx_analisis_datos_app(), public.cfx_analisis_nego
 --   Cada app define antes: cfx_yo(), cfx_dar_premium(uuid, text, int), cfx_avisar(uuid, text, text) y cfx_avisar_admin(text, text).
 -- ---------------------------------------------------------------------
 create table if not exists public.cfx_config (clave text primary key, valor jsonb not null);
+
+-- G112 c1 · 🔒 Llaves en Supabase Vault (cifradas DENTRO de la base: ni un respaldo ni una consulta a la tabla las muestra).
+-- La tabla guarda solo la marca 'vault:<nombre>'; la llave real vive en vault.secrets. Sin Vault (base vieja o local) queda como antes.
+create or replace function public.cfx_vault_hay() returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  return to_regclass('vault.decrypted_secrets') is not null and to_regclass('vault.secrets') is not null and exists (select 1 from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace s on s.oid = p.pronamespace where s.nspname = 'vault' and p.proname = 'create_secret');
+end $$;
+-- Guarda p_valor en Vault con el nombre p_nombre y devuelve la marca (o el mismo valor si no hay Vault o algo falla: nunca se pierde la llave).
+create or replace function public.cfx_secreto_poner(p_nombre text, p_valor text) returns text
+language plpgsql security definer set search_path = '' as $$
+declare i uuid;
+begin
+  if p_valor is null or p_valor = '' or p_valor like 'vault:%' or not public.cfx_vault_hay() then return p_valor; end if;
+  begin
+    execute 'select id from vault.secrets where name = $1' into i using p_nombre;
+    if i is null then execute 'select vault.create_secret($1, $2, $3)' using p_valor, p_nombre, 'CodeFix (G112 c1)';
+    else execute 'select vault.update_secret($1, $2)' using i, p_valor; end if;
+    return 'vault:' || p_nombre;
+  exception when others then
+    raise notice 'Vault no disponible (%): la llave queda como antes.', sqlerrm;
+    return p_valor;
+  end;
+end $$;
+-- Abre una llave guardada (si es la marca 'vault:…' la busca en Vault; si no, es la llave tal cual).
+create or replace function public.cfx_secreto(p_valor text) returns text
+language plpgsql stable security definer set search_path = '' as $$
+declare v text;
+begin
+  if p_valor is null or p_valor not like 'vault:%' then return p_valor; end if;
+  if not public.cfx_vault_hay() then return null; end if;
+  execute 'select decrypted_secret from vault.decrypted_secrets where name = $1' into v using substr(p_valor, 7);
+  return v;
+end $$;
+-- Borra de Vault las llaves cuyo nombre parte con p_prefijo (al desconectar).
+create or replace function public.cfx_secreto_quitar(p_prefijo text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if coalesce(p_prefijo, '') = '' or not public.cfx_vault_hay() then return; end if;
+  execute 'delete from vault.secrets where name like $1' using replace(replace(p_prefijo, '%', ''), '_', '\_') || '%';
+exception when others then null;
+end $$;
+-- Abre los campos de llave de una configuración (token / apikey / secret).
+create or replace function public.cfx_llaves(p jsonb) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare k text; r jsonb := p;
+begin
+  if p is null then return null; end if;
+  foreach k in array array['token', 'apikey', 'secret'] loop
+    if r ? k then r := jsonb_set(r, array[k], coalesce(to_jsonb(public.cfx_secreto(r ->> k)), 'null'::jsonb)); end if;
+  end loop;
+  return r;
+end $$;
+revoke all on function public.cfx_vault_hay(), public.cfx_secreto_poner(text, text), public.cfx_secreto(text), public.cfx_secreto_quitar(text),
+  public.cfx_llaves(jsonb) from public, anon, authenticated;
 alter table public.cfx_config enable row level security;
 insert into public.cfx_config (clave, valor) values ('pagos', jsonb_build_object(
   'negocio', jsonb_build_object('inicio', 4900, 'inicio_dias', 30, 'mensual', 4900, 'anual', 49900, 'exigir_inicio', true),
@@ -6227,7 +6283,7 @@ end $$;
 -- Busca en Mercado Pago el pago aprobado de este cobro; si está (monto completo), lo aprueba y avisa (push a la persona y al CM).
 create or replace function public.cfx_mp_confirmar(p_id uuid) returns text
 language plpgsql security definer set search_path = '' as $$
-declare g public.cfx_pagos; tk text := (select valor ->> 'token' from public.cfx_config where clave = 'mp'); r jsonb; pg jsonb;
+declare g public.cfx_pagos; tk text := public.cfx_secreto((select valor ->> 'token' from public.cfx_config where clave = 'mp')); r jsonb; pg jsonb;
 begin
   select * into g from public.cfx_pagos where id = p_id for update;
   if g.medio = 'flow' and g.estado = 'pendiente' then return public.cfx_flow_confirmar(p_id); end if;  -- G38
@@ -6265,7 +6321,7 @@ end $$;
 drop function if exists public.cfx_mp_pagar(text, int, text, text, text);
 create or replace function public.cfx_auto_pagar(p_medio text, p_periodo text, p_meses int, p_producto text, p_cupon text, p_volver text, p_regalo boolean) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare y jsonb := public.cfx_yo(); m jsonb := (select valor from public.cfx_config where clave = 'mp'); cup text := nullif(upper(trim(coalesce(p_cupon, ''))), '');
+declare y jsonb := public.cfx_yo(); m jsonb := public.cfx_llaves((select valor from public.cfx_config where clave = 'mp')); cup text := nullif(upper(trim(coalesce(p_cupon, ''))), '');
         v text := left(coalesce(p_volver, ''), 500); monto int; i uuid; r jsonb; x uuid; tit text;
 begin
   if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
@@ -6368,7 +6424,8 @@ language plpgsql stable security definer set search_path = '' as $$
 declare m jsonb := (select valor from public.cfx_config where clave = 'mp');
 begin
   perform public.cfx_es_admin();
-  return jsonb_build_object('conectado', coalesce(m ->> 'token', '') <> '', 'activo', public.cfx_mp_on(), 'nick', m ->> 'nick', 'fin', right(m ->> 'token', 4));
+  return jsonb_build_object('conectado', coalesce(m ->> 'token', '') <> '', 'activo', public.cfx_mp_on(), 'nick', m ->> 'nick', 'fin', right(public.cfx_secreto(m ->> 'token'), 4),
+    'desde', m -> 'desde', 'rotar', coalesce((m ->> 'desde')::timestamptz < now() - interval '365 days', false));
 end $$;
 
 -- Conecta (token), prende/pausa (p_activo) o desconecta (sin token y p_activo null).
@@ -6433,7 +6490,7 @@ $$;
 -- Llama a Flow firmando (HMAC-SHA256 de los parámetros ordenados: nombre+valor). p_cfg: llaves a probar (si no, las guardadas).
 create or replace function public.cfx_flow_api(p_metodo text, p_ruta text, p_params jsonb, p_cfg jsonb default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare f jsonb := coalesce(p_cfg, (select valor from public.cfx_config where clave = 'flow')); pr jsonb; firma text; q text; st int; c text;
+declare f jsonb := public.cfx_llaves(coalesce(p_cfg, (select valor from public.cfx_config where clave = 'flow'))); pr jsonb; firma text; q text; st int; c text;
         base text := case when coalesce((f ->> 'sandbox')::boolean, false) then 'https://sandbox.flow.cl/api' else 'https://www.flow.cl/api' end;
 begin
   if coalesce(f ->> 'apikey', '') = '' or coalesce(f ->> 'secret', '') = '' then return jsonb_build_object('status', 0, 'error', 'Flow sin llaves'); end if;
@@ -6528,7 +6585,8 @@ language plpgsql stable security definer set search_path = '' as $$
 declare f jsonb := (select valor from public.cfx_config where clave = 'flow');
 begin
   perform public.cfx_es_admin();
-  return jsonb_build_object('conectado', coalesce(f ->> 'apikey', '') <> '', 'activo', public.cfx_flow_on(), 'sandbox', coalesce((f ->> 'sandbox')::boolean, false), 'fin', right(f ->> 'apikey', 4));
+  return jsonb_build_object('conectado', coalesce(f ->> 'apikey', '') <> '', 'activo', public.cfx_flow_on(), 'sandbox', coalesce((f ->> 'sandbox')::boolean, false), 'fin', right(public.cfx_secreto(f ->> 'apikey'), 4),
+    'desde', f -> 'desde', 'rotar', coalesce((f ->> 'desde')::timestamptz < now() - interval '365 days', false));
 end $$;
 
 -- Conecta (llaves), prende/pausa (p_activo) o desconecta (sin llaves y p_activo null). p_sandbox = cuenta de pruebas de Flow.
@@ -6712,7 +6770,7 @@ $$;
 -- La persona prende la renovación automática: devuelve { ok, url } (página de MP para autorizar la tarjeta) o { ok: false, error }.
 create or replace function public.cfx_mp_suscribir(p_periodo text, p_producto text default null, p_email text default null, p_volver text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare y jsonb := public.cfx_yo(); u uuid; tk text := (select valor ->> 'token' from public.cfx_config where clave = 'mp');
+declare y jsonb := public.cfx_yo(); u uuid; tk text := public.cfx_secreto((select valor ->> 'token' from public.cfx_config where clave = 'mp'));
         m text := lower(trim(coalesce(p_email, ''))); v text := left(coalesce(p_volver, ''), 500); pr text := nullif(trim(coalesce(p_producto, '')), '');
         monto int; h timestamptz; ini timestamptz; s public.cfx_mp_subs; r jsonb; tit text;
 begin
@@ -6784,7 +6842,7 @@ end $$;
 -- Pregunta a MP por UNA suscripción: estado + cobros nuevos. Devuelve cuántos cobros nuevos encontró.
 create or replace function public.cfx_mp_sub_revisar(p_id uuid) returns int
 language plpgsql security definer set search_path = '' as $$
-declare s public.cfx_mp_subs; tk text := (select valor ->> 'token' from public.cfx_config where clave = 'mp'); r jsonb; e jsonb; nuevo text; n int := 0;
+declare s public.cfx_mp_subs; tk text := public.cfx_secreto((select valor ->> 'token' from public.cfx_config where clave = 'mp')); r jsonb; e jsonb; nuevo text; n int := 0;
 begin
   select * into s from public.cfx_mp_subs where id = p_id for update skip locked;
   if s.id is null or s.preapproval is null or s.estado = 'cancelada' or coalesce(tk, '') = '' then return 0; end if;
@@ -6822,7 +6880,7 @@ end $$;
 -- Quitar la renovación automática (lo pagado sigue activo hasta que venza). false = MP no respondió (se reintenta).
 create or replace function public.cfx_mp_sub_quitar(p_producto text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare y jsonb := public.cfx_yo(); s public.cfx_mp_subs; tk text := (select valor ->> 'token' from public.cfx_config where clave = 'mp'); r jsonb; todo boolean := true;
+declare y jsonb := public.cfx_yo(); s public.cfx_mp_subs; tk text := public.cfx_secreto((select valor ->> 'token' from public.cfx_config where clave = 'mp')); r jsonb; todo boolean := true;
         pr text := nullif(trim(coalesce(p_producto, '')), '');
 begin
   if y is null or (y ->> 'id') is null then raise exception 'Inicia sesión'; end if;
@@ -7236,7 +7294,7 @@ end $$;
 -- ¿El token de Turnstile es de una persona? Sin secret key no se exige. Si Cloudflare no responde, no frena la venta.
 create or replace function public.cfx_humano_ok(p_token text) returns boolean
 language plpgsql security definer set search_path = '' as $$
-declare k text := (select valor from public.cfx_secretos where clave = 'turnstile'); st int; c text;
+declare k text := public.cfx_secreto((select valor from public.cfx_secretos where clave = 'turnstile')); st int; c text;
 begin
   if k is null then return true; end if;
   if coalesce(p_token, '') = '' or length(p_token) > 4000 then return false; end if;
@@ -10310,6 +10368,7 @@ create table if not exists public.cfx_mp_negocio (
   updated_at timestamptz not null default now()
 );
 alter table public.cfx_mp_negocio enable row level security;
+alter table public.cfx_mp_negocio add column if not exists llave_desde timestamptz not null default now(); -- G112 c2
 revoke all on public.cfx_mp_negocio from anon, authenticated;
 
 create table if not exists public.cfx_mp_neg_cobros (
@@ -10344,6 +10403,7 @@ create table if not exists public.cfx_flow_negocio (
   updated_at timestamptz not null default now()
 );
 alter table public.cfx_flow_negocio enable row level security;
+alter table public.cfx_flow_negocio add column if not exists llave_desde timestamptz not null default now(); -- G112 c2
 revoke all on public.cfx_flow_negocio from anon, authenticated;
 alter table public.cfx_mp_neg_cobros add column if not exists medio text not null default 'mp';
 alter table public.cfx_mp_neg_cobros add column if not exists volver text;
@@ -10368,7 +10428,8 @@ $$;
 
 create or replace function public.cfx_mp_neg_estado() returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object('dueno', n is not null, 'conectado', m.negocio is not null, 'activo', coalesce(m.activo, false), 'nick', m.nick, 'fin', right(m.token, 4))
+  select jsonb_build_object('dueno', n is not null, 'conectado', m.negocio is not null, 'activo', coalesce(m.activo, false), 'nick', m.nick, 'fin', right(public.cfx_secreto(m.token), 4),
+    'desde', m.llave_desde, 'rotar', coalesce(m.llave_desde < now() - interval '365 days', false))
   from (select public.cfx_mp_neg_mio() n) x left join public.cfx_mp_negocio m on m.negocio = x.n
 $$;
 
@@ -10405,7 +10466,7 @@ declare tk text; c public.cfx_mp_neg_cobros; r jsonb; v text := left(coalesce(p_
         md text := coalesce(p_medio, case when public.cfx_mp_neg_mp(p_negocio) then 'mp' else 'flow' end);
 begin
   if md = 'flow' then return public.cfx_flow_neg_cobro(p_negocio, p_ref, p_titulo, p_monto, p_volver, p_vence); end if;
-  select token into tk from public.cfx_mp_negocio where negocio = p_negocio and activo;
+  select public.cfx_secreto(token) into tk from public.cfx_mp_negocio where negocio = p_negocio and activo;
   if tk is null then return jsonb_build_object('ok', false, 'error', 'Este negocio no tiene Mercado Pago activo'); end if;
   if coalesce(p_monto, 0) < 1 then return jsonb_build_object('ok', false, 'error', 'Monto no válido'); end if;
   if p_vence is not null and p_vence < now() + interval '1 minute' then return jsonb_build_object('ok', false, 'error', 'Se pasó el tiempo para pagar'); end if;
@@ -10437,7 +10498,7 @@ begin
   if c.id is null then return false; end if;
   if c.pago is not null then return true; end if;
   if c.medio = 'flow' then return public.cfx_flow_neg_confirmar(c); end if;  -- G107
-  select token into tk from public.cfx_mp_negocio where negocio = c.negocio;
+  select public.cfx_secreto(token) into tk from public.cfx_mp_negocio where negocio = c.negocio;
   if tk is null then return false; end if;
   r := public.cfx_mp_api(tk, 'GET', '/v1/payments/search?sort=date_created&criteria=desc&external_reference=' || c.id::text);
   select e into pg from jsonb_array_elements(coalesce(r #> '{body,results}', '[]'::jsonb)) e
@@ -10493,7 +10554,7 @@ end $$;
 -- ---------------------------------------------------------------------
 create or replace function public.cfx_flow_neg_cfg(p_negocio uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object('apikey', apikey, 'secret', secret, 'sandbox', sandbox) from public.cfx_flow_negocio where negocio = p_negocio
+  select jsonb_build_object('apikey', public.cfx_secreto(apikey), 'secret', public.cfx_secreto(secret), 'sandbox', sandbox) from public.cfx_flow_negocio where negocio = p_negocio
 $$;
 
 create or replace function public.cfx_flow_neg_cobro(p_negocio uuid, p_ref text, p_titulo text, p_monto int, p_volver text, p_vence timestamptz default null) returns jsonb
@@ -10547,7 +10608,8 @@ end $$;
 
 create or replace function public.cfx_flow_neg_estado() returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object('dueno', n is not null, 'conectado', f.negocio is not null, 'activo', coalesce(f.activo, false), 'sandbox', coalesce(f.sandbox, false), 'fin', right(f.apikey, 4))
+  select jsonb_build_object('dueno', n is not null, 'conectado', f.negocio is not null, 'activo', coalesce(f.activo, false), 'sandbox', coalesce(f.sandbox, false), 'fin', right(public.cfx_secreto(f.apikey), 4),
+    'desde', f.llave_desde, 'rotar', coalesce(f.llave_desde < now() - interval '365 days', false))
   from (select public.cfx_mp_neg_mio() n) x left join public.cfx_flow_negocio f on f.negocio = x.n
 $$;
 
@@ -10646,7 +10708,7 @@ language plpgsql security definer set search_path = '' as $$
 declare tk text; s public.cfx_mp_neg_subs; r jsonb; v text := left(coalesce(p_volver, ''), 500); m text := lower(trim(coalesce(p_email, '')));
   ini timestamptz := greatest(coalesce(p_inicio, now()), now() + interval '5 minutes');
 begin
-  select token into tk from public.cfx_mp_negocio where negocio = p_negocio and activo;
+  select public.cfx_secreto(token) into tk from public.cfx_mp_negocio where negocio = p_negocio and activo;
   if tk is null then return jsonb_build_object('ok', false, 'error', 'Este negocio no tiene Mercado Pago activo'); end if;
   if coalesce(p_monto, 0) < 1 then return jsonb_build_object('ok', false, 'error', 'Monto no válido'); end if;
   if m !~ '^[^@\s"<>]+@[^@\s"<>]+\.[a-z]{2,}$' or length(m) > 120 then return jsonb_build_object('ok', false, 'error', 'Escribe el correo de tu cuenta de Mercado Pago'); end if;
@@ -10676,7 +10738,7 @@ declare s public.cfx_mp_neg_subs; tk text; r jsonb; e jsonb; nuevo text; n int :
 begin
   select * into s from public.cfx_mp_neg_subs where id = p_id for update skip locked;
   if s.id is null or s.preapproval is null or s.estado = 'cancelada' then return 0; end if;
-  select token into tk from public.cfx_mp_negocio where negocio = s.negocio;
+  select public.cfx_secreto(token) into tk from public.cfx_mp_negocio where negocio = s.negocio;
   if tk is null then return 0; end if;
   update public.cfx_mp_neg_subs set revisado_at = now() where id = s.id;
   r := public.cfx_mp_api(tk, 'GET', '/preapproval/' || s.preapproval);
@@ -10727,7 +10789,7 @@ language plpgsql security definer set search_path = '' as $$
 declare s public.cfx_mp_neg_subs; tk text; r jsonb; todo boolean := true;
 begin
   for s in select * from public.cfx_mp_neg_subs where ref = p_ref and estado <> 'cancelada' for update loop
-    select token into tk from public.cfx_mp_negocio where negocio = s.negocio;
+    select public.cfx_secreto(token) into tk from public.cfx_mp_negocio where negocio = s.negocio;
     if s.preapproval is not null and tk is not null then
       r := public.cfx_mp_api(tk, 'PUT', '/preapproval/' || s.preapproval, jsonb_build_object('status', 'cancelled'));
       if coalesce((r ->> 'status')::int, 0) not in (200, 201) and coalesce(r #>> '{body,status}', '') <> 'cancelled' then todo := false; continue; end if;
@@ -10761,6 +10823,87 @@ begin
 exception when others then
   raise notice 'Revisión de pagos automáticos no programada (%).', sqlerrm;
 end $$;
+
+-- ---------- G112 c1 · 🔒 Llaves de pago y secretos a Supabase Vault (se puede volver a correr) ----------
+-- G112 c2 · 🔄 Fecha de cada llave (llave_desde / 'desde'): las pantallas avisan a los 12 meses "Cámbiala".
+-- Al guardar una llave (CM → Pagos, el dueño en su app, Turnstile, GitHub, Cloudflare) un trigger la pasa a Vault y en la tabla queda
+-- solo 'vault:<nombre>'. Al desconectar se borra también de Vault. Sin Vault: queda como antes (la base vieja no se rompe).
+create or replace function public._cfx_vault_cfg() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare k text; nueva boolean := false;
+begin
+  if tg_op = 'DELETE' then perform public.cfx_secreto_quitar('cfx_cfg_' || old.clave || '_'); return old; end if;
+  if new.clave not in ('mp', 'flow') then return new; end if;
+  foreach k in array array['token', 'apikey', 'secret'] loop
+    if coalesce(new.valor ->> k, '') <> '' and new.valor ->> k not like 'vault:%' then
+      -- G112 c2: ¿es una llave nueva? (no la misma que ya estaba) → se anota la fecha para avisar a los 12 meses.
+      nueva := nueva or tg_op = 'INSERT' or new.valor ->> k is distinct from public.cfx_secreto(old.valor ->> k);
+      new.valor := jsonb_set(new.valor, array[k], to_jsonb(public.cfx_secreto_poner('cfx_cfg_' || new.clave || '_' || k, new.valor ->> k)));
+    end if;
+  end loop;
+  if nueva or (not new.valor ? 'desde' and coalesce(new.valor ->> 'token', new.valor ->> 'apikey', '') <> '') then
+    new.valor := new.valor || jsonb_build_object('desde', now());
+  end if;
+  return new;
+end $$;
+create or replace function public._cfx_vault_mp_neg() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then perform public.cfx_secreto_quitar('cfx_mpneg_' || old.negocio); return old; end if;
+  if tg_op = 'INSERT' or (new.token not like 'vault:%' and new.token is distinct from public.cfx_secreto(old.token)) then new.llave_desde := now(); end if;
+  new.token := public.cfx_secreto_poner('cfx_mpneg_' || new.negocio, new.token);
+  return new;
+end $$;
+create or replace function public._cfx_vault_flow_neg() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then perform public.cfx_secreto_quitar('cfx_flowneg_' || old.negocio || '_'); return old; end if;
+  if tg_op = 'INSERT' or (new.apikey not like 'vault:%' and new.apikey is distinct from public.cfx_secreto(old.apikey))
+     or (new.secret not like 'vault:%' and new.secret is distinct from public.cfx_secreto(old.secret)) then new.llave_desde := now(); end if;
+  new.apikey := public.cfx_secreto_poner('cfx_flowneg_' || new.negocio || '_apikey', new.apikey);
+  new.secret := public.cfx_secreto_poner('cfx_flowneg_' || new.negocio || '_secret', new.secret);
+  return new;
+end $$;
+create or replace function public._cfx_vault_secretos() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then perform public.cfx_secreto_quitar('cfx_sec_' || old.clave || '_'); return old; end if;
+  new.valor := public.cfx_secreto_poner('cfx_sec_' || new.clave || '_', new.valor);
+  return new;
+end $$;
+revoke all on function public._cfx_vault_cfg(), public._cfx_vault_mp_neg(), public._cfx_vault_flow_neg(), public._cfx_vault_secretos() from public, anon, authenticated;
+drop trigger if exists cfx_vault on public.cfx_config;
+create trigger cfx_vault before insert or update on public.cfx_config for each row execute function public._cfx_vault_cfg();
+drop trigger if exists cfx_vault_borrar on public.cfx_config;
+create trigger cfx_vault_borrar after delete on public.cfx_config for each row when (old.clave in ('mp', 'flow')) execute function public._cfx_vault_cfg();
+drop trigger if exists cfx_vault on public.cfx_mp_negocio;
+create trigger cfx_vault before insert or update on public.cfx_mp_negocio for each row execute function public._cfx_vault_mp_neg();
+drop trigger if exists cfx_vault_borrar on public.cfx_mp_negocio;
+create trigger cfx_vault_borrar after delete on public.cfx_mp_negocio for each row execute function public._cfx_vault_mp_neg();
+drop trigger if exists cfx_vault on public.cfx_flow_negocio;
+create trigger cfx_vault before insert or update on public.cfx_flow_negocio for each row execute function public._cfx_vault_flow_neg();
+drop trigger if exists cfx_vault_borrar on public.cfx_flow_negocio;
+create trigger cfx_vault_borrar after delete on public.cfx_flow_negocio for each row execute function public._cfx_vault_flow_neg();
+drop trigger if exists cfx_vault on public.cfx_secretos;
+create trigger cfx_vault before insert or update on public.cfx_secretos for each row execute function public._cfx_vault_secretos();
+drop trigger if exists cfx_vault_borrar on public.cfx_secretos;
+create trigger cfx_vault_borrar after delete on public.cfx_secretos for each row execute function public._cfx_vault_secretos();
+-- Las llaves que ya estaban (en texto) pasan a Vault al correr este archivo (el trigger hace el trabajo; si no hay Vault, no cambia nada).
+do $$
+begin
+  if public.cfx_vault_hay() then
+    update public.cfx_config set valor = valor where clave in ('mp', 'flow') and valor::text !~ '"(token|apikey|secret)": "vault:';
+    update public.cfx_mp_negocio set token = token where token not like 'vault:%';
+    update public.cfx_flow_negocio set apikey = apikey where apikey not like 'vault:%' or secret not like 'vault:%';
+    update public.cfx_secretos set valor = valor where valor not like 'vault:%';
+  end if;
+end $$;
+-- La función de servidor (Cloudflare) abre su token con esto: solo la llave de servicio puede llamarla.
+create or replace function public.cfx_secreto_srv(p_clave text) returns text
+language sql stable security definer set search_path = '' as $$
+  select public.cfx_secreto(valor) from public.cfx_secretos where clave = p_clave $$;
+revoke all on function public.cfx_secreto_srv(text) from public, anon, authenticated;
+do $$ begin grant execute on function public.cfx_secreto_srv(text) to service_role; exception when others then null; end $$;
 -- <<< CFX núcleo
 
 -- G95 🎁 Prueba por botón: quien ya tuvo su prueba Pro queda anotado por correo (no se borra) · al probar se marca trial_used.
