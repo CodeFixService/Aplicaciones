@@ -46,7 +46,8 @@
      · La app deja su cliente: window.CFX_NUBE_SB = sb.
      · await CFX_NUBE.subir(dato) → URL pública (o el mismo dato si no se pudo: nada se pierde).
      · CFX_NUBE.es(url) → ¿es una foto de la nube? (para mostrarla con fondo()).
-     · CFX_NUBE.pasarViejas(rpc) → pasa a Storage, de a poco, las fotos viejas del dueño (cfx_fotos_viejas / cfx_foto_pasar de cada app). */
+     · CFX_NUBE.pasarViejas(rpc) → pasa a Storage, de a poco, las fotos viejas del dueño (cfx_fotos_viejas / cfx_foto_pasar de cada app).
+     · CFX_NUBE.limpiar(rpc) → borra de Storage MIS fotos que ya nadie usa (G122 b). */
   const NUBE = /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/vitrina\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(webp|jpg|png)$/;
   const cli = (sb) => sb || window.CFX_NUBE_SB || null;
   const blobDe = (d) => {
@@ -86,5 +87,25 @@
     }
     return n;
   }
-  window.CFX_NUBE = { subir, borrar, pasarViejas, es: (u) => NUBE.test(u || '') };
+  /* G122 b 🧹 Fotos huérfanas (producto, servicio, oferta, portafolio o bici borrados): 1 vez por semana revisa MI carpeta y borra
+     solo las fotos de más de 7 días que el servidor confirma que no están en NINGUNA tabla (cfx_fotos_libres). Ante la duda, no borra. */
+  const DIAS = 7;
+  async function limpiar(rpc, sb) {
+    const c = cli(sb); if (!c || !c.storage || !rpc) return 0;
+    const uid = await miId(c); if (!uid) return 0;
+    const k = 'cfx-nube-limpia-' + uid;
+    try { const v = +localStorage.getItem(k) || 0; if (Date.now() - v < DIAS * 864e5) return 0; localStorage.setItem(k, String(Date.now())); } catch (e) { return 0; }
+    try {
+      const { data, error } = await c.storage.from('vitrina').list(uid, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+      if (error || !Array.isArray(data)) return 0;
+      const viejo = Date.now() - DIAS * 864e5;
+      const cand = data.filter((o) => o && o.id && /^[0-9a-f-]{36}\.(webp|jpg|png)$/.test(o.name || '') && o.created_at && Date.parse(o.created_at) < viejo).map((o) => o.name);
+      if (!cand.length) return 0;
+      const libres = await rpc('cfx_fotos_libres', { p_nombres: cand });
+      const borrar = (Array.isArray(libres) ? libres : []).filter((n) => cand.includes(n)).map((n) => uid + '/' + n);
+      for (let i = 0; i < borrar.length; i += 100) await c.storage.from('vitrina').remove(borrar.slice(i, i + 100));
+      return borrar.length;
+    } catch (e) { return 0; }
+  }
+  window.CFX_NUBE = { subir, borrar, pasarViejas, limpiar, es: (u) => NUBE.test(u || '') };
 })();

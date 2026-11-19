@@ -1548,7 +1548,7 @@
     if (CFG.admin) return;
     refRegistrar();
     legal().then(revisar);  // primero los términos (si hay versión nueva) y después la guía
-    if (primera && window.CFX_NUBE && window.CFX_NUBE_SB) setTimeout(() => window.CFX_NUBE.pasarViejas(R), 9000);  // G122 🖼️ fotos viejas → Storage
+    if (primera && window.CFX_NUBE && window.CFX_NUBE_SB) setTimeout(() => window.CFX_NUBE.pasarViejas(R).catch(() => 0).then(() => window.CFX_NUBE.limpiar && window.CFX_NUBE.limpiar(R)), 9000);  // G122 🖼️ fotos viejas → Storage · G122 b 🧹 huérfanas
     if (primera) setTimeout(anuncios, 4000);  // G93 📣 promos propias de CodeFix (con ✕)
     if (primera) {
       setInterval(revisar, 5 * 60 * 1000);
