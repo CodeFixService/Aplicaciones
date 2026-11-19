@@ -68,8 +68,8 @@ pre, code, kbd { white-space: pre-wrap; overflow-wrap: anywhere; }
     font-size: 21px !important; line-height: 1 !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; color: inherit !important;
   }
   nav.cfx-barra svg { width: 23px !important; height: 23px !important; display: block; margin: 0 auto; }
-  nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current="page"] { color: var(--brand, var(--marca, #2563eb)) !important; }
-  nav.cfx-barra > .on::before, nav.cfx-barra > .activo::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: currentColor; }
+  nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current="page"], nav.cfx-barra > .cfx-mas-on { color: var(--brand, var(--marca, #2563eb)) !important; }
+  nav.cfx-barra > .on::before, nav.cfx-barra > .activo::before, nav.cfx-barra > .cfx-mas-on::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: currentColor; }
   /* El + grande, con color, un poco más arriba que el resto */
   nav.cfx-barra > .cfx-mas { overflow: visible; color: var(--cfx-texto) !important; font-size: 0 !important; justify-content: center !important; }  /* solo el +, sin texto */
   nav.cfx-barra > .cfx-mas::before { display: none; }
@@ -266,6 +266,9 @@ button, .btn, a.btn, .chip { align-items: center; }
 @media (max-width: 899px) {
   body.cfx-con-barra { padding-bottom: calc(136px + env(safe-area-inset-bottom)) !important; }
   body.cfx-con-barra .cfx-pad-barra { padding-bottom: calc(136px + env(safe-area-inset-bottom)) !important; }
+  /* G116: con el pie al final, el pie mismo deja el espacio del + (sin hueco grande debajo). */
+  body.cfx-con-barra.cfx-con-pie { padding-bottom: calc(66px + env(safe-area-inset-bottom)) !important; }
+  body.cfx-con-barra.cfx-con-pie .cfx-pie { padding-bottom: 30px !important; }
 }
 /* Botones chicos (chips, ✕) con alto táctil de 40 px */
 button.chip, a.chip, [role="button"].chip { min-height: 40px; }

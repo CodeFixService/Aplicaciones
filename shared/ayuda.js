@@ -698,7 +698,9 @@
     d.addEventListener('click', (ev) => { if (ev.target === d || ev.target.closest('.cfx-hm-x, .cfx-hm-cerrar')) fuera(); });
     // Deslizar hacia abajo desde la barra de arriba (o desde el contenido si ya está arriba de todo) la cierra.
     const c = d.firstChild, z = d.querySelector('.cfx-hm-zona'); let y0 = null, dy = 0;
-    c.addEventListener('pointerdown', (e) => { if (e.target.closest('input, textarea, select') || (!e.target.closest('.cfx-hm-cab') && z.scrollTop > 0)) return; y0 = e.clientY; dy = 0; c.style.transition = 'none'; });
+    // G116: una lista con su propio scroll adentro (comunas, ciudades…) sube y baja sola: no arrastra la hoja.
+    const cajaPropia = (el) => { for (let x = el; x && x !== z && x !== c; x = x.parentElement) { if (x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(x).overflowY)) return true; } return false; };
+    c.addEventListener('pointerdown', (e) => { if (e.target.closest('input, textarea, select, datalist') || (!e.target.closest('.cfx-hm-cab') && (z.scrollTop > 0 || cajaPropia(e.target)))) return; y0 = e.clientY; dy = 0; c.style.transition = 'none'; });
     c.addEventListener('pointermove', (e) => { if (y0 === null) return; if (document.documentElement.classList.contains('cfx-ordenando')) { y0 = null; c.style.transform = ''; return; } dy = Math.max(0, e.clientY - y0); if (dy > 6) c.style.transform = 'translateY(' + dy + 'px)'; });
     const soltar = () => { if (y0 === null) return; y0 = null; c.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)'; if (dy > 110) fuera(); else c.style.transform = ''; };
     c.addEventListener('pointerup', soltar); c.addEventListener('pointercancel', soltar);
@@ -712,7 +714,8 @@
   const cerrarHojas = () => { while (hojas.length) hojas[hojas.length - 1]._fuera(); };
   // U6 (núcleo 2.35): el menú Más no repite lo que ya está a la vista en la barra de abajo o en el + (mismo destino, misma clave o mismo nombre).
   // No cuenta el botón que abre este mismo menú (Más/Ajustes/Perfil/Cuenta) ni los que la barra mandó a su hoja de sobrantes.
-  const destino = (u) => { try { const x = new URL(u, location.href); return x.origin + x.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + (x.hash.length > 1 ? x.hash : ''); } catch (e) { return ''; } };
+  // G116: con ?v=… es otra opción (Cupones ≠ Pedidos).
+  const destino = (u) => { try { const x = new URL(u, location.href); return x.origin + x.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + x.search + (x.hash.length > 1 ? x.hash : ''); } catch (e) { return ''; } };
   function enBarra() {
     const n = document.querySelector('nav.cfx-barra'); if (!n) return null;
     const B = [...n.children].filter((b) => !b.classList.contains('cfx-oculto') && b.getClientRects().length).map((b) => {
@@ -730,6 +733,7 @@
     const nodos = L.map((s) => s.nodo).filter(Boolean);
     const grilla = () => {
       nodos.forEach((n) => { if (!n.closest('.cfx-hm-zona')) n.classList.add('cfx-oc'); });
+      if (o.menu) deBarra(L);
       const grupos = [];
       const rep = o.menu && enBarra();
       L.forEach((s) => { if (rep && rep(s)) return; const g = s.grupo || ''; let x = grupos.find((y) => y.g === g); if (!x) grupos.push(x = { g, l: [] }); x.l.push(s); });
@@ -768,11 +772,14 @@
       const marcar = (i) => { pag = i; T.querySelectorAll('.cfx-mm-tab').forEach((b, j) => { b.classList.toggle('on', j === i); b.setAttribute('aria-pressed', j === i); });
         w.querySelectorAll('.cfx-mm-pts i').forEach((b, j) => b.classList.toggle('on', j === i));
         const b = T.children[i]; if (b) { const r = b.getBoundingClientRect(), rg = T.getBoundingClientRect(); if (r.left < rg.left) T.scrollLeft -= rg.left - r.left + 12; else if (r.right > rg.right) T.scrollLeft += r.right - rg.right + 12; } };
-      const alto = () => { const pg = P.children[pag]; if (pg) P.style.height = pg.offsetHeight + 'px'; };
+      // G116: con la pantalla escondida la página mide 0 → sin alto fijo (antes quedaba en 0 px y el menú no se veía).
+      let corriendo = false;
+      const alto = () => { const pg = P.children[pag]; if (!pg) return; const h = pg.offsetHeight; P.style.height = h ? h + 'px' : ''; };
+      if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (!corriendo) alto(); }); [...P.children].forEach((x) => ro.observe(x)); }
       const marcar0 = marcar; const marcar2 = (i) => { marcar0(i); alto(); };
       const ir = (i, suave) => { P.scrollTo({ left: i * P.clientWidth, behavior: suave ? 'smooth' : 'auto' }); marcar2(i); };
       requestAnimationFrame(() => { if (pag) P.scrollLeft = pag * P.clientWidth; alto(); });
-      let tm = 0; P.addEventListener('scroll', () => { P.style.height = ''; clearTimeout(tm); tm = setTimeout(() => { const i = Math.round(P.scrollLeft / Math.max(1, P.clientWidth)); marcar2(i); }, 80); }, { passive: true });
+      let tm = 0; P.addEventListener('scroll', () => { corriendo = true; P.style.height = ''; clearTimeout(tm); tm = setTimeout(() => { corriendo = false; const i = Math.round(P.scrollLeft / Math.max(1, P.clientWidth)); marcar2(i); }, 80); }, { passive: true });
       T.onclick = (e) => { const b = e.target.closest('[data-mm-i]'); if (b) ir(+b.dataset.mmI, true); };
       w.querySelector('[data-mm-ord]').onclick = () => ordenar(grupos, ck);
       w.querySelectorAll('.cfx-aj > [data-k]').forEach((b) => { b.onclick = () => abrir(b.dataset.k); });
@@ -817,7 +824,23 @@
       return s.abrir ? s.abrir(h.zona, k, h) : undefined;
     };
     grilla();
+    // G116: si la barra de abajo se arma después, sus botones que no caben se suman al menú.
+    if (o.menu) document.addEventListener('cfx-barra-lista', () => { if (w.isConnected) grilla(); });
     return { abrir, grilla, cerrar: cerrarHojas };
+  }
+  // G116 · ⋯ Más va directo a este menú: los botones de la barra que no caben (barra.js → nav.cfxExtras) se agregan
+  //   como filas (al primer grupo), salvo que la app ya tenga esa opción. Al tocarlas hacen lo mismo que en la barra.
+  function deBarra(L) {
+    const n = document.querySelector('nav.cfx-barra'), X = (n && n.cfxExtras) || [];
+    const g0 = (L.find((s) => s && s.grupo) || {}).grupo || '';
+    X.forEach((b, i) => {
+      if (b.classList.contains('cfx-menu-app') || b.classList.contains('cfx-mas')) return;
+      const t = (b.getAttribute('aria-label') || b.textContent || '').replace(/\d+/g, '').trim(); if (!t) return;
+      const k = 'cfx-barra-' + (b.dataset.v || b.dataset.r || b.dataset.k || b.dataset.tab || i);
+      if (L.some((s) => s.k === k || normal(s.t) === normal(t) || (s.ir && b.getAttribute('href') && destino(s.ir) === destino(b.getAttribute('href'))))) return;
+      const ic = b.querySelector('.cfx-ico, svg');
+      L.unshift({ k, t, ico: ic ? (ic.tagName.toLowerCase() === 'svg' ? ic.outerHTML : ic.innerHTML) : '', grupo: g0, accion: () => b.click() });
+    });
   }
   // Lo común de "Cuenta y ayuda" (plan, chat, guía, términos, invita, panel y cerrar sesión), como filas del menú.
   // Las que la app ya tiene en su lista (mismo k) no se repiten.

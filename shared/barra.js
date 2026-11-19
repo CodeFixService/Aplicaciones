@@ -97,12 +97,20 @@
     if (mas && (L.length > 4 || (extra.length && L.length >= 4))) {
       const quedan = L.filter((b) => b !== bMas).slice(0, 3);
       extra = L.filter((b) => !quedan.includes(b) && b !== bMas).concat(extra);
-      if (bMas) extra.push(bMas);
       L = quedan; menu = true;
     } else if (extra.length) {
       menu = true;
-      if (bMas) { L = L.filter((b) => b !== bMas); extra.push(bMas); }
+      if (bMas) L = L.filter((b) => b !== bMas);
     }
+    // G116 · ⋯ Más lleva DIRECTO a los Ajustes de la app (sin ventanita): los botones que no caben aparecen dentro
+    //   de ese menú (CFX_MENU los agrega solos, ayuda.js). Solo sin "Más" propio de la app se abre la hoja con ellos.
+    if (menu && bMas) {
+      bMas.classList.add('cfx-menu-app');
+      const marcarM = () => { const on = extra.some((b) => b.classList.contains('on') || b.classList.contains('activo')); if (bMas.classList.contains('cfx-mas-on') !== on) bMas.classList.toggle('cfx-mas-on', on); };
+      new MutationObserver(marcarM).observe(nav, { attributes: true, subtree: true, attributeFilter: ['class'] }); setTimeout(marcarM, 0);
+      L.push(bMas); menu = false;
+    }
+    nav.cfxExtras = extra.slice();
     let m = null;
     if (menu) {
       m = document.createElement('button');
@@ -126,6 +134,7 @@
     nav.style.setProperty('--cfx-n', String(nav.querySelectorAll(':scope > :not(.cfx-oculto)').length));
     nav.cfxHijos = new Set(nav.children);  // G78: para notar si la app vuelve a dibujar los botones
     document.documentElement.classList.add('cfx-barra-lista');
+    document.dispatchEvent(new CustomEvent('cfx-barra-lista'));
     verBarra();  // al cargar se ve; se esconde al bajar
   }
 
@@ -176,7 +185,23 @@
       if (/auto|scroll/.test(s.overflowY) && e.clientHeight > innerHeight * 0.5 && e.getBoundingClientRect().bottom > innerHeight - 90) e.classList.add('cfx-pad-barra');
     });
   }
+  // G116 · 🦶 El pie (© … derechos reservados) siempre al fondo de la pantalla: si la página es corta baja hasta abajo,
+  //   y si es larga queda al final, sin el hueco grande de abajo (la barra se esconde al bajar; el + no lo tapa).
+  function pieAbajo() {
+    const se = document.scrollingElement || document.documentElement, b = document.body;
+    const f = [...document.querySelectorAll('footer, .pie')].filter((x) => x.offsetParent && /©/.test(x.textContent || '') && !x.closest('dialog, .cfx-hoja-m, .cfx-hm-zona')).pop();
+    document.querySelectorAll('.cfx-pie').forEach((x) => { if (x !== f) { x.classList.remove('cfx-pie'); x.style.marginTop = ''; } });
+    if (!f) { b.classList.remove('cfx-con-pie'); return; }
+    f.classList.add('cfx-pie'); f.style.marginTop = '';
+    const pad = parseFloat(getComputedStyle(b).paddingBottom) || 0, finPie = f.getBoundingClientRect().bottom + se.scrollTop;
+    const ultimo = se.scrollHeight - finPie <= pad + 48;  // nada debajo del pie (solo el espacio de la barra)
+    b.classList.toggle('cfx-con-pie', ultimo && innerWidth < 900);
+    if (!ultimo) return;
+    const falta = innerHeight - se.scrollHeight;
+    if (falta > 1) f.style.marginTop = ((parseFloat(getComputedStyle(f).marginTop) || 0) + falta) + 'px';
+  }
   function apilar() {
+    try { pieAbajo(); } catch (e) { /* nada */ }
     espacioAbajo();
     if (innerWidth >= 900) return;
     cabeceraAlto();
