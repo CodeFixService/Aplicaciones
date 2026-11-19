@@ -569,6 +569,46 @@
     $('impRubro').value = rubro;
     if (rubro) verImp(Core.plantilla(rubro), 'la plantilla'); else $('impRubro').focus();
   };
+  // G118 📊 Planilla única (núcleo CFX_RESPALDO.planilla): ⬇️ con ejemplos de TU rubro · ⬆️ subir o 💬 pegar (Claude) → vista previa → crea o ACTUALIZA por nombre.
+  // El servidor valida cada producto publicado (catalog_upsert / set_stock); nunca se borra nada.
+  $('impPlanD').ontoggle = async () => {
+    const w = $('impPlanilla'); if (!$('impPlanD').open || w.dataset.listo || !window.CFX_RESPALDO || !CFX_RESPALDO.planilla) return; w.dataset.listo = 1;
+    let rubro = ''; try { rubro = (await Cuenta.rpc('tienda_info', { p_negocio: cuenta.id }) || {}).rubro || ''; } catch (e) { /* sin red: ejemplo general */ }
+    let ej = []; try { ej = (Core.plantilla(rubro) || []).slice(0, 3); } catch (e) { /* nada */ }
+    if (!ej.length) ej = [{ nombre: 'Polera básica', precio: 9990, categoria: 'Poleras' }, { nombre: 'Jeans clásico', precio: 19990, categoria: 'Pantalones' }];
+    ej = ej.map((x, i) => Object.assign({ stock: 10, costo: Math.round((x.precio || 0) * 0.5), desc: '', ops: i ? '' : 'S, M, L', pub: 'sí' }, x));
+    const mismo = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+    CFX_RESPALDO.planilla(w, { que: 'productos', archivo: 'planilla-productos', max: 500, rubro, clave: 'nombre',
+      cols: [{ k: 'nombre', t: 'Nombre', req: true, max: 60, al: /^(producto|articulo|item)/ }, { k: 'precio', t: 'Precio', tipo: 'plata', req: true, al: /^(valor|precio venta)/ },
+        { k: 'categoria', t: 'Categoría', max: 40, al: /^(tipo|seccion|familia)/ }, { k: 'stock', t: 'Stock', tipo: 'entero', tope: 100000, al: /^(cantidad|existencia|inventario)/ },
+        { k: 'costo', t: 'Costo', tipo: 'plata', ayuda: 'lo que te cuesta a ti (no lo ve el cliente)' }, { k: 'desc', t: 'Descripción', max: 300, al: /^detalle/ },
+        { k: 'ops', t: 'Opciones', max: 200, ayuda: 'tallas o colores separados por coma' }].concat(esCliente ? [] : [{ k: 'pub', t: 'En catálogo', tipo: 'si_no', ayuda: 'sí = lo ven tus clientes' }]),
+      ejemplos: ej,
+      existe: (f) => productos.some((p) => mismo(p.nombre, f.nombre)),
+      guardar: async (filas) => {
+        let creados = 0, actualizados = 0; const errores = [], pubDef = !esCliente;
+        for (const f of filas) {
+          let p = productos.find((x) => mismo(x.nombre, f.nombre)); const nuevo = !p;
+          if (nuevo) {
+            if (productos.length >= LIMITE) { errores.push({ fila: f._fila, msg: 'llegaste al máximo de ' + LIMITE + ' productos' }); continue; }
+            p = { id: Core.uid(), nombre: String(f.nombre).slice(0, 60), precio: 0, costo: 0, stock: '', categoria: '', publicado: pubDef, premium: null, vip: false, desc: '', ops: '', vars: [] };
+          }
+          const antes = JSON.stringify(p), estaba = !nuevo && p.publicado;
+          ['precio', 'costo', 'categoria', 'desc', 'ops', 'stock'].forEach((k) => { if (f[k] != null) p[k] = f[k]; });
+          if (f.pub != null && !esCliente) p.publicado = f.pub;
+          if (!esCliente && (p.publicado || estaba)) {
+            try {
+              if (p.publicado) await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip, p_descripcion: p.desc || '', p_opciones: p.ops || '' });
+              else { await Cuenta.rpc('catalog_delete', { p_key: p.id }); p.foto = false; }
+              if (p.publicado && f.stock != null) await Cuenta.rpc('set_stock', { p_key: p.id, p_stock: f.stock });
+            } catch (e) { errores.push({ fila: f._fila, msg: e.message }); if (!nuevo) Object.assign(p, JSON.parse(antes)); continue; }
+          }
+          if (nuevo) { productos.push(p); creados++; } else actualizados++;
+        }
+        guardarProductos(); renderProds(); renderLista();
+        return { creados, actualizados, errores };
+      } });
+  };
   $('impRubro').onchange = (e) => e.target.value && verImp(Core.plantilla(e.target.value), 'la plantilla');
   $('impAgregar').onclick = async () => {
     const l = imp.filter((x) => x.ok), malos = l.filter((x) => !x.nombre || isNaN(x.precio));
