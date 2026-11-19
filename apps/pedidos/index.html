@@ -81,6 +81,7 @@
       <button class="small alt" data-f="devolver">💸 Por devolver</button>
       <button class="small alt" data-f="historial">📚 Historial</button>
     </div>
+    <div id="sinMedio"></div>
     <input id="buscar" placeholder="Buscar por nombre o WhatsApp…" aria-label="Buscar" style="margin-bottom:12px">
     <div class="ped" id="lista"><p class="empty">Cargando…</p></div>
   </section>
@@ -192,9 +193,16 @@
   let BOL = {};
   const bolP = Cuenta.rpc('boleta_estado').then((b) => { BOL = b || {}; }).catch(() => {});
   const PAGADO = ['preparando', 'listo', 'en_camino', 'entregado'];
+  // G128 🛒 estados claros (núcleo CFX_COBRO) y aviso al dueño si sus clientes no tienen cómo pagar.
+  const est = (p) => (window.CFX_COBRO ? CFX_COBRO.estado(p).e : ESTADOS[p.estado] || p.estado);
+  const btnE = (e, p) => (e === 'entregado' && p.servicio ? '🛠️ Servicio realizado' : ESTADOS[e]);
+  const cobroListo = () => (window.CFX_COBRO || document.readyState === 'complete' ? Promise.resolve() : new Promise((ok) => addEventListener('load', ok, { once: true })));
+  if (yo.role !== 'equipo') Promise.all([Cuenta.rpc('tienda_info', { p_negocio: yo.id }), cobroListo()]).then(([t]) => {
+    if (t && !t.cobra_online && window.CFX_COBRO) CFX_COBRO.sinMedios($('sinMedio'), { ir: '../../#links' });
+  }).catch(() => {});
   const COMPRADO = ['recibido'].concat(PAGADO);  // G25: 🧾 Detalle de compra apenas se confirma el pago
   const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
-  let etiq = new Set();
+  let etiq = new Set(), hilos = {};
   async function cargar() {
     document.querySelectorAll('#filtros button').forEach((x) => { x.classList.toggle('on', x.dataset.f === filtro); x.classList.toggle('alt', x.dataset.f !== filtro); });
     try {
@@ -205,6 +213,8 @@
       // Sin comprobantes por revisar, se abre en "Activos" para que nunca quede oculto un pedido nuevo.
       if (auto && filtro === 'revisar' && !pedidos.length) { auto = false; filtro = 'activos'; return cargar(); }
       auto = false;
+      hilos = {};
+      try { (await Cuenta.rpc('cfx_hilos_sin_leer', { p_refs: pedidos.filter((p) => p.cliente_id).map((p) => 'pedido:' + p.id) }) || []).forEach((x) => { hilos[x.ref] = x.n; }); } catch (e) { /* sin chat */ }
     }
     catch (e) { $('lista').innerHTML = '<p class="empty">⚠️ ' + Core.esc(e.message) + '</p>'; return; }
     const nuevos = vistos && ultFiltro === filtro ? pedidos.filter((p) => !vistos.has(p.id) && ['pagando', 'en_revision', 'recibido'].includes(p.estado)) : [];
@@ -241,12 +251,14 @@
         (p.cliente_estrellas ? ' <span class="estrellas5">★ ' + p.cliente_estrellas + '</span>' : '') +
         '<div class="muted">' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) +
         (p.estado === 'pagando' && p.retenido_hasta ? ' · apartado ' + quedan(p.retenido_hasta) : '') + '</div></div>' +
-        '<span class="pill est-' + p.estado + '">' + (ESTADOS[p.estado] || p.estado) + '</span></div>' +
+        '<span class="pill est-' + p.estado + '">' + Core.esc(est(p)) + '</span></div>' +
         '<pre>' + Core.esc(p.lineas.map((x) => x.cant + ' × ' + x.nombre + ' — ' + precio(x.subtotal)).join('\n')) + '</pre>' +
         (p.descuento - (p.desc_premium || 0) > 0 ? '<div class="muted">Cupón ' + Core.esc(p.cupon || '') + ': −' + precio(p.descuento - (p.desc_premium || 0)) + '</div>' : '') +
         (p.desc_premium > 0 ? '<div class="muted">⭐ Descuento Premium: −' + precio(p.desc_premium) + '</div>' : '') +
         '<div class="total">Total ' + precio(p.total) + '</div>' +
-        '<div class="muted">' + (p.entrega === 'despacho' ? '🚚 Despacho a ' + Core.esc(p.direccion || '') + (p.envio && p.envio.por_pagar ? ' · <b>📦 envío por pagar</b> (lo paga el cliente al courier)' : '') : '🏪 Retiro en tienda') + '</div>' +
+        (p.cobro === 'abono' ? '<div class="aviso">💵 Abono ' + precio(p.a_pagar) + (p.abonado || p.pagado ? ' ✅ pagado' : ' por pagar') + ' · 💰 ' + (p.pagado ? 'resto pagado ✅' : '<b>cobra ' + precio(p.total - p.a_pagar) + ' al entregar</b>') + '</div>'
+          : p.cobro === 'retiro' && !p.pagado && !['cancelado', 'rechazado', 'expirado'].includes(p.estado) ? '<div class="aviso">💰 <b>Cobra ' + precio(p.total) + ' al entregar</b> (paga al retirar)</div>' : '') +
+        '<div class="muted">' + (p.servicio ? '🛠️ Servicio (sin envío)' : p.digital ? '🔑 Acceso digital: se entrega al aprobar el pago' : p.entrega === 'despacho' ? '🚚 Despacho a ' + Core.esc(p.direccion || '') + (p.envio && p.envio.por_pagar ? ' · <b>📦 envío por pagar</b> (lo paga el cliente al courier)' : '') : '🏪 Retiro en tienda') + '</div>' +
         (p.envio && (p.envio.codigo || p.envio.link) ? '<div class="muted">📍 ' + Core.esc(p.envio.nombre) + (p.envio.codigo ? ' · ' + Core.esc(p.envio.codigo) : '') +
           (p.envio.link ? ' · <a target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(p.envio.link)) + '">Seguir</a>' : '') + '</div>' : '') +
         (p.nota ? '<div class="muted">📝 ' + Core.esc(p.nota) + '</div>' : '') +
@@ -263,7 +275,7 @@
         (COMPRADO.includes(p.estado) ? '<button class="alt small" data-recibo="' + p.id + '">🧾 Detalle de compra</button>' : '') +
         (p.tiene_comprobante ? '<button class="alt small" data-comp="' + p.id + '">📷 Foto del pago</button>' : '') +
         (p.estado === 'en_revision' ? '<button class="ok small" data-rev="' + p.id + '" data-si="1">✅ Aprobar pago</button><button class="danger small" data-rev="' + p.id + '" data-si="0">Rechazar</button>' : '') +
-        sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + ESTADOS[e] + '</button>').join('') +
+        sig.map((e) => '<button class="ok small" data-id="' + p.id + '" data-e="' + e + '">' + btnE(e, p) + '</button>').join('') +
         (abierto && p.estado !== 'en_revision' ? '<button class="alt small" data-id="' + p.id + '" data-e="cancelado">Cancelar</button>' : '') +
         (BOL.conectado && PAGADO.includes(p.estado) && !(p.boleta && p.boleta.folio) ? '<button class="small alt" data-bol="' + p.id + '">🧾 ' + (BOL.modo === 'openfactura' ? 'Emitir ' : 'Anotar N° ') + (p.boleta && p.boleta.factura ? 'factura SII' : 'boleta SII') + '</button>' : '') +
         (BOL.conectado && !(p.boleta && p.boleta.folio) && !['cancelado', 'rechazado', 'expirado'].includes(p.estado) ? '<button class="small alt" data-fac="' + p.id + '">🧾 ' + (p.boleta && p.boleta.factura ? 'Datos de factura' : 'Dar factura') + '</button>' : '') +
@@ -271,8 +283,11 @@
         (p.entrega === 'despacho' && ['recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado) ? '<button class="small alt" data-env="' + p.id + '">🚚 ' + (p.envio && p.envio.codigo ? 'Cambiar seguimiento' : 'Seguimiento') + '</button>' : '') +
         (etiq.has(p.id) ? '<button class="small alt" data-etv="' + p.id + '">🖨️ Etiqueta</button>'
           : p.entrega === 'despacho' && Cuenta.puede('courier') && ['recibido', 'preparando', 'listo'].includes(p.estado) ? '<button class="small alt" data-etq="' + p.id + '">🏷️ Etiqueta Chilexpress</button>' : '') +
-        (p.cliente_id ? '<a class="btn small alt" href="../mensajes/?con=' + p.cliente_id + '">💬 Chat</a>' : '') +
+        (p.cliente_id ? '<button class="small alt" data-hilo="' + p.id + '">💬 Chat del pedido' + (hilos['pedido:' + p.id] ? ' (' + hilos['pedido:' + p.id] + ')' : '') + '</button>' : '') +
+        (tel && p.invitado && p.token && window.CFX_COBRO ? '<a class="btn small alt" target="_blank" rel="noopener" href="' + Core.esc(CFX_COBRO.wa(tel, 'Hola ' + (p.cliente || '') + ' 👋 Este es el enlace de tu pedido en ' + ((yo.role === 'equipo' ? yo.negocio : yo.empresa) || 'la tienda') +
+          ': ahí ves el estado' + (p.estado === 'pagando' ? ', pagas y subes el comprobante' : '') + '.\n' + Core.rootUrl() + 'r/?t=' + p.token)) + '">📲 Enviar enlace al cliente</a>' : '') +
         (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div>' +
+        (p.cliente_id ? '<div class="hidden" data-hilo-de="' + p.id + '"></div>' : '') +
         (p.estado === 'entregado' && !p.calificado ? '<div class="row" style="align-items:center;margin-top:10px"><span class="muted" style="flex:none">Califica al cliente:</span><span class="califica">' +
           [1, 2, 3, 4, 5].map((n) => '<button type="button" data-cal="' + p.id + '" data-n="' + n + '" aria-label="' + n + ' estrellas">★</button>').join('') + '</span></div>' : '') +
         '</div>';
@@ -283,6 +298,11 @@
     const b = e.target.closest('button');
     if (!b) return;
     try {
+      if (b.dataset.hilo) {  // 💬 G128 chat del pedido (solo clientes con cuenta)
+        const c = $('lista').querySelector('[data-hilo-de="' + b.dataset.hilo + '"]');
+        if (c && window.CFX_COBRO) { const cerrado = c.classList.toggle('hidden'); if (!cerrado) CFX_COBRO.hilo(c, { rpc: Cuenta.rpc, ref: 'pedido:' + b.dataset.hilo, tienda: true }); else c.innerHTML = ''; }
+        return;
+      }
       if (b.dataset.recibo) {
         const p = pedidos.find((x) => x.id === b.dataset.recibo);
         if (p && window.CFX_COMPROBANTE) CFX_COMPROBANTE.abrir({ negocio: yo.role === 'equipo' ? yo.negocio : yo.empresa, fecha: p.fecha,
@@ -312,7 +332,7 @@
       if (b.dataset.e) {
         if (b.dataset.e === 'cancelado' && !await Core.confirmar('¿Cancelar este pedido? Se le avisará al cliente.')) return;
         await Cuenta.rpc('actualizar_pedido', { p_id: b.dataset.id, p_estado: b.dataset.e });
-        Core.toast('Pedido: ' + ESTADOS[b.dataset.e]);
+        Core.toast('Pedido: ' + btnE(b.dataset.e, pedidos.find((x) => x.id === b.dataset.id) || {}));
       }
       if (b.dataset.fac) {
         // G38 🧾 la tienda pone, cambia o quita los datos de factura (si el cliente la pidió por chat o WhatsApp).

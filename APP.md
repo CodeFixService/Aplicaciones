@@ -32,7 +32,12 @@ Tienda online + caja + pedidos para pymes chilenas. Free / Pro / 🧩 módulos (
 profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, boleta_cuentas, boletas_caja, calificaciones, sellos, avisos_stock, publicaciones, publicacion_vistas, subscribers, user_invites, requests, conexiones, webhooks, webhook_envios, negocio_correo, notifications, notification_reads, push_subscriptions, planes, textos, app_settings, app_secrets, actividad_dia.
 
 ## Versiones
-core.js l.349/l.350 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql. Ahora: 6.62 · bd 5.81 · enviar 3.8.
+core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql (~l.5453). Ahora: 6.78 · bd 5.89 · enviar 3.8.
+
+## 🛒 Cobro de pedidos (G128)
+- Ítem: `catalog_items.tipo` (producto/servicio/digital) · `cobro` (ahora/abono/retiro) · `abono_pct` · `acceso` (solo al pagar). Caja → producto → 🛒 Venta online (`catalogo_venta`).
+- Pedido: `cobro`, `a_pagar` (lo que se paga ahora; null = total), `abonado_at`, `accesos`. Sin medio (ni 🏦 datos_pago, ni MP/Flow, ni link) = 💰 paga al retirar. Trigger `pedido_g128`.
+- 💬 Chat del pedido: núcleo `cfx_hilo_*` (ref `pedido:<id>`, solo con cuenta) · ganchos `cfx_hilo_app` / `cfx_hilo_aviso_app`.
 
 ## ✉️ Correo (G42f, 6.19 · bd 5.50 · enviar 3.5)
 - CodeFix → negocios/todos: Gmail de Josué (app_secrets gmail_*), se pone en CM → Control → ✉️ Correo.

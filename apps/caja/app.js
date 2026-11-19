@@ -680,13 +680,28 @@
       return { nombre: r.dataset.var, precio: a.value.trim() === '' || isNaN(pr) ? null : pr, stock: b.value.trim() === '' || isNaN(st) ? null : Math.max(0, st) }; });
   }
   $('p-ops').addEventListener('input', () => pintarVars());
+  // G128 🛒 Venta online del ítem: tipo y forma de pago (la base valida: digital = pagar ahora; servicio/digital sin stock).
+  const VT = { producto: '📦 Producto', servicio: '🛠️ Servicio', digital: '🔑 Digital' }, VC = { ahora: '⚡ Pagar ahora', abono: '💵 Abono', retiro: '💰 Pagar al retirar' };
+  function pintarVenta() {
+    const tp = $('p-tipo').value; if (tp === 'digital') $('p-cobro').value = 'ahora';
+    $('p-cobro').disabled = tp === 'digital';
+    $('rowAbono').classList.toggle('hidden', $('p-cobro').value !== 'abono'); $('rowAcceso').classList.toggle('hidden', tp !== 'digital');
+    $('pVentaRes').textContent = VT[tp] + ' · ' + VC[$('p-cobro').value] + ($('p-cobro').value === 'abono' ? ' ' + ($('p-abono').value || 50) + '%' : '');
+  }
+  function ponerVenta(v) {
+    v = v || {}; $('p-tipo').value = v.tipo || 'producto'; $('p-cobro').value = v.cobro || 'ahora'; $('p-abono').value = v.abono || ''; $('p-acceso').value = v.acceso || ''; pintarVenta();
+  }
+  ['p-tipo', 'p-cobro', 'p-abono'].forEach((k) => $(k).addEventListener('input', pintarVenta));
+  $('pVentaW').classList.toggle('hidden', esCliente);
+  const leerVenta = () => ({ tipo: $('p-tipo').value, cobro: $('p-cobro').value, abono: $('p-cobro').value === 'abono' ? parseInt($('p-abono').value || '50', 10) : null, acceso: $('p-acceso').value.trim() });
+  const ventaFabrica = (v) => v.tipo === 'producto' && v.cobro === 'ahora';
 
   function limpiarForm() {
     editId = null;
     fotoNueva = null; fotoQuitar = false; fotoVieja = null; verFoto(null);
     ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem', 'desc', 'ops'].forEach((k) => { $('p-' + k).value = ''; });
     $('p-pub').checked = !esCliente; $('rowPrem').classList.toggle('hidden', esCliente); // lo nuevo se publica por defecto
-    $('p-vip').checked = false; pintarVars([]);
+    $('p-vip').checked = false; pintarVars([]); ponerVenta(null);
     renderLista();
   }
   $('bCancelarProd').onclick = limpiarForm;
@@ -735,6 +750,13 @@
       if (p.publicado && !(await sincronizar(prod))) prod.publicado = false;
     }
     await guardarFoto(prod);
+    if (!esCliente && prod.publicado) {  // G128 venta online (si falla, se avisa y el producto queda guardado)
+      const v = leerVenta();
+      if (!ventaFabrica(v) || prod.venta) {
+        try { prod.venta = await Cuenta.rpc('catalogo_venta', { p_key: prod.id, p: v }); if (prod.venta.tipo !== 'producto') prod.stock = ''; }
+        catch (err) { Core.toast('🛒 Venta online: ' + err.message); }
+      }
+    }
     if (!esCliente && prod.publicado) Cuenta.rpc('set_stock', { p_key: prod.id, p_stock: prod.stock === '' ? null : prod.stock }).catch(() => {});
     if (!esCliente && prod.publicado && (prod.ops || (prod.vars || []).length)) Cuenta.rpc('variantes_guardar', { p_clave: prod.id, p_lista: prod.ops ? prod.vars || [] : [] }).catch((e) => Core.toast('⚠️ ' + (e.message || e)));
     guardarProductos();
@@ -752,6 +774,8 @@
       $('p-pub').checked = !!p.publicado; $('p-prem').value = p.premium == null ? '' : p.premium;
       $('p-vip').checked = !!p.vip;
       $('p-desc').value = p.desc || ''; $('p-ops').value = p.ops || ''; pintarVars(p.vars || []);
+      ponerVenta(p.venta);
+      if (p.publicado && !esCliente) Cuenta.rpc('catalogo_venta_ver', { p_key: p.id }).then((v) => { if (v && editId === id) { p.venta = v; ponerVenta(v); } }).catch(() => {});
       $('rowPrem').classList.toggle('hidden', !p.publicado);
       fotoNueva = null; fotoQuitar = false; fotoVieja = null; verFoto(null);
       if (p.publicado && !esCliente) {

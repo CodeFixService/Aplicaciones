@@ -3205,6 +3205,7 @@ begin
     return jsonb_build_object('ok', false, 'error', 'Pedido no encontrado');
   end if;
   if x.estado not in ('pagando', 'en_revision', 'recibido', 'preparando') then return jsonb_build_object('ok', false, 'error', 'Este pedido ya no se puede cancelar'); end if;
+  if x.accesos is not null then return jsonb_build_object('ok', false, 'error', 'Ya recibiste tu acceso digital: escríbele a la tienda'); end if;  -- G128
   dev := case when x.comprobante_at is null then null
               when now() - x.comprobante_at <= make_interval(mins => public.regla('cancel_min', 10)) then 'pendiente' else 'sin_devolucion' end;
   if x.stock_descontado then perform public.mover_stock(x, 1); end if;
@@ -5122,7 +5123,7 @@ begin
   r := public.mp_api(tk, 'GET', '/v1/payments/search?sort=date_created&criteria=desc&external_reference=' || x.id::text);
   select e into pg from jsonb_array_elements(coalesce(r #> '{body,results}', '[]'::jsonb)) e
   where e ->> 'status' = 'approved' and e ->> 'external_reference' = x.id::text
-    and coalesce(e ->> 'currency_id', 'CLP') = 'CLP' and (e ->> 'transaction_amount')::numeric >= round(x.total) limit 1;
+    and coalesce(e ->> 'currency_id', 'CLP') = 'CLP' and (e ->> 'transaction_amount')::numeric >= round(coalesce(x.a_pagar, x.total)) limit 1;  -- G128: abono = a_pagar
   if pg is null then return x.estado; end if;
   perform public.mover_stock(x, -1);
   update public.pedidos set estado = 'preparando', pagado_at = now(), stock_descontado = true, motivo = null,
@@ -5450,7 +5451,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.88'::text $$;
+language sql immutable as $$ select '5.89'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -8238,7 +8239,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -9091,6 +9092,112 @@ revoke all on function public.cfx_msg_restantes(uuid), public.cfx_msg_enviar(uui
 grant execute on function public.cfx_msg_restantes(uuid), public.cfx_msg_enviar(uuid, text), public.cfx_msg_lista(), public.cfx_msg_sin_leer(),
   public.cfx_msg_hilo(uuid), public.cfx_msg_bloquear(uuid, boolean), public.cfx_msg_reportar(uuid, text), public.cfx_msg_borrar(uuid),
   public.cfx_msg_reportes(), public.cfx_msg_resolver(uuid, boolean) to authenticated;
+
+-- ---------- G128 💬 Chat DEL PEDIDO (hilo ligado a una referencia, no aparece en Mensajes) ----------
+-- Solo para clientes CON cuenta y su tienda. Sin cuenta: el enlace /r/ + WhatsApp. Es parte del pedido (no es el módulo 'chat').
+-- A los 7 días de cerrado el pedido se borran sus mensajes (cron diario 'cfx-hilos'); el pedido queda como registro.
+-- Ganchos que pone cada app que lo usa (sin ganchos todo responde "no disponible"):
+--   cfx_hilo_app(ref, u) jsonb   {"ok": bool, "tienda": bool, "cerrado": timestamptz|null, "existe": bool}
+--                                 ¿u participa en el hilo ref? (u null = la limpieza pregunta si existe y cuándo cerró)
+--   cfx_hilo_aviso_app(ref, de, texto) void  push al otro lado (con el link al pedido)
+create table if not exists public.cfx_hilos (
+  id      uuid primary key default gen_random_uuid(),
+  ref     text not null check (char_length(ref) between 3 and 80),
+  de      uuid not null references auth.users (id) on delete cascade,
+  tienda  boolean not null default false,
+  texto   text not null check (char_length(texto) between 1 and 1000),
+  creado  timestamptz not null default now(),
+  leido   timestamptz
+);
+create index if not exists cfx_hilos_ref_idx on public.cfx_hilos (ref, creado);
+create index if not exists cfx_hilos_de_idx on public.cfx_hilos (de, creado);
+alter table public.cfx_hilos enable row level security;
+revoke all on public.cfx_hilos from anon, authenticated;
+
+create or replace function public.cfx_hilo_quien(p_ref text, u uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare r jsonb;
+begin
+  if to_regprocedure('public.cfx_hilo_app(text,uuid)') is null or coalesce(p_ref, '') = '' then return jsonb_build_object('ok', false, 'existe', false); end if;
+  execute 'select public.cfx_hilo_app($1, $2)' into r using left(p_ref, 80), u;
+  return coalesce(r, jsonb_build_object('ok', false, 'existe', false));
+end $$;
+
+-- Ver el hilo (marca como leídos los del otro lado): {"ok", "abierto", "mensajes": [{id, mio, tienda, texto, creado, leido}]}.
+create or replace function public.cfx_hilo_ver(p_ref text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare q jsonb := public.cfx_hilo_quien(p_ref, auth.uid()); t boolean;
+begin
+  if auth.uid() is null or not coalesce((q ->> 'ok')::boolean, false) then return jsonb_build_object('ok', false, 'error', 'Chat no disponible para este pedido'); end if;
+  t := coalesce((q ->> 'tienda')::boolean, false);
+  update public.cfx_hilos set leido = now() where ref = p_ref and tienda <> t and leido is null;
+  return jsonb_build_object('ok', true, 'abierto', q ->> 'cerrado' is null, 'cerrado', q -> 'cerrado',
+    'mensajes', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'mio', m.de = auth.uid(), 'tienda', m.tienda, 'texto', m.texto,
+      'creado', m.creado, 'leido', m.leido) order by m.creado)
+      from (select * from public.cfx_hilos where ref = p_ref order by creado desc limit 200) m), '[]'));
+end $$;
+
+-- Escribir: hasta 1000 caracteres, 60 al día por persona y 200 por pedido. Se puede hasta que se borra (7 días después de cerrar).
+create or replace function public.cfx_hilo_enviar(p_ref text, p_texto text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare q jsonb := public.cfx_hilo_quien(p_ref, auth.uid()); t text := trim(coalesce(p_texto, '')); i uuid;
+begin
+  if auth.uid() is null or not coalesce((q ->> 'ok')::boolean, false) then return jsonb_build_object('ok', false, 'error', 'Chat no disponible para este pedido'); end if;
+  if t = '' then return jsonb_build_object('ok', false, 'error', 'Escribe un mensaje'); end if;
+  if char_length(t) > 1000 then return jsonb_build_object('ok', false, 'error', 'Máximo 1000 caracteres por mensaje'); end if;
+  if (q ->> 'cerrado') is not null and (q ->> 'cerrado')::timestamptz < now() - interval '7 days' then
+    return jsonb_build_object('ok', false, 'error', 'Este pedido cerró hace más de 7 días');
+  end if;
+  if (select count(*) from public.cfx_hilos where de = auth.uid() and creado > now() - interval '1 day') >= 60 then
+    return jsonb_build_object('ok', false, 'error', 'Llegaste al máximo de 60 mensajes por día');
+  end if;
+  if (select count(*) from public.cfx_hilos where ref = p_ref) >= 200 then
+    return jsonb_build_object('ok', false, 'error', 'Este pedido llegó a 200 mensajes: sigue por WhatsApp');
+  end if;
+  insert into public.cfx_hilos (ref, de, tienda, texto) values (p_ref, auth.uid(), coalesce((q ->> 'tienda')::boolean, false), t) returning id into i;
+  if to_regprocedure('public.cfx_hilo_aviso_app(text,uuid,text)') is not null then
+    begin execute 'select public.cfx_hilo_aviso_app($1, $2, $3)' using p_ref, auth.uid(), t; exception when others then null; end;
+  end if;
+  return jsonb_build_object('ok', true, 'id', i);
+end $$;
+
+-- Sin leer por hilo, para las listas: [{ref, n}] (solo los refs donde participo; máx. 300).
+create or replace function public.cfx_hilos_sin_leer(p_refs text[]) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then return '[]'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('ref', z.ref, 'n', z.n)) from (
+    select r.ref, (select count(*)::int from public.cfx_hilos h where h.ref = r.ref and h.leido is null and h.tienda <> (w.q ->> 'tienda')::boolean) n
+    from (select distinct x as ref from unnest((coalesce(p_refs, '{}'::text[]))[1:300]) x
+          where exists (select 1 from public.cfx_hilos h where h.ref = x and h.leido is null)) r
+    cross join lateral (select public.cfx_hilo_quien(r.ref, auth.uid()) q) w
+    where coalesce((w.q ->> 'ok')::boolean, false)) z where z.n > 0), '[]');
+end $$;
+
+-- Cada noche: borra los mensajes de pedidos cerrados hace más de 7 días (o que ya no existen).
+create or replace function public.cfx_hilos_limpiar() returns int
+language plpgsql security definer set search_path = '' as $$
+declare r text; q jsonb; n int := 0; k int;
+begin
+  for r in select distinct ref from public.cfx_hilos loop
+    q := public.cfx_hilo_quien(r, null);
+    if not coalesce((q ->> 'existe')::boolean, false) or ((q ->> 'cerrado') is not null and (q ->> 'cerrado')::timestamptz < now() - interval '7 days') then
+      delete from public.cfx_hilos where ref = r;
+      get diagnostics k = row_count; n := n + k;
+    end if;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.cfx_hilo_quien(text, uuid), public.cfx_hilos_limpiar() from public, anon, authenticated;
+revoke all on function public.cfx_hilo_ver(text), public.cfx_hilo_enviar(text, text), public.cfx_hilos_sin_leer(text[]) from public, anon;
+grant execute on function public.cfx_hilo_ver(text), public.cfx_hilo_enviar(text, text), public.cfx_hilos_sin_leer(text[]) to authenticated;
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'cfx-hilos';
+  perform cron.schedule('cfx-hilos', '52 7 * * *', 'select public.cfx_hilos_limpiar()');
+exception when others then
+  raise notice 'Limpieza del chat de pedidos no programada (%).', sqlerrm;
+end $$;
 -- ---------- Calificaciones en dos direcciones (C15): el cliente califica al negocio y el negocio al cliente (módulo 'calificaciones') ----------
 -- Una calificación por "ref" (pedido, reserva, arriendo…) y por lado. Estrellas 1-5 y comentario opcional (300).
 -- Gancho que pone cada app que las usa (y 'calificaciones' en cfx_modulos_app()):
@@ -13408,17 +13515,17 @@ begin
   select token into tk from public.mp_cuentas where owner_id = x.negocio_id and activo;
   if p_medio = 'flow' or (tk is null and coalesce(p_medio, '') <> 'mp') then
     select coalesce(nullif(trim(empresa), ''), 'Tienda') into t from public.profiles where id = x.negocio_id;
-    r := public.cfx_flow_neg_cobro(x.negocio_id, 'pedido:' || x.id, left('Pedido en ' || t, 120), round(x.total)::int, p_volver, x.retenido_hasta);
+    r := public.cfx_flow_neg_cobro(x.negocio_id, 'pedido:' || x.id, left('Pedido en ' || t, 120), round(coalesce(x.a_pagar, x.total))::int, p_volver, x.retenido_hasta);
     if (r ->> 'ok')::boolean then update public.pedidos set mp_desde = coalesce(mp_desde, now()) where id = x.id; end if;
     return r;
   end if;
   if tk is null then return jsonb_build_object('ok', false, 'error', 'La tienda no tiene Mercado Pago activo'); end if;
-  if round(x.total) < 1 then return jsonb_build_object('ok', false, 'error', 'Monto no válido'); end if;
+  if round(coalesce(x.a_pagar, x.total)) < 1 then return jsonb_build_object('ok', false, 'error', 'Monto no válido'); end if;
   if v !~ '^https://[^\s"<>]+$' then v := null; end if;
   select coalesce(nullif(trim(empresa), ''), 'Tienda') into t from public.profiles where id = x.negocio_id;
   r := public.mp_api(tk, 'POST', '/checkout/preferences', jsonb_build_object(
-    'items', jsonb_build_array(jsonb_build_object('id', x.id, 'title', left('Pedido en ' || t, 120), 'quantity', 1,
-                                                  'currency_id', 'CLP', 'unit_price', round(x.total))),
+    'items', jsonb_build_array(jsonb_build_object('id', x.id, 'title', left(case when x.cobro = 'abono' then 'Abono pedido en ' else 'Pedido en ' end || t, 120), 'quantity', 1,
+                                                  'currency_id', 'CLP', 'unit_price', round(coalesce(x.a_pagar, x.total)))),
     'external_reference', x.id::text,
     'payment_methods', jsonb_build_object('excluded_payment_types', jsonb_build_array(jsonb_build_object('id', 'ticket'))),
     'expires', true,
@@ -13445,3 +13552,377 @@ end $$;
 revoke all on function public.pedido_pagado_auto(uuid, text, text), public.cfx_mp_neg_pagado_app(text, text, int) from public, anon, authenticated;
 revoke all on function public.mp_pagar(text, text, text) from public, anon;
 grant execute on function public.mp_pagar(text, text, text), public.mp_revisar(text) to anon, authenticated;
+
+-- =====================================================================
+--  G128 🛒 COBRO DE PEDIDOS. a) 🏦 transferencia (datos_pago) = medio → 'pagando' + comprobante + la tienda aprueba ·
+--  b) por ítem ⚡ Pagar ahora (de fábrica) / 💵 Abono % / 💰 Pagar al retirar · c) tipo 📦 producto / 🛠️ servicio (sin stock ni despacho) /
+--  🔑 acceso digital (se entrega al aprobarse el pago) · d) sin ningún medio → "💰 Pagas al retirar" · e) 💬 chat DEL pedido (solo con cuenta,
+--  núcleo cfx_hilo_*). Pedidos viejos: cobro null = ⚡ pagar ahora; a_pagar null = total. La BASE calcula todo.
+-- =====================================================================
+alter table public.catalog_items add column if not exists tipo text not null default 'producto';
+alter table public.catalog_items add column if not exists cobro text not null default 'ahora';
+alter table public.catalog_items add column if not exists abono_pct int;
+alter table public.catalog_items add column if not exists acceso text;
+alter table public.catalog_items drop constraint if exists catalog_items_g128_check;
+alter table public.catalog_items add constraint catalog_items_g128_check check (tipo in ('producto', 'servicio', 'digital') and cobro in ('ahora', 'abono', 'retiro')
+  and (abono_pct is null or abono_pct between 10 and 90) and (acceso is null or char_length(acceso) <= 500));
+alter table public.pedidos add column if not exists cobro text;
+alter table public.pedidos add column if not exists a_pagar numeric(12, 2);
+alter table public.pedidos add column if not exists abonado_at timestamptz;
+alter table public.pedidos add column if not exists accesos jsonb;
+alter table public.pedidos drop constraint if exists pedidos_cobro_check;
+alter table public.pedidos add constraint pedidos_cobro_check check (cobro is null or cobro in ('ahora', 'abono', 'retiro'));
+
+-- Reglas fijas del ítem: 🔑 digital siempre se paga ahora; 🛠️ servicio y 🔑 digital no llevan stock; abono 10–90 % (50 de fábrica).
+create or replace function public.catalog_venta_fija() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.tipo is null or new.tipo not in ('producto', 'servicio', 'digital') then new.tipo := 'producto'; end if;
+  if new.cobro is null or new.cobro not in ('ahora', 'abono', 'retiro') then new.cobro := 'ahora'; end if;
+  if new.tipo = 'digital' then new.cobro := 'ahora'; end if;
+  if new.tipo <> 'producto' then new.stock := null; end if;
+  new.abono_pct := case when new.cobro = 'abono' then least(90, greatest(10, coalesce(new.abono_pct, 50))) end;
+  new.acceso := case when new.tipo = 'digital' then nullif(left(trim(coalesce(new.acceso, '')), 500), '') end;
+  return new;
+end $$;
+revoke all on function public.catalog_venta_fija() from public, anon, authenticated;
+drop trigger if exists catalog_venta_fija on public.catalog_items;
+create trigger catalog_venta_fija before insert or update on public.catalog_items for each row execute function public.catalog_venta_fija();
+
+-- El dueño elige tipo y forma de pago de un producto publicado. p = { tipo, cobro, abono, acceso }.
+create or replace function public.catalogo_venta(p_key text, p jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare tp text := coalesce(nullif(p ->> 'tipo', ''), 'producto'); cb text := coalesce(nullif(p ->> 'cobro', ''), 'ahora'); pc int; ac text := nullif(trim(coalesce(p ->> 'acceso', '')), ''); r public.catalog_items;
+begin
+  if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
+  if tp not in ('producto', 'servicio', 'digital') then raise exception 'Tipo no válido'; end if;
+  if cb not in ('ahora', 'abono', 'retiro') then raise exception 'Forma de pago no válida'; end if;
+  if tp = 'digital' then cb := 'ahora'; end if;
+  if cb = 'abono' then
+    if coalesce(p ->> 'abono', '') !~ '^\d{1,2}$' or (p ->> 'abono')::int not between 10 and 90 then raise exception 'El abono va de 10 a 90 %%'; end if;
+    pc := (p ->> 'abono')::int;
+  end if;
+  if tp = 'digital' and ac is null then raise exception 'Escribe lo que recibe el cliente al pagar (link, código o instrucciones)'; end if;
+  if char_length(coalesce(ac, '')) > 500 then raise exception 'El acceso tiene máximo 500 caracteres'; end if;
+  update public.catalog_items set tipo = tp, cobro = cb, abono_pct = pc, acceso = ac, updated_at = now()
+  where owner_id = auth.uid() and client_key = left(coalesce(p_key, ''), 80) returning * into r;
+  if r.id is null then raise exception 'Primero marca "Mostrar en mi catálogo" y guarda el producto'; end if;
+  return jsonb_build_object('tipo', r.tipo, 'cobro', r.cobro, 'abono', r.abono_pct, 'acceso', r.acceso);
+end $$;
+create or replace function public.catalogo_venta_ver(p_key text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('tipo', c.tipo, 'cobro', c.cobro, 'abono', c.abono_pct, 'acceso', c.acceso)
+  from public.catalog_items c where c.owner_id = auth.uid() and c.client_key = p_key
+$$;
+-- Lo que el carrito necesita saber (nunca el acceso digital): solo los ítems que no son "📦 producto ⚡ pagar ahora".
+create or replace function public.catalogo_venta_publica(p_slug text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('clave', c.client_key, 'tipo', c.tipo, 'cobro', c.cobro, 'abono', c.abono_pct)), '[]'::jsonb)
+  from public.catalog_items c join public.profiles t on t.id = c.owner_id
+  where t.slug = lower(trim(coalesce(p_slug, ''))) and t.role = 'user' and not t.suspended and (c.tipo <> 'producto' or c.cobro <> 'ahora')
+$$;
+create or replace function public.catalogo_venta_negocio(p_negocio uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('clave', c.client_key, 'tipo', c.tipo, 'cobro', c.cobro, 'abono', c.abono_pct)), '[]'::jsonb)
+  from public.catalog_items c join public.profiles t on t.id = c.owner_id
+  where c.owner_id = p_negocio and t.role = 'user' and not t.suspended and (c.tipo <> 'producto' or c.cobro <> 'ahora')
+$$;
+revoke all on function public.catalogo_venta(text, jsonb), public.catalogo_venta_ver(text), public.catalogo_venta_publica(text), public.catalogo_venta_negocio(uuid) from public, anon;
+grant execute on function public.catalogo_venta(text, jsonb), public.catalogo_venta_ver(text), public.catalogo_venta_negocio(uuid) to authenticated;
+grant execute on function public.catalogo_venta_publica(text) to anon, authenticated;
+
+-- a) 🏦 La transferencia también es un medio: con datos_pago el pedido queda por pagar (comprobante + la tienda aprueba).
+--    link.transferencia = true · link.mp = hay pago automático · link.medios = { mp, flow } · sin nada = null (💰 paga al retirar).
+create or replace function public.link_activo(o uuid, t text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select case when t <> 'pedido' then s.l
+    when m.mp or m.flow then coalesce(s.l, '{}'::jsonb) || jsonb_build_object('mp', true, 'medios', jsonb_build_object('mp', m.mp, 'flow', m.flow)) || m.tr
+    when m.tr <> '{}'::jsonb then coalesce(s.l, '{}'::jsonb) || m.tr
+    else s.l end
+  from (select (select jsonb_build_object('titulo', titulo, 'url', url, 'precio', precio) from public.links_pago
+                where owner_id = o and tipo = t and activo and url <> '' limit 1) as l) s,
+       (select exists (select 1 from public.mp_cuentas c where c.owner_id = o and c.activo) as mp, public.cfx_flow_neg_on(o) as flow,
+               case when exists (select 1 from public.profiles p where p.id = o and coalesce(trim(p.datos_pago), '') <> '') then '{"transferencia": true}'::jsonb
+                    else '{}'::jsonb end as tr) m
+$$;
+
+-- El pedido: p_cobro = 'ahora' (de fábrica) | 'abono' | 'retiro'. La base revisa que esté permitido y calcula a_pagar.
+drop function if exists public.guardar_pedido(uuid, uuid, text, text, jsonb, text, text, text, text);
+create or replace function public.guardar_pedido(p_negocio uuid, p_cliente uuid, p_nombre text, p_tel text, p_items jsonb, p_entrega text,
+                                                 p_direccion text, p_nota text, p_cupon text, p_cobro text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare a jsonb; pct int := 0; desc_ numeric := 0; dp numeric := 0; sub numeric; ped public.pedidos; l jsonb := public.link_activo(p_negocio, 'pedido');
+  quien text; prem boolean := public.es_cliente_premium(p_cliente); dsp jsonb; gc public.giftcards; gm int := 0;
+  cb text := coalesce(nullif(p_cobro, ''), 'ahora'); ent text := p_entrega; ln jsonb; lin jsonb := '[]'::jsonb; vt text; vc text; vp int; s numeric;
+  fis boolean := false; base numeric := 0; ya numeric := 0; todo_retiro boolean := true; hay_abono boolean := false; costo numeric; tot numeric; pagar numeric;
+begin
+  if public.en_vacaciones(p_negocio) then return jsonb_build_object('ok', false, 'error', 'La tienda está de vacaciones. Podrás pedir a su regreso.'); end if;
+  if cb not in ('ahora', 'abono', 'retiro') then return jsonb_build_object('ok', false, 'error', 'Elige cómo pagas'); end if;
+  a := public.armar_pedido(p_negocio, p_items);
+  if a ? 'error' then return jsonb_build_object('ok', false, 'error', a ->> 'error'); end if;
+  -- Tipo y forma de pago de cada línea (lo viejo y las ofertas = 📦 producto ⚡ pagar ahora).
+  for ln in select * from jsonb_array_elements(a -> 'lineas') loop
+    vt := null; vc := null; vp := null;
+    select c.tipo, c.cobro, c.abono_pct into vt, vc, vp from public.catalog_items c where c.owner_id = p_negocio and c.client_key = ln ->> 'clave';
+    vt := coalesce(vt, 'producto'); vc := coalesce(vc, 'ahora'); s := coalesce((ln ->> 'subtotal')::numeric, 0);
+    lin := lin || (ln || jsonb_build_object('tipo', vt, 'cobro', vc) || case when vc = 'abono' then jsonb_build_object('abono', vp) else '{}'::jsonb end);
+    fis := fis or vt = 'producto'; base := base + s;
+    ya := ya + case vc when 'abono' then s * coalesce(vp, 50) / 100.0 when 'retiro' then 0 else s end;
+    todo_retiro := todo_retiro and vc = 'retiro'; hay_abono := hay_abono or vc = 'abono';
+  end loop;
+  a := jsonb_set(a, '{lineas}', lin);
+  -- 🛠️ Solo servicios o 🔑 accesos: sin despacho.
+  if not fis then ent := 'retiro';
+  else
+    if ent not in ('retiro', 'despacho') then return jsonb_build_object('ok', false, 'error', 'Elige despacho o retiro en tienda'); end if;
+    if ent = 'despacho' and coalesce(trim(p_direccion), '') = '' then return jsonb_build_object('ok', false, 'error', 'Escribe la dirección de despacho'); end if;
+    if ent = 'retiro' and not coalesce((select (despacho ->> 'retiro')::boolean from public.profiles where id = p_negocio), true) then
+      return jsonb_build_object('ok', false, 'error', 'Esta tienda no tiene retiro: elige despacho');
+    end if;
+  end if;
+  sub := (a ->> 'sub')::numeric;
+  if coalesce(trim(p_cupon), '') <> '' then
+    pct := public.cfx_desc_pct(p_negocio, p_cupon);
+    if pct is null then
+      gc := public.giftcard_valida(p_negocio, p_cupon);
+      if gc.id is null then return jsonb_build_object('ok', false, 'error', 'Cupón o gift card no válido o vencido'); end if;
+      pct := 0;
+    end if;
+    desc_ := round(sub * pct / 100.0);
+  end if;
+  if prem then dp := round(sub * coalesce((select desc_premium from public.profiles where id = p_negocio), 0) / 100.0); end if;
+  dp := least(dp, sub - desc_);
+  dsp := public.costo_despacho(p_negocio, ent, p_direccion, sub - desc_ - dp);
+  if dsp ? 'error' then return jsonb_build_object('ok', false, 'error', dsp ->> 'error'); end if;
+  costo := coalesce((dsp ->> 'costo')::numeric, 0);
+  if costo > 0 then
+    a := jsonb_set(a, '{lineas}', (a -> 'lineas') || jsonb_build_object('nombre', '🚚 ' || coalesce(dsp ->> 'servicio', 'Despacho') || ' a ' || (dsp ->> 'comuna'), 'cant', 1, 'precio', costo,
+      'subtotal', costo, 'clave', 'despacho', 'opcion', null));
+  end if;
+  if gc.id is not null then gm := least(gc.saldo, greatest(0, sub - desc_ - dp + costo))::int; end if;
+  tot := sub - desc_ - dp + costo - gm;
+  -- 💳 Cómo paga (d: sin ningún medio, paga al retirar/recibir).
+  if l is null then cb := 'retiro';
+  elsif cb = 'retiro' and not (todo_retiro and ent = 'retiro') then return jsonb_build_object('ok', false, 'error', 'Este pedido se paga en línea: elige ⚡ Pagar ahora');
+  elsif cb = 'abono' and not hay_abono then return jsonb_build_object('ok', false, 'error', 'Este pedido no tiene abono: elige ⚡ Pagar ahora');
+  end if;
+  pagar := case when tot <= 0 or cb = 'retiro' then 0
+                when cb = 'abono' and base > 0 then least(tot, greatest(1, round((tot - costo) * ya / base) + costo))
+                else tot end;
+  if cb = 'abono' and pagar >= tot then cb := 'ahora'; end if;
+  insert into public.pedidos (negocio_id, cliente_id, invitado_nombre, invitado_tel, lineas, subtotal, descuento, desc_premium, total, cupon, entrega, direccion, nota,
+                              estado, retenido_hasta, token, costo_despacho, comuna, gift_codigo, gift_monto, cobro, a_pagar)
+  values (p_negocio, p_cliente, p_nombre, p_tel, a -> 'lineas', sub, desc_ + dp + gm, dp, tot,
+          nullif(upper(regexp_replace(coalesce(p_cupon, ''), '[^A-Za-z0-9]', '', 'g')), ''), ent,
+          case when ent = 'despacho' then left(trim(p_direccion), 200) end, nullif(left(trim(coalesce(p_nota, '')), 300), ''),
+          case when pagar > 0 then 'pagando' else 'recibido' end,
+          case when pagar > 0 then now() + make_interval(mins => public.regla('retencion_min', 30)) end,
+          left(replace(gen_random_uuid()::text, '-', ''), 24), costo, dsp ->> 'comuna', gc.codigo, gm, cb, pagar)
+  returning * into ped;
+  if pct > 0 then perform public.cfx_desc_usar(p_negocio, p_cupon); end if;
+  if gm > 0 then
+    update public.giftcards set saldo = saldo - gm where id = gc.id;
+    insert into public.giftcard_usos (giftcard_id, monto, pedido_id, donde) values (gc.id, gm, ped.id, 'pedido');
+  end if;
+  quien := coalesce(p_nombre, (select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = p_cliente));
+  perform public.notify_user(p_negocio, case when prem then '⭐ ' else '' end ||
+    case when pagar > 0 then '⏳ Pedido por pagar de ' when cb = 'retiro' and tot > 0 then '💰 Nuevo pedido (paga al retirar) de ' else '📦 Nuevo pedido de ' end || quien,
+    'Total $' || to_char(ped.total, 'FM999G999G999') || case when cb = 'abono' then ' · abono $' || to_char(pagar, 'FM999G999G999') else '' end || ' · ' ||
+    case when not fis then 'Sin envío' when ent = 'despacho' then 'Despacho' else 'Retiro en tienda' end ||
+    case when prem then ' · Cliente Premium' else '' end, 'apps/pedidos/');
+  if pagar <= 0 then
+    perform public.notify_user(e.id, '📦 Pedido para preparar', quien || ' · Total $' || to_char(ped.total, 'FM999G999G999'), 'apps/pedidos/')
+    from public.profiles e where e.role = 'equipo' and e.negocio_id = p_negocio and not e.suspended;
+  end if;
+  return jsonb_build_object('ok', true, 'id', ped.id, 'token', ped.token, 'subtotal', ped.subtotal, 'descuento', ped.descuento, 'desc_premium', ped.desc_premium,
+    'total', ped.total, 'despacho', ped.costo_despacho, 'gift', ped.gift_monto, 'estado', ped.estado, 'retenido_hasta', ped.retenido_hasta, 'link', l,
+    'cobro', ped.cobro, 'a_pagar', ped.a_pagar, 'entrega', ped.entrega);
+exception when others then
+  return jsonb_build_object('status', 0, 'error', sqlerrm);
+end $$;
+revoke all on function public.guardar_pedido(uuid, uuid, text, text, jsonb, text, text, text, text, text) from public, anon, authenticated;
+
+drop function if exists public.crear_pedido(uuid, jsonb, text, text, text, text);
+create or replace function public.crear_pedido(p_negocio uuid, p_items jsonb, p_entrega text, p_direccion text,
+                                               p_nota text, p_cupon text, p_cobro text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r jsonb;
+begin
+  if not public.puede_comprar(auth.uid(), p_negocio) then return jsonb_build_object('ok', false, 'error', 'No puedes pedirle a esta tienda'); end if;
+  if (select count(*) from public.pedidos where cliente_id = auth.uid() and created_at > now() - interval '1 day') >= 20 then
+    return jsonb_build_object('ok', false, 'error', 'Máximo 20 pedidos por día');
+  end if;
+  r := public.guardar_pedido(p_negocio, auth.uid(), null, null, p_items, p_entrega, p_direccion, p_nota, p_cupon, p_cobro);
+  if (r ->> 'ok')::boolean then perform public.cfx_carrito_vaciar(auth.uid(), p_negocio); end if;
+  return r;
+end $$;
+revoke all on function public.crear_pedido(uuid, jsonb, text, text, text, text, text) from public, anon;
+grant execute on function public.crear_pedido(uuid, jsonb, text, text, text, text, text) to authenticated;
+
+drop function if exists public.crear_pedido_invitado(text, text, text, jsonb, text, text, text, text);
+create or replace function public.crear_pedido_invitado(p_slug text, p_nombre text, p_tel text, p_items jsonb, p_entrega text,
+                                                        p_direccion text, p_nota text, p_humano text default null, p_cobro text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare t uuid; nom text := left(trim(coalesce(p_nombre, '')), 60); tel text := regexp_replace(coalesce(p_tel, ''), '\D', '', 'g');
+begin
+  select id into t from public.profiles where slug = lower(trim(coalesce(p_slug, ''))) and role = 'user' and not suspended;
+  if t is null then return jsonb_build_object('ok', false, 'error', 'Tienda no encontrada'); end if;
+  if not public.cfx_humano_ok(p_humano) then return jsonb_build_object('ok', false, 'error', 'Confirma que no eres un robot y vuelve a intentar'); end if;
+  if nom = '' then return jsonb_build_object('ok', false, 'error', 'Escribe tu nombre'); end if;
+  if length(tel) < 8 or length(tel) > 15 then return jsonb_build_object('ok', false, 'error', 'Escribe tu WhatsApp (con código de país, ej: 56912345678)'); end if;
+  if (select count(*) from public.pedidos where negocio_id = t and invitado_tel = tel and estado in ('pagando', 'en_revision', 'recibido')) >= 3 then
+    return jsonb_build_object('ok', false, 'error', 'Ya tienes 3 pedidos pendientes en esta tienda');
+  end if;
+  if (select count(*) from public.pedidos where negocio_id = t and cliente_id is null and created_at > now() - interval '1 hour') >= 30 then
+    return jsonb_build_object('ok', false, 'error', 'La tienda recibió muchos pedidos seguidos. Intenta en un rato.');
+  end if;
+  return public.guardar_pedido(t, null, nom, tel, p_items, p_entrega, p_direccion, p_nota, null, p_cobro);
+end $$;
+revoke all on function public.crear_pedido_invitado(text, text, text, jsonb, text, text, text, text, text) from public;
+grant execute on function public.crear_pedido_invitado(text, text, text, jsonb, text, text, text, text, text) to anon, authenticated;
+
+-- 💵 Abono aprobado ≠ pago completo (el resto se cobra al entregar) · 💰 entregado = pagado · 🔑 pago aprobado = se entrega el acceso.
+create or replace function public.pedido_g128() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare ac jsonb;
+begin
+  if new.cobro = 'abono' and new.pagado_at is not null and old.pagado_at is null and new.abonado_at is null and new.estado <> 'entregado' then
+    new.abonado_at := new.pagado_at; new.pagado_at := null;
+  end if;
+  if new.cobro in ('abono', 'retiro') and new.estado = 'entregado' and old.estado <> 'entregado' and new.pagado_at is null then new.pagado_at := now(); end if;
+  if new.accesos is null and new.estado in ('preparando', 'listo', 'en_camino', 'entregado')
+     and (new.pagado_at is not null or new.abonado_at is not null or new.estado = 'entregado' or new.total <= 0) then
+    select jsonb_agg(jsonb_build_object('nombre', l ->> 'nombre', 'acceso', c.acceso)) into ac
+    from jsonb_array_elements(new.lineas) l join public.catalog_items c on c.owner_id = new.negocio_id and c.client_key = l ->> 'clave'
+    where l ->> 'tipo' = 'digital' and c.tipo = 'digital' and c.acceso is not null;
+    if ac is not null then
+      new.accesos := ac;
+      -- Solo accesos digitales: queda entregado al tiro.
+      if not exists (select 1 from jsonb_array_elements(new.lineas) l where coalesce(l ->> 'tipo', 'producto') <> 'digital') then
+        new.estado := 'entregado'; new.pagado_at := coalesce(new.pagado_at, now());
+      end if;
+    end if;
+  end if;
+  return new;
+end $$;
+create or replace function public.pedido_g128_aviso() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.accesos is not null and old.accesos is null then
+    perform public.aviso_cliente(new, '🔑 Tu acceso digital está listo', 'Ábrelo en el detalle de tu pedido');
+  end if;
+  return null;
+end $$;
+revoke all on function public.pedido_g128(), public.pedido_g128_aviso() from public, anon, authenticated;
+drop trigger if exists pedido_g128 on public.pedidos;
+create trigger pedido_g128 before update on public.pedidos for each row execute function public.pedido_g128();
+drop trigger if exists pedido_g128_aviso on public.pedidos;
+create trigger pedido_g128_aviso after update of accesos on public.pedidos for each row execute function public.pedido_g128_aviso();
+
+-- e) 💬 Chat DEL pedido (núcleo cfx_hilo_*): solo el cliente CON cuenta y la tienda (dueño o equipo). ref = 'pedido:<id>'.
+create or replace function public.cfx_hilo_app(p_ref text, u uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x public.pedidos;
+begin
+  if coalesce(p_ref, '') !~ '^pedido:[0-9a-f-]{36}$' then return jsonb_build_object('ok', false, 'existe', false); end if;
+  select * into x from public.pedidos where id = substr(p_ref, 8)::uuid;
+  if x.id is null or x.cliente_id is null then return jsonb_build_object('ok', false, 'existe', false); end if;
+  return jsonb_build_object('existe', true,
+    'cerrado', case when x.estado in ('entregado', 'cancelado', 'rechazado', 'expirado') then x.updated_at end,
+    'ok', u is not null and (u = x.cliente_id or public.negocio_de(u) is not distinct from x.negocio_id),
+    'tienda', u is not null and u <> x.cliente_id and public.negocio_de(u) is not distinct from x.negocio_id);
+end $$;
+create or replace function public.cfx_hilo_aviso_app(p_ref text, p_de uuid, p_texto text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare x public.pedidos;
+begin
+  select * into x from public.pedidos where id = substr(p_ref, 8)::uuid;
+  if x.id is null then return; end if;
+  if p_de = x.cliente_id then
+    perform public.notify_user(x.negocio_id, '💬 ' || coalesce((select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = x.cliente_id), 'Un cliente') ||
+      ' escribió por su pedido', left(p_texto, 120), 'apps/pedidos/');
+  else
+    perform public.aviso_cliente(x, '💬 La tienda te respondió', left(p_texto, 120));
+  end if;
+end $$;
+revoke all on function public.cfx_hilo_app(text, uuid), public.cfx_hilo_aviso_app(text, uuid, text) from public, anon, authenticated;
+
+-- G128: lo que ven el cliente, el comprador sin cuenta y la tienda (cobro, monto a pagar ahora, si ya está pagado, accesos y token para 📲 enviar el enlace).
+--   pagado = pago completo (⚡ aprobado o entregado) · abonado = 💵 abono aprobado · servicio/digital = todo el pedido es de ese tipo.
+create or replace function public.ver_pedido(p_ref text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x public.pedidos := public.pedido_ref(p_ref); t public.profiles;
+begin
+  if x.id is null then return null; end if;
+  select * into t from public.profiles where id = x.negocio_id;
+  return jsonb_build_object('id', x.id, 'token', x.token, 'estado', x.estado, 'lineas', x.lineas, 'subtotal', x.subtotal, 'descuento', x.descuento,
+    'desc_premium', x.desc_premium, 'total', x.total, 'entrega', x.entrega, 'direccion', x.direccion, 'nota', x.nota, 'fecha', x.created_at,
+    'retenido_hasta', x.retenido_hasta, 'rechazos', x.rechazos,
+    'tiene_comprobante', x.comprobante is not null, 'devolucion', x.devolucion, 'motivo', x.motivo, 'nombre', x.invitado_nombre,
+    'tienda', jsonb_build_object('nombre', t.empresa, 'slug', t.slug, 'logo', t.logo, 'color', t.color, 'telefono', t.telefono, 'datos_pago', t.datos_pago),
+    'link', case when x.estado = 'pagando' then public.link_activo(x.negocio_id, 'pedido') end,
+    'cancel_min', public.regla('cancel_min', 10),
+    'calificado', public.cfx_calif_hecha(x.id::text, false),
+    'boleta', case when x.boleta_folio is not null then public.boleta_de(x) end,
+    'envio', public.envio_de(x), 'con_correo', x.cliente_id is not null or x.invitado_correo is not null,
+    'cobro', coalesce(x.cobro, 'ahora'), 'a_pagar', coalesce(x.a_pagar, x.total), 'pagado', x.pagado_at is not null, 'abonado', x.abonado_at is not null,
+    'accesos', x.accesos, 'con_cuenta', x.cliente_id is not null, 'servicio', public.pedido_solo(x.lineas, 'servicio'), 'digital', public.pedido_solo(x.lineas, 'digital'));
+end $$;
+
+-- ¿Todas las líneas (sin el despacho) son de este tipo? (líneas viejas sin tipo = 📦 producto)
+create or replace function public.pedido_solo(p_lineas jsonb, p_tipo text) returns boolean
+language sql immutable set search_path = '' as $$
+  select coalesce(bool_and(coalesce(l ->> 'tipo', 'producto') = p_tipo), false) from jsonb_array_elements(coalesce(p_lineas, '[]'::jsonb)) l where l ->> 'clave' is distinct from 'despacho'
+$$;
+revoke all on function public.pedido_solo(jsonb, text) from public, anon, authenticated;
+
+drop function if exists public.mis_pedidos(uuid);
+create or replace function public.mis_pedidos(p_negocio uuid default null)
+returns table (id uuid, negocio text, lineas jsonb, subtotal numeric, descuento numeric, total numeric, cupon text,
+               entrega text, direccion text, nota text, estado text, fecha timestamptz, actualizado timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, calificado boolean, token text,
+               desc_premium numeric, motivo text, rechazos int, boleta jsonb, envio jsonb,
+               cobro text, a_pagar numeric, pagado boolean, abonado boolean, accesos jsonb, servicio boolean, digital boolean)
+language sql stable security definer set search_path = '' as $$
+  select x.id, t.empresa, x.lineas, x.subtotal, x.descuento, x.total, x.cupon,
+         x.entrega, x.direccion, x.nota, x.estado, x.created_at, x.updated_at, x.retenido_hasta, x.comprobante is not null, x.devolucion,
+         public.cfx_calif_hecha(x.id::text, false), x.token, x.desc_premium, x.motivo, x.rechazos,
+         case when x.boleta_folio is not null then public.boleta_de(x) end, public.envio_de(x),
+         coalesce(x.cobro, 'ahora'), coalesce(x.a_pagar, x.total), x.pagado_at is not null, x.abonado_at is not null, x.accesos,
+         public.pedido_solo(x.lineas, 'servicio'), public.pedido_solo(x.lineas, 'digital')
+  from public.pedidos x join public.profiles t on t.id = x.negocio_id
+  where x.cliente_id = auth.uid() and (p_negocio is null or x.negocio_id = p_negocio)
+  order by x.created_at desc limit 50
+$$;
+revoke all on function public.mis_pedidos(uuid) from public, anon;
+grant execute on function public.mis_pedidos(uuid) to authenticated;
+
+drop function if exists public.pedidos_tienda(text);
+create or replace function public.pedidos_tienda(p_estado text default null)
+returns table (id uuid, cliente_id uuid, cliente text, telefono text, lineas jsonb, subtotal numeric, descuento numeric,
+               total numeric, cupon text, entrega text, direccion text, nota text, estado text, fecha timestamptz,
+               retenido_hasta timestamptz, tiene_comprobante boolean, devolucion text, invitado boolean, calificado boolean, cliente_estrellas numeric,
+               premium boolean, desc_premium numeric, rechazos int, motivo text, boleta jsonb, medio text, envio jsonb,
+               cobro text, a_pagar numeric, pagado boolean, abonado boolean, token text, servicio boolean, digital boolean)
+language sql stable security definer set search_path = '' as $$
+  select x.id, x.cliente_id, coalesce(nullif(c.empresa, ''), split_part(c.email, '@', 1), x.invitado_nombre, 'Cliente'),
+         coalesce(c.telefono, x.invitado_tel), x.lineas, x.subtotal, x.descuento, x.total, x.cupon, x.entrega, x.direccion, x.nota, x.estado,
+         x.created_at, x.retenido_hasta, x.comprobante is not null, x.devolucion, x.cliente_id is null,
+         public.cfx_calif_hecha(x.id::text, true),
+         (public.cfx_calif_cliente(x.cliente_id, case when x.cliente_id is null then x.invitado_tel end) ->> 'promedio')::numeric,
+         pr.premium, x.desc_premium, x.rechazos, x.motivo, public.boleta_de(x),
+         case when x.mp_pago is not null then 'mercadopago' when x.comprobante_at is not null then 'transferencia' end, public.envio_de(x),
+         coalesce(x.cobro, 'ahora'), coalesce(x.a_pagar, x.total), x.pagado_at is not null, x.abonado_at is not null, x.token,
+         public.pedido_solo(x.lineas, 'servicio'), public.pedido_solo(x.lineas, 'digital')
+  from public.pedidos x left join public.profiles c on c.id = x.cliente_id
+  cross join lateral (select c.role = 'client' and public.is_pro(c.id) as premium) pr
+  where x.negocio_id = public.negocio_de(auth.uid())
+    and (p_estado is null or (p_estado = 'activos' and x.estado in ('recibido', 'preparando', 'listo', 'en_camino'))
+         or (p_estado = 'revisar' and x.estado = 'en_revision') or (p_estado = 'pagando' and x.estado = 'pagando')
+         or (p_estado = 'devolver' and x.devolucion = 'pendiente')
+         or (p_estado = 'historial' and x.estado in ('entregado', 'cancelado', 'rechazado', 'expirado')) or x.estado = p_estado)
+  order by (coalesce(pr.premium, false) and x.estado in ('pagando', 'en_revision', 'recibido', 'preparando', 'listo', 'en_camino')) desc, x.created_at desc
+  limit 300
+$$;
+revoke all on function public.pedidos_tienda(text) from public, anon;
+grant execute on function public.pedidos_tienda(text) to authenticated;

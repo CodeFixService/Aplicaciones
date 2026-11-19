@@ -187,6 +187,7 @@
       <div class="stats" id="hoyStats"></div>
       <div class="card hidden" id="hoyStock" style="border-color:#f59e0b"></div>
       <div class="card hidden" id="hoyRecuperar"><h2>🔎 Para vender más</h2><p class="muted" id="hoyRecuperarC" style="margin-top:-4px"></p><div id="hoyRecuperarL"></div></div>
+      <div id="hoySinMedio"></div>
       <div class="card hidden" id="hoyFalta" data-cfx-guia-propia><div class="row" style="align-items:center;margin:0 0 6px"><h2 style="flex:2;margin:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🚀 Tu tienda en 5 minutos</h2><button type="button" class="alt small" id="hoyFaltaX" aria-label="Ocultar hasta tu próximo inicio de sesión" style="flex:none;min-width:40px">✕</button></div><div class="t5"><div class="t5b"><i id="hoyFaltaB"></i></div><b id="hoyFaltaN"></b></div><ul class="list" id="hoyFaltaL"></ul></div>
       <div class="card hidden" id="hoyTienda"><h2>🔗 Tu tienda</h2>
         <p class="muted" style="margin-top:0">Compártela en WhatsApp o Instagram, o imprime el QR. Sin cuenta piden desde ahí; con cuenta entran directo a su app.</p>
@@ -747,8 +748,11 @@ try {
       [!!acc.telefono, { ir: '#tienda', campo: '#eTel', k: 'whatsapp', como: 'Escribe tu WhatsApp con el 9 (ej: 912345678) y toca "Guardar mi tienda" al final.' }, 'Escribe el WhatsApp de tu tienda'],
       [!!t.horario, { ir: '#tienda', campo: '#tHorario + .fo', k: 'horario', como: 'Marca tus días abiertos y sus horas (⚡ Rápido: Lun a Vie, Sáb y Dom) y toca "Guardar mi tienda" al final.' }, 'Escribe tu horario de atención'],
       [!!h.productos, { ir: 'apps/caja/#productos', campo: '#p-nombre', k: 'productos' }, 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '') + ' o cárgalos de una vez con 📥 Excel, WhatsApp o ✨ plantilla'],
-      [!!h.link_pago, { ir: '#links', campo: '#cLinks input[type=url]', k: 'cobro', como: 'Pega aquí tu link de pago (Mercado Pago u otro) y guarda: tus clientes pagan al tiro.' }, 'Pega tu link de pago para cobrar pedidos online'],
+      [!!h.link_pago, { ir: '#links', campo: '#cLinks input[type=url]', k: 'cobro', como: 'Pega aquí tu link de pago (Mercado Pago u otro) y guarda: tus clientes pagan al tiro.' }, 'Configura cómo te pagan: 🏦 transferencia, ⚡ Mercado Pago, 💳 Webpay o 🔗 link'],
       [compartio, { ir: '#', campo: '#hoyCompartir', k: 'link', como: 'Toca Compartir y mándalo a tus grupos de WhatsApp o ponlo en tu Instagram. ¡Así llegan tus primeros pedidos!' }, 'Comparte tu tienda por WhatsApp o con el QR']];
+    // G128 d) sin ningún medio de pago: aviso al dueño (sus clientes quedan "💰 Pagas al retirar").
+    const sinM = () => { if (window.CFX_COBRO) { if (!t.cobra_online) CFX_COBRO.sinMedios($('hoySinMedio'), { ir: '#links' }); else $('hoySinMedio').innerHTML = ''; } };
+    if (window.CFX_COBRO) sinM(); else addEventListener('load', sinM, { once: true });
     const hechos = pasos.filter((x) => x[0]).length, pct = Math.round(hechos * 100 / pasos.length);
     const verG = !window.CFX_AYUDA || !CFX_AYUDA.guiaEstado || CFX_AYUDA.guiaEstado() === 'ver';
     $('hoyFalta').classList.toggle('hidden', hechos === pasos.length || !verG);

@@ -507,3 +507,146 @@
 
   window.CFX_PAGOS = { abrir, revisar, cerrar, mpVolver, mpNegocio, botonesNegocio, flowNegocio: (el, o) => flowNegocio(el, o, true) };
 })();
+
+/* G128 🛒 COBRO DE PEDIDOS (núcleo, las 6; parte por Despega). Todo lo decide y valida la BASE; esto solo muestra.
+   CFX_COBRO.estado(p)            → { e: '⏳ Esperando pago', t: 'qué pasa' }  p = { estado, cobro, pagado, servicio, digital, entrega }
+   CFX_COBRO.opciones(lineas, o)  → [{ k: 'ahora'|'abono'|'retiro', txt, monto, resto }] lo que el cliente PUEDE elegir
+                                     lineas = [{ subtotal, cobro: 'ahora'|'abono'|'retiro', abono: %, tipo }], o = { medios: bool, extra: $despacho, entrega }
+   CFX_COBRO.elegir(el, ops, k, cb) → botones (solo lo permitido; con 1 sola opción, solo el texto) · cb(k)
+   CFX_COBRO.sinMedios(el, { ir })  → aviso al DUEÑO: "⚠️ Tus clientes no pueden pagar en línea → Configurar"
+   CFX_COBRO.enlace(el, { url, tel, tienda }) → comprador SIN cuenta: 📋 Copiar / 📲 Mandarme por WhatsApp el enlace del pedido
+   CFX_COBRO.wa(tel, texto)         → link wa.me con el texto listo (p. ej. "📲 Enviar enlace al cliente" de la tienda)
+   CFX_COBRO.hilo(el, { rpc, ref }) → 💬 chat DEL PEDIDO (solo con cuenta; cfx_hilo_ver / cfx_hilo_enviar). Se borra a los 7 días de cerrado. */
+(function () {
+  'use strict';
+  if (window.CFX_COBRO) return;
+  const esc = (s) => (window.CFX_ESC ? window.CFX_ESC(s) : String(s == null ? '' : s).replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';'));
+  const plata = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
+  const avisar = (t) => (window.CFX_AVISO ? window.CFX_AVISO(t) : window.CFX_DIALOGO ? window.CFX_DIALOGO.avisar(t) : null);
+  if (!document.getElementById('cfx-cobro-css')) {
+    const st = document.createElement('style'); st.id = 'cfx-cobro-css';
+    st.textContent = '.cfx-cobro{display:grid;gap:8px;margin:8px 0}.cfx-cobro button{display:flex;gap:8px;align-items:center;text-align:left;width:100%;min-height:48px;padding:10px 12px;border-radius:12px;' +
+      'border:2px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font:inherit;cursor:pointer;overflow-wrap:anywhere}' +
+      '.cfx-cobro button.on{border-color:var(--cfx-acento,#2563eb);background:color-mix(in srgb,var(--cfx-acento,#2563eb) 10%,var(--cfx-tarjeta,#fff))}' +
+      '.cfx-cobro small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:13px}.cfx-cobro .cc-uno{margin:0;font-size:14px;color:var(--cfx-texto-2,#5b6472)}' +
+      '.cfx-sinmedio{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:12px;margin:0 0 10px;overflow-wrap:anywhere;' +
+      'background:color-mix(in srgb,#f59e0b 14%,var(--cfx-tarjeta,#fff));border:1px solid color-mix(in srgb,#f59e0b 45%,transparent);color:var(--cfx-texto,#111827)}' +
+      '.cfx-sinmedio>span{flex:1 1 180px}.cfx-sinmedio a{flex:none}' +
+      '.cfx-enlace{display:grid;gap:8px}.cfx-enlace code{display:block;font-size:12px;overflow-wrap:anywhere;padding:6px 8px;border-radius:8px;background:var(--cfx-fondo,#f3f5f8);color:var(--cfx-texto,#111827)}' +
+      '.cfx-enlace .ce-b{display:flex;gap:8px;flex-wrap:wrap}.cfx-enlace .ce-b>*{flex:1 1 130px;min-height:44px}' +
+      '.cfx-hilo .ch-l{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto;margin:6px 0;padding:2px}' +
+      '.cfx-hilo .ch-m{max-width:85%;padding:7px 10px;border-radius:12px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--cfx-fondo,#f3f5f8);color:var(--cfx-texto,#111827)}' +
+      '.cfx-hilo .ch-m.mio{align-self:flex-end;background:color-mix(in srgb,var(--cfx-acento,#2563eb) 16%,var(--cfx-tarjeta,#fff))}' +
+      '.cfx-hilo .ch-m small{display:block;font-size:11px;color:var(--cfx-texto-2,#5b6472);margin-top:2px}' +
+      '.cfx-hilo .ch-f{display:flex;gap:6px}.cfx-hilo textarea{flex:1;min-width:0;min-height:44px;resize:vertical;box-sizing:border-box}.cfx-hilo .ch-f button{flex:none;min-height:44px}' +
+      '.cfx-hilo .ch-n{margin:4px 0 0;font-size:12px;color:var(--cfx-texto-2,#5b6472)}';
+    document.head.appendChild(st);
+  }
+
+  // i) Estados claros (los mismos textos en las 6).
+  const E = {
+    pagando: ['⏳ Esperando pago', 'Paga antes de que se acabe el tiempo.'],
+    en_revision: ['🔍 Revisando comprobante', 'La tienda está revisando tu pago.'],
+    recibido: ['📦 Recibido', 'La tienda recibió tu pedido.'],
+    preparando: ['👩‍🍳 Preparando', 'Pago aprobado: lo están preparando.'],
+    listo: ['✅ Listo', 'Ya puedes retirarlo.'],
+    en_camino: ['🚚 En camino', 'Va hacia tu dirección.'],
+    entregado: ['🎉 Entregado', '¡Gracias por tu compra!'],
+    cancelado: ['❌ Cancelado', ''], rechazado: ['❌ Rechazado', 'El pago no se aprobó.'], expirado: ['❌ Expirado', 'Se acabó el tiempo para pagar.']
+  };
+  function estado(p) {
+    p = p || {};
+    const r = E[p.estado] || [String(p.estado || '')], deb = (p.cobro === 'retiro' || p.cobro === 'abono') && !p.pagado;
+    let e = r[0], t = r[1] || '';
+    if (p.estado === 'recibido' && deb) { e = '💰 Pagar al retirar'; t = p.entrega === 'despacho' ? 'Pagas al recibir: la tienda te contacta.' : 'Pagas en la tienda al retirar.'; }
+    else if (['recibido', 'preparando', 'listo'].includes(p.estado) && deb) t = (p.cobro === 'abono' ? 'Abono pagado. ' : '') + '💰 El resto lo pagas al ' + (p.entrega === 'despacho' ? 'recibir.' : 'retirar.');
+    if (p.estado === 'listo' && p.servicio) { e = '✅ Listo'; t = 'Tu servicio está listo.'; }
+    if (p.estado === 'entregado' && p.servicio) e = '🛠️ Servicio realizado';
+    if (p.estado === 'entregado' && p.digital) t = '🔑 Tu acceso está en el detalle.';
+    return { e, t };
+  }
+
+  // b) ¿Cómo puede pagar el cliente? Lo de fábrica es ⚡ Pagar ahora. Sin ningún medio: 💰 Pagas al retirar.
+  function opciones(lineas, o) {
+    o = o || {};
+    const l = (lineas || []).filter((x) => Number(x.subtotal) > 0), extra = Number(o.extra) || 0;
+    const base = l.reduce((a, x) => a + Number(x.subtotal), 0), total = base + extra;
+    const al = o.entrega === 'despacho' ? 'recibir' : 'retirar';
+    if (!o.medios) return [{ k: 'retiro', txt: '💰 Pagas al ' + al, nota: 'La tienda aún no recibe pagos en línea.', monto: 0, resto: total }];
+    const ops = [{ k: 'ahora', txt: '⚡ Pagar todo ahora', monto: total, resto: 0 }];
+    if (l.some((x) => x.cobro === 'abono' && x.tipo !== 'digital')) {
+      const ya = l.reduce((a, x) => a + (x.cobro === 'abono' && x.tipo !== 'digital' ? Number(x.subtotal) * (Number(x.abono) || 50) / 100 : x.cobro === 'retiro' && x.tipo !== 'digital' ? 0 : Number(x.subtotal)), 0);
+      const m = Math.max(1, Math.round(ya + extra));
+      if (m < total) ops.push({ k: 'abono', txt: '💵 Abono ahora', monto: m, resto: total - m });
+    }
+    if (l.length && l.every((x) => x.cobro === 'retiro' && x.tipo !== 'digital') && o.entrega !== 'despacho') ops.push({ k: 'retiro', txt: '💰 Pagar al ' + al, monto: 0, resto: total });
+    return ops;
+  }
+  function elegir(el, ops, k, cb) {
+    if (!el) return;
+    if (!ops.some((x) => x.k === k)) k = ops[0] && ops[0].k;
+    const det = (x) => x.k === 'ahora' ? plata(x.monto) + ' en línea' : x.k === 'abono' ? plata(x.monto) + ' ahora · ' + plata(x.resto) + ' después' : x.nota || plata(x.resto) + ' al entregar';
+    el.innerHTML = ops.length === 1 ? '<div class="cfx-cobro"><p class="cc-uno"><b>' + esc(ops[0].txt) + '</b> · ' + esc(det(ops[0])) + '</p></div>'
+      : '<div class="cfx-cobro" role="radiogroup" aria-label="Cómo pagas">' + ops.map((x) => '<button type="button" role="radio" aria-checked="' + (x.k === k) + '" class="' + (x.k === k ? 'on' : '') +
+        '" data-cobro="' + x.k + '"><span><b>' + esc(x.txt) + '</b><small>' + esc(det(x)) + '</small></span></button>').join('') + '</div>';
+    el.onclick = (e) => { const b = e.target.closest('[data-cobro]'); if (!b) return; elegir(el, ops, b.dataset.cobro, cb); };
+    if (cb) cb(k);
+    return k;
+  }
+
+  // d) Aviso al dueño cuando sus clientes no tienen cómo pagar.
+  function sinMedios(el, o) {
+    if (!el) return;
+    o = o || {};
+    el.innerHTML = '<div class="cfx-sinmedio" role="status"><span>⚠️ <b>Tus clientes no pueden pagar en línea.</b> Sus pedidos quedan "💰 Pagas al retirar".</span>' +
+      '<a class="btn small" href="' + esc(o.ir || '#') + '" data-cfx-cobro-ir="">Configurar</a></div>';
+    const a = el.querySelector('[data-cfx-cobro-ir]');
+    if (a && o.alTocar) a.onclick = (e) => { e.preventDefault(); o.alTocar(); };
+  }
+
+  // h) Enlace del pedido para quien compra SIN cuenta (y para la tienda).
+  const wa = (tel, texto) => 'https://wa.me/' + String(tel || '').replace(/\D/g, '') + '?text=' + encodeURIComponent(texto || '');
+  function enlace(el, o) {
+    if (!el || !o || !o.url) return;
+    el.innerHTML = '<div class="cfx-enlace"><b>🔗 Guarda el enlace de tu pedido</b><span style="font-size:13px;color:var(--cfx-texto-2,#5b6472)">Con él ves el estado, pagas y subes el comprobante.</span>' +
+      '<code>' + esc(o.url) + '</code><div class="ce-b"><button type="button" class="alt" data-ce="copiar">📋 Copiar enlace</button>' +
+      '<a class="btn ok" target="_blank" rel="noopener" href="' + esc(wa(o.tel, '🧾 Mi pedido' + (o.tienda ? ' en ' + o.tienda : '') + ': ' + o.url)) + '">📲 Mandarme por WhatsApp</a></div></div>';
+    el.querySelector('[data-ce=copiar]').onclick = async () => {
+      try { await navigator.clipboard.writeText(o.url); avisar('📋 Enlace copiado'); }
+      catch (e) { if (window.CFX_DIALOGO) window.CFX_DIALOGO.pedir('Copia el enlace', o.url, { si: 'Cerrar' }); }
+    };
+  }
+
+  // e) 💬 Chat DEL PEDIDO (dentro del pedido; no aparece en Mensajes).
+  function hilo(el, o) {
+    if (!el || !o || !o.rpc || !o.ref) return;
+    const hora = (f) => new Date(f).toLocaleString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    let vivo = null;
+    async function cargar(bajar) {
+      let r;
+      try { r = await o.rpc('cfx_hilo_ver', { p_ref: o.ref }); } catch (e) { r = { ok: false, error: e.message }; }
+      if (!el.isConnected) { clearInterval(vivo); return; }
+      if (!r || !r.ok) { el.innerHTML = '<p class="ch-n">💬 ' + esc((r && r.error) || 'Chat no disponible') + '</p>'; return; }
+      const l = r.mensajes || [];
+      const cuerpo = l.length ? l.map((m) => '<div class="ch-m' + (m.mio ? ' mio' : '') + '">' + esc(m.texto) + '<small>' + (m.mio ? 'Tú' : m.tienda ? '🏪 Tienda' : '👤 Cliente') + ' · ' + hora(m.creado) + '</small></div>').join('')
+        : '<p class="ch-n">Aún no hay mensajes. Pregunta lo que necesites de este pedido.</p>';
+      const ya = el.querySelector('.ch-l');
+      if (ya) { const abajo = ya.scrollTop + ya.clientHeight >= ya.scrollHeight - 20; ya.innerHTML = cuerpo; if (abajo || bajar) ya.scrollTop = ya.scrollHeight; return; }
+      el.innerHTML = '<div class="cfx-hilo"><b>💬 Chat del pedido</b><div class="ch-l" aria-live="polite">' + cuerpo + '</div>' +
+        '<div class="ch-f"><textarea maxlength="1000" rows="1" aria-label="Escribe tu mensaje" placeholder="Escribe aquí…"></textarea><button type="button" class="ok">Enviar</button></div>' +
+        '<p class="ch-n">🔒 Solo tú y ' + (o.tienda ? 'el cliente' : 'la tienda') + '. Se borra 7 días después de cerrar el pedido.</p></div>';
+      const lst = el.querySelector('.ch-l'); lst.scrollTop = lst.scrollHeight;
+      const tx = el.querySelector('textarea'), bt = el.querySelector('.ch-f button');
+      bt.onclick = async () => {
+        const v = tx.value.trim(); if (!v) return;
+        bt.disabled = true;
+        try { const x = await o.rpc('cfx_hilo_enviar', { p_ref: o.ref, p_texto: v }); if (!x || !x.ok) throw new Error((x && x.error) || 'No se pudo enviar'); tx.value = ''; await cargar(true); }
+        catch (e) { avisar(e.message || String(e)); } finally { bt.disabled = false; }
+      };
+    }
+    cargar(true);
+    vivo = setInterval(() => { if (!document.hidden) cargar(false); }, 20000);
+  }
+
+  window.CFX_COBRO = { estado, opciones, elegir, sinMedios, enlace, wa, hilo, plata };
+})();

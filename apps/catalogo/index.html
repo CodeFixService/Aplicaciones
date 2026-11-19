@@ -162,7 +162,8 @@
       <div id="lineas"></div>
       <p class="muted hidden" id="premTip" style="margin:8px 0 0"></p>
       <div class="total"><span>Total</span><span id="carTotal">$0</span></div>
-      <label>¿Cómo lo recibes?</label>
+      <label id="cobroL">💳 ¿Cómo pagas?</label><div id="cobroOps"></div>
+      <label id="entregaL">¿Cómo lo recibes?</label>
       <div class="entrega" id="entrega">
         <button class="on" data-e="retiro" type="button">🏪 Retiro en tienda</button>
         <button data-e="despacho" type="button">🚚 Despacho</button>
@@ -252,6 +253,9 @@
   let carro = db.get('carro', []);       // [{clave, cant, nombre?, precio?}] (nombre/precio: ofertas con precio)
   let ofertas = null;
   const tienda = await traer('tienda_info', { p_negocio: negocio }, 'tienda', {}) || {};
+  // G128 🛒 tipo y forma de pago de cada ítem (de fábrica: 📦 producto ⚡ pagar ahora).
+  const venta = {};
+  Cuenta.rpc('catalogo_venta_negocio', { p_negocio: negocio }).then((l) => { (l || []).forEach((x) => { venta[x.clave] = x; }); try { pintarCarro(); } catch (e) { /* aún cargando */ } }).catch(() => {});
 
   // Abierto / cerrado, vacaciones, horario y reseñas de la tienda.
   const vacaciones = /^\d{4}-\d{2}-\d{2}$/.test(tienda.vacaciones_hasta || '') ? new Date(tienda.vacaciones_hasta + 'T12:00') : null;
@@ -536,6 +540,7 @@
     const dp = premium && descPrem ? Math.min(Math.round(t * descPrem / 100), t - d) : 0;
     if (cupon && cupon.gift) d = Math.min(cupon.gift, t - dp);
     $('carTotal').textContent = precio(t - d - dp) + (d + dp ? ' (−' + precio(d + dp) + ')' : '');
+    pintarCobro(ls);
     $('premTip').classList.toggle('hidden', !descPrem || !comprador);
     $('premTip').innerHTML = !descPrem ? '' : premium ? '⭐ Descuento Premium: <b>−' + precio(dp) + '</b> (' + descPrem + '%)'
       : '⭐ Con <a href="../../#plan">Premium</a> pagarías <b>' + descPrem + '% menos</b> en esta tienda.';
@@ -549,6 +554,17 @@
   $('bVerCarro').onclick = () => vista('pedidos');
   $('bVaciar').onclick = async () => { if (await Core.confirmar('¿Vaciar el pedido?')) { carro = []; guardarCarro(); } };
 
+  // G128 💳 Cómo paga (solo lo permitido; la base lo vuelve a revisar) y 🛠️/🔑 sin envío.
+  let cobroSel = 'ahora';
+  const ventaDe = (l) => venta[l.clave] || { tipo: 'producto', cobro: 'ahora' };
+  function pintarCobro(ls) {
+    if (!window.CFX_COBRO) return;
+    const fis = ls.some(({ l }) => ventaDe(l).tipo === 'producto');
+    ['entregaL', 'entrega'].forEach((k) => $(k).classList.toggle('hidden', !fis));
+    if (!fis && entrega !== 'retiro') { entrega = 'retiro'; $('rowDir').classList.add('hidden'); $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.e === 'retiro')); }
+    const ops = CFX_COBRO.opciones(ls.map(({ l, i }) => Object.assign({ subtotal: precioDe(i) * l.cant }, ventaDe(l))), { medios: !!tienda.cobra_online, entrega });
+    CFX_COBRO.elegir($('cobroOps'), ops, cobroSel, (k) => { cobroSel = k; });
+  }
   // Retiro o despacho (el despacho tiene costo adicional según la distancia).
   let entrega = 'retiro';
   $('entrega').onclick = (e) => {
@@ -558,6 +574,7 @@
     $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     $('rowDir').classList.toggle('hidden', entrega !== 'despacho');
     if (entrega === 'despacho') $('dir').focus();
+    pintarCarro();
   };
 
   // Cupón (lo valida el servidor).
@@ -602,7 +619,7 @@
     try {
       const r = await Cuenta.rpc('crear_pedido', {
         p_negocio: negocio, p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant, opcion: l.opcion || null })), p_entrega: entrega,
-        p_direccion: dirFinal, p_nota: $('nota').value, p_cupon: cupon ? cupon.codigo : null
+        p_direccion: dirFinal, p_nota: $('nota').value, p_cupon: cupon ? cupon.codigo : null, p_cobro: cobroSel
       });
       if (!r.ok) throw new Error(r.error);
       if (fac) { FAC_MEM.set('fac', fac); try { const g = await Cuenta.rpc('pedido_factura_guardar', { p_ref: r.token || r.id, p: fac }); if (!g.ok) throw new Error(g.error); } catch (e) { Core.toast('🧾 Factura: ' + e.message); } }
@@ -610,7 +627,8 @@
       Cuenta.sb.functions.invoke('enviar').catch(() => {}); // aviso push inmediato a la tienda
       carro = []; carroEnviado = '[]'; $('nota').value = ''; $('cupon').value = ''; cupon = null; $('cuponTxt').textContent = '';
       guardarCarro(); cargarPedidos();
-      Core.toast(r.estado === 'pagando' ? (r.link && r.link.mp ? '⏳ Pedido apartado: págalo con ⚡ Mercado Pago aquí abajo' : '⏳ Pedido apartado: paga con el link y sube el comprobante aquí abajo') : '✅ Pedido enviado (' + precio(r.total) + '). Te avisaremos cada cambio de estado.');
+      Core.toast(r.estado === 'pagando' ? (r.link && r.link.mp ? '⏳ Pedido apartado: págalo con ⚡ Mercado Pago aquí abajo' : '⏳ Pedido apartado: paga ' + precio(r.a_pagar != null ? r.a_pagar : r.total) + ' y sube el comprobante aquí abajo')
+        : r.cobro === 'retiro' ? '✅ Pedido enviado (' + precio(r.total) + '). 💰 Pagas al ' + (r.entrega === 'despacho' ? 'recibir.' : 'retirar.') : '✅ Pedido enviado (' + precio(r.total) + '). Te avisaremos cada cambio de estado.');
       cargarStock();
       if (tienda.datos_pago) $('cPago').scrollIntoView({ behavior: 'smooth' });
     } catch (err) { Core.toast(err.message); } finally { btn.disabled = false; }
@@ -643,15 +661,20 @@
     const links = {};
     await Promise.all(pedidos.filter((p) => p.estado === 'pagando').map((p) => Cuenta.rpc('ver_pedido', { p_ref: p.id }).then((v) => { if (v) links[p.id] = Object.assign({ tk: v.token }, v.link); }).catch(() => {})));
     const quedan = (t) => Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4));
+    // 💬 G128 chat DEL pedido (núcleo): mensajes sin leer por pedido.
+    const hilos = {};
+    try { (await Cuenta.rpc('cfx_hilos_sin_leer', { p_refs: pedidos.map((p) => 'pedido:' + p.id) }) || []).forEach((x) => { hilos[x.ref] = x.n; }); } catch (e) { /* sin chat */ }
     $('pedidos').innerHTML = pedidos.length ? pedidos.map((p, n) =>
       '<li><div class="grow"><b>' + new Date(p.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) + ' · ' + precio(p.total) + '</b> ' +
-      '<span class="pill est">' + (ESTADOS[p.estado] || p.estado) + '</span>' +
-      '<pre>' + Core.esc(p.lineas.map((l) => l.cant + ' × ' + l.nombre).join('\n') + '\n' + (p.entrega === 'despacho' ? '🚚 Despacho: ' + (p.direccion || '') : '🏪 Retiro en tienda') +
+      '<span class="pill est">' + (window.CFX_COBRO ? CFX_COBRO.estado(p).e : ESTADOS[p.estado] || p.estado) + '</span>' +
+      '<pre>' + Core.esc(p.lineas.map((l) => l.cant + ' × ' + l.nombre).join('\n') + '\n' + (p.servicio || p.digital ? (p.digital ? '🔑 Acceso digital' : '🛠️ Servicio') : p.entrega === 'despacho' ? '🚚 Despacho: ' + (p.direccion || '') : '🏪 Retiro en tienda') +
+        (p.cobro === 'abono' ? '\n💵 Abono ' + precio(p.a_pagar) + (p.abonado || p.pagado ? ' ✅' : '') + ' · resto ' + precio(p.total - p.a_pagar) + (p.pagado ? ' ✅' : ' al entregar') : p.cobro === 'retiro' && !p.pagado ? '\n💰 Pagas al ' + (p.entrega === 'despacho' ? 'recibir' : 'retirar') : '') +
         (p.descuento - (p.desc_premium || 0) > 0 ? '\nCupón ' + (p.cupon || '') + ': −' + precio(p.descuento - (p.desc_premium || 0)) : '') +
         (p.desc_premium > 0 ? '\n⭐ Descuento Premium: −' + precio(p.desc_premium) : '')) + '</pre>' +
       (p.estado === 'pagando' && p.motivo ? '<p class="aviso">❌ <b>Comprobante rechazado</b>: ' + Core.esc(p.motivo) + '. Revisa el pago y sube otro.</p>' : '') +
-      (p.estado === 'pagando' ? '<p class="aviso">⏳ Tu pedido está apartado <b>' + quedan(p.retenido_hasta) + ' min</b>. Paga <b>' + precio(p.total) + '</b>' +
-        (links[p.id] && links[p.id].mp ? ' con Mercado Pago y se confirma solo' + (links[p.id].url ? ', o con el link y sube la foto del comprobante.' : '.') : ' con el link de la tienda y sube la foto del comprobante.') + '</p>' : '') +
+      (p.accesos && p.accesos.length ? '<div class="aviso" style="margin-top:6px">🔑 <b>Tu acceso</b>' + p.accesos.map((a) => '<div style="margin-top:4px"><b>' + Core.esc(a.nombre) + ':</b> <span style="white-space:pre-wrap;overflow-wrap:anywhere">' + Core.esc(a.acceso) + '</span> <button type="button" class="small alt" data-cfx-copiar="' + Core.esc(a.acceso) + '">📋 Copiar</button></div>').join('') + '</div>' : '') +
+      (p.estado === 'pagando' ? '<p class="aviso">⏳ Tu pedido está apartado <b>' + quedan(p.retenido_hasta) + ' min</b>. Paga <b>' + precio(p.a_pagar != null ? p.a_pagar : p.total) + '</b>' +
+        (links[p.id] && links[p.id].mp ? ' en línea y se confirma solo' + (links[p.id].url || links[p.id].transferencia ? ', o paga y sube la foto del comprobante.' : '.') : links[p.id] && !links[p.id].url ? ' por transferencia y sube la foto del comprobante.' : ' con el link de la tienda y sube la foto del comprobante.') + '</p>' : '') +
       (p.estado === 'rechazado' && p.motivo ? '<p class="muted" style="margin:6px 0 0">❌ ' + Core.esc(p.motivo) + '</p>' : '') +
       (p.envio && p.envio.por_pagar ? '<p class="muted" style="margin:6px 0 0">📦 Envío por pagar: lo pagas al recibir.</p>' : '') +
       (p.envio && (p.envio.codigo || p.envio.link) ? '<p class="muted" style="margin:6px 0 0">📍 ' + Core.esc(p.envio.nombre) + (p.envio.codigo ? ' · código <b>' + Core.esc(p.envio.codigo) + '</b>' : '') +
@@ -663,15 +686,15 @@
       (p.estado === 'entregado' && !p.calificado ? '<div style="margin-top:8px"><span class="muted">Califica tu compra: </span><span class="califica">' +
         [1, 2, 3, 4, 5].map((k) => '<button type="button" data-cal="' + p.id + '" data-n="' + k + '" aria-label="' + k + ' estrellas">★</button>').join('') + '</span></div>' : '') +
       '</div><div class="acc" style="display:flex;gap:6px;flex-wrap:wrap">' +
-      (p.estado === 'pagando' ? '<button class="small alt" data-monto="' + Math.round(Number(p.total)) + '">📋 Copiar monto</button>' : '') +
+      (p.estado === 'pagando' ? '<button class="small alt" data-monto="' + Math.round(Number(p.a_pagar != null ? p.a_pagar : p.total)) + '">📋 Copiar monto</button>' : '') +
       (p.estado === 'pagando' && links[p.id] && links[p.id].mp ? [['mp', '⚡ Pagar con Mercado Pago'], ['flow', '💳 Pagar con Webpay']].filter((m) => (links[p.id].medios || { mp: true })[m[0]])
         .map((m) => '<button class="small ok" data-mp="' + p.id + '" data-medio="' + m[0] + '" data-tk="' + Core.esc(links[p.id].tk) + '">' + m[1] + '</button>').join('') : '') +
-      (p.estado === 'pagando' && links[p.id] && links[p.id].url ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(links[p.id].url)) + '">💳 Pagar ' + precio(p.total) + '</a>' : '') +
+      (p.estado === 'pagando' && links[p.id] && links[p.id].url ? '<a class="btn small ok" target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(links[p.id].url)) + '">💳 Pagar ' + precio(p.a_pagar != null ? p.a_pagar : p.total) + '</a>' : '') +
       (p.estado === 'pagando' && !(links[p.id] && links[p.id].mp && !links[p.id].url) ? '<button class="small" data-comp="' + p.id + '">📷 Subir comprobante</button>' : '') +
-      (['pagando', 'en_revision', 'recibido', 'preparando'].includes(p.estado) ? '<button class="small alt" data-can="' + p.id + '">Cancelar</button>' : '') +
+      (['pagando', 'en_revision', 'recibido', 'preparando'].includes(p.estado) && !(p.accesos && p.accesos.length) ? '<button class="small alt" data-can="' + p.id + '">Cancelar</button>' : '') +
       (['recibido', 'preparando', 'listo', 'en_camino', 'entregado'].includes(p.estado) ? '<button class="small alt" data-det="' + n + '">🧾 Detalle de compra</button>' : '') +
       '<button class="small alt" data-rep="' + n + '">🔁 Repetir</button>' +
-      '<a class="btn small alt" href="../mensajes/?con=' + negocio + '">💬 Chat</a></div></li>').join('')
+      '<button class="small alt" data-hilo="' + p.id + '">💬 Chat del pedido' + (hilos['pedido:' + p.id] ? ' (' + hilos['pedido:' + p.id] + ')' : '') + '</button></div><div class="hidden" style="flex-basis:100%" data-hilo-de="' + p.id + '"></div></li>').join('')
       : '<li class="empty">' + vacio('pedidos', 'Aún no envías pedidos. Agrega productos u ofertas con 🛒 y envíalos desde aquí.') + '</li>';
     const s = await traer('cfx_sellos_mios', { p_negocio: negocio }, 'sellos', null);
     $('cSellos').classList.toggle('hidden', !s);
@@ -699,6 +722,11 @@
     if (!b) return;
     try {
       if (b.dataset.monto) { Core.copiar(b.dataset.monto, '📋 Monto copiado: ' + precio(b.dataset.monto)); return; }
+      if (b.dataset.hilo) {  // 💬 G128 chat del pedido (dentro del pedido, no en Mensajes)
+        const c = $('pedidos').querySelector('[data-hilo-de="' + b.dataset.hilo + '"]');
+        if (c && window.CFX_COBRO) { const ab = c.classList.toggle('hidden'); if (!ab) CFX_COBRO.hilo(c, { rpc: Cuenta.rpc, ref: 'pedido:' + b.dataset.hilo }); else c.innerHTML = ''; }
+        return;
+      }
       if (b.dataset.mp) {
         b.disabled = true;
         const r = await Cuenta.rpc('mp_pagar', { p_ref: b.dataset.mp, p_volver: Core.rootUrl() + 'r/?t=' + b.dataset.tk, ...(b.dataset.medio === 'flow' ? { p_medio: 'flow' } : {}) });

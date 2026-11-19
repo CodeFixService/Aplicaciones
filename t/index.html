@@ -68,7 +68,8 @@
         <label for="nom">Tu nombre</label><input id="nom" maxlength="60" autocomplete="name">
         <label for="tel">Tu WhatsApp (con código de país)</label><input id="tel" inputmode="tel" placeholder="56912345678" autocomplete="tel">
         <label for="mail">Tu correo (opcional)</label><input id="mail" type="email" maxlength="120" autocomplete="email" placeholder="para el comprobante y el seguimiento">
-        <label>¿Cómo lo recibes?</label>
+        <label id="cobroL">💳 ¿Cómo pagas?</label><div id="cobroOps"></div>
+        <label id="entregaL">¿Cómo lo recibes?</label>
         <div class="entrega" id="entrega"><button class="on" data-e="retiro" type="button">🏪 Retiro</button><button data-e="despacho" type="button">🚚 Despacho</button></div>
         <div id="rowDir" class="hidden"><p class="muted" style="font-size:13px">⚠️ El despacho tiene un costo según la distancia; la tienda te lo confirma.</p>
           <label for="dir">Dirección</label><input id="dir" maxlength="200" placeholder="Calle, número, comuna"></div>
@@ -141,8 +142,9 @@
   // 📊 Medir anuncios (módulo): el Worker carga Meta Pixel / Google Analytics; aquí solo se marcan los eventos de compra.
   const medir = (ev, d) => { try { if (window.fbq) fbq('track', ev, d); if (window.gtag) gtag('event', ({ AddToCart: 'add_to_cart', InitiateCheckout: 'begin_checkout' })[ev] || ev, d); } catch (e) { /* sin medición */ } };
   if (window.CodeFixVitrina) pf(); else addEventListener('load', pf);
-  $('pagoTip').textContent = t.cobra_online ? '💳 Al enviar, tu pedido queda apartado ' + t.retencion_min + ' min para que pagues con el link de la tienda y subas el comprobante.'
-    : 'La tienda te contactará por WhatsApp para coordinar el pago.';
+  // G128 d) sin ningún medio de pago: "💰 Pagas al retirar" (la tienda te contacta por WhatsApp).
+  $('pagoTip').textContent = t.cobra_online ? '💳 Al enviar, tu pedido queda apartado ' + t.retencion_min + ' min para que pagues y subas el comprobante (o pagues en línea).'
+    : '💰 Pagas al retirar: la tienda te contactará por WhatsApp.';
 
   // Mis pedidos sin cuenta (guardados en este celular)
   const KEY = 'pub:' + slug, mem = Core.store(KEY);
@@ -154,6 +156,11 @@
   /* ---------- Catálogo con fotos (guardadas en el celular) ---------- */
   let items = [];
   try { items = await Cuenta.rpc('catalogo_publico', { p_slug: slug }); } catch (e) { items = []; }
+  // G128 🛒 tipo y forma de pago de cada ítem (de fábrica: 📦 producto ⚡ pagar ahora; nunca trae el acceso digital).
+  const venta = {};
+  Cuenta.rpc('catalogo_venta_publica', { p_slug: slug }).then((l) => { (l || []).forEach((x) => { venta[x.clave] = x; }); try { pintar(); pintarCarro(); } catch (e) { /* aún cargando */ } }).catch(() => {});
+  const ventaDe = (k) => venta[k] || { tipo: 'producto', cobro: 'ahora' };
+  const chipVenta = (k) => { const v = ventaDe(k); return v.tipo === 'servicio' ? '🛠️ Servicio' : v.tipo === 'digital' ? '🔑 Digital: llega al pagar' : v.cobro === 'abono' ? '💵 Abono ' + (v.abono || 50) + '%' : v.cobro === 'retiro' ? '💰 Pagas al retirar' : ''; };
   const fotos = {};
   function pintar() {
     const q = $('buscar').value.toLowerCase();
@@ -163,7 +170,7 @@
       (i.descripcion ? '<span class="desc">' + Core.esc(i.descripcion) + '</span>' : '') +
       (i.opciones ? '<select data-opc="' + Core.esc(i.clave) + '" aria-label="Elige una opción"><option value="">🎨 Elige…</option>' +
         i.opciones.split(',').map((o) => o.trim()).filter(Boolean).map((o) => '<option>' + Core.esc(o) + '</option>').join('') + '</select>' : '') +
-      '<span class="p">' + precio(i.precio) + '</span>' +
+      '<span class="p">' + precio(i.precio) + '</span>' + (chipVenta(i.clave) ? '<span class="pill" style="align-self:flex-start">' + chipVenta(i.clave) + '</span>' : '') +
       (i.disponible != null && i.disponible <= 3 ? '<span class="pill ' + (i.disponible ? 'warn' : 'bad') + '" style="align-self:flex-start">' + (i.disponible ? 'Quedan ' + i.disponible : 'Agotado') + '</span>' : '') +
       '<div class="acc">' + (i.disponible === 0 ? '<button class="alt" disabled style="width:100%">Agotado</button>' : '<button class="ok" style="width:100%" data-add="' + Core.esc(i.clave) + '">➕ Agregar</button>') +
       '<a class="btn alt" href="../apps/mensajes/?con=' + encodeURIComponent(t.id) + '&txt=' + encodeURIComponent('Hola, me interesa: ' + i.nombre) + '">💬 Preguntar</a>' + '</div></div>').join('')
@@ -232,6 +239,17 @@
       '</b><div class="muted">' + precio(i.precio) + ' c/u</div></div><div class="qty"><button class="alt" data-k="' + k + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
       '</b><button class="alt" data-k="' + k + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('') || '<p class="muted">Agrega productos con ➕.</p>';
     $('total').textContent = precio(total());
+    pintarCobro();
+  }
+  // G128 💳 Cómo paga (solo lo permitido; la base lo vuelve a revisar) · 🛠️/🔑 sin envío.
+  let cobroSel = 'ahora';
+  function pintarCobro() {
+    if (!window.CFX_COBRO) return;
+    const ls = lineas(), fis = ls.some(({ l }) => ventaDe(l.clave).tipo === 'producto');
+    ['entregaL', 'entrega'].forEach((k) => $(k).classList.toggle('hidden', !fis && ls.length > 0));
+    if (!fis && ls.length && entrega !== 'retiro') { entrega = 'retiro'; $('rowDir').classList.add('hidden'); $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.e === 'retiro')); }
+    CFX_COBRO.elegir($('cobroOps'), CFX_COBRO.opciones(ls.map(({ l, i }) => Object.assign({ subtotal: i.precio * l.cant }, ventaDe(l.clave))), { medios: !!t.cobra_online, entrega }), cobroSel, (k) => { cobroSel = k; });
+    $('cobroL').classList.toggle('hidden', !ls.length); $('cobroOps').classList.toggle('hidden', !ls.length);
   }
   $('lineas').onclick = (e) => { const { k, d } = e.target.dataset; if (k === undefined) return; const l = lineas()[+k].l; l.cant += +d; pintarCarro(); };
   function agregar(x) {
@@ -261,6 +279,7 @@
     entrega = b.dataset.e;
     $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     $('rowDir').classList.toggle('hidden', entrega !== 'despacho');
+    pintarCobro();
   };
   const montoCarro = () => lineas().reduce((a, x) => a + (Number(x.i.precio) || 0) * (Number(x.l.cant) || 0), 0);
   Despacho.montar({ cfg: t.despacho, monto: montoCarro, cotizar: (c) => Cuenta.rpc('despacho_cotizar', { p_negocio: t.id, p_comuna: c, p_monto: montoCarro() }) });
@@ -277,7 +296,7 @@
     $('bPedir').disabled = true;
     try {
       const r = await Cuenta.rpc('crear_pedido_invitado', { p_slug: slug, p_nombre: $('nom').value, p_tel: $('tel').value,
-        p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant, opcion: l.opcion || null })), p_entrega: entrega, p_direccion: dirFinal, p_nota: $('nota').value });
+        p_items: carro.map((l) => ({ clave: l.clave, cant: l.cant, opcion: l.opcion || null })), p_entrega: entrega, p_direccion: dirFinal, p_nota: $('nota').value, p_cobro: cobroSel });
       if (!r.ok) throw new Error(r.error);
       mem.set('nom', $('nom').value); mem.set('tel', $('tel').value); mem.set('mail', correo);
       if (correo) { try { await Cuenta.rpc('pedido_correo_guardar', { p_ref: r.token, p_correo: correo }); } catch (e) { /* el pedido ya quedó */ } }
@@ -286,7 +305,7 @@
       tokens.push({ t: r.token, f: Date.now(), total: r.total }); mem.set('tokens', tokens.slice(-20));
       carro = []; mem.set('carro', []);
       Cuenta.sb.functions.invoke('enviar').catch(() => {});
-      location.href = '../r/?t=' + r.token;
+      location.href = '../r/?t=' + r.token + '&nuevo=1';
     } catch (err) { Core.toast(err.message); } finally { $('bPedir').disabled = false; }
   };
 
