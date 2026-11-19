@@ -176,11 +176,20 @@ function deDataUrl(d) {
   return { tipo: m[1], bytes: u };
 }
 
+// G122 🖼️ Foto en Storage (bucket vitrina de Supabase): se trae para la vista previa al compartir.
+async function deNube(u) {
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/vitrina\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(webp|jpg|png)$/.test(u || '')) return null;
+  try {
+    const r = await fetch(u); const tipo = (r.headers.get('content-type') || '').split(';')[0];
+    return r.ok && /^image\/(png|jpeg|webp)$/.test(tipo) ? { tipo, bytes: new Uint8Array(await r.arrayBuffer()) } : null;
+  } catch (e) { return null; }
+}
+
 async function imagen(url, env) {
   const s = limpio(url.searchParams.get('s')), p = String(url.searchParams.get('p') || '').slice(0, 120);
   let img = null;
   try {
-    if (s && p) { const f = await rpc(env, url, 'fotos_publicas', { p_slug: s, p_claves: [p] }); img = deDataUrl(f && f[0] && f[0].foto); }
+    if (s && p) { const f = await rpc(env, url, 'fotos_publicas', { p_slug: s, p_claves: [p] }); const x = f && f[0] && f[0].foto; img = deDataUrl(x) || await deNube(x); }
     if (s && !img) { const t = await rpc(env, url, 'tienda_publica', { p_slug: s }); img = deDataUrl(t && t.logo); }
   } catch (e) { img = null; }
   if (!img) return [await env.ASSETS.fetch(new Request(new URL('/icons/icon-512.png', url))), false];

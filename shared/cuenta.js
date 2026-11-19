@@ -11,6 +11,7 @@
       auth: { persistSession: true, autoRefreshToken: true, storageKey: 'cfx-auth', detectSessionInUrl: true }
     })
     : null;
+  if (sb) global.CFX_NUBE_SB = sb; // G122 🖼️ fotos de vitrina a Storage (núcleo fotos.js)
 
   const CACHE_KEY = 'cfx:cuenta';
   const OFFLINE_DAYS = 7;

@@ -2439,7 +2439,7 @@ language plpgsql security definer set search_path = '' as $$
 declare f text := nullif(trim(coalesce(p_foto, '')), ''); t timestamptz := case when f is null then null else now() end;
 begin
   if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
-  if f is not null and (f !~ '^data:image/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$' or length(f) > 320000) then -- vitrina (núcleo fotos.js)
+  if f is not null and not public.cfx_foto_nube(f, auth.uid()) and (f !~ '^data:image/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$' or length(f) > 320000) then -- vitrina (núcleo fotos.js) o G122 Storage
     raise exception 'Foto no válida o muy pesada';
   end if;
   update public.catalog_items set foto = f, foto_at = t where owner_id = auth.uid() and client_key = p_key;
@@ -2498,6 +2498,24 @@ revoke all on function public.fotos_catalogo(uuid) from public, anon;
 revoke all on function public.fotos_productos(uuid, text[]) from public, anon;
 grant execute on function public.set_foto_producto(text, text), public.fotos_catalogo(uuid), public.fotos_productos(uuid, text[]),
   public.admin_uso() to authenticated;
+
+-- G122 🖼️ Fotos viejas (base64) del dueño → Storage: núcleo fotos.js (CFX_NUBE.pasarViejas) pide 10 y las cambia por su URL.
+-- Solo cambia si la foto sigue igual (mismo largo y base64) y la URL nueva es de SU carpeta. Si algo falla, queda como estaba.
+create or replace function public.cfx_fotos_viejas() returns table (t text, id text, i int, foto text)
+language sql stable security definer set search_path = '' as $$
+  select 'producto'::text, c.client_key, -1, c.foto from public.catalog_items c
+  where c.owner_id = auth.uid() and c.foto like 'data:image/%' order by c.foto_at nulls last limit 10
+$$;
+create or replace function public.cfx_foto_pasar(p_t text, p_id text, p_i int, p_largo int, p_nueva text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null or not public.cfx_foto_nube(p_nueva, auth.uid()) or p_t <> 'producto' then return false; end if;
+  update public.catalog_items set foto = p_nueva, foto_at = now()
+  where owner_id = auth.uid() and client_key = p_id and foto like 'data:image/%' and length(foto) = p_largo;
+  return found;
+end $$;
+revoke all on function public.cfx_fotos_viejas(), public.cfx_foto_pasar(text, text, int, int, text) from public, anon;
+grant execute on function public.cfx_fotos_viejas(), public.cfx_foto_pasar(text, text, int, int, text) to authenticated;
 
 -- =====================================================================
 --  VERSIÓN 5.0 · Órbita: planes editables, pagos con comprobante, links de
@@ -5432,7 +5450,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.87'::text $$;
+language sql immutable as $$ select '5.88'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -11000,6 +11018,38 @@ end $$;
 revoke all on function public.cfx_estudio_negocio(), public.cfx_estudio_puede(uuid), public.cfx_estudio_fila(public.cfx_estudio) from public, anon, authenticated;
 revoke all on function public.cfx_estudio_mio(), public.cfx_estudio_guardar(jsonb), public.cfx_estudio_borrar(uuid[]) from public, anon;
 grant execute on function public.cfx_estudio_mio(), public.cfx_estudio_guardar(jsonb), public.cfx_estudio_borrar(uuid[]) to authenticated;
+-- ===================== G122 🖼️ Fotos a Storage (núcleo) =====================
+-- Bucket público 'vitrina': cada uno sube SOLO a su carpeta (<su id>/<uuid>.webp), hasta 700 KB, solo imágenes. Nadie lista lo ajeno.
+-- Las apps aceptan en sus fotos de vitrina el texto base64 de siempre O una URL de este bucket (cfx_foto_ok). Lo viejo sigue igual.
+do $$ begin
+  if to_regclass('storage.buckets') is not null then
+    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    values ('vitrina', 'vitrina', true, 716800, array['image/webp', 'image/jpeg', 'image/png'])
+    on conflict (id) do update set public = true, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+    drop policy if exists cfx_vitrina_subir on storage.objects;
+    drop policy if exists cfx_vitrina_ver on storage.objects;
+    drop policy if exists cfx_vitrina_borrar on storage.objects;
+    create policy cfx_vitrina_subir on storage.objects for insert to authenticated
+      with check (bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text);
+    create policy cfx_vitrina_ver on storage.objects for select to authenticated
+      using (bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text);
+    create policy cfx_vitrina_borrar on storage.objects for delete to authenticated
+      using (bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text);
+  end if;
+end $$;
+
+-- ¿Es una foto de la nube (bucket vitrina de Supabase)? Con p_uid: además, ¿la subió esa persona?
+create or replace function public.cfx_foto_nube(t text, p_uid uuid default null) returns boolean
+language sql immutable set search_path = '' as $$
+  select coalesce(t, '') ~ '^https://[a-z0-9-]+\.supabase\.co/storage/v1/object/public/vitrina/[0-9a-f-]{36}/[0-9a-f-]{36}\.(webp|jpg|png)$'
+    and (p_uid is null or split_part(split_part(t, '/vitrina/', 2), '/', 1) = p_uid::text)
+$$;
+-- Foto de vitrina válida: vacía, base64 liviano (≤ maxlen) o de la nube.
+create or replace function public.cfx_foto_ok(t text, maxlen int) returns boolean
+language sql immutable set search_path = '' as $$
+  select coalesce(t, '') = '' or (t ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$' and length(t) <= maxlen) or public.cfx_foto_nube(t)
+$$;
+grant execute on function public.cfx_foto_nube(text, uuid), public.cfx_foto_ok(text, int) to authenticated, anon;
 -- <<< CFX núcleo
 
 -- G95 🎁 Prueba por botón: quien ya tuvo su prueba Pro queda anotado por correo (no se borra) · al probar se marca trial_used.

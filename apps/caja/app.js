@@ -626,7 +626,7 @@
         if (!(await sincronizar(p))) { p.publicado = false; break; }
         ok++;
         if (p.stock !== '') Cuenta.rpc('set_stock', { p_key: p.id, p_stock: p.stock }).catch(() => {});
-        if (p._foto) { try { await Cuenta.rpc('set_foto_producto', { p_key: p.id, p_foto: p._foto }); p.foto = true; fotosOk++; } catch (err) { Core.toast('📷 ' + err.message); } }
+        if (p._foto) { try { await Cuenta.rpc('set_foto_producto', { p_key: p.id, p_foto: window.CFX_NUBE ? await CFX_NUBE.subir(p._foto) : p._foto }); p.foto = true; fotosOk++; } catch (err) { Core.toast('📷 ' + err.message); } }
       }
     } finally {
       nuevos.forEach((p) => delete p._foto);
@@ -639,7 +639,7 @@
   $('p-pub').onchange = (e) => $('rowPrem').classList.toggle('hidden', !e.target.checked);
 
   /* ---------- 📷 Foto del producto (1 por producto; se guarda en el servidor, liviana) ---------- */
-  let fotoNueva = null, fotoQuitar = false;
+  let fotoNueva = null, fotoQuitar = false, fotoVieja = null;
   $('rowFoto').classList.toggle('hidden', esCliente); // la Caja del cliente es privada: sin fotos
   function verFoto(src) {
     $('p-fotoPrev').classList.toggle('hidden', !src);
@@ -658,8 +658,10 @@
     if (esCliente || (!fotoNueva && !fotoQuitar)) return;
     if (!prod.publicado) { if (fotoNueva) Core.toast('📷 Para mostrar la foto, marca "Mostrar en mi catálogo"'); return; }
     try {
-      await Cuenta.rpc('set_foto_producto', { p_key: prod.id, p_foto: fotoQuitar ? null : fotoNueva });
-      prod.foto = !fotoQuitar;
+      const nueva = fotoQuitar ? null : (window.CFX_NUBE ? await CFX_NUBE.subir(fotoNueva) : fotoNueva); // G122 🖼️ a Storage (si no se puede, base64)
+      await Cuenta.rpc('set_foto_producto', { p_key: prod.id, p_foto: nueva });
+      if (window.CFX_NUBE && fotoVieja && fotoVieja !== nueva) CFX_NUBE.borrar(fotoVieja);
+      fotoVieja = nueva; prod.foto = !fotoQuitar;
     } catch (err) { Core.toast('📷 Foto: ' + err.message); }
   }
 
@@ -681,7 +683,7 @@
 
   function limpiarForm() {
     editId = null;
-    fotoNueva = null; fotoQuitar = false; verFoto(null);
+    fotoNueva = null; fotoQuitar = false; fotoVieja = null; verFoto(null);
     ['nombre', 'precio', 'costo', 'stock', 'cat', 'prem', 'desc', 'ops'].forEach((k) => { $('p-' + k).value = ''; });
     $('p-pub').checked = !esCliente; $('rowPrem').classList.toggle('hidden', esCliente); // lo nuevo se publica por defecto
     $('p-vip').checked = false; pintarVars([]);
@@ -751,10 +753,10 @@
       $('p-vip').checked = !!p.vip;
       $('p-desc').value = p.desc || ''; $('p-ops').value = p.ops || ''; pintarVars(p.vars || []);
       $('rowPrem').classList.toggle('hidden', !p.publicado);
-      fotoNueva = null; fotoQuitar = false; verFoto(null);
+      fotoNueva = null; fotoQuitar = false; fotoVieja = null; verFoto(null);
       if (p.publicado && !esCliente) {
         Cuenta.rpc('fotos_productos', { p_negocio: cuenta.id, p_claves: [p.id] })
-          .then((l) => { p.foto = !!l[0]; if (editId === id && l[0] && !fotoNueva && !fotoQuitar) verFoto(l[0].foto); }).catch(() => {});
+          .then((l) => { p.foto = !!l[0]; if (editId === id && l[0] && !fotoNueva && !fotoQuitar) { fotoVieja = l[0].foto; verFoto(l[0].foto); } }).catch(() => {});
       }
       renderLista();
       scrollTo(0, 0);
