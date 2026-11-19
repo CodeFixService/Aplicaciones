@@ -1685,7 +1685,8 @@
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button, a'); if (!b || b.closest('dialog, .modal, .sheet, .cfx-mv')) return;
     const t = (b.textContent || '').trim(), al = b.getAttribute('aria-label') || '';
-    if (!(/volver|atrás/i.test(al) || (t && t.length <= 12 && VOLVER.test(t) && /[‹←⬅<]|volver|atr/i.test(t)))) return;
+    // G114: solo si el nombre EMPIEZA con volver/atrás ("Volver al inicio" sí; "Mover atrás" del Tablero no).
+    if (!(/^\s*(volver|atrás|atras|regresar)(\s|$)/i.test(al) || (t && t.length <= 12 && VOLVER.test(t) && /[‹←⬅<]|volver|atr/i.test(t)))) return;
     const l = pila();
     // Solo en pantallas con dirección propia (#…): las vistas internas sin dirección usan su propio Volver.
     if (location.hash.length > 1 && l.length > 1 && !b.hasAttribute('data-sin-atras')) { e.preventDefault(); e.stopImmediatePropagation(); history.back(); }
