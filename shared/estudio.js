@@ -137,7 +137,11 @@
     }
     function copy(idea) {
       const c = cf(), el = may(idea.elemento || idea.tema);
-      const cuerpo = c.obj === 'vender' ? el + '. Lo vemos todos los días y tiene solución.' : c.obj === 'comentarios' ? el + '. ¿A ti te ha pasado?' : c.obj === 'compartidos' ? el + '. Guárdalo: te va a servir.' : el + '. Cada semana te traigo uno así.';
+      const V = { vender: ['. Lo vemos todos los días y tiene solución.', '. Te lo resolvemos rápido y sin vueltas.', '. Escríbenos y lo vemos juntos hoy.'],
+        comentarios: ['. ¿A ti te ha pasado?', '. Cuéntame en comentarios si te suena.', '. ¿Qué harías tú? Te leo.'],
+        compartidos: ['. Guárdalo: te va a servir.', '. Compártelo con quien lo necesita.', '. Guárdalo para cuando te toque.'],
+        seguidores: ['. Cada semana te traigo uno así.', '. Sígueme: mañana viene la parte 2.', '. Más datos así en mi perfil.'] }[c.obj] || ['.'];
+      const cuerpo = el + V[(+idea.vc || 0) % V.length]; // G123: 🔄 Otra cambia la variante
       return idea.gancho + '\n\n' + cuerpo + (c.publico ? '\nPara ' + c.publico + '.' : '') + '\n\n👉 ' + idea.cta;
     }
     function hashtags(idea) {
@@ -145,7 +149,10 @@
       String(c.tags || '').split(/[\s,]+/).filter(Boolean).forEach((x) => s.add(x[0] === '#' ? x.toLowerCase() : tagDe(x)));
       s.add(tagDe(idea.tema)); if (nombre) s.add(tagDe(nombre));
       if (idea.red === 'tiktok') s.add('#tiktokchile'); else if (idea.red !== 'historias') s.add('#chile');
-      return Array.from(s).filter((x) => x.length > 2).slice(0, 8).join(' ');
+      const X = ['#tips', '#datos', '#emprendimiento', '#pyme', '#hechoenchile', '#negociolocal', '#consejos', '#santiago'], v = +idea.vh || 0; // G123: 🔄 Otra suma otros
+      if (v) { s.add(tagDe(idea.elemento || '').slice(0, 20)); for (let k = 0; k < 3; k++) s.add(X[(v * 3 + k) % X.length]); }
+      const L = Array.from(s).filter((x) => x.length > 2); if (v) L.push(...L.splice(0, v % Math.max(1, L.length)));
+      return L.slice(0, 8).join(' ');
     }
     const redN = (r) => (REDES.find((x) => x[0] === r) || [0, r || ''])[1];
     function cajas(idea) {
@@ -160,13 +167,13 @@
         ['toma', '🎥 Tomas a grabar', may(idea.toma)]
       ];
     }
-    const REFRESCA = { gancho: 'gancho', texto_pantalla: 'texto_pantalla', cta: 'cta', red: 'red', toma: 'toma', guion: 'formato' };
+    const REFRESCA = { gancho: 'gancho', texto_pantalla: 'texto_pantalla', cta: 'cta', red: 'red', toma: 'toma', guion: 'formato', copy: 'vc', tags: 'vh' };
     function htmlCajas(idea, guardada) {
       return cajas(idea).map((c) => '<div class="e-card" data-caja="' + c[0] + '"><div class="e-fila"><b>' + c[1] + '</b>' + (c[3] ? '<span class="e-pill">' + esc(c[3]) + '</span>' : '') + '</div>' +
         '<p class="e-txt">' + esc(c[2] || '—') + '</p>' +
         (c[4] ? '<details><summary>2 ganchos más</summary>' + c[4].map((a, k) => '<div class="e-alt"><p>' + esc(a.txt) + '</p><span class="e-sub">⭐ ' + a.pts + ' · ' + esc(a.tec) + '</span><div class="e-b"><button type="button" class="small alt" data-e="copiaAlt" data-k="' + k + '">📋 Copiar</button>' + (guardada ? '' : '<button type="button" class="small alt" data-e="usarAlt" data-k="' + k + '">Usar este</button>') + '</div></div>').join('') + '</details>' : '') +
         '<div class="e-b"><button type="button" class="small" data-e="copiar" data-c="' + c[0] + '">📋 Copiar</button>' + (REFRESCA[c[0]] && !guardada ? '<button type="button" class="small alt" data-e="refrescar" data-c="' + c[0] + '" aria-label="Otra opción">🔄 Otra</button>' : '') + '</div></div>').join('') +
-        '<div class="e-b"><button type="button" class="alt" data-e="prompt">📋 Copiar prompt para Claude</button>' + (guardada || !D.puede ? '' : '<button type="button" class="ok" data-e="guardar">💾 Guardar idea</button>') + '</div>';
+        '<div class="e-b">' + (guardada || !D.puede ? '' : '<button type="button" class="alt" data-e="todo">🔄 Cambiar todo</button>') + '<button type="button" class="alt" data-e="prompt">📋 Copiar prompt para Claude</button>' + (guardada || !D.puede ? '' : '<button type="button" class="ok" data-e="guardar">💾 Guardar idea</button>') + '</div>';
     }
     function promptClaude(idea) {
       const c = cf(), ob = (OBJ.find((x) => x[0] === c.obj) || [0, c.obj])[1];
@@ -183,7 +190,7 @@
       if (re && !re.test(idea.formato) && ((idea.combo || '').length % 3) !== 0) { const f = window.Motor.formatosDe(idea.red).find((x) => re.test(x.t)); if (f) { idea.formato = f.t; idea.duracion_seg = f.dur || idea.duracion_seg; } }
       return idea;
     }
-    function datosIdea(i) { const r = {}; ['combo', 'tema', 'red', 'estructura', 'estructura_nombre', 'elemento_id', 'elemento', 'gancho', 'formato', 'duracion_seg', 'toma', 'texto_pantalla', 'cta', 'hora', 'fecha_plan', 'm'].forEach((k) => { if (i[k] != null) r[k] = typeof i[k] === 'string' ? i[k].slice(0, 300) : i[k]; }); return r; }
+    function datosIdea(i) { const r = {}; ['combo', 'tema', 'red', 'estructura', 'estructura_nombre', 'elemento_id', 'elemento', 'gancho', 'formato', 'duracion_seg', 'toma', 'texto_pantalla', 'cta', 'hora', 'fecha_plan', 'm', 'vc', 'vh'].forEach((k) => { if (i[k] != null) r[k] = typeof i[k] === 'string' ? i[k].slice(0, 300) : i[k]; }); return r; }
     const filaIdea = (i) => ({ tipo: 'idea', titulo: String(i.gancho || '').slice(0, 200), fecha: i.fecha_plan || null, estado: 'pendiente', datos: datosIdea(i) });
 
     /* ---------- CSV ---------- */
@@ -322,6 +329,12 @@
           if (!n) return toast('Se usaron todas las combinaciones: suma filas a la base (📚 Base).');
           ui.idea = ajustarObjetivo(n); ui.v = 'idea'; ui.det = null; return pintar();
         }
+        if (a === 'todo') { // G123 a: 🔄 Cambiar todo (mismo tema si se puede)
+          const C = ctx(), t = (ui.idea || {}).tema, n = (C.temas.includes(t) && window.Motor.nueva(C, ui.red, hoy(), { tema: t })) || window.Motor.nueva(C, ui.red, hoy());
+          if (!n) return toast('Se usaron todas las combinaciones: suma filas a la base (📚 Base).');
+          const k = ((ui.idea || {}).vc || 0) + 1; ui.idea = Object.assign(ajustarObjetivo(n), { vc: k, vh: k }); return pintar();
+        }
+        if (a === 'refrescar' && (REFRESCA[b.dataset.c] === 'vc' || REFRESCA[b.dataset.c] === 'vh')) { const k = REFRESCA[b.dataset.c]; ui.idea = Object.assign({}, ui.idea, { [k]: (+ui.idea[k] || 0) + 1 }); return pintar(); }
         if (a === 'refrescar') { const campo = REFRESCA[b.dataset.c], prev = ui.idea.cta, op = CTA_OBJ[cf().obj] || []; ui.idea = window.Motor.refrescar(ctx(), ui.idea, campo); if (campo === 'cta' && op.length) ui.idea.cta = op[(op.indexOf(prev) + 1) % op.length]; return pintar(); }
         if (a === 'usarAlt') { const al = alternativas(ui.idea)[+b.dataset.k]; ui.idea = Object.assign({}, ui.idea, { gancho: al.txt, estructura: al.k, estructura_nombre: al.tec }); return pintar(); }
         if (a === 'guardar') { b.disabled = true; await guardar([filaIdea(ui.idea)]); ui.idea = null; toast('💾 Guardada en 📅 Semana'); return pintar(); }
