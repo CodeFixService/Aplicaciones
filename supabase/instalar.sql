@@ -1206,7 +1206,7 @@ begin
   if public.cfx_modulo('sellos') then perform public.cfx_sellos_guardar(p_sellos_meta, p_sellos_premio); end if;
   update public.profiles set
     datos_pago = nullif(left(trim(coalesce(p_datos_pago, '')), 400), ''),
-    horario = nullif(left(trim(coalesce(p_horario, '')), 120), ''),
+    horario = nullif(left(trim(coalesce(p_horario, '')), 300), ''),  -- G117: generado por días (hasta 7 días × 2 tramos)
     abierto = coalesce(p_abierto, true)
   where id = auth.uid();
   return public.my_account();
@@ -5432,7 +5432,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.86'::text $$;
+language sql immutable as $$ select '5.87'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.

@@ -240,7 +240,7 @@
       <label for="tPago">Datos para transferencia</label>
       <textarea id="tPago" maxlength="400" placeholder="Banco · Tipo de cuenta · N° de cuenta · RUT · Nombre · Correo"></textarea>
       <label for="tHorario">Horario de atención</label>
-      <input id="tHorario" maxlength="120" placeholder="Lun a Vie 9:00 a 19:00 · Sáb 10:00 a 14:00">
+      <input id="tHorario" maxlength="300" placeholder="Lun a Vie 9:00 a 19:00 · Sáb 10:00 a 14:00">
       <details id="dPerfil"><summary style="cursor:pointer;font-weight:700;margin:12px 0 4px">📇 Perfil y políticas de tu tienda</summary>
         <p class="muted" style="font-size:13px;margin:4px 0">Se luce arriba en tu página de tienda.</p><div id="tPerfil"></div></details>
       <label class="terms"><input type="checkbox" id="tAbierto" checked> <span>Tienda abierta ahora (si la desmarcas, tus clientes ven "Cerrado: te responderemos al abrir")</span></label>
@@ -745,7 +745,7 @@ try {
     const pasos = [[!!t.rubro, { ir: '#tienda', campo: '#tRubro', k: 'rubro' }, 'Elige a qué se dedica tu negocio'],
       [!!acc.logo, { ir: '#tienda', campo: '#tLogo', k: 'logo', como: 'Toca aquí y elige tu logo de la galería: se guarda solo. Tu color lo eliges arriba, en tu perfil de Ajustes.' }, 'Sube tu logo y elige tu color'],
       [!!acc.telefono, { ir: '#tienda', campo: '#eTel', k: 'whatsapp', como: 'Escribe tu WhatsApp con el 9 (ej: 912345678) y toca "Guardar mi tienda" al final.' }, 'Escribe el WhatsApp de tu tienda'],
-      [!!t.horario, { ir: '#tienda', campo: '#tHorario', k: 'horario', como: 'Escribe tus días y horas (ej: Lun a Vie 9:00 a 19:00) y toca "Guardar mi tienda" al final.' }, 'Escribe tu horario de atención'],
+      [!!t.horario, { ir: '#tienda', campo: '#tHorario + .fo', k: 'horario', como: 'Marca tus días abiertos y sus horas (⚡ Rápido: Lun a Vie, Sáb y Dom) y toca "Guardar mi tienda" al final.' }, 'Escribe tu horario de atención'],
       [!!h.productos, { ir: 'apps/caja/#productos', campo: '#p-nombre', k: 'productos' }, 'Agrega tus productos o servicios con foto y precio' + (rb ? ' (ej: ' + rb[2] + ')' : '') + ' o cárgalos de una vez con 📥 Excel, WhatsApp o ✨ plantilla'],
       [!!h.link_pago, { ir: '#links', campo: '#cLinks input[type=url]', k: 'cobro', como: 'Pega aquí tu link de pago (Mercado Pago u otro) y guarda: tus clientes pagan al tiro.' }, 'Pega tu link de pago para cobrar pedidos online'],
       [compartio, { ir: '#', campo: '#hoyCompartir', k: 'link', como: 'Toca Compartir y mándalo a tus grupos de WhatsApp o ponlo en tu Instagram. ¡Así llegan tus primeros pedidos!' }, 'Comparte tu tienda por WhatsApp o con el QR']];
@@ -1199,6 +1199,8 @@ try {
       const t = await Cuenta.rpc('tienda_info', { p_negocio: acc.id });
       if (!t) return;
       $('tPago').value = t.datos_pago || ''; $('tHorario').value = t.horario || '';
+      // G117: horario por días y datos de banco por campos (núcleo vitrina.js); el texto se sigue guardando igual.
+      if (CodeFixVitrina.horario) { CodeFixVitrina.horario($('tHorario')); CodeFixVitrina.transferencia($('tPago')); }
       $('tAbierto').checked = t.abierto !== false;
       SELLOS = [t.sellos_meta ?? null, t.sellos_premio || ''];
       $('tVac').checked = !!t.vacaciones_hasta;

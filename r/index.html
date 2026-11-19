@@ -41,7 +41,7 @@
       <div class="btns"><a class="btn ok" id="bPagar" target="_blank" rel="noopener" style="flex:1">💳 Pagar</a></div>
       <div class="btns" id="rowComp"><label class="btn" for="fComp" style="flex:1">📷 Subir foto del comprobante</label><input type="file" accept="image/*" id="fComp" class="hidden"></div>
     </div>
-    <div class="card hidden" id="cDatos"><h2>🏦 Datos de la tienda</h2><pre id="datos"></pre></div>
+    <div class="card hidden" id="cDatos"><h2>🏦 Datos de la tienda</h2><pre id="datos"></pre><button type="button" class="small alt" id="bCopDatos" data-cfx-copiar="">📋 Copiar todo</button></div>
     <div class="card"><h2>🧾 Detalle</h2><pre id="detalle"></pre><div class="row" style="justify-content:space-between" ><b>Total</b><b id="total"></b></div><p class="muted hidden" id="boleta" style="margin:8px 0 0"></p></div>
     <div class="card hidden" id="cEnvio"><h2>🚚 Tu envío</h2><div id="envio"></div></div>
     <div class="card hidden" id="cCorreo"><h2>✉️ Avisos por correo</h2><p class="muted" style="margin-top:0">Te mandamos el estado de tu pedido y el código de seguimiento.</p>
@@ -118,6 +118,7 @@
     if (p.link && p.link.url) { $('bPagar').href = CFX_URL(p.link.url); $('bPagar').textContent = '💳 Pagar ' + precio(p.total) + (p.link.titulo ? ' · ' + p.link.titulo : ''); }
     $('cDatos').classList.toggle('hidden', !t.datos_pago || !['pagando', 'recibido'].includes(p.estado));
     $('datos').textContent = t.datos_pago || '';
+    $('bCopDatos').setAttribute('data-cfx-copiar', t.datos_pago || '');  // G117 b (núcleo vitrina.js)
     const tel = String(t.telefono || '').replace(/\D/g, '');
     $('bWsp').classList.toggle('hidden', !tel);
     $('bWsp').href = 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Hola, hice un pedido de ' + precio(p.total) + ' en ' + t.nombre + ': ' + location.href);
