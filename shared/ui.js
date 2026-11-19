@@ -211,7 +211,10 @@
 
   window.CFX_ORDEN = {
     lista(el, clave, todo) { if (!el) return; el.dataset.cfxOrden = clave; if (todo) el.dataset.cfxOrdenTodo = '1'; el._cfxOrd = ''; preparar(el); },
-    borrar(clave) { try { localStorage.removeItem(llave(clave)); } catch (e) { /* nada */ } }
+    borrar(clave) { try { localStorage.removeItem(llave(clave)); } catch (e) { /* nada */ } },
+    // G113 d: leer/guardar un dato propio de la persona con la misma llave (orden de las páginas del Más, nombres editados).
+    leer(clave) { try { return JSON.parse(localStorage.getItem(llave(clave)) || 'null'); } catch (e) { return null; } },
+    guardar(clave, v) { try { localStorage.setItem(llave(clave), JSON.stringify(v)); } catch (e) { /* lleno */ } }
   };
   window.CFX_SUBIR = { revisar };
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', () => { revisarListas(); fijar(); }); else { revisarListas(); fijar(); }
@@ -235,6 +238,9 @@
       'border:1px solid var(--cfx-borde,#dce3ea);border-bottom:0;box-shadow:0 -12px 40px -12px rgba(0,0,0,.45);animation:cfxDlgS .2s cubic-bezier(.2,.8,.2,1) both}' +
       '.cfx-dlg-t{margin:0 0 14px;font-size:16px;line-height:1.4;font-weight:600;white-space:pre-line;overflow-wrap:anywhere}' +
       '.cfx-dlg-i{box-sizing:border-box;width:100%;margin:0 0 14px;padding:12px;border-radius:12px;border:1.5px solid var(--cfx-borde,#dce3ea);background:var(--cfx-campo,#f7f9fb);color:inherit;font:inherit;font-size:16px}' +
+      '.cfx-dlg-l{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:6px;max-height:45vh;overflow:auto}' +
+      '.cfx-dlg-l li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:14px;background:var(--cfx-campo,#f1f4f7);border:1px solid var(--cfx-borde,#dce3ea);font-size:15px;font-weight:600;overflow-wrap:anywhere}' +
+      '.cfx-dlg-l li span{flex:none;font-weight:500;font-size:13px;opacity:.75}' +
       '.cfx-dlg-i:focus{outline:2px solid var(--brand,#2563eb);outline-offset:0}.cfx-dlg-b{display:flex;gap:10px}' +
       '.cfx-dlg-b button{flex:1;min-height:46px;border-radius:14px;border:0;font:inherit;font-weight:700;font-size:15px;cursor:pointer}' +
       '.cfx-dlg-no{background:var(--cfx-campo,#f1f4f7);color:var(--cfx-texto,#111827);border:1px solid var(--cfx-borde,#dce3ea)!important}' +
@@ -252,6 +258,11 @@
       v.className = 'cfx-dlg'; v.setAttribute('role', 'presentation');
       const c = d.createElement('div'); c.className = 'cfx-dlg-c'; c.setAttribute('role', o.input ? 'dialog' : 'alertdialog'); c.setAttribute('aria-modal', 'true');
       const t = d.createElement('p'); t.className = 'cfx-dlg-t'; t.id = 'cfxDlgT' + Date.now(); t.textContent = String(texto == null ? '' : texto); c.setAttribute('aria-labelledby', t.id); c.appendChild(t);
+      // G113 a: opción lista → cada elemento en su fila con fondo redondeado (texto o { t, d }: nombre + detalle a la derecha)
+      if (Array.isArray(o.lista) && o.lista.length) { const ul = d.createElement('ul'); ul.className = 'cfx-dlg-l';
+        o.lista.forEach((x) => { const li = d.createElement('li'), n = d.createElement('b'); n.textContent = String(x && typeof x === 'object' ? x.t : x); li.appendChild(n);
+          if (x && typeof x === 'object' && x.d != null && x.d !== '') { const s = d.createElement('span'); s.textContent = String(x.d); li.appendChild(s); } ul.appendChild(li); });
+        c.appendChild(ul); }
       let inp = null;
       if (o.input) { inp = d.createElement('input'); inp.className = 'cfx-dlg-i'; inp.type = o.tipo || 'text'; inp.value = o.valor == null ? '' : String(o.valor); if (o.tipo === 'number') inp.inputMode = 'decimal'; c.appendChild(inp); }
       const b = d.createElement('div'); b.className = 'cfx-dlg-b';
@@ -272,10 +283,45 @@
   // El botón rojo dice la acción ("Eliminar", "Quitar"…), no "Aceptar".
   const verbo = (t) => { const m = String(t).match(PELIGRO); if (!m) return null; const v = m[0].trim().split(' ')[0].toLowerCase(); return v === 'cancelar' ? 'Sí, cancelar' : v[0].toUpperCase() + v.slice(1); };
   const confirmar = (texto, o = {}) => { const pel = o.peligro != null ? o.peligro : PELIGRO.test(String(texto));
-    return abrir(texto, { si: o.si || (pel && verbo(texto)) || undefined, no: o.no || (pel ? 'No' : undefined), peligro: pel, vacio: false, lleno: true }); };
+    return abrir(texto, { si: o.si || (pel && verbo(texto)) || undefined, no: o.no || (pel ? 'No' : undefined), peligro: pel, vacio: false, lleno: true, lista: o.lista }); };
   const pedir = (texto, valor, o = {}) => abrir(texto, { input: true, valor, tipo: o.tipo, si: o.si || 'Listo', vacio: null });
-  const avisar = (texto, o = {}) => abrir(texto, { si: o.si || 'Entendido', no: false, vacio: undefined, lleno: undefined });
+  const avisar = (texto, o = {}) => abrir(texto, { si: o.si || 'Entendido', no: false, vacio: undefined, lleno: undefined, lista: o.lista });
   window.CFX_DIALOGO = { confirmar, pedir, avisar };
+
+  // ---------- G113 b · 🗂️ CFX_CAJA: elegir entre muchas opciones (CSS .ca en tema.css) ----------
+  // CFX_CAJA.montar(cont, { opciones: [{ id, t, sub?, img?, ico?, color? }], actual, alElegir(id), aviso?, titulo?, extra?(op, editando), pie?(editando), dato? })
+  //  img = URL (si no carga → cuadro neutro) · ico = emoji/HTML ya seguro · color = punto de color. Devuelve { pintar, actual() }.
+  const escH = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function caja(cont, o) {
+    o = o || {}; let abierta = false; const st = { editando: false };
+    const ops = () => (typeof o.opciones === 'function' ? o.opciones() : o.opciones) || [];
+    const dato = o.dato || 'ca-op';
+    const fig = (x) => x.img ? '<img class="ca-img" alt="" src="' + escH(x.img) + '">' : x.color ? '<i class="ca-img ca-punto" style="background:' + escH(x.color) + '"></i>' : x.ico ? '<span class="ca-img" aria-hidden="true">' + x.ico + '</span>' : '';
+    function pintar() {
+      const L = ops(); const a = L.find((x) => String(x.id) === String(o.actual)) || L[0]; if (!a) { cont.innerHTML = ''; return; }
+      o.actual = a.id;
+      cont.innerHTML = '<div class="ca' + (abierta ? ' abierta' : '') + '">' +
+        '<button type="button" class="ca-btn" data-ca="abrir" aria-expanded="' + abierta + '"' + (o.titulo ? ' aria-label="' + escH(o.titulo + ': ' + a.t) + '"' : '') + '>' + fig(a) +
+          '<span class="ca-txt"><b>' + escH(a.t) + '</b><small>' + escH(abierta ? (o.titulo || 'Elige una opción') : (o.aviso || 'Toca para cambiar')) + '</small></span><span class="ca-flecha" aria-hidden="true"></span></button>' +
+        (abierta ? '<div class="ca-lista" role="listbox">' + L.map((x) => { const on = String(x.id) === String(a.id); return '<div class="ca-fila' + (on ? ' on' : '') + '">' +
+            '<button type="button" class="ca-op" role="option" aria-selected="' + on + '" data-' + dato + '="' + escH(x.id) + '">' + fig(x) +
+              '<span class="ca-txt"><b>' + escH(x.t) + '</b>' + (x.sub ? '<small>' + escH(x.sub) + '</small>' : '') + '</span>' + (on ? '<span class="ca-ok" aria-hidden="true">✓</span>' : '') + '</button>' +
+            (o.extra ? (o.extra(x, st.editando) || '') : '') + '</div>'; }).join('') + (o.pie ? (o.pie(st.editando) || '') : '') + '</div>' : '') + '</div>';
+      const sin = (i) => { const s2 = d.createElement('span'); s2.className = 'ca-img sin'; i.replaceWith(s2); };
+      cont.querySelectorAll('img.ca-img').forEach((i) => { if (i.complete && !i.naturalWidth) sin(i); else i.onerror = () => sin(i); });
+    }
+    const clave = dato.replace(/-([a-z])/g, (m, c) => c.toUpperCase());
+    cont.onclick = (ev) => {
+      const b = ev.target.closest('[data-ca],[data-' + dato + ']');
+      if (b && b.dataset.ca === 'abrir') { abierta = !abierta; st.editando = false; return pintar(); }
+      if (b && b.dataset[clave] != null) { abierta = false; const id = b.dataset[clave]; if (String(id) === String(o.actual)) return pintar();
+        const op = ops().find((x) => String(x.id) === id); o.actual = op ? op.id : id; pintar(); return o.alElegir && o.alElegir(o.actual); }
+      if (o.alTocar) o.alTocar(ev, st, pintar);
+    };
+    pintar();
+    return { pintar, actual: () => o.actual, estado: st };
+  }
+  window.CFX_CAJA = { montar: caja };
   window.alert = (t) => { window.CFX_DIALOGO.avisar(t); };
 })();
 

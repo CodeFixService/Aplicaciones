@@ -346,3 +346,27 @@ html.cfx-col-ico :is(nav.tabs, .seg, .segs, .tabs2) button:not(.on):not(.activo)
 .cfx-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
 .cfx-chips .cfx-chip { flex: 1 1 auto; min-width: 0; min-height: 38px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--cfx-borde, #d0d5dd); background: transparent; color: inherit; font: inherit; font-size: 15px; line-height: 1.2; font-weight: 600; cursor: pointer; box-shadow: none; }
 .cfx-chips .cfx-chip.on { background: var(--brand, var(--marca, #2563eb)); border-color: var(--brand, var(--marca, #2563eb)); color: var(--cfx-mas-ink, #fff); }
+
+/* G113 b · 🗂️ CFX_CAJA (ui.js): elegir entre muchas opciones = botón con la elegida (imagen/ícono + nombre ▾);
+   al tocarlo se abre la lista hacia abajo. Misma caja en las 6 apps y el CM (antes: MisApps.cajaApps solo en el CM). */
+.ca { margin: 4px 0 10px; border: 1px solid var(--cfx-borde, #dce3ea); border-radius: 16px; background: var(--cfx-tarjeta, #fff); overflow: hidden; }
+.ca .ca-btn, .ca .ca-op { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 12px; margin: 0; border: 0; border-radius: 0; background: transparent; color: var(--cfx-texto, #111827); text-align: left; font: inherit; box-shadow: none; cursor: pointer; }
+.ca .ca-img { flex: none; width: 40px; height: 40px; border-radius: 10px; object-fit: cover; background: color-mix(in srgb, var(--cfx-texto, #111827) 8%, transparent); display: inline-flex; align-items: center; justify-content: center; font-size: 20px; }
+.ca .ca-img.sin { display: inline-block; border: 1px solid var(--cfx-borde, #dce3ea); }
+.ca .ca-img.ca-punto { width: 14px; height: 14px; border-radius: 50%; margin: 0 13px; }
+.ca .ca-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.ca .ca-txt b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ca .ca-txt small { font-size: 12.5px; color: var(--cfx-texto-2, #6b7280); font-weight: 500; }
+.ca .ca-flecha { flex: none; width: 10px; height: 10px; border-right: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor; transform: rotate(45deg); margin: 0 6px 4px; opacity: .7; transition: transform .15s; }
+.ca.abierta .ca-flecha { transform: rotate(-135deg); margin-bottom: -4px; }
+.ca .ca-lista { border-top: 1px solid var(--cfx-borde, #dce3ea); padding: 4px 0; max-height: 60vh; overflow-y: auto; }
+.ca .ca-fila { display: flex; align-items: center; }
+.ca .ca-fila .ca-op { min-height: 52px; }
+.ca .ca-fila .ca-img:not(.ca-punto) { width: 34px; height: 34px; border-radius: 9px; font-size: 18px; }
+.ca .ca-fila.on .ca-op { background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 12%, transparent); }
+.ca .ca-fila.on .ca-txt b { color: var(--brand, var(--marca, #2563eb)); }
+.ca .ca-ok { flex: none; font-weight: 800; color: var(--brand, var(--marca, #2563eb)); }
+.ca .ca-ed { display: flex; gap: 6px; padding-right: 10px; flex: none; }
+.ca .ca-ed button { min-height: 34px; padding: 0 10px; font-size: 13px; }
+.ca .ca-cambiar { display: block; margin: 6px 12px 8px auto; }
+@media (min-width: 900px) { .ca { max-width: 520px; } }

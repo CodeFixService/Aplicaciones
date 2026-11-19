@@ -140,11 +140,32 @@
     // Menú en lista (CFX_AJUSTES / CFX_MENU): filas con ícono, nombre, detalle, dato y ›; igual en las 7 apps.
     '.cfx-aj-w{--pf:var(--brand,var(--marca,#2563eb))}.cfx-aj-g{margin:20px 6px 8px;font:800 12px/1.2 var(--cfx-letra,system-ui,sans-serif);letter-spacing:.06em;text-transform:uppercase;color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-aj-w>.cfx-aj-g:first-child,.cfx-aj-w>.cfx-aj-sec:first-child>.cfx-aj-g{margin-top:4px}' +
+    // G113 d · Más en páginas que se deslizan de lado (una categoría por página) + pestañas con el nombre + ⇅ ordenar.
+    '.cfx-mm-cab{display:flex;align-items:center;gap:6px;margin:10px 0 6px}.cfx-mm-tabs{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;padding:2px}.cfx-mm-tabs::-webkit-scrollbar{display:none}' +
+    '.cfx-mm-tab{flex:none;min-height:38px;padding:6px 14px;border-radius:999px;border:1px solid var(--cfx-borde,#dce3ea);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font:700 14px/1.2 var(--cfx-letra,system-ui,sans-serif);cursor:pointer;white-space:nowrap}' +
+    '.cfx-mm-tab.on{background:var(--pf);border-color:var(--pf);color:var(--brand-ink,#fff)}' +
+    '.cfx-mm-ord{flex:none;width:40px;height:40px;border-radius:12px;border:1px solid var(--cfx-borde,#dce3ea);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:18px;cursor:pointer;padding:0}' +
+    '.cfx-mm-pags{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;align-items:flex-start;-webkit-overflow-scrolling:touch}.cfx-mm-pags::-webkit-scrollbar{display:none}' +
+    '.cfx-mm-pags>.cfx-mm-pag{flex:0 0 100%;min-width:0;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;padding:0 1px}' +
+    '.cfx-mm-pag>.cfx-aj-g{margin-top:4px;display:flex;align-items:baseline;gap:8px}.cfx-mm-pag>.cfx-aj-g small{font-weight:600;letter-spacing:0;opacity:.7}' +
+    '.cfx-mm-pts{display:flex;justify-content:center;gap:6px;margin:8px 0 4px}.cfx-mm-pts i{width:7px;height:7px;border-radius:50%;background:var(--cfx-borde,#dce3ea)}.cfx-mm-pts i.on{background:var(--pf);width:18px;border-radius:4px}' +
+    '.cfx-mm-ol{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.cfx-mm-ayuda{margin:0 0 4px;color:var(--cfx-texto-2,#5b6472);font-size:14px}' +
+    '.cfx-mm-of{display:flex;align-items:center;gap:6px;padding:8px 8px 8px 14px;border-radius:14px;background:var(--cfx-campo,#f1f4f7);border:1px solid var(--cfx-borde,#dce3ea)}.cfx-mm-of b{flex:1;min-width:0;overflow-wrap:anywhere}' +
+    '.cfx-mm-of button{flex:none;width:40px;height:40px;border-radius:10px;border:1px solid var(--cfx-borde,#dce3ea);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font-size:17px;cursor:pointer;padding:0}.cfx-mm-of button:disabled{opacity:.35;cursor:default}' +
+    '.cfx-mm-fab{align-self:flex-start;margin-top:4px;min-height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--cfx-borde,#dce3ea);background:transparent;color:var(--cfx-texto-2,#5b6472);font:600 14px var(--cfx-letra,system-ui,sans-serif);cursor:pointer}' +
+    '@media (prefers-reduced-motion:reduce){.cfx-mm-pags{scroll-behavior:auto}}' +
     '.cfx-lista{display:flex!important;flex-direction:column;gap:0!important;margin:0 0 6px!important;padding:0!important;border-radius:20px;overflow:hidden;background:var(--cfx-tarjeta,#fff);' +
     'border:1.5px solid color-mix(in srgb,var(--pf) 18%,var(--cfx-borde,#e2e7ec));box-shadow:0 1px 2px rgba(15,23,42,.05),0 8px 24px -12px rgba(15,23,42,.18)}' +
     '.cfx-lista>.cfx-fila{display:flex!important;align-items:center;gap:12px;width:100%!important;min-height:62px!important;margin:0!important;padding:10px 14px!important;border:0!important;border-radius:0!important;' +
     'border-bottom:1px solid var(--cfx-borde,#e2e7ec)!important;background:transparent!important;color:var(--cfx-texto,#111827)!important;text-align:left!important;justify-content:flex-start!important;box-shadow:none!important;cursor:pointer;font:inherit;transform:none!important;animation:none!important}' +
     '.cfx-lista>.cfx-fila:last-child{border-bottom:0!important}.cfx-lista>.cfx-fila:active{background:color-mix(in srgb,var(--pf) 8%,transparent)!important}' +
+    // G113 e · 🖥️ Computador (≥ 900 px): las opciones del menú van una al lado de la otra, TODAS del mismo ancho y alto (grilla pareja),
+    //   cada una en su tarjeta (sin la línea de abajo que se ajustaba a cada opción). En las hojas (ventanas) siguen en lista.
+    '@media (min-width:900px){.cfx-aj.cfx-lista:not(.cfx-hoja-m .cfx-lista){display:grid!important;grid-template-columns:repeat(auto-fill,minmax(var(--cfx-mm-col,260px),1fr));grid-auto-rows:1fr;gap:10px!important;' +
+      'background:none!important;border:0!important;box-shadow:none!important;border-radius:0!important;overflow:visible!important;margin-bottom:10px!important}' +
+      '.cfx-aj.cfx-lista:not(.cfx-hoja-m .cfx-lista)>.cfx-fila{height:100%;box-sizing:border-box;border:1.5px solid color-mix(in srgb,var(--pf) 18%,var(--cfx-borde,#e2e7ec))!important;border-radius:16px!important;' +
+      'background:var(--cfx-tarjeta,#fff)!important;box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 18px -12px rgba(15,23,42,.18)!important}' +
+      '.cfx-aj.cfx-lista:not(.cfx-hoja-m .cfx-lista)>.cfx-fila:hover{border-color:var(--pf)!important}}' +
     '.cfx-fila-ic{flex:none;width:40px;height:40px;border-radius:13px;display:grid;place-items:center;font-size:20px;line-height:1;background:color-mix(in srgb,var(--pf) 14%,transparent);color:var(--pf)}.cfx-fila-ic svg{width:21px;height:21px}' +
     '.cfx-fila-t{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left!important}.cfx-fila-t b{font:700 15.5px/1.25 var(--cfx-letra,system-ui,sans-serif)}.cfx-fila-t small{font:500 12.5px/1.3 var(--cfx-letra,system-ui,sans-serif);color:var(--cfx-texto-2,#5b6472)}' +
     '.cfx-fila-dato{flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 9px;border-radius:999px;font:800 12px/1.4 var(--cfx-letra,system-ui,sans-serif);background:color-mix(in srgb,var(--pf) 14%,transparent);color:var(--pf)}' +
@@ -715,12 +736,74 @@
       ['Configuración', 'Cuenta y ayuda'].forEach((g) => { const i = grupos.findIndex((x) => x.g === g); if (i >= 0) grupos.push(grupos.splice(i, 1)[0]); });
       // G42c ✋ Cada sección y cada opción se ordena manteniendo presionado (núcleo ui.js: data-cfx-orden / data-cfx-oi, se guarda por usuario).
       const ck = 'aj:' + (o.clave || (o.menu ? 'menu' : el.id || 'ajustes'));
+      if (o.menu && grupos.length > 1) { paginas(grupos, ck); return anchoPar(); }
       w.dataset.cfxOrden = ck;
       w.innerHTML = (o.arriba || '') + grupos.map((x) => '<div class="cfx-aj-sec" data-cfx-oi="' + esc(x.g || '-') + '">' + (x.g ? '<div class="cfx-aj-g">' + esc(x.g) + '</div>' : '') +
         '<div class="cfx-aj cfx-lista" data-cfx-orden="' + esc(ck + ':' + (x.g || '-')) + '">' + x.l.map(fila).join('') + '</div></div>').join('') + (o.abajo || '');
       w.querySelectorAll('.cfx-aj > [data-k]').forEach((b) => { b.onclick = () => abrir(b.dataset.k); });
       if (o.alPintar) o.alPintar(w);
+      anchoPar();
     };
+    // G113 e: en computador todas las tarjetas del ancho del nombre más largo (entre 220 y 360 px).
+    const anchoPar = () => { if (innerWidth < 900) return; requestAnimationFrame(() => {
+      let m = 0; w.querySelectorAll('.cfx-aj > .cfx-fila .cfx-fila-t b').forEach((b) => { const r = document.createRange(); r.selectNodeContents(b); m = Math.max(m, r.getBoundingClientRect().width); });
+      if (m) w.style.setProperty('--cfx-mm-col', Math.round(Math.min(360, Math.max(220, m + 120))) + 'px'); }); };
+    // G113 d · ☰ Más en PÁGINAS: cada categoría es una página que se desliza de lado (pestañas arriba con su nombre).
+    //   ⇅ Ordenar → hoja con ↑ ↓ por categoría y ✏️ para cambiarle el nombre (solo para esta persona; misma llave que el orden con el dedo).
+    let pag = 0;
+    const OR = () => window.CFX_ORDEN;
+    const nomG = (g, N) => (N && N[g || '-']) || g || 'General';
+    function paginas(grupos, ck) {
+      delete w.dataset.cfxOrden;
+      const ord = (OR() && OR().leer(ck)) || [], N = (OR() && OR().leer(ck + ':nombres')) || {};
+      if (Array.isArray(ord) && ord.length) { const pos = (x) => { const i = ord.indexOf(x.g || '-'); return i < 0 ? 1e6 + grupos.indexOf(x) : i; }; grupos.sort((a, b) => pos(a) - pos(b)); }
+      if (pag >= grupos.length) pag = 0;
+      w.innerHTML = (o.arriba || '') +
+        '<div class="cfx-mm-cab"><div class="cfx-mm-tabs" data-cfx-sin-deslizar>' + grupos.map((x, i) => '<button type="button" class="cfx-mm-tab' + (i === pag ? ' on' : '') + '" data-mm-i="' + i + '" aria-pressed="' + (i === pag) + '">' + esc(nomG(x.g, N)) + '</button>').join('') + '</div>' +
+          '<button type="button" class="cfx-mm-ord" data-mm-ord aria-label="Ordenar categorías" title="Ordenar">⇅</button></div>' +
+        '<div class="cfx-mm-pags" data-sin-fijo>' + grupos.map((x, i) => '<div class="cfx-aj-sec cfx-mm-pag" data-cfx-oi="' + esc(x.g || '-') + '" data-mm-p="' + i + '"><div class="cfx-aj-g">' + esc(nomG(x.g, N)) + ' <small>' + (i + 1) + '/' + grupos.length + '</small></div>' +
+          '<div class="cfx-aj cfx-lista" data-cfx-orden="' + esc(ck + ':' + (x.g || '-')) + '">' + x.l.map(fila).join('') + '</div></div>').join('') + '</div>' +
+        '<div class="cfx-mm-pts" aria-hidden="true">' + grupos.map((x, i) => '<i' + (i === pag ? ' class="on"' : '') + '></i>').join('') + '</div>' + (o.abajo || '');
+      const P = w.querySelector('.cfx-mm-pags'), T = w.querySelector('.cfx-mm-tabs');
+      const marcar = (i) => { pag = i; T.querySelectorAll('.cfx-mm-tab').forEach((b, j) => { b.classList.toggle('on', j === i); b.setAttribute('aria-pressed', j === i); });
+        w.querySelectorAll('.cfx-mm-pts i').forEach((b, j) => b.classList.toggle('on', j === i));
+        const b = T.children[i]; if (b) { const r = b.getBoundingClientRect(), rg = T.getBoundingClientRect(); if (r.left < rg.left) T.scrollLeft -= rg.left - r.left + 12; else if (r.right > rg.right) T.scrollLeft += r.right - rg.right + 12; } };
+      const alto = () => { const pg = P.children[pag]; if (pg) P.style.height = pg.offsetHeight + 'px'; };
+      const marcar0 = marcar; const marcar2 = (i) => { marcar0(i); alto(); };
+      const ir = (i, suave) => { P.scrollTo({ left: i * P.clientWidth, behavior: suave ? 'smooth' : 'auto' }); marcar2(i); };
+      requestAnimationFrame(() => { if (pag) P.scrollLeft = pag * P.clientWidth; alto(); });
+      let tm = 0; P.addEventListener('scroll', () => { P.style.height = ''; clearTimeout(tm); tm = setTimeout(() => { const i = Math.round(P.scrollLeft / Math.max(1, P.clientWidth)); marcar2(i); }, 80); }, { passive: true });
+      T.onclick = (e) => { const b = e.target.closest('[data-mm-i]'); if (b) ir(+b.dataset.mmI, true); };
+      w.querySelector('[data-mm-ord]').onclick = () => ordenar(grupos, ck);
+      w.querySelectorAll('.cfx-aj > [data-k]').forEach((b) => { b.onclick = () => abrir(b.dataset.k); });
+      if (o.alPintar) o.alPintar(w);
+    }
+    function ordenar(grupos, ck) {
+      const N = (OR() && OR().leer(ck + ':nombres')) || {};
+      const H = hoja('⇅ Ordenar categorías', () => grilla());
+      const pintar = () => {
+        H.zona.querySelectorAll('.cfx-mm-ol').forEach((x) => x.remove());
+        const ul = document.createElement('div'); ul.className = 'cfx-mm-ol';
+        ul.innerHTML = '<p class="cfx-mm-ayuda">Sube o baja cada categoría. ✏️ le cambia el nombre (solo para ti).</p>' + grupos.map((x, i) => '<div class="cfx-mm-of"><b>' + esc(nomG(x.g, N)) + '</b>' +
+          '<button type="button" data-mm-sube="' + i + '" aria-label="Subir"' + (i ? '' : ' disabled') + '>↑</button><button type="button" data-mm-baja="' + i + '" aria-label="Bajar"' + (i < grupos.length - 1 ? '' : ' disabled') + '>↓</button>' +
+          '<button type="button" data-mm-nom="' + i + '" aria-label="Cambiar nombre">✏️</button></div>').join('') +
+          '<button type="button" class="cfx-mm-fab" data-mm-fab>Volver al orden de fábrica</button>';
+        H.zona.prepend(ul);
+      };
+      const guardarOrden = () => { if (OR()) OR().guardar(ck, grupos.map((x) => x.g || '-')); };
+      H.zona.addEventListener('click', async (e) => {
+        const b = e.target.closest('button'); if (!b || b.disabled) return;
+        const mover = (i, j) => { const [x] = grupos.splice(i, 1); grupos.splice(j, 0, x); if (pag === i) pag = j; guardarOrden(); pintar(); };
+        if (b.dataset.mmSube) return mover(+b.dataset.mmSube, +b.dataset.mmSube - 1);
+        if (b.dataset.mmBaja) return mover(+b.dataset.mmBaja, +b.dataset.mmBaja + 1);
+        if (b.dataset.mmNom) { const x = grupos[+b.dataset.mmNom], k = x.g || '-';
+          const v = window.CFX_DIALOGO ? await window.CFX_DIALOGO.pedir('Nombre de la categoría', nomG(x.g, N), { si: 'Guardar' }) : null;
+          if (v == null) return; const t = String(v).trim().slice(0, 40); if (!t || t === (x.g || 'General')) delete N[k]; else N[k] = t;
+          if (OR()) OR().guardar(ck + ':nombres', N); return pintar(); }
+        if (b.hasAttribute('data-mm-fab')) { if (OR()) { OR().borrar(ck); OR().borrar(ck + ':nombres'); } Object.keys(N).forEach((k) => delete N[k]); pag = 0; cerrarHojas(); }
+      });
+      pintar();
+    }
     const abrir = (k) => {
       const s = L.find((x) => x.k === k); if (!s) return undefined;
       if (s.ir) { if (/^#/.test(s.ir)) location.hash = s.ir; else location.href = s.ir; return undefined; }
