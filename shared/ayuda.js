@@ -1517,6 +1517,16 @@
     pintar();
   }
   window.CFX_ANUNCIOS = { revisar: anuncios, promos };
+  // G112 d 🎬 Estudio de contenido (módulo 'estudio'): estudio.js + motor se cargan recién al abrirlo (misma carpeta que ayuda.js).
+  // Uso: CFX_ESTUDIO.montar(zona, { rpc: (f, a) => ..., probar: (k) => ..., nombre: 'Mi negocio' }).
+  if (!window.CFX_ESTUDIO) {
+    let cargaEst = null;
+    window.CFX_ESTUDIO = { montar(z, o) {
+      cargaEst = cargaEst || new Promise((ok, no) => { const s = document.createElement('script'); s.src = String(yo || '').replace(/[^/]*$/, '') + 'estudio.js';
+        s.onload = () => (window.CFX_ESTUDIO.cargador ? no(new Error('Actualiza la app')) : ok()); s.onerror = () => { cargaEst = null; no(new Error('No se pudo cargar el Estudio. Revisa tu conexión.')); }; document.head.appendChild(s); });
+      return cargaEst.then(() => window.CFX_ESTUDIO.montar(z, o)).catch((e) => { z.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; });
+    }, cargador: true };
+  }
 
   // ---------- Flechas siempre al centro de su cuadro ----------
   // Los botones que solo tienen una flecha de texto (‹ › ← →) pasan a un dibujo: así queda centrada en todas las letras y celulares.

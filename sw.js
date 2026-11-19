@@ -9,7 +9,7 @@ const FILES = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'shared/core.css',
-  'shared/core.js', 'shared/ui.js', 'shared/vendor/bootstrap-utilities.min.css', 'shared/seguro.js', 'shared/vitrina.js', 'shared/datos.js', 'shared/tienda.js', 'shared/carga.js', 'shared/ayuda.js', 'shared/despacho.js', 'shared/premium.js', 'shared/humano.js', 'shared/verificar.js', 'shared/pagos.js', 'shared/modulos.js', 'shared/extras.js', 'shared/respaldo.js', 'shared/voz.js', 'shared/fotos.js', 'shared/auto.js', 'shared/barra.js', 'shared/tema.css',
+  'shared/core.js', 'shared/ui.js', 'shared/vendor/bootstrap-utilities.min.css', 'shared/seguro.js', 'shared/vitrina.js', 'shared/datos.js', 'shared/tienda.js', 'shared/carga.js', 'shared/ayuda.js', 'shared/est-motor.js', 'shared/est-importador.js', 'shared/estudio.js', 'shared/despacho.js', 'shared/premium.js', 'shared/humano.js', 'shared/verificar.js', 'shared/pagos.js', 'shared/modulos.js', 'shared/extras.js', 'shared/respaldo.js', 'shared/voz.js', 'shared/fotos.js', 'shared/auto.js', 'shared/barra.js', 'shared/tema.css',
   'shared/iconos.js', 'shared/tour.js', 'shared/comprobante.js', 'shared/impresora.js', 'shared/tap.js', 'shared/qr.js',
   'shared/instalar.js',
   'shared/config.js',

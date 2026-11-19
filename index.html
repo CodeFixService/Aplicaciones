@@ -413,13 +413,13 @@ try {
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier)$/.test(location.hash);
+  const enAjustes = () => /^#(ajustes|plan|premium|tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier|estudio)$/.test(location.hash);
   let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta, #redes y #modulos abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier|estudio)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -639,6 +639,7 @@ try {
           ['proveedores', '📦', 'Stock mínimo y proveedores', 'Avisos y pedido por WhatsApp', 'proveedores', 'Tu tienda'],
           ['sucursales', '🏬', 'Sucursales y bodegas', 'Stock por local y mover mercadería', 'sucursales', 'Tu tienda'],
           ['promos', '📣', 'Promo destacada', 'Tarjeta al abrir la app de tus clientes', 'promos', 'Vender más'],
+          ['estudio', '🎬', 'Estudio de contenido', 'Ideas para tus redes listas para copiar', 'estudio', 'Vender más'],
           ['mercadolibre', '🛒', 'Mercado Libre', 'Stock unido con tus publicaciones', 'mercadolibre', 'Vender más'],
           ['courier', '🚚', 'Courier Chilexpress', 'Cotiza y saca la etiqueta del pedido', 'courier', 'Tu tienda']]
           .map(([k, ico, t, d, m, grupo]) => ({ k, ico, t, d, grupo, dato: Cuenta.puede(m) ? '' : acc.mods ? '🧩' : 'PRO', abrir: (z) => EXTRAS[k](z, { probar: probarMod }) })) : []),

@@ -426,5 +426,7 @@
     };
   }
 
-  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores, sucursales, promos, mercadolibre, courier, courierEtiqueta, verEtiqueta };
+  // G112 d 🎬 Estudio de contenido (núcleo estudio.js, lo carga ayuda.js al abrir).
+  const estudio = (z, o) => window.CFX_ESTUDIO ? CFX_ESTUDIO.montar(z, { rpc: R, probar: o.probar }) : error(z, 'Actualiza la app');
+  window.EXTRAS = { giftcards, carritos, recurrentes, misRecurrentes, proveedores, sucursales, promos, mercadolibre, courier, courierEtiqueta, verEtiqueta, estudio };
 })();
