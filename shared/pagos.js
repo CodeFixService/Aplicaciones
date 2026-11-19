@@ -513,7 +513,7 @@
    CFX_COBRO.opciones(lineas, o)  → [{ k: 'ahora'|'abono'|'retiro', txt, monto, resto }] lo que el cliente PUEDE elegir
                                      lineas = [{ subtotal, cobro: 'ahora'|'abono'|'retiro', abono: %, tipo }], o = { medios: bool, extra: $despacho, entrega }
    CFX_COBRO.elegir(el, ops, k, cb) → botones (solo lo permitido; con 1 sola opción, solo el texto) · cb(k)
-   CFX_COBRO.sinMedios(el, { ir })  → aviso al DUEÑO: "⚠️ Tus clientes no pueden pagar en línea → Configurar"
+   CFX_COBRO.sinMedios(el, { ir })  → aviso al DUEÑO: "⚠️ Tus clientes no pueden pagar en línea → Configurar" (o.titulo/o.texto/o.alTocar)
    CFX_COBRO.enlace(el, { url, tel, tienda }) → comprador SIN cuenta: 📋 Copiar / 📲 Mandarme por WhatsApp el enlace del pedido
    CFX_COBRO.wa(tel, texto)         → link wa.me con el texto listo (p. ej. "📲 Enviar enlace al cliente" de la tienda)
    CFX_COBRO.hilo(el, { rpc, ref }) → 💬 chat DEL PEDIDO (solo con cuenta; cfx_hilo_ver / cfx_hilo_enviar). Se borra a los 7 días de cerrado. */
@@ -598,7 +598,8 @@
   function sinMedios(el, o) {
     if (!el) return;
     o = o || {};
-    el.innerHTML = '<div class="cfx-sinmedio" role="status"><span>⚠️ <b>Tus clientes no pueden pagar en línea.</b> Sus pedidos quedan "💰 Pagas al retirar".</span>' +
+    // G128 b: o.titulo / o.texto para reservas y arriendos (por defecto, el texto de los pedidos de Despega).
+    el.innerHTML = '<div class="cfx-sinmedio" role="status"><span>⚠️ <b>' + esc(o.titulo || 'Tus clientes no pueden pagar en línea.') + '</b> ' + esc(o.texto != null ? o.texto : 'Sus pedidos quedan "💰 Pagas al retirar".') + '</span>' +
       '<a class="btn small" href="' + esc(o.ir || '#') + '" data-cfx-cobro-ir="">Configurar</a></div>';
     const a = el.querySelector('[data-cfx-cobro-ir]');
     if (a && o.alTocar) a.onclick = (e) => { e.preventDefault(); o.alTocar(); };
