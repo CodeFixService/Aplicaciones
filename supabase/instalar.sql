@@ -5451,7 +5451,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.90'::text $$;
+language sql immutable as $$ select '5.91'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -9655,8 +9655,25 @@ begin
     jsonb_build_object('clave', 'n_reportes', 'titulo', 'Reportes del chat ya revisados', 'detalle', 'Más de 90 días.', 'auto', true,
       'filas', (select count(*) from public.cfx_reportes where resuelto and creado < now() - interval '90 days')),
     jsonb_build_object('clave', 'n_carritos', 'titulo', 'Carritos abandonados', 'detalle', 'Sin tocar hace más de 30 días.', 'auto', true,
-      'filas', (select count(*) from public.cfx_carritos where actualizado < now() - interval '30 days')));
+      'filas', (select count(*) from public.cfx_carritos where actualizado < now() - interval '30 days')))
+    -- G131 b: se borra desde el CM por la API de Storage (no por SQL); las que algo aún usa se quedan.
+    || jsonb_build_array(jsonb_build_object('clave', 'n_fotos_cuentas', 'titulo', '🖼️ Fotos de cuentas borradas', 'detalle', 'En Storage; las que algo aún usa se quedan.', 'auto', false, 'storage', true,
+      'filas', public.cfx_fotos_sin_cuenta_n()));
 end $$;
+
+-- G131 b: cuántas fotos hay en carpetas de cuentas que ya no existen (rápido, sin revisar tablas). Sin Storage → 0.
+create or replace function public.cfx_fotos_sin_cuenta_n() returns int
+language plpgsql stable security definer set search_path = '' as $$
+declare n int := 0;
+begin
+  if to_regclass('storage.objects') is null then return 0; end if;
+  execute $q$select count(*) from storage.objects o where o.bucket_id = 'vitrina'
+    and split_part(o.name, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    and not exists (select 1 from auth.users x where x.id::text = split_part(o.name, '/', 1))$q$ into n;
+  return n;
+exception when others then return 0;
+end $$;
+revoke all on function public.cfx_fotos_sin_cuenta_n() from public, anon, authenticated;
 
 create or replace function public.cfx_limpiar_nucleo(p_clave text) returns int
 language plpgsql security definer set search_path = '' as $$
@@ -11128,6 +11145,20 @@ grant execute on function public.cfx_estudio_mio(), public.cfx_estudio_guardar(j
 -- ===================== G122 🖼️ Fotos a Storage (núcleo) =====================
 -- Bucket público 'vitrina': cada uno sube SOLO a su carpeta (<su id>/<uuid>.webp), hasta 700 KB, solo imágenes. Nadie lista lo ajeno.
 -- Las apps aceptan en sus fotos de vitrina el texto base64 de siempre O una URL de este bucket (cfx_foto_ok). Lo viejo sigue igual.
+-- G131 b 🧹 Carpeta de una CUENTA BORRADA: solo el admin (Centro de Mando) la ve y la borra por la API de Storage.
+-- Nunca lanza error (va dentro de las reglas de Storage): ante la duda, false.
+create or replace function public.cfx_foto_sin_cuenta(p_name text) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare c text := split_part(coalesce(p_name, ''), '/', 1);
+begin
+  if c !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' or (select auth.uid()) is null then return false; end if;
+  if exists (select 1 from auth.users where id = c::uuid) then return false; end if;
+  perform public.cfx_es_admin();
+  return true;
+exception when others then return false;
+end $$;
+revoke all on function public.cfx_foto_sin_cuenta(text) from public, anon;
+grant execute on function public.cfx_foto_sin_cuenta(text) to authenticated;
 do $$ begin
   if to_regclass('storage.buckets') is not null then
     insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -11139,9 +11170,9 @@ do $$ begin
     create policy cfx_vitrina_subir on storage.objects for insert to authenticated
       with check (bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text);
     create policy cfx_vitrina_ver on storage.objects for select to authenticated
-      using (bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text);
+      using ((bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text) or (bucket_id = 'vitrina' and public.cfx_foto_sin_cuenta(name)));
     create policy cfx_vitrina_borrar on storage.objects for delete to authenticated
-      using (bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text);
+      using ((bucket_id = 'vitrina' and (storage.foldername(name))[1] = (select auth.uid())::text) or (bucket_id = 'vitrina' and public.cfx_foto_sin_cuenta(name)));
   end if;
 end $$;
 
@@ -11161,14 +11192,11 @@ grant execute on function public.cfx_foto_nube(text, uuid), public.cfx_foto_ok(t
 -- G122 b 🧹 Fotos huérfanas: de una lista de MIS archivos (<uuid>.webp de mi carpeta), ¿cuáles NO aparecen en ninguna tabla?
 -- Busca en TODAS las columnas de texto/json/arreglo de la app (también respaldos), así nunca se borra una foto en uso.
 -- Ante cualquier duda (nombre raro, error al leer una tabla) devuelve vacío: no se borra nada.
-create or replace function public.cfx_fotos_libres(p_nombres text[]) returns text[]
-language plpgsql security definer set search_path = '' as $$
-declare u uuid := auth.uid(); pat text; r record; txt text; n text; usados text[] := '{}'; libres text[] := '{}';
+-- Interno: de los archivos p_nombres de la carpeta u, ¿cuáles aparecen en alguna tabla? null = no se pudo leer todo (no borrar nada).
+create or replace function public.cfx_fotos_en_uso(u uuid, p_nombres text[]) returns text[]
+language plpgsql stable security definer set search_path = '' as $$
+declare pat text; r record; txt text; n text; usados text[] := '{}';
 begin
-  if u is null or coalesce(array_length(p_nombres, 1), 0) = 0 or array_length(p_nombres, 1) > 1000 then return '{}'; end if;
-  foreach n in array p_nombres loop
-    if n is null or n !~ '^[0-9a-f-]{36}\.(webp|jpg|png)$' then return '{}'; end if;
-  end loop;
   pat := '%/vitrina/' || u::text || '/%';
   for r in select c.table_schema s, c.table_name t, c.column_name col
       from information_schema.columns c join information_schema.tables tb on tb.table_schema = c.table_schema and tb.table_name = c.table_name
@@ -11178,7 +11206,7 @@ begin
         and c.table_schema !~ '^pg_' loop
     begin
       execute format('select string_agg(%I::text, '' '') from %I.%I where %I::text like $1', r.col, r.s, r.t, r.col) into txt using pat;
-    exception when others then return '{}';
+    exception when others then return null;
     end;
     if txt is not null then
       foreach n in array p_nombres loop
@@ -11186,6 +11214,20 @@ begin
       end loop;
     end if;
   end loop;
+  return usados;
+end $$;
+revoke all on function public.cfx_fotos_en_uso(uuid, text[]) from public, anon, authenticated;
+
+create or replace function public.cfx_fotos_libres(p_nombres text[]) returns text[]
+language plpgsql security definer set search_path = '' as $$
+declare u uuid := auth.uid(); n text; usados text[]; libres text[] := '{}';
+begin
+  if u is null or coalesce(array_length(p_nombres, 1), 0) = 0 or array_length(p_nombres, 1) > 1000 then return '{}'; end if;
+  foreach n in array p_nombres loop
+    if n is null or n !~ '^[0-9a-f-]{36}\.(webp|jpg|png)$' then return '{}'; end if;
+  end loop;
+  usados := public.cfx_fotos_en_uso(u, p_nombres);
+  if usados is null then return '{}'; end if;
   foreach n in array p_nombres loop
     if not (n = any(usados)) then libres := libres || n; end if;
   end loop;
@@ -11193,6 +11235,31 @@ begin
 end $$;
 revoke all on function public.cfx_fotos_libres(text[]) from public, anon;
 grant execute on function public.cfx_fotos_libres(text[]) to authenticated;
+
+-- G131 b 🧹 Fotos de CUENTAS BORRADAS (solo admin): archivos 'carpeta/archivo' que ya no usa ninguna tabla → el CM los borra por Storage.
+-- Las que algo aún usa (respaldos, otra fila) se quedan. Hasta 1000 por vez.
+create or replace function public.cfx_fotos_sin_cuenta() returns text[]
+language plpgsql security definer set search_path = '' as $$
+declare r record; usados text[]; n text; sale text[] := '{}';
+begin
+  perform public.cfx_es_admin();
+  if to_regclass('storage.objects') is null then return '{}'; end if;
+  for r in execute $q$select split_part(name, '/', 1) c, array_agg(split_part(name, '/', 2) order by name) a from storage.objects
+      where bucket_id = 'vitrina' and split_part(name, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        and split_part(name, '/', 2) ~ '^[0-9a-f-]{36}\.(webp|jpg|png)$'
+        and not exists (select 1 from auth.users x where x.id::text = split_part(name, '/', 1))
+      group by 1 order by 1$q$ loop
+    usados := public.cfx_fotos_en_uso(r.c::uuid, r.a);
+    if usados is null then return '{}'; end if;
+    foreach n in array r.a loop
+      if not (n = any(usados)) then sale := sale || (r.c || '/' || n); end if;
+      if array_length(sale, 1) >= 1000 then return sale; end if;
+    end loop;
+  end loop;
+  return sale;
+end $$;
+revoke all on function public.cfx_fotos_sin_cuenta() from public, anon;
+grant execute on function public.cfx_fotos_sin_cuenta() to authenticated;
 -- <<< CFX núcleo
 
 -- G95 🎁 Prueba por botón: quien ya tuvo su prueba Pro queda anotado por correo (no se borra) · al probar se marca trial_used.
