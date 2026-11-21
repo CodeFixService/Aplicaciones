@@ -5454,7 +5454,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.94'::text $$;
+language sql immutable as $$ select '5.95'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -5568,6 +5568,12 @@ language sql stable security definer set search_path = '' as $$ select public.is
 create or replace function public.cfx_modulos_app() returns text[]
 language sql immutable as $$ select array['chat', 'calificaciones', 'cupones', 'sellos', 'carrito', 'analisis', 'estadisticas', 'equipo', 'campanas', 'redes', 'webhooks'] $$;
 revoke all on function public.cfx_negocio_de_cuenta(uuid), public.cfx_es_premium(uuid), public.cfx_modulos_app() from public, anon, authenticated;
+-- G141 a 🔗 Mis redes (núcleo redes.sql): la llave pública de la tienda es su slug (/t/?s=).
+create or replace function public.cfx_redes_llave_app(p_llave text) returns uuid
+language sql stable security definer set search_path = '' as $$
+  select t.id from public.profiles t where t.slug = lower(trim(coalesce(p_llave, ''))) and t.role = 'user' and not t.suspended
+$$;
+revoke all on function public.cfx_redes_llave_app(text) from public, anon, authenticated;
 
 -- =====================================================================
 --  VERSIÓN 5.38 · G37 🔌 Avisos a otro sistema (webhooks). La tienda Pro pega una URL https y Órbita le manda (POST JSON firmado)
@@ -8243,7 +8249,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_redes', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -11302,6 +11308,84 @@ end $$;
 
 revoke all on function public.cfx_personal(), public.cfx_personal_guardar(jsonb) from public, anon;
 grant execute on function public.cfx_personal(), public.cfx_personal_guardar(jsonb) to authenticated;
+-- ---------------------------------------------------------------------
+-- CodeFix · G141 a 🔗 Mis redes (igual en las 7 apps; lo reparte nucleo/sincronizar.py).
+--   El dueño pega el link de su perfil (Instagram, TikTok, Facebook, YouTube, X, Threads, LinkedIn, WhatsApp, Pinterest,
+--   Spotify o su web) y su página pública muestra botones con ícono. Gratis (FREE opera completo).
+--   cfx_redes_mias()            → { lista: [{red, url}] } del negocio de quien llama (dueño o equipo; solo lectura para el equipo).
+--   cfx_redes_guardar(p_lista)  → solo el DUEÑO; valida en el servidor red, https y dominio de cada red (máx. 12).
+--   cfx_redes_publicas(p_llave) → lista pública (anon). La app traduce su llave pública (slug, código…) con el gancho
+--                                 cfx_redes_llave_app(text) → uuid del negocio; sin gancho → [] (nunca error).
+-- ---------------------------------------------------------------------
+create table if not exists public.cfx_redes (
+  negocio  uuid primary key,
+  lista    jsonb not null default '[]'::jsonb check (jsonb_typeof(lista) = 'array' and pg_column_size(lista) <= 4000),
+  cambiado timestamptz not null default now()
+);
+alter table public.cfx_redes enable row level security;
+revoke all on public.cfx_redes from anon, authenticated;
+
+-- Dominio permitido por red ('web' = cualquier https).
+create or replace function public.cfx_red_ok(p_red text, p_url text) returns boolean
+language sql immutable set search_path = '' as $$
+  select coalesce(p_url, '') ~ '^https://[^\s<>"''`\\]{3,200}$' and case p_red
+    when 'instagram' then p_url ~* '^https://([a-z0-9-]+\.)?instagram\.com/'
+    when 'facebook' then p_url ~* '^https://([a-z0-9-]+\.)?(facebook\.com|fb\.com|fb\.me)/'
+    when 'tiktok' then p_url ~* '^https://([a-z0-9-]+\.)?tiktok\.com/'
+    when 'youtube' then p_url ~* '^https://([a-z0-9-]+\.)?(youtube\.com|youtu\.be)/'
+    when 'x' then p_url ~* '^https://([a-z0-9-]+\.)?(x\.com|twitter\.com)/'
+    when 'threads' then p_url ~* '^https://([a-z0-9-]+\.)?threads\.(net|com)/'
+    when 'linkedin' then p_url ~* '^https://([a-z0-9-]+\.)?linkedin\.com/'
+    when 'whatsapp' then p_url ~* '^https://(wa\.me|([a-z0-9-]+\.)?whatsapp\.com)/'
+    when 'pinterest' then p_url ~* '^https://([a-z0-9-]+\.)?(pinterest\.[a-z.]{2,6}|pin\.it)/'
+    when 'spotify' then p_url ~* '^https://open\.spotify\.com/'
+    when 'web' then true
+    else false end
+$$;
+
+create or replace function public.cfx_redes_mias() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid := public.cfx_negocio_cuenta(auth.uid());
+begin
+  if n is null then return jsonb_build_object('lista', '[]'::jsonb, 'dueno', false); end if;
+  return jsonb_build_object('lista', coalesce((select r.lista from public.cfx_redes r where r.negocio = n), '[]'::jsonb),
+    'dueno', public.cfx_negocio_dueno(n) = auth.uid());
+end $$;
+
+create or replace function public.cfx_redes_guardar(p_lista jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.cfx_negocio_cuenta(auth.uid()); x jsonb; r text; u text; out jsonb := '[]'::jsonb;
+begin
+  if auth.uid() is null then raise exception 'Inicia sesión para guardar.'; end if;
+  if n is null or public.cfx_negocio_dueno(n) is distinct from auth.uid() then raise exception 'Solo el dueño del negocio cambia sus redes.'; end if;
+  if p_lista is null or jsonb_typeof(p_lista) <> 'array' then raise exception 'Lista no válida.'; end if;
+  if jsonb_array_length(p_lista) > 12 then raise exception 'Máximo 12 redes.'; end if;
+  for x in select * from jsonb_array_elements(p_lista) loop
+    r := lower(coalesce(x ->> 'red', '')); u := trim(coalesce(x ->> 'url', ''));
+    if not public.cfx_red_ok(r, u) then raise exception 'Link no válido para %: %', r, left(u, 80); end if;
+    if not exists (select 1 from jsonb_array_elements(out) y where y ->> 'url' = u) then
+      out := out || jsonb_build_array(jsonb_build_object('red', r, 'url', u));
+    end if;
+  end loop;
+  insert into public.cfx_redes (negocio, lista, cambiado) values (n, out, now())
+  on conflict (negocio) do update set lista = excluded.lista, cambiado = now();
+  return jsonb_build_object('ok', true, 'lista', out);
+end $$;
+
+-- Pública: nunca lanza error (llave rara, sin gancho o sin redes → []).
+create or replace function public.cfx_redes_publicas(p_llave text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid;
+begin
+  if coalesce(p_llave, '') = '' or length(p_llave) > 120 or to_regprocedure('public.cfx_redes_llave_app(text)') is null then return '[]'::jsonb; end if;
+  begin execute 'select public.cfx_redes_llave_app($1)' into n using p_llave; exception when others then return '[]'::jsonb; end;
+  if n is null then return '[]'::jsonb; end if;
+  return coalesce((select r.lista from public.cfx_redes r where r.negocio = n), '[]'::jsonb);
+end $$;
+
+revoke all on function public.cfx_red_ok(text, text), public.cfx_redes_mias(), public.cfx_redes_guardar(jsonb), public.cfx_redes_publicas(text) from public, anon, authenticated;
+grant execute on function public.cfx_redes_mias(), public.cfx_redes_guardar(jsonb) to authenticated;
+grant execute on function public.cfx_redes_publicas(text) to anon, authenticated;
 -- <<< CFX núcleo
 
 -- G95 🎁 Prueba por botón: quien ya tuvo su prueba Pro queda anotado por correo (no se borra) · al probar se marca trial_used.

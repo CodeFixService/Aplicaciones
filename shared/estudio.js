@@ -44,8 +44,8 @@
   const dia = (f) => f ? String(f).slice(8, 10) + '/' + String(f).slice(5, 7) : '';
 
   let libs;
-  const cargarLibs = () => libs || (libs = Promise.all(['est-motor.js', 'est-importador.js'].map((f) => new Promise((ok, no) => {
-    if ((f === 'est-motor.js' && window.Motor) || (f === 'est-importador.js' && window.Importador)) return ok();
+  const cargarLibs = () => libs || (libs = Promise.all(['est-motor.js', 'est-importador.js', 'est-links.js'].map((f) => new Promise((ok, no) => {
+    if ((f === 'est-motor.js' && window.Motor) || (f === 'est-importador.js' && window.Importador) || (f === 'est-links.js' && window.EstLinks)) return ok();
     const s = document.createElement('script'); s.src = BASE + f; s.onload = ok; s.onerror = () => { libs = null; no(new Error('No se pudo cargar el Estudio. Revisa tu conexión.')); }; document.head.appendChild(s);
   }))));
 
@@ -230,10 +230,19 @@
       (o.probar ? '<button type="button" class="ok e-big" data-e="probar">▶️ Probar módulo</button>' : '') + (L.length ? '<p class="e-sub">Tus ideas y tu base siguen aquí, a la vista.</p>' : '') + '</div>';
     function vIdea() {
       let x = '<div class="e-chips">' + REDES.map((r) => '<button type="button" class="e-chip' + (ui.red === r[0] ? ' on' : '') + '" data-red="' + r[0] + '">' + r[1] + '</button>').join('') + '</div>';
-      if (!base().length) return x + '<div class="e-card"><p>Aún no tienes base de temas.</p><p class="e-sub">Con 1 tema y sus errores, síntomas o datos ya salen ideas. En 📚 Base bajas la plantilla y la subes llena, o agregas a mano.</p><button type="button" class="ok e-big" data-v="base">📚 Ir a la base</button></div>';
+      if (!base().length) return x + vSinIdea();
       if (D.puede) x += '<button type="button" class="ok e-big" data-e="generar">✨ Generar idea</button>';
       if (ui.idea) x += htmlCajas(ui.idea);
       return x;
+    }
+    // G141 b 💡 "No tengo idea": base de fábrica del rubro (1 palabra) → ideas al tiro, sin preparar nada.
+    const app = o.app || (window.CFX_AYUDA && CFX_AYUDA.app ? CFX_AYUDA.app() : '');
+    const queVende = () => ((cf().que || '') || ((window.EstLinks && EstLinks.RUBRO[app]) || {}).x || '');
+    function vSinIdea() {
+      return '<div class="e-card"><b>💡 ¿No sabes qué publicar?</b><p class="e-sub">Te damos ideas al tiro: gancho, guion, copy y hashtags. Solo dinos qué vendes.</p>' +
+        '<label>¿Qué vendes o haces? (1 o 2 palabras)<input id="cfxEstQue" maxlength="40" value="' + esc(queVende()) + '" placeholder="ej. polerones, cortes, pasteles"></label>' +
+        (D.puede ? '<button type="button" class="ok e-big" data-e="fabrica">✨ Dame ideas ahora</button>' : '') +
+        '<p class="e-sub">Después puedes sumar tus propios datos en 📚 Base para que salgan más tuyas.</p><button type="button" class="alt e-big" data-v="base">📚 Armar mi base</button></div>';
     }
     const fila = (i) => '<div class="e-card"><button type="button" class="e-tit" data-e="abrir" data-id="' + esc(i.id) + '">' + esc(i.titulo || '(sin gancho)') + '</button><p class="e-sub">' + (i.fecha ? dia(i.fecha) + ' · ' : '') + esc(redN((i.datos || {}).red)) + ' · ' + esc((i.datos || {}).formato || '') + ' · <span class="e-pill">' + esc(i.estado) + '</span>' + (i.datos && i.datos.m ? ' · 👁️ ' + (+i.datos.m.vistas || 0) : '') + '</p></div>';
     function vSemana() {
@@ -250,7 +259,7 @@
       B.forEach((b) => { const d = b.datos || {}; const t = (por[d.tema || 'General'] = por[d.tema || 'General'] || {}); t[d.cat] = (t[d.cat] || 0) + 1; });
       let cap = { libres: 0, total: 0 }; try { cap = window.Motor.capacidad(ctx()); } catch (e) { /* sin base */ }
       let x = '<div class="e-card"><b>' + B.length + ' filas · ' + Object.keys(por).length + ' temas</b><p class="e-sub">Quedan ' + cap.libres + ' de ' + cap.total + ' ideas sin repetir. Cada combinación se usa 1 vez.</p>' +
-        '<div class="e-b">' + (D.puede ? '<button type="button" class="small ok" data-e="subirBase">⬆️ Subir CSV</button>' : '') + '<button type="button" class="small alt" data-e="plant" data-p="base">⬇️ Plantilla</button>' + (D.puede ? '<button type="button" class="small alt" data-e="agregar">＋ Agregar</button>' : '') + '</div></div>';
+        '<div class="e-b">' + (D.puede ? '<button type="button" class="small ok" data-e="subirBase">⬆️ Subir CSV</button>' : '') + '<button type="button" class="small alt" data-e="plant" data-p="base">⬇️ Plantilla</button>' + (D.puede ? '<button type="button" class="small alt" data-e="agregar">＋ Agregar</button><button type="button" class="small alt" data-e="fabricaBase">✨ De fábrica</button>' : '') + '</div></div>';
       x += '<details><summary>¿Qué va en la base?</summary><p class="e-sub">Una fila por dato: <b>tema</b> (ej. tu servicio estrella), <b>categoria</b> (error, sintoma, dato, mito, parte, costo, idea_video, cta) y <b>texto</b>. Tema "General": estructura_gancho (con {error} {sintoma} {dato}…), toma, cta. Ábrela en Excel, llénala y súbela.</p></details>';
       x += Object.keys(por).sort().map((t) => '<div class="e-card"><button type="button" class="e-tit" data-e="tema" data-t="' + esc(t) + '">' + esc(t) + '</button><p class="e-sub">' + Object.keys(por[t]).map((c) => esc(CATN[c] || c) + ' ' + por[t][c]).join(' · ') + '</p></div>').join('');
       if (ui.tema != null) x += vTema();
@@ -265,9 +274,12 @@
     }
     function vBI() {
       const P = publicadas();
-      let x = '<div class="e-card"><b>📊 Lo que te funciona</b><p class="e-sub">Sale de TUS métricas: marca las ideas como publicadas con sus números, o sube tu historial / el export de Meta Business Suite o TikTok Studio.</p>' +
-        '<div class="e-b">' + (D.puede ? '<button type="button" class="small ok" data-e="subirHist">⬆️ Subir historial</button>' : '') + '<button type="button" class="small alt" data-e="plant" data-p="historial">⬇️ Plantilla historial</button></div></div>';
-      if (!P.length) return x + '<p class="e-sub">Aún sin publicaciones con métricas. Mientras tanto el motor usa 70 % lo probado y 30 % lo nuevo, con horas de fábrica.</p>';
+      let x = '<div class="e-card"><b>📊 Lo que te funciona</b><p class="e-sub">Sale de TUS números: pega el link de cada publicación con el pantallazo de sus estadísticas (o márcalas publicadas con sus números).</p>' +
+        (D.puede ? '<button type="button" class="ok e-big" data-e="link">🔗 Anotar publicación por link</button>' : '') +
+        '<details><summary class="e-sub">Avanzado: planilla CSV</summary><div class="e-b">' + (D.puede ? '<button type="button" class="small ok" data-e="subirHist">⬆️ Subir historial</button>' : '') + '<button type="button" class="small alt" data-e="plant" data-p="historial">⬇️ Plantilla historial</button></div></details></div>';
+      if (ui.link) x = '<div id="cfxEstLink"></div>' + x;
+      if (!P.length) return x + '<p class="e-sub">Aún sin publicaciones con métricas. Pega el link de tus últimas 5 publicaciones con su pantallazo y aquí verás qué te funciona. Mientras tanto el motor usa 70 % lo probado y 30 % lo nuevo, con horas de fábrica.</p>';
+      x += window.EstLinks ? EstLinks.analisis(P, cf().obj) : '';  // G141 b: gráficos + qué hacer (vs SU promedio, según el objetivo)
       const media = P.reduce((a, i) => a + puntos(i.datos.m), 0) / P.length || 1;
       const top = (k, n, fmt) => {
         const g = {}; P.forEach((i) => { const v = fmt ? fmt(i) : i.datos[k]; if (v) (g[v] = g[v] || []).push(puntos(i.datos.m) / media); });
@@ -277,7 +289,7 @@
       const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
       const tot = P.reduce((a, i) => { const m = i.datos.m; a.v += +m.vistas || 0; a.c += +m.clientes || 0; a.s += +m.seguidores || 0; return a; }, { v: 0, c: 0, s: 0 });
       x += '<div class="e-card"><b>' + P.length + ' publicaciones</b><p class="e-sub">👁️ ' + tot.v.toLocaleString('es-CL') + ' vistas · 👥 +' + tot.s + ' seguidores · 💰 ' + tot.c + ' clientes (' + (tot.c / P.length).toFixed(1).replace('.', ',') + ' por video)</p></div>';
-      x += top('tema', '🏷️ Temas') + top('estructura_nombre', '🎣 Ganchos') + top('formato', '🎞️ Formatos') + top('red', '📱 Redes') + top('hora', '⏰ Horas') + top(null, '📅 Días', (i) => i.fecha ? DIAS[new Date(i.fecha + 'T12:00:00').getDay()] : '');
+      x += '<details><summary class="e-sub">📋 Ver en listas (ganchos y horas exactas)</summary>' + top('estructura_nombre', '🎣 Ganchos') + top('hora', '⏰ Horas') + top('tema', '🏷️ Temas') + top('formato', '🎞️ Formatos') + top('red', '📱 Redes') + top(null, '📅 Días', (i) => i.fecha ? DIAS[new Date(i.fecha + 'T12:00:00').getDay()] : '') + '</details>';
       const porT = {}; P.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).forEach((i) => { const t = i.datos.tema; if (t) (porT[t] = porT[t] || []).push(puntos(i.datos.m) / media); });
       const cans = Object.keys(porT).filter((t) => porT[t].length >= 3 && porT[t].slice(0, 3).every((v) => v < 0.8));
       if (cans.length) x += '<div class="e-card"><b>😴 Temas cansados</b><p class="e-sub">' + cans.map(esc).join(', ') + ': sus últimas 3 rindieron bajo el promedio. Descánsalos 2 semanas.</p></div>';
@@ -300,7 +312,7 @@
       return '<button type="button" class="alt" data-e="volverLista">← Mis ideas</button><h3>🎬 ' + esc(dia(it.fecha) || 'Idea') + '</h3>' + htmlCajas(idea, true) +
         '<div class="e-card"><b>Estado</b><div class="e-chips">' + [['pendiente', '⏳ Por grabar'], ['grabada', '🎥 Grabada'], ['publicada', '✅ Publicada']].map((s) => '<button type="button" class="e-chip' + (it.estado === s[0] ? ' on' : '') + '" data-est="' + s[0] + '"' + (D.puede ? '' : ' disabled') + '>' + s[1] + '</button>').join('') + '</div>' +
         '<p class="e-sub">Métricas (a los 7 días)</p><div class="e-grid">' + [['vistas', '👁️ Vistas'], ['guardados', '🔖 Guardados'], ['compartidos', '🔁 Compartidos'], ['comentarios', '💬 Comentarios'], ['seguidores', '👥 Seguidores'], ['clientes', '💰 Clientes']].map((k) => '<label>' + k[1] + '<input type="number" min="0" inputmode="numeric" data-m="' + k[0] + '" value="' + (m[k[0]] != null ? +m[k[0]] : '') + '"></label>').join('') + '</div>' +
-        '<div class="e-b">' + (D.puede ? '<button type="button" class="small ok" data-e="guardarM">💾 Guardar métricas</button>' : '') + '<button type="button" class="small alt" data-e="pedido">📲 Pedir grabación</button><button type="button" class="small alt" data-e="borrar">🗑️ Borrar</button></div></div>';
+        '<div class="e-b">' + (D.puede ? '<button type="button" class="small ok" data-e="guardarM">💾 Guardar métricas</button>' : '') + (D.puede ? '<button type="button" class="small alt" data-e="linkDet">🔗📸 Link o pantallazo</button>' : '') + '<button type="button" class="small alt" data-e="pedido">📲 Pedir grabación</button><button type="button" class="small alt" data-e="borrar">🗑️ Borrar</button></div></div>';
     }
     const ideaDet = () => { const it = get(ui.det); return it ? Object.assign({}, it.datos, { gancho: it.titulo, fecha_plan: it.fecha }) : {}; };
 
@@ -309,6 +321,21 @@
       const tabs = '<div class="e-chips" role="tablist">' + [['idea', '💡 Idea'], ['semana', '📅 Semana'], ['base', '📚 Base'], ['bi', '📊 Qué funciona'], ['espacio', '🎯 Objetivo']].map((t) => '<button type="button" class="e-chip' + (ui.v === t[0] && !ui.det ? ' on' : '') + '" data-v="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
       z.innerHTML = '<div class="cfx-est">' + sinMod() + tabs + '<p class="e-sub">Objetivo: ' + esc(ob ? ob[1] : '') + (conf() ? '' : ' · <button type="button" class="small alt" data-v="espacio">elegir</button>') + '</p>' +
         (ui.det ? vDet() : ({ idea: vIdea, semana: vSemana, base: vBase, bi: vBI, espacio: vEspacio }[ui.v] || vIdea)()) + '</div>';
+      const zl = z.querySelector('#cfxEstLink');
+      if (zl && ui.link && window.EstLinks) {
+        const it = ui.link.id && get(ui.link.id), d0 = (it && it.datos) || {};
+        EstLinks.ventana(zl, { puede: D.puede, temas: Array.from(new Set(base().map((b) => (b.datos || {}).tema).filter(Boolean))), conTexto: !it,
+          m: d0.m, link: d0.link, fecha: it ? it.fecha || '' : '', hora: d0.hora || '', red: d0.red, formato: d0.formato,
+          alCancelar: () => { ui.link = null; pintar(); },
+          alGuardar: async (r) => {
+            const extra = { link: r.link, m: r.m }; if (r.hora) extra.hora = r.hora;
+            if (it) await guardar([{ id: it.id, estado: 'publicada', fecha: r.fecha || it.fecha, datos: Object.assign({}, d0, extra) }]);
+            else await guardar([{ tipo: 'idea', estado: 'publicada', titulo: (r.titulo || r.link || 'Publicación').slice(0, 200), fecha: r.fecha,
+              datos: { gancho: (r.titulo || '').slice(0, 300), red: r.red, formato: r.formato || 'Publicación', hora: r.hora, fecha_plan: r.fecha, tema: r.tema || 'Sin tema', estructura: 'link', link: r.link, m: r.m } }]);
+            ui.link = null; ui.det = null; ui.v = 'bi'; toast('✅ Guardada: el análisis y el motor ya la usan'); pintar();
+          } });
+        if (zl.scrollIntoView) zl.scrollIntoView({ block: 'nearest' });
+      }
     }
     z.onclick = async (ev) => {
       const b = ev.target.closest('[data-e],[data-v],[data-red],[data-obj],[data-est]'); if (!b || b.disabled) return;
@@ -320,6 +347,20 @@
         if (b.dataset.est) { await guardar([{ id: ui.det, estado: b.dataset.est }]); toast('✅ Listo'); return pintar(); }
         const idea = ui.det ? ideaDet() : (ui.idea || {});
         if (a === 'probar') return o.probar && o.probar('estudio');
+        if (a === 'link') { ui.link = {}; ui.v = 'bi'; ui.det = null; return pintar(); }
+        if (a === 'linkDet') { ui.link = { id: ui.det }; ui.det = null; ui.v = 'bi'; return pintar(); }
+        if (a === 'fabrica' || a === 'fabricaBase') {
+          const qi = z.querySelector('#cfxEstQue'), que = (qi ? qi.value.trim() : '') || queVende();
+          if (a === 'fabrica' && !que) { toast('Escribe qué vendes (1 palabra)'); if (qi) qi.focus(); return; }
+          b.disabled = true;
+          const ya = new Set(base().map((x) => ((x.datos || {}).cat + '|' + x.titulo).toLowerCase()));
+          const rows = EstLinks.semilla(app, que).filter((r) => !ya.has((r.datos.cat + '|' + r.titulo).toLowerCase()));
+          if (rows.length) await guardar(rows);
+          if (que && que !== cf().que) await guardar([{ tipo: 'conf', titulo: 'Estudio', datos: Object.assign({}, cf(), { que: que.slice(0, 40) }) }]);
+          if (a === 'fabricaBase') { toast(rows.length ? '✨ ' + rows.length + ' filas de fábrica sumadas' : 'Ya las tenías'); return pintar(); }
+          const n = window.Motor.nueva(ctx(), ui.red, hoy());
+          ui.idea = n ? ajustarObjetivo(n) : null; ui.v = 'idea'; toast('✨ Listo: aquí va tu primera idea'); return pintar();
+        }
         if (a === 'copiar') { const c = cajas(idea).find((x) => x[0] === b.dataset.c); return copiar(c ? c[2] || '' : ''); }
         if (a === 'copiaAlt') return copiar(alternativas(idea)[+b.dataset.k].txt);
         if (a === 'prompt') return copiar(promptClaude(idea));
@@ -357,7 +398,7 @@
         if (a === 'guardarConf') {
           const ritmo = {}; z.querySelectorAll('[data-ritmo]').forEach((i) => { ritmo[i.dataset.ritmo] = Math.max(0, Math.min(21, Math.round(+i.value) || 0)); });
           const on = z.querySelector('[data-obj].on'), q = (s) => z.querySelector(s).value.trim();
-          await guardar([{ tipo: 'conf', titulo: 'Estudio', datos: { obj: on ? on.dataset.obj : 'vender', publico: q('#cfxEstPub').slice(0, 80), tono: q('#cfxEstTono').slice(0, 60), tags: q('#cfxEstTags').slice(0, 160), ritmo } }]);
+          await guardar([{ tipo: 'conf', titulo: 'Estudio', datos: { que: cf().que || '', obj: on ? on.dataset.obj : 'vender', publico: q('#cfxEstPub').slice(0, 80), tono: q('#cfxEstTono').slice(0, 60), tags: q('#cfxEstTags').slice(0, 160), ritmo } }]);
           toast('💾 Guardado'); ui.v = 'idea'; return pintar();
         }
         if (a === 'guardarM') { const nm = {}; z.querySelectorAll('[data-m]').forEach((i) => { if (i.value !== '') nm[i.dataset.m] = Math.max(0, Math.round(+i.value) || 0); }); await guardar([{ id: ui.det, estado: 'publicada', datos: Object.assign({}, get(ui.det).datos, { m: nm }) }]); toast('✅ Métricas guardadas: el motor ya aprende de esta'); ui.det = null; ui.v = 'semana'; return pintar(); }

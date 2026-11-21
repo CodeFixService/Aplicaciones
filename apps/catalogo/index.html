@@ -269,6 +269,7 @@
   function pintarVitrina() {
     if (!tienda.empresa) return;
     tienda.politicas = true; // 📄 cambios, retracto y garantía (Ley 19.496)
+    tienda.rpc = (f, x) => Cuenta.rpc(f, x); tienda.redes_llave = tienda.slug;  // G141 a: 🔗 redes con ícono
     CodeFixVitrina.montar($('perfil'), tienda);
     // Compartir: el link público de la tienda (este catálogo pide cuenta).
     const b = $('perfil').querySelector('[data-pf="compartir"]');

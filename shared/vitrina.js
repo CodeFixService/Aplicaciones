@@ -36,15 +36,14 @@
     .pf-info a:hover{color:${B}}
     .pf-acc{display:flex;flex-wrap:wrap;gap:8px}
     .pf-acc .btn,.pf-acc button{flex:1 1 140px;min-height:42px;border-radius:12px}
-    .pf-red{display:flex;flex-wrap:wrap;gap:6px}
+    .pf-red:empty{display:none}
     .pf-pol{border-top:1px solid var(--line);padding-top:10px;font-size:14px}
     .pf-pol summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:8px}
     .pf-pol summary::-webkit-details-marker{display:none}
     .pf-pol summary::after{content:'›';transition:transform .2s}
     .pf-pol[open] summary::after{transform:rotate(90deg)}
     .pf-pol h4{margin:12px 0 4px;font-size:14px}
-    .pf-pol p{margin:0;white-space:pre-line;overflow-wrap:anywhere;color:var(--muted)}
-    .pf-red a{font-size:13px;font-weight:600;padding:6px 10px;border-radius:99px;background:color-mix(in srgb,${B} 10%,var(--card));color:${B};text-decoration:none}`;
+    .pf-pol p{margin:0;white-space:pre-line;overflow-wrap:anywhere;color:var(--muted)}`;
     document.head.appendChild(st);
   }
   const red = (v, base) => /^https?:\/\//i.test(v) ? v : base + String(v).replace(/^@/, '').replace(/[^\w.\-]/g, '');
@@ -70,12 +69,8 @@
     if (p.correo) info.push('<a href="mailto:' + esc(p.correo) + '">✉️ <span>' + esc(p.correo) + '</span></a>');
     if (t.desde) info.push('<span class="muted">📅 <span>Tienda desde ' + esc(fecha(t.desde, { month: 'long', year: 'numeric' })) + '</span></span>');
     if (info.length) partes.push('<div class="pf-info">' + info.join('') + '</div>');
-    const redes = [];
-    if (p.instagram) redes.push(['Instagram', red(p.instagram, 'https://instagram.com/')]);
-    if (p.facebook) redes.push(['Facebook', red(p.facebook, 'https://facebook.com/')]);
-    if (p.tiktok) redes.push(['TikTok', red(p.tiktok, 'https://www.tiktok.com/@')]);
-    if (p.web) redes.push(['🌐 Sitio web', p.web]);
-    if (redes.length) partes.push('<div class="pf-red">' + redes.map(([n, u]) => '<a href="' + esc(window.CFX_URL(u)) + '" target="_blank" rel="noopener">' + esc(n) + '</a>').join('') + '</div>');
+    // G141 a: redes con ícono (t.redes = las nuevas de 🔗 Mis redes; si no hay, las de antes del perfil). data-pf-redes: la página las refresca con CodeFixVitrina.redes.publico.
+    partes.push('<div class="pf-red" data-pf-redes>' + redes.botones(Array.isArray(t.redes) && t.redes.length ? t.redes : redes.deViejas(p), { titulo: 'Síguenos' }) + '</div>');
     if (t.politicas) partes.push(politicas(t, p, dir));
     const tel = String(t.telefono || '').replace(/\D/g, '');
     const wa = 'https://wa.me/' + tel + (t.wa_texto ? '?text=' + encodeURIComponent(t.wa_texto) : '');
@@ -84,6 +79,8 @@
     nodo.innerHTML = '<section class="pf"><div class="pf-ban"></div><div class="pf-cab"><div class="pf-logo"' + logo + '>' + (logo ? '' : esc((t.empresa || '?').charAt(0).toUpperCase())) +
       '</div><div class="pf-nom"><h2>' + esc(t.empresa || 'Tienda') + '</h2>' + (t.rubro ? '<div class="muted">' + esc(t.rubro) + '</div>' : '') + '</div></div>' +
       '<div class="pf-cuerpo">' + partes.join('') + '</div></section>';
+    // G141 a: la página pasa t.rpc + t.redes_llave (slug/código) → se cambian por las de 🔗 Mis redes si las hay.
+    if (t.rpc && t.redes_llave) redes.publico(nodo.querySelector('[data-pf-redes]'), { rpc: t.rpc, llave: t.redes_llave, respaldo: Array.isArray(t.redes) && t.redes.length ? t.redes : redes.deViejas(p) });
     nodo.querySelector('[data-pf="compartir"]').onclick = async () => {
       // G33: abierta en workers.dev y con dominio de CodeFix ✅ → se comparte el link del dominio.
       const sd = window.CFX_AYUDA && CFX_AYUDA.sitio ? CFX_AYUDA.sitio() : '';
@@ -120,7 +117,10 @@
     const campo = ([k, l, ph, m]) => '<label for="pf-' + k + '">' + l + '</label>' + (k === 'descripcion' || k === 'cambios' || k === 'envios'
       ? '<textarea id="pf-' + k + '" data-pf="' + k + '" maxlength="' + m + '" placeholder="' + ph + '">' + esc(p[k]) + '</textarea>'
       : '<input id="pf-' + k + '" data-pf="' + k + '" maxlength="' + m + '" placeholder="' + ph + '" value="' + esc(p[k]) + '"' + (k === 'correo' ? ' type="email"' : '') + '>');
-    nodo.innerHTML = CAMPOS.map(campo).join('') + (o && o.politicas ? '<h3 style="margin:18px 0 0">📄 Políticas de la tienda</h3>' +
+    // G141 a: con o.rpc las redes van en la caja 🔗 (pega el link → ícono). Los 4 campos de antes quedan escondidos con su valor (nada se pierde).
+    const conRedes = !!(o && o.rpc), RED4 = ['instagram', 'facebook', 'tiktok', 'web'];
+    const campoV = (c) => conRedes && RED4.includes(c[0]) ? '<input type="hidden" data-pf="' + c[0] + '" value="' + esc(p[c[0]]) + '">' : campo(c);
+    nodo.innerHTML = CAMPOS.map(campoV).join('') + (conRedes ? '<h3 style="margin:18px 0 6px">🔗 Tus redes</h3><div data-pf-redes-ed></div>' : '') + (o && o.politicas ? '<h3 style="margin:18px 0 0">📄 Políticas de la tienda</h3>' +
       '<p class="muted" style="margin:4px 0 0;font-size:13px">La ley pide mostrarlas en la venta por internet. El retracto y la garantía legal ya salen solos.</p>' +
       POL.map(campo).join('') + '<label class="row" style="gap:8px;align-items:center"><input type="checkbox" data-pf="sin_retracto" style="width:auto"' + (p.sin_retracto ? ' checked' : '') +
       '> No acepto retracto en compras por internet</label>' : '');
@@ -128,6 +128,7 @@
     const cm = nodo.querySelector('[data-pf="comuna"]'), L = window.Despacho && Despacho.COMUNAS_RM;
     if (cm && L && !document.getElementById('pfComunas')) { const dl = document.createElement('datalist'); dl.id = 'pfComunas'; dl.innerHTML = L.map((x) => '<option value="' + esc(x) + '">').join(''); document.body.appendChild(dl); }
     if (cm && L) cm.setAttribute('list', 'pfComunas');
+    if (conRedes) redes.editor(nodo.querySelector('[data-pf-redes-ed]'), { rpc: o.rpc, viejas: redes.deViejas(p) });
   }
   function leer(nodo) {
     const r = {};
@@ -337,5 +338,153 @@
     try { await navigator.clipboard.writeText(v); b.textContent = '✅ Copiado'; setTimeout(() => { b.textContent = antes; }, 1800); }
     catch (er) { if (window.CFX_DIALOGO) CFX_DIALOGO.pedir('Copia los datos', v, { si: 'Cerrar' }); }
   });
-  window.CodeFixVitrina = { montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, rutOk, BANCOS };
+  // ===== G141 a 🔗 Mis redes con ícono =====
+  // CodeFixVitrina.redes.detectar(texto)              → { red, url, nombre, aviso } (pega link, @usuario o un +56 9…)
+  // CodeFixVitrina.redes.botones(lista, { titulo })   → HTML de botones con ícono (SVG en línea: 0 descargas, rápido)
+  // CodeFixVitrina.redes.editor(nodo, { rpc, viejas }) → pantalla 🔗 Mis redes (pega el link → la reconoce sola → 💾)
+  // CodeFixVitrina.redes.publico(nodo, { rpc, llave, respaldo }) → pinta las redes públicas del negocio (cfx_redes_publicas)
+  //   viejas/respaldo = [{red, url}] que la app ya tenía (Despega: perfil.instagram…): se muestran hasta que guarde las nuevas.
+  const S = (d, f) => '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"' + (f ? ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' : ' fill="currentColor"') + '>' + d + '</svg>';
+  const RED = {
+    instagram: ['Instagram', '#d62976', S('<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6" fill="currentColor"/>', 1), /(^|\.)instagram\.com$/],
+    tiktok: ['TikTok', '#111', S('<path d="M16.6 3c.3 2.3 1.7 3.8 3.9 4v3.1c-1.4 0-2.7-.4-3.9-1.1v6.3a5.7 5.7 0 1 1-5.7-5.7l.9.1v3.2a2.6 2.6 0 1 0 1.8 2.4V3h3z"/>'), /(^|\.)tiktok\.com$/],
+    facebook: ['Facebook', '#1877f2', S('<path d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4v2.2H7.8v3h2.6V21h3.1z"/>'), /(^|\.)(facebook\.com|fb\.com|fb\.me)$/],
+    youtube: ['YouTube', '#e00', S('<path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18 4.8 12 4.8 12 4.8s-6 0-7.7.5a2.7 2.7 0 0 0-1.9 1.9C2 8.9 2 12 2 12s0 3.1.4 4.8a2.7 2.7 0 0 0 1.9 1.9c1.7.5 7.7.5 7.7.5s6 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9c.4-1.7.4-4.8.4-4.8s0-3.1-.4-4.8zM10 15.1V8.9l5.2 3.1-5.2 3.1z"/>'), /(^|\.)(youtube\.com|youtu\.be)$/],
+    whatsapp: ['WhatsApp', '#1fa855', S('<path d="M12 2.5a9.4 9.4 0 0 0-8.1 14.2L2.6 21.5l4.9-1.3A9.4 9.4 0 1 0 12 2.5zm5.5 13.3c-.2.6-1.3 1.2-1.8 1.3-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.5-.6-2.6-1.1-4.3-3.8-4.4-4-.1-.2-1-1.4-1-2.7s.7-1.9.9-2.2c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 1.9 1.1 1 2 1.3 2.3 1.4.3.1.4.1.6-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3z"/>'), /^(wa\.me|([a-z0-9-]+\.)?whatsapp\.com)$/],
+    x: ['X', '#111', S('<path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.2-8.3L1.8 3h6.4l4.4 5.8L17.8 3zm-1.1 16.2h1.7L7.2 4.7H5.4l11.3 14.5z"/>'), /(^|\.)(x\.com|twitter\.com)$/],
+    threads: ['Threads', '#111', S('<path d="M16.4 11.2c-.3-2.2-1.8-3.4-4.1-3.4-1.6 0-2.9.7-3.6 1.9M7.6 15.6c1 1.9 2.6 2.9 4.7 2.9 3.4 0 5.7-2.3 5.7-6.4S15.6 5.5 12.2 5.5 6.3 7.9 6.3 12" /><path d="M16.4 11.6c-2.4-.6-6.3-.4-6.3 2 0 2.4 5.6 2.4 6-1.5"/>', 1), /(^|\.)threads\.(net|com)$/],
+    linkedin: ['LinkedIn', '#0a66c2', S('<path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.8h4V21H3V9.8zm6.5 0h3.8v1.6c.6-1 1.9-1.9 3.8-1.9 4 0 4.7 2.5 4.7 5.8V21h-4v-5c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21h-4V9.8z"/>'), /(^|\.)linkedin\.com$/],
+    pinterest: ['Pinterest', '#e60023', S('<path d="M12 2a10 10 0 0 0-3.6 19.3c-.1-.8-.2-2 0-2.9l1.3-5.4s-.3-.7-.3-1.6c0-1.5.9-2.7 2-2.7.9 0 1.4.7 1.4 1.6 0 1-.6 2.4-.9 3.7-.3 1.1.6 2 1.6 2 2 0 3.5-2.1 3.5-5.1 0-2.7-1.9-4.5-4.7-4.5-3.2 0-5 2.4-5 4.9 0 1 .4 2 .9 2.6l.1.4-.3 1.3c0 .2-.2.3-.4.2-1.4-.7-2.3-2.7-2.3-4.4 0-3.6 2.6-6.9 7.5-6.9 3.9 0 7 2.8 7 6.6 0 3.9-2.5 7.1-5.9 7.1-1.2 0-2.2-.6-2.6-1.3l-.7 2.7c-.3 1-1 2.2-1.4 3A10 10 0 1 0 12 2z"/>'), /(^|\.)(pinterest\.[a-z.]{2,6}|pin\.it)$/],
+    spotify: ['Spotify', '#1aa34a', S('<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.6 14.4a.6.6 0 0 1-.9.2c-2.4-1.5-5.4-1.8-9-1-.4.1-.7-.2-.8-.5 0-.4.2-.7.5-.8 3.9-.9 7.2-.5 9.9 1.1.3.2.4.6.3 1zm1.2-2.7c-.2.4-.7.5-1.1.3-2.7-1.7-6.9-2.2-10.2-1.2-.4.1-.9-.1-1-.5-.1-.4.1-.9.5-1 3.7-1.1 8.4-.6 11.5 1.4.4.2.5.7.3 1zm.1-2.8c-3.3-1.9-8.7-2.1-11.8-1.2-.5.2-1-.1-1.2-.6-.2-.5.1-1 .6-1.2 3.6-1.1 9.6-.9 13.4 1.4.5.3.6.9.3 1.3-.3.4-.9.6-1.3.3z"/>'), /^open\.spotify\.com$/],
+    web: ['Sitio web', B, S('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>', 1), null]
+  };
+  const ORDEN_R = Object.keys(RED);
+  const URLDE = { instagram: 'https://instagram.com/', tiktok: 'https://www.tiktok.com/@', x: 'https://x.com/', threads: 'https://www.threads.net/@', youtube: 'https://www.youtube.com/@', facebook: 'https://facebook.com/', pinterest: 'https://pinterest.com/', linkedin: 'https://www.linkedin.com/in/' };
+  function detectar(txt) {
+    let s = String(txt || '').trim().replace(/^<|>$/g, '');
+    if (!s) return null;
+    const digitos = s.replace(/[\s().-]/g, '');
+    if (/^\+?\d{8,15}$/.test(digitos)) { let n = digitos.replace(/^\+/, ''); if (/^9\d{8}$/.test(n)) n = '56' + n; return { red: 'whatsapp', url: 'https://wa.me/' + n, nombre: '+' + n }; }
+    if (/^@[\w.]{2,40}$/.test(s)) return { red: null, usuario: s.slice(1), nombre: s, aviso: '¿De qué red es? Elige abajo.' };
+    if (!/^https?:\/\//i.test(s)) { if (!/^[\w-]+(\.[\w-]+)+(\/|$)/.test(s)) return { red: null, aviso: 'Pega el link completo (ej: instagram.com/tutienda) o tu @usuario.' }; s = 'https://' + s; }
+    let u; try { u = new URL(s.replace(/^http:/i, 'https:')); } catch (e) { return { red: null, aviso: 'Ese link no se entiende.' }; }
+    if (u.protocol !== 'https:' || u.username || u.password) return { red: null, aviso: 'Ese link no se entiende.' };
+    const h = u.hostname.toLowerCase().replace(/^www\.|^m\.|^web\./, ''), seg = u.pathname.split('/').filter(Boolean);
+    let red = ORDEN_R.find((k) => RED[k][3] && RED[k][3].test(h)) || 'web';
+    u.hash = ''; ['igsh', 'igshid', 'utm_source', 'utm_medium', 'utm_campaign', 'si', 'fbclid', 'mibextid', 'ref', '_t', '_r', 'is_from_webapp', 'sender_device'].forEach((k) => u.searchParams.delete(k));
+    let url = u.toString().replace(/\/$/, ''), nombre = h, aviso = '';
+    const p0 = seg[0] || '';
+    if (red === 'instagram') { if (/^(p|reel|reels|tv|stories)$/.test(p0)) aviso = 'Es una publicación: pega el link de tu PERFIL (instagram.com/tutienda).'; else if (p0) nombre = '@' + p0; }
+    else if (red === 'tiktok') { if (/^@/.test(p0)) { nombre = p0; if (seg[1] === 'video') aviso = 'Es un video: para tu perfil basta tiktok.com/' + p0; } }
+    else if (red === 'youtube') { if (/^@/.test(p0)) nombre = p0; else if (/^(watch|shorts)$/.test(p0) || h === 'youtu.be') aviso = 'Es un video: pega el link de tu canal (youtube.com/@tucanal).'; }
+    else if (red === 'x' || red === 'threads') { if (p0 && !/^(i|home|search)$/.test(p0)) nombre = '@' + p0.replace(/^@/, ''); if (seg[1] === 'status' || seg[1] === 'post') aviso = 'Es una publicación: pega el link de tu perfil.'; }
+    else if (red === 'whatsapp') { if (/^\d+$/.test(p0)) nombre = '+' + p0; }
+    else if (red === 'facebook' || red === 'pinterest' || red === 'linkedin') { if (p0 && !/^(profile\.php|share|pages)$/.test(p0)) nombre = (red === 'linkedin' && seg[1] ? seg[1] : p0); }
+    if (url.length > 200) return { red: null, aviso: 'El link es muy largo: copia solo el de tu perfil.' };
+    return { red, url, nombre: nombre.slice(0, 40), aviso };
+  }
+  const deUsuario = (red, usuario) => URLDE[red] ? { red, url: URLDE[red] + String(usuario).replace(/^@/, ''), nombre: '@' + String(usuario).replace(/^@/, '') } : null;
+  const nombreDe = (x) => { const d = detectar(x.url) || {}; return d.nombre || RED[x.red][0]; };
+  let cssR = false;
+  function estilosR() {
+    if (cssR) return; cssR = true;
+    const st = document.createElement('style');
+    st.textContent = `
+    .cfx-redes{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0}
+    .cfx-redes.centro,[data-cfx-redes-centro] .cfx-redes{justify-content:center}
+    .cfx-redes-t{font-weight:800;font-size:14px;margin:0 0 6px;width:100%}
+    .cfx-red{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px 6px 6px;border-radius:99px;text-decoration:none;font-weight:700;font-size:14px;
+      background:var(--card,#fff);color:var(--text,inherit);border:1px solid var(--line,#ddd);box-shadow:0 2px 8px -4px rgba(0,0,0,.25);transition:transform .12s}
+    .cfx-red:active{transform:scale(.96)}.cfx-red:hover{border-color:var(--cfx-red-c)}
+    .cfx-red i{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--cfx-red-c);color:#fff;flex:none;font-style:normal}
+    .cfx-red.solo{padding:6px}.cfx-red.solo i{width:36px;height:36px}
+    .cfx-re-in{display:flex;gap:6px}.cfx-re-in input{flex:1;min-width:0}
+    .cfx-re-det{font-size:13px;margin:6px 0 0;min-height:1.3em}
+    .cfx-re-fila{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line,#ddd)}
+    .cfx-re-fila:first-child{border-top:0}.cfx-re-fila b{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px}
+    .cfx-re-fila i{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--cfx-red-c);color:#fff;flex:none}
+    .cfx-re-fila button{min-height:36px;min-width:36px;padding:4px 8px}
+    .cfx-re-ch{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.cfx-re-ch button{min-height:36px;font-size:13px;border-radius:99px}`;
+    document.head.appendChild(st);
+  }
+  function limpiar(lista) {
+    const vistos = new Set();
+    return (Array.isArray(lista) ? lista : []).filter((x) => x && RED[x.red] && /^https:\/\//i.test(x.url || '') && !vistos.has(x.url) && vistos.add(x.url)).slice(0, 12);
+  }
+  // Las de antes (perfil.instagram/facebook/tiktok/web): nunca se pierden, se muestran igual.
+  function deViejas(p) {
+    p = p || {}; const L = [];
+    if (p.instagram) L.push({ red: 'instagram', url: red(p.instagram, 'https://instagram.com/') });
+    if (p.tiktok) L.push({ red: 'tiktok', url: red(p.tiktok, 'https://www.tiktok.com/@') });
+    if (p.facebook) L.push({ red: 'facebook', url: red(p.facebook, 'https://facebook.com/') });
+    if (p.web) L.push({ red: 'web', url: /^https?:\/\//i.test(p.web) ? p.web.replace(/^http:/i, 'https:') : 'https://' + p.web });
+    return limpiar(L);
+  }
+  function botones(lista, o) {
+    o = o || {}; estilosR();
+    const L = limpiar(lista); if (!L.length) return '';
+    return '<div class="cfx-redes" data-cfx-redes>' + (o.titulo ? '<p class="cfx-redes-t">' + esc(o.titulo) + '</p>' : '') + L.map((x) => {
+      const r = RED[x.red], n = x.red === 'web' ? 'Sitio web' : r[0];
+      return '<a class="cfx-red' + (o.solo ? ' solo' : '') + '" style="--cfx-red-c:' + r[1] + '" href="' + esc(window.CFX_URL(x.url)) + '" target="_blank" rel="noopener nofollow" aria-label="' + esc(n + ' ' + nombreDe(x)) + '" title="' + esc(nombreDe(x)) + '"><i>' + r[2] + '</i>' + (o.solo ? '' : esc(n)) + '</a>';
+    }).join('') + '</div>';
+  }
+  async function publico(nodo, o) {
+    if (!nodo) return; o = o || {};
+    const pinta = (L) => { nodo.innerHTML = botones(L, { titulo: o.titulo === undefined ? 'Síguenos' : o.titulo, solo: o.solo }); nodo.hidden = !limpiar(L).length; };
+    pinta(o.respaldo || []);
+    if (!o.rpc || !o.llave) return;
+    try { const L = await o.rpc('cfx_redes_publicas', { p_llave: String(o.llave) }); if (limpiar(L).length) pinta(L); } catch (e) { /* sin red: quedan las de antes */ }
+  }
+  async function editorRedes(nodo, o) {
+    if (!nodo) return; o = o || {}; estilosR();
+    let D = { lista: [], dueno: true };
+    nodo.innerHTML = '<p class="muted">⏳ Cargando…</p>';
+    try { D = await o.rpc('cfx_redes_mias') || D; } catch (e) { nodo.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; return; }
+    let L = limpiar(D.lista); const viejas = limpiar(o.viejas);
+    if (!L.length && viejas.length) L = viejas.slice();
+    let pend = null, cambio = !limpiar(D.lista).length && viejas.length > 0;
+    const toast = (t) => (window.CFX_AVISO ? CFX_AVISO(t) : window.Core && Core.toast ? Core.toast(t) : null);
+    const pintar = () => {
+      const fila = (x, i) => '<div class="cfx-re-fila" style="--cfx-red-c:' + RED[x.red][1] + '"><i>' + RED[x.red][2] + '</i><b>' + esc(RED[x.red][0]) + '<br><span class="muted" style="font-weight:600">' + esc(nombreDe(x)) + '</span></b>' +
+        (D.dueno ? (i ? '<button type="button" class="alt small" data-re="sube" data-i="' + i + '" aria-label="Subir">↑</button>' : '') + '<button type="button" class="alt small" data-re="quita" data-i="' + i + '" aria-label="Quitar ' + esc(RED[x.red][0]) + '">✕</button>' : '') + '</div>';
+      nodo.innerHTML = '<div class="cfx-re">' + (D.dueno ? '<label for="cfxReIn"><b>Pega el link de tu perfil</b></label><p class="muted" style="margin:2px 0 6px;font-size:13px">Instagram, TikTok, Facebook, YouTube, WhatsApp, X, Threads, LinkedIn… La reconocemos sola.</p>' +
+        '<div class="cfx-re-in"><input id="cfxReIn" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="300" placeholder="instagram.com/tutienda o @tutienda"><button type="button" class="ok" data-re="suma">➕ Agregar</button></div>' +
+        '<p class="cfx-re-det" id="cfxReDet" aria-live="polite"></p><div class="cfx-re-ch" id="cfxReCh" hidden></div>' : '<p class="muted">Solo el dueño cambia las redes. Así se ven en la página del negocio:</p>') +
+        '<div style="margin-top:10px">' + (L.length ? L.map(fila).join('') : '<p class="muted">Aún no agregas redes.</p>') + '</div>' +
+        (L.length ? '<p style="margin:14px 0 6px;font-weight:800">👀 Así se ve en tu página</p>' + botones(L) : '') +
+        (D.dueno ? '<button type="button" class="ok" data-re="guarda" style="width:100%;margin-top:12px;min-height:46px"' + (cambio ? '' : ' disabled') + '>💾 Guardar mis redes</button>' : '') + '</div>';
+      const inp = nodo.querySelector('#cfxReIn'); if (!inp) return;
+      inp.oninput = () => {
+        const d = detectar(inp.value), det = nodo.querySelector('#cfxReDet'), ch = nodo.querySelector('#cfxReCh'); pend = d;
+        ch.hidden = !(d && !d.red && d.usuario);
+        ch.innerHTML = ch.hidden ? '' : Object.keys(URLDE).map((k) => '<button type="button" class="alt" data-re="usu" data-r="' + k + '" style="--cfx-red-c:' + RED[k][1] + '">' + esc(RED[k][0]) + '</button>').join('');
+        det.innerHTML = !d ? '' : d.red ? '<span style="color:' + RED[d.red][1] + '">' + RED[d.red][2].replace('width="22" height="22"', 'width="16" height="16" style="vertical-align:-3px"') + '</span> <b>' + esc(RED[d.red][0]) + '</b> · ' + esc(d.nombre) + (d.aviso ? '<br>⚠️ ' + esc(d.aviso) : ' ✓') : '⚠️ ' + esc(d.aviso || '');
+      };
+      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); sumar(); } };
+    };
+    const sumar = (d) => {
+      d = d || pend; if (!d || !d.red) return toast(d && d.aviso ? d.aviso : 'Pega un link primero');
+      if (L.some((x) => x.url === d.url)) return toast('Ya estaba');
+      if (L.length >= 12) return toast('Máximo 12 redes');
+      L.push({ red: d.red, url: d.url }); pend = null; cambio = true; pintar();
+      const i = nodo.querySelector('#cfxReIn'); if (i) i.focus();
+    };
+    nodo.onclick = async (e) => {
+      const b = e.target.closest('[data-re]'); if (!b || b.disabled) return;
+      const a = b.dataset.re, i = +b.dataset.i;
+      if (a === 'suma') return sumar();
+      if (a === 'usu') return sumar(deUsuario(b.dataset.r, pend && pend.usuario));
+      if (a === 'quita') { L.splice(i, 1); cambio = true; return pintar(); }
+      if (a === 'sube') { L.splice(i - 1, 0, L.splice(i, 1)[0]); cambio = true; return pintar(); }
+      if (a === 'guarda') {
+        b.disabled = true;
+        try { const r = await o.rpc('cfx_redes_guardar', { p_lista: L }); L = limpiar((r || {}).lista || L); cambio = false; toast('✅ Redes guardadas: ya salen en tu página'); pintar(); if (o.alGuardar) o.alGuardar(L); }
+        catch (er) { b.disabled = false; toast('⚠️ ' + (er.message || er)); }
+      }
+    };
+    pintar();
+  }
+  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar };
+
+  window.CodeFixVitrina = { redes, montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, rutOk, BANCOS };
 })();

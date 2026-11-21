@@ -138,6 +138,7 @@
   if (tel.length >= 8) window.CFX_WA_PRODUCTO = (k, nombre, pre, op) => 'https://wa.me/' + tel + '?text=' + encodeURIComponent('Hola 👋 Me interesa ' + nombre + (op ? ' (' + op + ')' : '') +
     (pre ? ' · ' + pre : '') + ' de ' + t.empresa + '. ¿Está disponible?\n' + window.CFX_LINK_PRODUCTO(k));
   t.politicas = true; // 📄 cambios, retracto y garantía (Ley 19.496)
+  t.rpc = (f, x) => Cuenta.rpc(f, x); t.redes_llave = slug;  // G141 a: 🔗 redes con ícono
   const pf = () => CodeFixVitrina.montar($('perfil'), t);
   $('lPol').onclick = (e) => { const d = document.getElementById('politicas'); if (!d) return; e.preventDefault(); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   // 📊 Medir anuncios (módulo): el Worker carga Meta Pixel / Google Analytics; aquí solo se marcan los eventos de compra.

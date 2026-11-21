@@ -414,13 +414,13 @@ try {
     if (a && (v === 'v-home' || v === 'v-ajustes')) Cuenta.nav(a.role === 'client' ? 'cuenta' : v === 'v-ajustes' ? 'mas' : 'hoy');
   };
   // #ajustes, #plan (o #premium) abren Ajustes.
-  const enAjustes = () => /^#(ajustes|plan|premium|tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier|estudio)$/.test(location.hash);
+  const enAjustes = () => /^#(ajustes|plan|premium|tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier|estudio|misredes)$/.test(location.hash);
   let MENU_O = null; // menú Más (núcleo): #plan, #links, #equipo, #despacho, #boleta, #redes y #modulos abren su hoja
   function irAVista() {
     if (!['v-home', 'v-ajustes'].some((v) => !$(v).classList.contains('hidden'))) return; // solo con sesión iniciada
     const cli = (Cuenta.account || {}).role === 'client'; // el cliente no tiene Ajustes: su menú está en Cuenta (inicio)
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
-    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier|estudio)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
+    const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier|estudio|misredes)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
     else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
     else scrollTo(0, 0);
@@ -644,6 +644,10 @@ try {
           ['mercadolibre', '🛒', 'Mercado Libre', 'Stock unido con tus publicaciones', 'mercadolibre', 'Vender más'],
           ['courier', '🚚', 'Courier Chilexpress', 'Cotiza y saca la etiqueta del pedido', 'courier', 'Tu tienda']]
           .map(([k, ico, t, d, m, grupo]) => ({ k, ico, t, d, grupo, dato: Cuenta.puede(m) ? '' : acc.mods ? '🧩' : 'PRO', abrir: (z) => EXTRAS[k](z, { probar: probarMod }) })) : []),
+        // G141 a 🔗 Mis redes (núcleo vitrina.js): pega el link → botón con ícono en tu tienda. Las de antes (Mi vitrina) se muestran hasta guardar.
+        dueno && window.CodeFixVitrina && CodeFixVitrina.redes && { k: 'misredes', ico: '🔗', t: 'Mis redes', d: 'Instagram, TikTok… con ícono en tu tienda', grupo: 'Tu tienda', abrir: async (z) => {
+          let p = {}; try { p = ((await Cuenta.rpc('tienda_info', { p_negocio: acc.id })) || {}).perfil || {}; } catch (e) { /* sin red */ }
+          CodeFixVitrina.redes.editor(z, { rpc: (f, x) => Cuenta.rpc(f, x), viejas: CodeFixVitrina.redes.deViejas(p) }); } },
         dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp, Google, Instagram y medir anuncios', grupo: 'Vender más', nodo: $('cRedes') },
         !equipo && { k: 'premium', ico: '⭐', t: dueno && acc.mods ? 'Mi plan y módulos' : 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
         cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
@@ -1212,7 +1216,7 @@ try {
       $('rowVac').classList.toggle('hidden', !t.vacaciones_hasta);
       $('tDescPrem').value = t.desc_premium ? t.desc_premium : '';
       $('tRubro').value = t.rubro || '';
-      CodeFixVitrina.editor($('tPerfil'), t.perfil, { politicas: true }); $('tPerfil').dataset.listo = '1';
+      CodeFixVitrina.editor($('tPerfil'), t.perfil, { politicas: true, rpc: (f, x) => Cuenta.rpc(f, x) }); $('tPerfil').dataset.listo = '1';  // G141 a: 🔗 Tus redes
     } catch (e) { /* sin red */ }
     cargarCorreo();
   }
