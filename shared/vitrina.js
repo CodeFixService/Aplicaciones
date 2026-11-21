@@ -80,7 +80,9 @@
       '</div><div class="pf-nom"><h2>' + esc(t.empresa || 'Tienda') + '</h2>' + (t.rubro ? '<div class="muted">' + esc(t.rubro) + '</div>' : '') + '</div></div>' +
       '<div class="pf-cuerpo">' + partes.join('') + '</div></section>';
     // G141 a: la página pasa t.rpc + t.redes_llave (slug/código) → se cambian por las de 🔗 Mis redes si las hay.
-    if (t.rpc && t.redes_llave) redes.publico(nodo.querySelector('[data-pf-redes]'), { rpc: t.rpc, llave: t.redes_llave, respaldo: Array.isArray(t.redes) && t.redes.length ? t.redes : redes.deViejas(p) });
+    const waViejo = nodo.querySelector('.pf-acc a.btn.ok');  // G144 d: se oculta si las redes ya traen WhatsApp
+    unWa(nodo.querySelector('[data-pf-redes]'), waViejo);
+    if (t.rpc && t.redes_llave) redes.publico(nodo.querySelector('[data-pf-redes]'), { rpc: t.rpc, llave: t.redes_llave, viejo: waViejo, respaldo: Array.isArray(t.redes) && t.redes.length ? t.redes : redes.deViejas(p) });
     nodo.querySelector('[data-pf="compartir"]').onclick = async () => {
       // G33: abierta en workers.dev y con dominio de CodeFix ✅ → se comparte el link del dominio.
       const sd = window.CFX_AYUDA && CFX_AYUDA.sitio ? CFX_AYUDA.sitio() : '';
@@ -425,12 +427,21 @@
     const L = limpiar(lista); if (!L.length) return '';
     return '<div class="cfx-redes" data-cfx-redes>' + (o.titulo ? '<p class="cfx-redes-t">' + esc(o.titulo) + '</p>' : '') + L.map((x) => {
       const r = RED[x.red], n = x.red === 'web' ? 'Sitio web' : r[0];
-      return '<a class="cfx-red' + (o.solo ? ' solo' : '') + '" style="--cfx-red-c:' + r[1] + '" href="' + esc(window.CFX_URL(x.url)) + '" target="_blank" rel="noopener nofollow" aria-label="' + esc(n + ' ' + nombreDe(x)) + '" title="' + esc(nombreDe(x)) + '"><i>' + r[2] + '</i>' + (o.solo ? '' : esc(n)) + '</a>';
+      return '<a class="cfx-red' + (o.solo ? ' solo' : '') + '" data-red="' + esc(x.red) + '" style="--cfx-red-c:' + r[1] + '" href="' + esc(window.CFX_URL(x.url)) + '" target="_blank" rel="noopener nofollow" aria-label="' + esc(n + ' ' + nombreDe(x)) + '" title="' + esc(nombreDe(x)) + '"><i>' + r[2] + '</i>' + (o.solo ? '' : esc(n)) + '</a>';
     }).join('') + '</div>';
+  }
+  // G144 d 💬 Un solo WhatsApp: si las redes traen WhatsApp, se oculta el botón antiguo (viejo) y el de las redes usa su link
+  // (con el mensaje listo) cuando es el mismo número. Sin WhatsApp en las redes, el antiguo se ve como siempre.
+  function unWa(nodo, viejo) {
+    viejo = typeof viejo === 'string' ? document.querySelector(viejo) : viejo; if (!nodo || !viejo) return;
+    const a = nodo.querySelector('a.cfx-red[data-red="whatsapp"]'), dig = (u) => (String(u || '').match(/wa\.me\/(\d+)/) || [])[1];
+    const v = viejo.getAttribute('href') || viejo.dataset.wa || '';  // botón sin href: data-wa con su link
+    if (a && dig(v) && dig(v) === dig(a.getAttribute('href'))) a.setAttribute('href', v);
+    viejo.hidden = !!a; viejo.style.display = a ? 'none' : '';
   }
   async function publico(nodo, o) {
     if (!nodo) return; o = o || {};
-    const pinta = (L) => { nodo.innerHTML = botones(L, { titulo: o.titulo === undefined ? 'Síguenos' : o.titulo, solo: o.solo }); nodo.hidden = !limpiar(L).length; };
+    const pinta = (L) => { nodo.innerHTML = botones(L, { titulo: o.titulo === undefined ? 'Síguenos' : o.titulo, solo: o.solo }); nodo.hidden = !limpiar(L).length; unWa(nodo, o.viejo); };
     pinta(o.respaldo || []);
     if (!o.rpc || !o.llave) return;
     try { const L = await o.rpc('cfx_redes_publicas', { p_llave: String(o.llave) }); if (limpiar(L).length) pinta(L); } catch (e) { /* sin red: quedan las de antes */ }
@@ -466,6 +477,7 @@
     const sumar = (d) => {
       d = d || pend; if (!d || !d.red) return toast(d && d.aviso ? d.aviso : 'Pega un link primero');
       if (L.some((x) => x.url === d.url)) return toast('Ya estaba');
+      if (d.red === 'whatsapp' && L.some((x) => x.red === 'whatsapp')) return toast('Ya tienes WhatsApp en tus redes: deja uno solo');  // G144 d
       if (L.length >= 12) return toast('Máximo 12 redes');
       L.push({ red: d.red, url: d.url }); pend = null; cambio = true; pintar();
       const i = nodo.querySelector('#cfxReIn'); if (i) i.focus();
@@ -491,7 +503,7 @@
     let M = {}; try { M = (await o.rpc('cfx_redes_equipo', { p_llave: String(o.llave) })) || {}; } catch (e) { return; }
     raiz.querySelectorAll('[data-redes-p]').forEach((n) => { const L = limpiar(M[n.dataset.redesP]); n.innerHTML = L.length ? botones(L, { solo: true }) : ''; n.hidden = !L.length; });
   }
-  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo };
+  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo, unWa };
 
   window.CodeFixVitrina = { redes, montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, rutOk, BANCOS };
 })();

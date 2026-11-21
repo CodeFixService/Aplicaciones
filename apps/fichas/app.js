@@ -486,9 +486,10 @@
     if (!f) return;
     const tipo = TEMPLATES[f.plantilla] && (licensed() || FREE_TEMPLATES.includes(f.plantilla)) ? f.plantilla : 'oferta';
     const pn = Core.precioNum(f.precio);
+    const alaNube = async (x) => (x && window.CFX_NUBE && window.CFX_NUBE_SB ? CFX_NUBE.subir(x).catch(() => x) : x);
     await Cuenta.rpc('publicar_ficha', {
       p_key: f.id, p_titulo: f.titulo || 'Diseño', p_detalle: f.subtitulo || '',
-      p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await imagenFicha(f, 432), // ~35 KB: rápida y liviana
+      p_precio: f.precio ? fmtPrice(f.precio) : '', p_imagen: await alaNube(await imagenFicha(f, 432)), // ~35 KB · G144 e: a Storage (si falla, queda en la base: nada se pierde)
       p_tipo: tipo, p_vip: false, p_precio_num: tipo !== 'lista' && !isNaN(pn) ? pn : null
     });
     f.pubAt = Date.now();

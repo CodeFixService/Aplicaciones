@@ -908,7 +908,7 @@
     const p = pend().length, adm = !!CFG.admin, g = 'Cuenta y ayuda', a = (k) => () => accion(k);
     return [
       suelto && CFG.cuenta && { k: 'cuenta', ico: '👤', t: 'Mi cuenta', accion: a('cuenta') },
-      CFG.panel && { k: 'panel', ico: '🛡️', t: 'Panel de administración', accion: a('panel') },
+      // G144 a: sin fila "Panel de administración" (el admin va al CM con el atajo de arriba).
       !adm && estado.items.length && { k: 'guia', ico: '🧭', t: 'Guía para partir', dato: p || '', accion: a('guia') },
       !adm && { k: 'chat', ico: '💬', t: 'Chat con soporte', dato: estado.sin_leer || '', accion: a('chat') },
       !adm && { k: 'falla', ico: '🐞', t: 'Reportar una falla', accion: a('falla') },

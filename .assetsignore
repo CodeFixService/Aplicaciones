@@ -1,0 +1,12 @@
+# G144 e 🛡️ Lo que NO se publica en Cloudflare (notas internas, SQL con datos del admin, pruebas). La app no los usa.
+.git
+.github
+.wrangler
+node_modules
+supabase
+pruebas
+analisis
+/*.md
+wrangler.jsonc
+docs/CONFIGURAR.md
+.assetsignore

@@ -438,3 +438,6 @@ html.cfx-col-ico :is(nav.tabs, .seg, .segs, .tabs2) button:not(.on):not(.activo)
 .ca .ca-ed button { min-height: 34px; padding: 0 10px; font-size: 13px; }
 .ca .ca-cambiar { display: block; margin: 6px 12px 8px auto; }
 @media (min-width: 900px) { .ca { max-width: 520px; } }
+/* G144 b · REGLA: insignia o botón redondo = círculo perfecto. .cfx-num: contador (1 cifra = círculo; más cifras = píldora). .cfx-redondo: botón de solo ícono. */
+.cfx-num { box-sizing: border-box; display: inline-flex !important; align-items: center; justify-content: center; padding: 0 !important; min-width: 0 !important; min-height: 1.75em; aspect-ratio: 1; border-radius: 99px !important; line-height: 1; }
+.cfx-redondo { aspect-ratio: 1; min-height: 0 !important; min-width: 0; flex: none; padding: 0 !important; display: inline-grid !important; place-items: center; border-radius: 50% !important; }

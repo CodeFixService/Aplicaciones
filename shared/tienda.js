@@ -58,6 +58,10 @@
   #grid.v3 .item .acc{padding:2px 8px 0;gap:4px} #grid.v3 .item .acc .btn,#grid.v3 .item .acc button{min-height:32px;font-size:0;padding:0;border-radius:10px}
   #grid.v3 .item .acc>:first-child::before{content:"＋ Agregar";font-size:12px;font-weight:700}#grid.v3 .item .acc>[disabled]:first-child::before{content:"Agotado"}
   #grid.v3 .item .acc>:not(:first-child){display:none} #grid.v3 .fav{width:28px;height:28px;font-size:14px;top:5px;right:5px}
+  /* G144 b: ❤️ favorito = círculo perfecto (nada estirado) y, marcado, el corazón ROJO sin óvalo rojo detrás. */
+  #grid .fav{aspect-ratio:1;min-height:0!important;min-width:0;flex:none;padding:0;display:grid;place-items:center;line-height:1}
+  #grid .fav.on{background:color-mix(in srgb,var(--card,#fff) 75%,transparent)!important;color:#ef4444}
+  #grid .fav.on svg{fill:#ef4444;stroke:#ef4444}
   @media (max-width:340px){#grid.v3{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
   #grid.v1 .item .foto{aspect-ratio:4/3}
   .opc-ch.agot{opacity:.4;text-decoration:line-through} .opc-ch.agot.sw i{background:repeating-linear-gradient(135deg,var(--sw) 0 5px,transparent 5px 8px)}

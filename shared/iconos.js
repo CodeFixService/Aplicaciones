@@ -75,6 +75,8 @@
     documento: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
     libro: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19a2 2 0 0 1 2-2h13"/>',
     corazon: '<path d="M12 20s-8-4.8-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6.2-8 11-8 11z"/>',
+    microfono: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',  // G144 c
+    casilla: '<rect x="4.5" y="4.5" width="15" height="15" rx="3"/>',  // G144 c: ⬜ ◻️ de las listas por hacer
     mapa: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/>',
     brujula: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
     escudo: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
@@ -169,7 +171,7 @@
   asignar('🌱 🌿 🪴 🌵 🌸 🌷 🌴 🌻', 'planta', 'verde'); asignar('☕', 'taza'); asignar('💤 😴', 'sueno'); asignar('🗂 📁 📂', 'carpeta');
   asignar('🔌', 'enchufe'); asignar('📶', 'senal'); asignar('🔋', 'bateria', 'verde'); asignar('🪫', 'bateriaBaja', 'rojo'); asignar('🎬 🎥 📹', 'video');
   asignar('🤖', 'bot'); asignar('🙈', 'ojoNo'); asignar('🥈 🥉 🏅 🎖', 'medalla', 'oro'); asignar('😕 😞 😩 😐 😬 🙁 😢', 'triste'); asignar('🤔', 'ayuda');
-  asignar('🎮', 'control'); asignar('🎧', 'audifonos'); asignar('🔢', 'numeros'); asignar('⚽ 🏀', 'pelota'); asignar('🎲', 'dado');
+  asignar('🎤 🎙', 'microfono'); asignar('⬜ ◻ ◽ ☐ ▫', 'casilla'); asignar('🎮', 'control'); asignar('🎧', 'audifonos'); asignar('🔢', 'numeros'); asignar('⚽ 🏀', 'pelota'); asignar('🎲', 'dado');
 
   // G81 b · El ícono sigue al CONTEXTO: si la palabra que va justo después del emoji es una acción conocida,
   // manda la palabra (ej. "📣 Compartir" ya no sale con parlante, "⚙️ Imprimir" sale con impresora).
@@ -243,9 +245,16 @@
     t.parentNode.replaceChild(frag, t);
   }
   let pendiente = new Set(), programado = false, obs = null;
+  // G144 b · Contador (insignia con 1-2 cifras) = círculo perfecto: se marca .cfx-num (tema.css) en las 7 apps.
+  const NUM = '.pill, .cfx-fila-dato, .badge, .cfx-badge';
+  function contadores(raiz) {
+    const L = raiz.matches(NUM) ? [raiz] : []; raiz.querySelectorAll(NUM).forEach((e) => L.push(e));
+    L.forEach((e) => e.classList.toggle('cfx-num', /^\d{1,2}$/.test(e.textContent.trim())));
+  }
   function procesar(raiz) {
     if (!raiz) return;
     if (raiz.nodeType === 3) return convertirTexto(raiz);
+    if (raiz.nodeType === 1) contadores(raiz);
     if (raiz.nodeType !== 1 || raiz.closest(FUERA)) return;
     const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, null), lista = [];
     let t; while ((t = w.nextNode())) { EMO.lastIndex = 0; if (EMO.test(t.data)) lista.push(t); }
