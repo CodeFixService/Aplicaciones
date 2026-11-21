@@ -221,7 +221,7 @@ create or replace function public.admin_set_secret(p_name text, p_value text) re
 language plpgsql security definer set search_path = '' as $$
 begin
   if not public.is_admin() then raise exception 'Solo el administrador'; end if;
-  if p_name not in ('vapid_public', 'vapid_private', 'gmail_user', 'gmail_app_password', 'mail_from_name') then
+  if p_name not in ('vapid_public', 'vapid_private', 'gmail_user', 'gmail_app_password', 'mail_from_name', 'cf_token') then
     raise exception 'Nombre no permitido';
   end if;
   insert into public.app_secrets (name, value) values (p_name, p_value)
@@ -5454,7 +5454,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.97'::text $$;
+language sql immutable as $$ select '5.98'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -12260,8 +12260,9 @@ begin
   select dominio into antes from public.profiles where id = me;
   update public.profiles set dominio = d where id = me;
   if d is not null and d is distinct from antes then
+    -- G145 a: la tienda lo conecta sola desde su app (función enviar → Cloudflare). Al CM solo llega el aviso.
     perform public.cfx_al_cm('🌐 Dominio nuevo: ' || d, 'Tienda ' || coalesce((select slug from public.profiles where id = me), '') ||
-      '. Agrégalo en Cloudflare → Workers → aplicaciones → Settings → Domains & Routes → Add → Custom domain.');
+      '. Se conecta solo desde su app (Ajustes → 🌐 Mi dominio); no tienes que hacer nada.');
   end if;
   return public.mi_marca_web();
 end $$;
@@ -12374,7 +12375,7 @@ begin
   update public.profiles set dominio = d where id = me;
   if d is not null and d is distinct from antes then
     perform public.cfx_al_cm('🌐 Dominio nuevo: www.' || d, 'Tienda ' || coalesce((select slug from public.profiles where id = me), '') ||
-      '. Agrégalo en Cloudflare → tu dominio → SSL/TLS → Custom Hostnames → Add custom hostname → www.' || d || ' → Add.');
+      '. Se conecta solo desde su app (Ajustes → 🌐 Mi dominio, G145 a); no tienes que hacer nada.');
   end if;
   return public.mi_marca_web();
 end $$;
@@ -14322,3 +14323,18 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.pedidos_tienda(text) from public, anon;
 grant execute on function public.pedidos_tienda(text) to authenticated;
+
+-- ---------- VERSIÓN 5.98 · G145 a 🌐 Dominio de la tienda se conecta SOLO desde su app (se puede volver a correr) ----------
+-- La función "enviar" (con la sesión del dueño) pide estos datos; el dominio SIEMPRE sale de la base, nunca del navegador.
+-- antes_libre: el dominio anterior ya no lo usa ninguna tienda → se puede borrar su Custom Hostname.
+create or replace function public.dominio_cf_datos(p_uid uuid, p_antes text default null) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare p record; a text := nullif(regexp_replace(lower(trim(regexp_replace(coalesce(p_antes, ''), '^https?://|/.*$', '', 'gi'))), '^www\.', ''), '');
+begin
+  select id, dominio, role, suspended into p from public.profiles where id = p_uid;
+  if p.id is null or p.role not in ('user', 'admin') then return jsonb_build_object('ok', false, 'error', 'Solo el dueño de la tienda'); end if;
+  return jsonb_build_object('ok', true, 'dominio', p.dominio, 'modulo', not coalesce(p.suspended, false) and public.pro_o_modulo(p.id, 'dominio'),
+    'cname', coalesce((select valor ->> 'cname' from public.cfx_config where clave = 'dominio'), ''),
+    'antes', a, 'antes_libre', a is not null and not exists (select 1 from public.profiles x where x.dominio = a));
+end $$;
+revoke all on function public.dominio_cf_datos(uuid, text) from public, anon, authenticated;

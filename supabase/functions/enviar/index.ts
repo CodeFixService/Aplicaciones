@@ -9,6 +9,7 @@
 import webpush from 'npm:web-push@3.6.7';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
+import { dominioTienda } from './dominio_tienda.ts';
 
 // ---------- G61 a · 📲 Push insistente (núcleo push.sql): cada aviso lleva su "grupo"; el celular confirma al recibirlo
 // (service worker → cfx_push_recibido). Sin confirmación se reenvía a 1, 2, 5, 10, 15, 30 min y luego cada 1 h, hasta 48 h.
@@ -37,7 +38,7 @@ async function reintentarPush(s: Rpc, preparar: () => Promise<boolean>) {
   return n;
 }
 
-const VERSION = '3.8';
+const VERSION = '3.9';
 const EMAIL_DAILY_LIMIT = 450; // Gmail permite ~500 al día; dejamos margen
 const EMAILS_PER_NOTIFICATION = 300;
 const BRAND = 'Despega Pyme · CodeFix';
@@ -276,6 +277,18 @@ if (Deno.env.get('SUPABASE_URL')) {
         const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
         try { return json(await crearUsuario(jwt, body)); }
         catch (e) { return json({ ok: false, error: 'Error del servidor: ' + String((e as Error).message || e) }); }
+      }
+      if (body && body.accion === 'dominio') {
+        // G145 a 🌐 La tienda conecta SU dominio sola: sesión del dueño → datos de la base → Cloudflare (token de CodeFix).
+        try {
+          const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''), db = adminDb();
+          const { data: who } = jwt ? await db.auth.getUser(jwt) : { data: null };
+          if (!who?.user) return json({ ok: false, error: 'Inicia sesión de nuevo' });
+          const { data: d, error: e1 } = await db.rpc('dominio_cf_datos', { p_uid: who.user.id, p_antes: typeof body.antes === 'string' ? body.antes.slice(0, 90) : null });
+          if (e1 || !d?.ok) return json({ ok: false, error: e1 ? 'Actualiza la base de Despega' : d?.error });
+          const { data: k } = await db.rpc('get_secrets');
+          return json(await dominioTienda({ token: (k && k.cf_token) || '', cname: d.cname, dominio: d.dominio, modulo: !!d.modulo, antes: d.antes, antesLibre: !!d.antes_libre }));
+        } catch (e) { return json({ ok: false, estado: 'error', error: 'Error del servidor: ' + String((e as Error).message || e) }); }
       }
       if (body && body.accion === 'qr_entrar') {
         try { return json(await qrEntrar(body)); }

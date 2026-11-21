@@ -1038,6 +1038,11 @@ try {
   }
   // 🌐 Mi dominio (G25: fila propia en Ajustes → Tu tienda · G29: pasos CNAME + estado con Cloudflare for SaaS)
   let domEstado = null; // null = sin revisar · 'activo' · 'pendiente'
+  let domCf = null; // G145 a: lo que respondió la conexión automática con Cloudflare (función enviar)
+  async function conectarDominio(antes) {
+    try { const { data } = await Cuenta.sb.functions.invoke('enviar', { body: { accion: 'dominio', antes: antes || null } }); domCf = data && typeof data === 'object' ? data : null; }
+    catch (e) { domCf = null; }
+  }
   async function revisarDominio(d) {
     try {
       const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
@@ -1066,8 +1071,9 @@ try {
         ? '<p class="muted" style="margin:0 0 4px"><b>1.</b> En tu proveedor del dominio (nic.cl, Cloudflare…) → <b>DNS</b> → agrega este registro:</p>' +
           copia('Tipo', 'CNAME') + copia('Nombre', 'www') + copia('Destino', w.cname) +
           '<p class="muted" style="margin:6px 0 4px"><b>2.</b> Redirige <b>' + e(d) + '</b> a <b>www.' + e(d) + '</b> (en tu proveedor: "Redirección" o "Reenvío").</p>' +
-          '<p class="cfx-nota-btn">En Cloudflare el registro va con la nube gris (solo DNS). CodeFix activa el certificado y te avisa.</p>'
-        : '<p class="muted">CodeFix te manda por el chat el dato para pegar en tu dominio (DNS). Al conectarlo, te avisamos.</p>';
+          '<p class="cfx-nota-btn">En Cloudflare el registro va con la nube gris (solo DNS). El certificado (candado 🔒) se activa solo; toca 🔄 Revisar en un rato.</p>' +
+          (domCf && domCf.estado === 'error' ? '<p class="muted">⚠️ ' + e(domCf.error || 'No se pudo conectar ahora') + '. Toca 🔄 Revisar en un rato.</p>' : '')
+        : '<p class="muted">⏳ Tu dominio queda guardado. CodeFix está terminando de activar los dominios propios: cuando esté, aquí aparece el dato para pegar (sin hacer nada más).</p>';
     }
     h += '<label for="mdDom">Tu dominio</label><input id="mdDom" inputmode="url" maxlength="80" placeholder="mitienda.cl" value="' + e(d || '') + '">' +
       '<div class="btns"><button type="button" class="small" data-rd="dominio">Guardar</button>' + (d ? (act ? '' : '<button type="button" class="small alt" data-rd="revisar-dom">🔄 Revisar</button>') +
@@ -1117,13 +1123,14 @@ try {
     if (ir) { ev.preventDefault(); return MENU_O && MENU_O.abrir(ir.dataset.rdIr); }
     if (!b) return;
     const a = b.dataset.rd;
-    if (a === 'revisar-dom') { domEstado = 'revisando'; pintarDominio(); return revisarDominio(web.dominio); }
+    if (a === 'revisar-dom') { domEstado = 'revisando'; pintarDominio(); await conectarDominio(); return revisarDominio(web.dominio); }
     if (a === 'medir' || a === 'dominio' || a === 'sin-dominio') {
       b.disabled = true;
+      const domAntes = web && web.dominio;
       try {
         web = a === 'medir' ? await Cuenta.rpc('medicion_guardar', { p_meta: $('mdMeta').value, p_ga: $('mdGa').value })
           : await Cuenta.rpc('dominio_guardar', { p_dominio: a === 'dominio' ? $('mdDom').value : null });
-        if (a !== 'medir') domEstado = null;
+        if (a !== 'medir') { domEstado = null; await conectarDominio(domAntes); }
         Core.toast(a === 'medir' ? '📊 Medición guardada' : a === 'dominio' ? '🌐 Dominio guardado: mira los pasos arriba' : 'Dominio quitado');
         pintarRedes();
       } catch (err) { Core.toast(err.message); b.disabled = false; }

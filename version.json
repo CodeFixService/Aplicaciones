@@ -1,6 +1,6 @@
 {
-  "version": "6.89",
-  "bd": "5.97",
-  "funcion": "3.8",
-  "notas": "🛡️ G144 (núcleo 3.40): sin botón \"Panel de administración\" ni limpieza dentro de las apps (todo en el CM → Apps) · ❤️ favorito rojo y redondo · contadores e íconos redondos = círculo perfecto · 🎤 y ⬜ ahora son íconos de línea · 💬 el WhatsApp del registro pasa solo a 📱 Mis redes (uno solo; el botón antiguo se oculta) · 🧹 archivos internos fuera de la página publicada."
+  "version": "6.90",
+  "bd": "5.98",
+  "funcion": "3.9",
+  "notas": "🌐 G145: tu dominio propio se conecta SOLO desde Ajustes → 🌐 Mi dominio (copias el dato, lo pegas en nic.cl y listo; el candado 🔒 se activa solo) · ⚙️ la función del servidor conecta el dominio con Cloudflare"
 }
