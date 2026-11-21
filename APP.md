@@ -32,7 +32,8 @@ Tienda online + caja + pedidos para pymes chilenas. Free / Pro / 🧩 módulos (
 profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, boleta_cuentas, boletas_caja, calificaciones, sellos, avisos_stock, publicaciones, publicacion_vistas, subscribers, user_invites, requests, conexiones, webhooks, webhook_envios, negocio_correo, notifications, notification_reads, push_subscriptions, planes, textos, app_settings, app_secrets, actividad_dia.
 
 ## Versiones
-core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql (~l.5453). Ahora: 6.78 · bd 5.89 · enviar 3.8.
+core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql (~l.5453). Ahora: 6.90 · bd 5.98 · enviar 3.9.
+- G145 a 🌐 Mi dominio: la tienda lo conecta SOLA (Guardar/🔄 Revisar → función enviar acción 'dominio' → `enviar/dominio_tienda.ts` crea/borra el Custom Hostname www.<dominio> en la zona de CodeFix con el token 'cf_token' que el CM copia aquí; datos SIEMPRE de la base: `dominio_cf_datos(uid, antes)` solo servidor). Prueba: SaaS/pruebas/g145a.js.
 
 ## 🛒 Cobro de pedidos (G128)
 - Ítem: `catalog_items.tipo` (producto/servicio/digital) · `cobro` (ahora/abono/retiro) · `abono_pct` · `acceso` (solo al pagar). Caja → producto → 🛒 Venta online (`catalogo_venta`).
