@@ -590,6 +590,8 @@
     // G130: con el menú común (CFX_MENU) todo esto ya está en ⚙️ Ajustes; y nunca se pega bajo otra pantalla abierta desde Más
     //   (Billetera: salía abajo de Billeteras conectadas, Comprobantes, Reportes…).
     if (MENU_USADO || (h && !MAS.test(h))) return quitar();
+    // G138: la barra marca "Cuenta" también en páginas que se abren desde ahí (Despega → Mi Caja): si el botón marcado lleva a OTRA página, aquí no va.
+    if (on && on.tagName === 'A' && on.getAttribute('href')) { try { if (new URL(on.href, location.href).pathname !== location.pathname) return quitar(); } catch (e) { /* href raro: sigue */ } }
     if (!(on && MAS.test((on.getAttribute('aria-label') || on.textContent || '').replace(/[0-9+]/g, '').trim())) && !MAS.test(h)) return quitar();
     // Si la pantalla ya tiene el menú común (CFX_MENU), "Cuenta y ayuda" ya viene adentro.
     if ([...document.querySelectorAll('.cfx-mmas')].some(vis)) return quitar();

@@ -288,6 +288,8 @@ button.chip, a.chip, [role="button"].chip { min-height: 40px; }
     border: 0; background: none; cursor: pointer; display: none; place-items: center; -webkit-tap-highlight-color: transparent; }
   .cfx-barra-asa::before { content: ''; width: 44px; height: 5px; border-radius: 3px; background: var(--cfx-texto-2, #5b6472); opacity: .55; box-shadow: 0 0 0 2px var(--cfx-tarjeta, #fff); }
   html.cfx-barra-oculta .cfx-barra-asa { display: grid; }
+  /* G138: escribiendo (teclado abierto) la barra de abajo y su asa no ocupan espacio */
+  html.cfx-teclado nav.cfx-barra, html.cfx-teclado .cfx-barra-asa { display: none !important; }
 }
 @media (min-width: 900px) { .cfx-barra-asa { display: none !important; } }
 @media (prefers-reduced-motion: reduce) { nav.cfx-barra { transition: none !important; } }

@@ -277,6 +277,25 @@
   addEventListener('click', (e) => { if (e.target.closest && e.target.closest('nav.cfx-barra')) verBarra(); }, { capture: true, passive: true });
   addEventListener('resize', () => { if (innerWidth >= 900) verBarra(); });
 
+  // ---------- G138: con el teclado abierto la cabecera queda arriba y solo se achica el contenido ----------
+  // Android/Chrome: sin esto el teclado empuja TODA la página hacia arriba (se iba la cabecera y el título). Con resizes-content
+  // la pantalla se achica y lo fijo (cabecera) se queda. La barra de abajo se esconde mientras se escribe (no tapa el chat).
+  try {
+    const m = document.querySelector('meta[name=viewport]');
+    if (m && !/interactive-widget/.test(m.content)) m.content += ', interactive-widget=resizes-content';
+  } catch (e) { /* sin meta */ }
+  let altoLibre = innerHeight;
+  const escribe = () => { const a = document.activeElement; return !!a && (a.isContentEditable || a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|range|color|file|image|hidden)$/i.test(a.type))); };
+  function teclado() {
+    const vv = window.visualViewport, h = Math.min(innerHeight, vv ? vv.height : innerHeight);
+    if (!escribe()) altoLibre = innerHeight;
+    raiz.classList.toggle('cfx-teclado', innerWidth < 900 && escribe() && altoLibre - h > 150);
+  }
+  addEventListener('resize', teclado);
+  if (window.visualViewport) visualViewport.addEventListener('resize', teclado);
+  document.addEventListener('focusin', () => setTimeout(teclado, 350));
+  document.addEventListener('focusout', () => setTimeout(teclado, 200));
+
   // ---------- G20/G27: deslizar el dedo a la izquierda/derecha cambia de pestaña ----------
   // G27: el gesto mueve SOLO el menú que se toca, nunca otro (antes podía terminar moviendo "Día / 7 días / 30 días" de la página).
   // · Dedo sobre un menú de pestañas (arriba o la barra de abajo): si el menú se corre de lado, se corre él solo (nativo);

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#2563eb">
 <meta name="robots" content="noindex, nofollow">
 <title>Mensajes</title>
@@ -21,6 +21,7 @@
   .wrap { display: grid; grid-template-columns: 1fr; height: calc(100dvh - 61px - env(safe-area-inset-top)); }
   @media (min-width: 860px) { .wrap { grid-template-columns: 340px 1fr; border-inline: 1px solid var(--line); } }
   body.con-nav .wrap { height: calc(100dvh - 133px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  html.cfx-teclado body.con-nav .wrap { height: calc(100dvh - 61px - env(safe-area-inset-top)); }  /* G138: escribiendo, la barra de abajo no está */
   .lista { overflow-y: auto; background: var(--card); border-right: 1px solid var(--line); min-width: 0; }
   .lista .top2 { display: flex; gap: 8px; padding: 12px; position: sticky; top: 0; background: var(--card); border-bottom: 1px solid var(--line); z-index: 1; }
   .conv { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }

@@ -19,7 +19,7 @@
     '.cfx-subir.on{opacity:1;transform:none;pointer-events:auto}.cfx-subir svg{width:22px;height:22px}' +
     '.cfx-fijo{position:sticky!important;top:var(--cfx-fijo-top,0px);z-index:3;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;' +
     'margin-left:calc(-1 * var(--cfx-fijo-px,0px))!important;margin-right:calc(-1 * var(--cfx-fijo-px,0px))!important;padding-left:var(--cfx-fijo-px,0px)!important;padding-right:var(--cfx-fijo-px,0px)!important;padding-top:8px!important;padding-bottom:8px!important}' +
-    '.cfx-fijo:is(h2):not(.cfx-tit-rep){display:block!important}.cfx-fijo.cfx-pegado{background:var(--cfx-fijo-bg,var(--cfx-tarjeta,#fff))!important;box-shadow:0 6px 10px -8px rgba(15,23,42,.25)}' +
+    '.cfx-fijo:is(h2):not(.cfx-tit-rep){display:block!important}.cfx-fijo.cfx-pegado{background:var(--cfx-fijo-bg,var(--cfx-tarjeta,#fff))!important;box-shadow:0 8px 14px -8px rgba(0,0,0,.45);border-bottom:2px solid var(--brand,var(--marca,#2563eb))!important;color:var(--brand,var(--marca,inherit))}' +
     '[data-cfx-orden]>*{-webkit-touch-callout:none}[data-cfx-orden]>.cfx-fila,[data-cfx-orden]>*>:is(h2,h3,.cfx-aj-g){-webkit-user-select:none;user-select:none}' +
     '[data-cfx-orden]>.cfx-aj-sec>.cfx-aj-g{display:flex;align-items:center;gap:8px;cursor:grab}[data-cfx-orden]>.cfx-aj-sec>.cfx-aj-g::after{content:"";margin-left:auto;flex:none;width:14px;height:14px;opacity:.55;background:currentColor;' +
     '-webkit-mask:radial-gradient(circle,#000 1.6px,transparent 1.9px) 0 0/7px 4.7px;mask:radial-gradient(circle,#000 1.6px,transparent 1.9px) 0 0/7px 4.7px}' +
@@ -70,9 +70,18 @@
     }
     return '';
   };
+  // Dónde queda pegada (sticky: su "top", aunque todavía no haya llegado; fija: donde está).
+  const arriba = (x, st, r) => st.position === 'sticky' && /px$/.test(st.top) ? parseFloat(st.top) : r.top;
   const cabecera = () => {
     const h = [...d.querySelectorAll('header')].find((x) => { const s = getComputedStyle(x); return (s.position === 'fixed' || s.position === 'sticky') && x.getClientRects().length && x.getBoundingClientRect().top <= 1; });
-    return h ? Math.max(0, Math.round(h.getBoundingClientRect().bottom)) : 0;
+    let b = h ? Math.max(0, Math.round(h.getBoundingClientRect().bottom)) : 0;
+    // G138: también las pestañas fijas que van bajo la cabecera (Mi Caja, tienda): el título queda DEBAJO de ellas, no escondido detrás.
+    if (b) for (let i = 0; i < 3; i++) {
+      const n = [...d.querySelectorAll('nav:not(.cfx-barra), .tabs, [data-cfx-pestanas]')].find((x) => { const st = getComputedStyle(x); if (!/fixed|sticky/.test(st.position) || x.closest('dialog, .cfx-hoja-m')) return false;
+        const r = x.getBoundingClientRect(), t = arriba(x, st, r); return r.height > 0 && r.height < 160 && r.width > innerWidth * 0.5 && t <= b + 8 && t + r.height > b + 1; });
+      if (!n) break; b = Math.round(arriba(n, getComputedStyle(n), n.getBoundingClientRect()) + n.getBoundingClientRect().height);
+    }
+    return b;
   };
   const TIT = '.card > h2:first-child, .tarjeta > h2:first-child, .cfx-aj-sec > .cfx-aj-g';
   function fijar() {
@@ -98,7 +107,9 @@
     d.querySelectorAll('.cfx-fijo').forEach((h) => {
       const r = h.getBoundingClientRect(), t = parseFloat(getComputedStyle(h).top) || 0, z = h.closest('.cfx-hm-zona');
       const ref = z ? z.getBoundingClientRect().top + t + (parseFloat(getComputedStyle(z).paddingTop) || 0) : t;
-      h.classList.toggle('cfx-pegado', r.height > 0 && Math.abs(r.top - ref) < 1.5 && (z ? z.scrollTop > 0 : scrollY > 0));
+      // G138: pegado = su tarjeta ya empezó más arriba (sirve aunque lo que se baje sea una caja y no la página; antes quedaba sin fondo, encima del texto).
+      const c = h.parentElement, ct = c ? c.getBoundingClientRect().top : r.top;
+      h.classList.toggle('cfx-pegado', r.height > 0 && Math.abs(r.top - ref) < 1.5 && (z ? z.scrollTop > 0 : ct < r.top - 2));
     });
   }
   let tFijo = 0;

@@ -81,22 +81,31 @@
     !NO.test([e.name, e.id, e.getAttribute('placeholder'), e.getAttribute('aria-label')].join(' ')));
   // G27: el micrófono va DENTRO de la página, junto a su campo (no fijo en la pantalla): al bajar se va con el campo
   // y queda debajo de la cabecera y de la barra de abajo, nunca flotando encima. Al esconderse sale de la página.
+  // G138: si el campo cambia de tamaño (crece al escribir) o se abre el teclado, el micrófono se reubica al tiro, en su esquina de abajo.
+  let ro = null, visto = null;
+  function vigilar(c) {
+    if (visto === c || !window.ResizeObserver) return;
+    if (!ro) ro = new ResizeObserver(() => { if (!b.hidden) ubicar(); });
+    if (visto) ro.unobserve(visto); visto = c; ro.observe(c);
+  }
   function caja(c) {
     const op = c.offsetParent;
     return op && op !== document.body && op !== document.documentElement && getComputedStyle(op).position !== 'static' ? op : document.body;
   }
   function ubicar() {
     if (!campo || !campo.isConnected || (!rec && document.activeElement !== campo)) return ocultar(true);
-    const r = campo.getBoundingClientRect();
+    let r = campo.getBoundingClientRect();
     if (!r.width || r.bottom < 0 || r.top > innerHeight) return ocultar(true);
     // Tamaño según el campo (en campos chicos el botón se achica) y el texto no queda debajo del micrófono.
     const alto = Math.round(Math.max(18, Math.min(campo.tagName === 'TEXTAREA' ? 30 : 28, r.height * 0.62, r.width / 6)));
-    if (!campo.dataset.cfxPad) { campo.dataset.cfxPad = campo.style.paddingRight || '-'; campo.style.paddingRight = (alto + 12) + 'px'; }
+    // G138: el espacio del micrófono puede pasar el texto a otra línea y el campo crece: se mide DESPUÉS (antes quedaba arriba, sobre el borde).
+    if (!campo.dataset.cfxPad) { campo.dataset.cfxPad = campo.style.paddingRight || '-'; campo.style.paddingRight = (alto + 12) + 'px'; r = campo.getBoundingClientRect(); }
+    vigilar(campo);
     const k = caja(campo); if (b.parentNode !== k) k.appendChild(b);
     const fijo = 'position:absolute!important;z-index:2!important;margin:0!important;min-width:0!important;max-width:none!important;width:' + alto + 'px!important;height:' + alto + 'px!important;';
     b.style.cssText = fijo + 'left:0;top:0'; b.hidden = false;
     const o = b.getBoundingClientRect();  // dónde queda el (0,0) de su caja, con lo que se haya bajado
-    const x = r.right - alto - Math.max(4, (r.height - alto) / 2.4), y = campo.tagName === 'TEXTAREA' ? r.bottom - alto - 7 : r.top + (r.height - alto) / 2;
+    const x = r.right - alto - (campo.tagName === 'TEXTAREA' ? 7 : Math.max(4, (r.height - alto) / 2.4)), y = campo.tagName === 'TEXTAREA' ? r.bottom - alto - 7 : r.top + (r.height - alto) / 2;
     b.style.cssText = fijo + 'left:' + Math.round(x - o.left) + 'px;top:' + Math.round(y - o.top) + 'px';
   }
   // forzar: también si estaba dictando (el campo desapareció, otra pantalla, la app pasó a segundo plano).
@@ -135,6 +144,7 @@
   addEventListener('hashchange', () => ocultar(true));
   addEventListener('scroll', () => { if (!b.hidden) ubicar(); }, true);
   addEventListener('resize', () => { if (!b.hidden) ubicar(); });
+  if (window.visualViewport) ['resize', 'scroll'].forEach((t) => visualViewport.addEventListener(t, () => { if (!b.hidden) ubicar(); }));
   setInterval(() => { if (!b.hidden) ubicar(); }, 600); // si la pantalla cambia sin mover nada (otra vista, ventana cerrada), el micrófono no queda suelto
   b.addEventListener('mousedown', (e) => e.preventDefault()); // que el campo no pierda el foco
   b.addEventListener('click', () => {
