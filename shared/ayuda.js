@@ -257,7 +257,7 @@
     'html.cfx-col-barra nav.cfx-barra>.cfx-mas>:first-child{box-shadow:0 6px 16px color-mix(in srgb,var(--brand,#2563eb) 45%,transparent),0 0 0 4px var(--cfx-barra)!important}' +
     '.cfx-pf .cfx-pf-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}' +
     '.cfx-pf-lt{display:flex;align-items:center;gap:12px;margin:2px 0 8px;padding:8px 14px;border:1px solid var(--cfx-borde,#dce3ea);border-radius:16px;background:var(--cfx-tarjeta,#fff)}.cfx-pf-lt>span{font-size:14px;font-weight:600;line-height:1}.cfx-pf-lt>.cfx-pf-ltg{font-size:22px}' +
-    '.cfx-pf-lt input{flex:1;min-width:0;min-height:36px;accent-color:var(--pf,var(--brand,#2563eb))}.cfx-pf .cfx-pf-gros button{min-height:64px!important}.cfx-pf-g-delgada{font-weight:300}.cfx-pf-g-normal{font-weight:500}.cfx-pf-g-gruesa{font-weight:800}' +
+    '.cfx-pf-lt input{flex:1;min-width:0;min-height:36px;accent-color:var(--pf,var(--brand,#2563eb))}.cfx-pf .cfx-pf-gros button{min-height:64px!important}.cfx-pf .cfx-pf-fam{grid-template-columns:repeat(3,minmax(0,1fr))!important}.cfx-pf .cfx-pf-fam button{min-height:58px!important;font-size:12px!important}.cfx-pf-fam span{font-size:20px;font-weight:600;line-height:1}.cfx-pf-g-delgada{font-weight:300}.cfx-pf-g-normal{font-weight:500}.cfx-pf-g-gruesa{font-weight:800}' +
     '.cfx-pf .cfx-pf-modos button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:74px!important;width:100%;min-width:0;margin:0!important;padding:10px 4px!important;border-radius:16px!important;' +
     'background:var(--cfx-campo,#f3f5f8)!important;color:var(--cfx-texto,#111827)!important;border:1.5px solid var(--pf-borde)!important;box-shadow:none!important;font:700 13.5px/1.2 inherit!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '.cfx-pf .cfx-pf-modos button>span{font-size:22px;line-height:1;display:grid;place-items:center}.cfx-pf .cfx-pf-modos button svg{width:24px;height:24px}' +
@@ -2141,57 +2141,73 @@
   // Tamaño: zoom de toda la pantalla (íconos y cajas crecen juntos: todo sigue cuadrado y centrado). 112 % máx → en 360 px queda ≥ 320 px.
   // Grosor (de fábrica: delgada, más legible): se reescriben los pesos de las hojas de estilo (delgada: 800/900→700, 700→600 · gruesa: +100). "Aprende": si la persona
   // agranda con los dedos varias veces, sugiere subir la letra (una sola vez).
-  const LT_TAM = [90, 95, 100, 106, 112], LT_GROS = [['delgada', 'Aa', 'Delgada'], ['normal', 'Aa', 'Normal'], ['gruesa', 'Aa', 'Gruesa']];
+  // G143: el tamaño agranda SOLO EL TEXTO (se reescriben los font-size de las hojas), ya no toda la pantalla con zoom. El grosor se nota de verdad
+  // porque la letra es variable (todos los grosores): delgada −100, gruesa +100. 🔤 Tipo de letra: 5 modernas + la del celular, iguales en las 7 apps.
+  const LT_TAM = [90, 95, 100, 106, 112, 118, 125], LT_GROS = [['delgada', 'Aa', 'Delgada'], ['normal', 'Aa', 'Normal'], ['gruesa', 'Aa', 'Gruesa']];
+  const LT_SIS = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  const LT_FAM = [['inter', 'Inter', '"CFX Inter"'], ['roboto', 'Roboto', '"CFX Roboto"'], ['opensans', 'Open Sans', '"CFX Open Sans"'], ['montserrat', 'Montserrat', '"CFX Montserrat"'], ['nunito', 'Nunito', '"CFX Nunito"'], ['sistema', 'Del celular', '']];
+  const ltFam = (k) => LT_FAM.find((x) => x[0] === k) || LT_FAM[0];
   const ltLlave = () => 'cfx-letra:' + location.pathname.replace(/index\.html$/, '') + ':' + colQuien();
-  const ltLeer = () => { let g; try { g = JSON.parse(localStorage.getItem(ltLlave()) || '{}') || {}; } catch (e) { g = {}; } return { t: LT_TAM.includes(+g.t) ? +g.t : 100, g: ['normal', 'gruesa'].includes(g.g) ? g.g : 'delgada', s: g.s || 0 }; };
+  const ltLeer = () => { let g; try { g = JSON.parse(localStorage.getItem(ltLlave()) || '{}') || {}; } catch (e) { g = {}; } return { t: LT_TAM.includes(+g.t) ? +g.t : 100, g: ['normal', 'gruesa'].includes(g.g) ? g.g : 'delgada', f: ltFam(g.f)[0], s: g.s || 0 }; };
   const ltGuardar = (n, quieto) => { try { localStorage.setItem(ltLlave(), JSON.stringify(n)); } catch (e) { /* lleno */ } if (!quieto) peCambio(); };
   let ltFirma = '';
   function ltPeso(w, g) {
-    const n = w === 'bold' ? 700 : w === 'normal' ? 400 : parseInt(w, 10); if (!n) return 0;
-    if (g === 'delgada') return n >= 800 ? 700 : n === 700 ? 600 : 0;
-    return n >= 400 && n < 900 ? Math.min(900, n + 100) : 0;
+    const n = w === 'bold' ? 700 : w === 'normal' ? 400 : parseInt(w, 10); if (!n || g === 'normal') return 0;
+    if (g === 'delgada') return n >= 500 ? n - 100 : 0;  // el texto común (400) no baja: se sigue leyendo bien
+    return n >= 400 && n < 900 ? n + 100 : 0;
   }
-  function ltReglas(lista, g, out) {
+  const LT_FS = /^\s*(?:(?:italic|oblique|small-caps|normal|bold|bolder|lighter|\d00)\s+)*([\d.]+)px\b/;
+  function ltReglas(lista, L, out) {
+    const f = L.t / 100, g = L.g;
     for (const r of lista) {
-      if (r.cssRules && r.media) { const d = []; ltReglas(r.cssRules, g, d); if (d.length) out.push('@media ' + r.media.mediaText + '{' + d.join('') + '}'); continue; }
+      if (r.cssRules && r.media) { const d = []; ltReglas(r.cssRules, L, d); if (d.length) out.push('@media ' + r.media.mediaText + '{' + d.join('') + '}'); continue; }
       if (!r.selectorText || !r.style) continue;
-      // "font: 800 11px var(--x)" (con var) deja fontWeight vacío: se lee del atajo.
-      const fw = r.style.fontWeight || ((/^\s*(?:(?:italic|oblique|small-caps|normal)\s+)*(\d00|bold)\b/.exec(r.style.getPropertyValue('font') || '') || [])[1]);
-      const w = fw && ltPeso(fw, g); if (!w) continue;
-      out.push(':is(' + r.selectorText + '):where(:root[data-cfx-grosor="' + g + '"] *){font-weight:' + w + (r.style.getPropertyPriority('font-weight') || r.style.getPropertyPriority('font') ? '!important' : '') + '}');
+      // "font: 800 11px var(--x)" (con var) deja fontWeight y fontSize vacíos: se leen del atajo.
+      const atajo = r.style.getPropertyValue('font') || '', pr = (k) => r.style.getPropertyPriority(k) || r.style.getPropertyPriority('font') ? '!important' : '';
+      const fw = r.style.fontWeight || ((/^\s*(?:(?:italic|oblique|small-caps|normal)\s+)*(\d00|bold)\b/.exec(atajo) || [])[1]);
+      const w = fw && ltPeso(fw, g);
+      const px = f !== 1 && (parseFloat((/^([\d.]+)px$/.exec(r.style.fontSize || '') || [])[1]) || parseFloat((LT_FS.exec(atajo) || [])[1]));
+      const d = (w ? 'font-weight:' + w + pr('font-weight') + ';' : '') + (px ? 'font-size:' + Math.round(px * f * 10) / 10 + 'px' + pr('font-size') + ';' : '');
+      if (d) out.push(':is(' + r.selectorText + '):where(:root.cfx-lt *){' + d + '}');
     }
   }
-  function ltGrosor(g) {
+  function ltGrosor(L) {
     let st = document.getElementById('cfx-grosor');
-    if (g === 'normal') { if (st) st.textContent = ''; return; }
+    if (L.g === 'normal' && L.t === 100) { if (st) st.textContent = ''; return; }
     const out = [];
-    for (const s of document.styleSheets) { if (s.ownerNode && s.ownerNode.id === 'cfx-grosor') continue; try { ltReglas(s.cssRules, g, out); } catch (e) { /* hoja de otro sitio */ } }
-    const raiz = ':root[data-cfx-grosor="' + g + '"]', P = g === 'delgada' ? [[9, 700], [8, 700], [7, 600]] : [[7, 800], [6, 700], [5, 600]];
-    out.push(P.map(([d, w]) => raiz + ' [style*="font-weight:' + d + '00"],' + raiz + ' [style*="font-weight: ' + d + '00"]{font-weight:' + w + '!important}').join(''));
-    out.push(g === 'gruesa' ? raiz + ' body{font-weight:500}' + raiz + ' :is(b,strong,th,h1,h2,h3,h4,h5,h6){font-weight:800}' : raiz + ' :is(b,strong,th,h1,h2,h3,h4,h5,h6){font-weight:600}');
+    for (const s of document.styleSheets) { if (s.ownerNode && s.ownerNode.id === 'cfx-grosor') continue; try { ltReglas(s.cssRules, L, out); } catch (e) { /* hoja de otro sitio */ } }
+    const raiz = ':root.cfx-lt', g = L.g;
+    if (L.t !== 100) out.push(raiz + '{font-size:' + L.t + '%}' + raiz + ' body{font-size:' + Math.round(16 * L.t) / 100 + 'px}');
+    if (g !== 'normal') {
+      const P = g === 'delgada' ? [[9, 800], [8, 700], [7, 600], [6, 500], [5, 400]] : [[8, 900], [7, 800], [6, 700], [5, 600], [4, 500]];
+      out.push(P.map(([d, w]) => raiz + ' [style*="font-weight:' + d + '00"],' + raiz + ' [style*="font-weight: ' + d + '00"]{font-weight:' + w + '!important}').join(''));
+      out.push(g === 'gruesa' ? raiz + ' body{font-weight:500}' + raiz + ' :is(b,strong,th,h1,h2,h3,h4,h5,h6){font-weight:800}' : raiz + ' :is(b,strong,th,h1,h2,h3,h4,h5,h6){font-weight:600}');
+    }
     if (!st) { st = document.createElement('style'); st.id = 'cfx-grosor'; }
     st.textContent = out.join('\n');
     (document.head || document.documentElement).appendChild(st);  // siempre al final: gana a lo de la app
   }
   function pintarLetra(prueba) {
-    const L = prueba || ltLeer(), r = document.documentElement;
-    if (L.t === 100) r.style.removeProperty('zoom'); else r.style.setProperty('zoom', String(L.t / 100));
+    const L = prueba || ltLeer(), r = document.documentElement, fam = ltFam(L.f)[2];
+    r.style.removeProperty('zoom');  // G87 G usaba zoom: ya no
+    r.style.setProperty('--cfx-letra', fam ? fam + ', ' + LT_SIS : LT_SIS);
     if (L.g === 'normal') delete r.dataset.cfxGrosor; else r.dataset.cfxGrosor = L.g;
-    const n = document.styleSheets.length + ':' + L.g;
-    if (n !== ltFirma) { ltFirma = n; ltGrosor(L.g); }
+    r.classList.toggle('cfx-lt', !(L.g === 'normal' && L.t === 100));
+    const n = document.styleSheets.length + ':' + L.g + ':' + L.t;
+    if (n !== ltFirma) { ltFirma = n; ltGrosor(L); }
   }
   // Las apps cargan estilos después (pantallas nuevas): se reescriben al aparecer hojas nuevas.
   let ltT = 0;
   new MutationObserver((ms) => {
     if (!ms.some((m) => [...m.addedNodes].some((x) => (x.tagName === 'STYLE' && x.id !== 'cfx-grosor') || x.tagName === 'LINK'))) return;
-    clearTimeout(ltT); ltT = setTimeout(() => { if (document.documentElement.dataset.cfxGrosor) { ltFirma = ''; pintarLetra(); } }, 120);
+    clearTimeout(ltT); ltT = setTimeout(() => { if (document.documentElement.classList.contains('cfx-lt')) { ltFirma = ''; pintarLetra(); } }, 120);
   }).observe(document.documentElement, { childList: true, subtree: true });
   // Aprende: 3 veces agrandando con los dedos (en días o pantallas distintas) → sugiere una letra más grande, una sola vez.
   try {
     const vv = window.visualViewport; let visto = false;
     if (vv) vv.addEventListener('resize', () => {
       if (visto || vv.scale < 1.25) return; visto = true;
-      const L = ltLeer(); if (L.s < 0 || L.t >= 112) return;
+      const L = ltLeer(); if (L.s < 0 || L.t >= LT_TAM[LT_TAM.length - 1]) return;
       L.s = (L.s || 0) + 1; ltGuardar(L, true);
       if (L.s >= 3) {
         L.s = -1; ltGuardar(L, true);
@@ -2202,7 +2218,7 @@
       }
     });
   } catch (e) { /* sin visualViewport */ }
-  window.CFX_LETRA = { leer: ltLeer, guardar: ltGuardar, pintar: pintarLetra, TAM: LT_TAM };
+  window.CFX_LETRA = { leer: ltLeer, guardar: ltGuardar, pintar: pintarLetra, TAM: LT_TAM, FAM: LT_FAM };
   // ---------- G140 🎨 Personalizar: barra de abajo (tipo, tamaño, nombres), temas listos y guardado en la base ----------
   // Todo es por usuario y por app. Se guarda en este celular (se ve al tiro, sin internet) y en la base (cfx_personal): en otro celular queda igual.
   const BAR = () => (window.CodeFixBarra || {}).personal;
@@ -2218,7 +2234,7 @@
   const btGuardar = (g, quieto) => { g = btLimpio(g); try { if (g.tipo === 'clasica' && g.tam === 'normal' && !Object.keys(g.textos).length) localStorage.removeItem(btLlave()); else localStorage.setItem(btLlave(), JSON.stringify(g)); } catch (e) { /* lleno */ } if (BAR()) BAR().pintar(g); if (!quieto) peCambio(); };
   const peV = () => { try { return +localStorage.getItem(peLlaveV()) || 0; } catch (e) { return 0; } };
   const colLimpio = (g) => { const o = {}; if (g && typeof g === 'object') Object.keys(g).forEach((k) => { if (/^(fondo|tarjeta|texto|icono|barra|marca2)$/.test(k) && HEX.test(g[k])) o[k] = g[k].toLowerCase(); }); return o; };
-  const peFoto = () => { const L = ltLeer(); return { v: peV(), col: { claro: colLeer('claro'), oscuro: colLeer('oscuro') }, letra: { t: L.t, g: L.g }, barra: btLeer() }; };
+  const peFoto = () => { const L = ltLeer(); return { v: peV(), col: { claro: colLeer('claro'), oscuro: colLeer('oscuro') }, letra: { t: L.t, g: L.g, f: L.f }, barra: btLeer() }; };
   let peT = 0;
   function peSubir() { if (!R) return; R('cfx_personal_guardar', { p_datos: peFoto() }).catch(() => { /* base sin cfx_personal todavía: queda en este celular */ }); }
   function peCambio() { try { localStorage.setItem(peLlaveV(), String(Date.now())); } catch (e) { /* lleno */ } clearTimeout(peT); peT = setTimeout(peSubir, 1200); }
@@ -2230,7 +2246,7 @@
       if (+d.v <= peV()) { if (peV() > +d.v) peSubir(); return; }
       const c = d.col || {};
       colGuardar('claro', colLimpio(c.claro), true); colGuardar('oscuro', colLimpio(c.oscuro), true);
-      const L = ltLeer(), l = d.letra || {}; L.t = LT_TAM.includes(+l.t) ? +l.t : 100; L.g = ['normal', 'gruesa'].includes(l.g) ? l.g : 'delgada'; ltGuardar(L, true);
+      const L = ltLeer(), l = d.letra || {}; L.t = LT_TAM.includes(+l.t) ? +l.t : 100; L.g = ['normal', 'gruesa'].includes(l.g) ? l.g : 'delgada'; L.f = ltFam(l.f)[0]; ltGuardar(L, true);
       btGuardar(d.barra, true);
       try { localStorage.setItem(peLlaveV(), String(+d.v)); } catch (e) { /* lleno */ }
       colFirma = ''; ltFirma = ''; pintarCols(); pintarLetra();
@@ -2254,7 +2270,7 @@
   }
   const temaActual = () => { const g = colLeer('claro'); const t = TEMAS.find((x) => x[2] && TEMA_K.every((c) => g[c] === x[2].claro[c])); return t ? t[0] : TEMA_K.some((c) => g[c]) ? '' : 'fabrica'; };
   // ↩️ Todo de fábrica: colores a tu gusto (claro y oscuro), letra y barra. El color y el modo de la app quedan (son de cada app).
-  function peFabrica() { colGuardar('claro', {}, true); colGuardar('oscuro', {}, true); ltGuardar({ t: 100, g: 'delgada', s: ltLeer().s }, true); btGuardar({}, true); peCambio(); colFirma = ''; ltFirma = ''; pintarCols(); pintarLetra(); }
+  function peFabrica() { colGuardar('claro', {}, true); colGuardar('oscuro', {}, true); ltGuardar({ t: 100, g: 'delgada', f: 'inter', s: ltLeer().s }, true); btGuardar({}, true); peCambio(); colFirma = ''; ltFirma = ''; pintarCols(); pintarLetra(); }
   window.CFX_PERSONAL = { leer: peFoto, traer: peTraer, subir: peSubir, barra: { leer: btLeer, guardar: btGuardar }, TEMAS, tema: temaPoner, temaActual, fabrica: peFabrica };
   if (BAR()) BAR().pintar(btLeer());
   pintarLetra();
@@ -2351,6 +2367,7 @@
       const L = ltLeer();
       return '<label>🔤 Tamaño de letra · <span data-lt-v>' + L.t + ' %</span></label><div class="cfx-pf-lt"><span aria-hidden="true">A</span>' +
         '<input type="range" data-lt min="0" max="' + (LT_TAM.length - 1) + '" step="1" value="' + LT_TAM.indexOf(L.t) + '" aria-label="Tamaño de letra"><span aria-hidden="true" class="cfx-pf-ltg">A</span></div>' +
+        '<label>Tipo de letra</label><div class="cfx-pf-modos cfx-pf-fam">' + LT_FAM.map(([k, t, ff]) => '<button type="button" data-lf="' + k + '" aria-pressed="' + (k === L.f) + '" class="' + (k === L.f ? 'on' : '') + '" style="font-family:' + (ff ? ff.replace(/"/g, "'") + ',' : '') + 'system-ui,sans-serif"><span>Aa</span>' + t + '</button>').join('') + '</div>' +
         '<label>Grosor de letra</label><div class="cfx-pf-modos cfx-pf-gros">' + LT_GROS.map(([k, i, t]) => '<button type="button" data-lg="' + k + '" aria-pressed="' + (k === L.g) + '" class="' + (k === L.g ? 'on' : '') + '"><span class="cfx-pf-g-' + k + '">' + i + '</span>' + t + '</button>').join('') + '</div>';
     }
     // G140 🎨 Temas listos (los colores a tu gusto de un toque). Alto contraste y De fábrica, para todos; el resto, como los colores a tu gusto.
@@ -2438,6 +2455,8 @@
           if (!(await window.CFX_DIALOGO.confirmar('↩️ ¿Volver los colores, la letra y la barra a lo de fábrica? (el color de la app y el modo quedan)', { si: 'Sí, de fábrica', no: 'Cancelar' }))) return;
           peFabrica(); verEstilo(z); aviso('↩️ Todo de fábrica'); return;
         }
+        const lf = ev.target.closest('[data-lf]');
+        if (lf) { ev.preventDefault(); marcar('[data-lf]', lf); const n = ltLeer(); n.f = ltFam(lf.dataset.lf)[0]; ltGuardar(n); pintarLetra(); aviso('🔤 Letra guardada'); return; }
         const lg = ev.target.closest('[data-lg]');
         if (lg) { ev.preventDefault(); marcar('[data-lg]', lg); const n = ltLeer(); n.g = lg.dataset.lg; ltGuardar(n); ltFirma = ''; pintarLetra(); aviso('🔤 Grosor guardado'); return; }
       const b = ev.target.closest('[data-c], [data-m]'); if (!b) return;

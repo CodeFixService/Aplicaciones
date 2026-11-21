@@ -13,6 +13,7 @@
   if (window.CodeFixBarra) return;
   const ICO = {
     mas: '<path d="M12 5v14M5 12h14"/>',
+    lineas: '<path d="M4 6h16M4 12h16M4 18h16"/>',  // G143: el ☰ de texto (se veía grueso y de otro tamaño) pasa a ícono de línea
     menu: '<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>'
   };
   const svg = (n) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICO[n] + '</svg>';
@@ -69,6 +70,7 @@
       nav.appendChild(mas);
       botones.push(mas);
     }
+    botones.forEach((b) => { const sp = b && b !== mas && b.querySelector(':scope > span:first-child'); if (sp && /^\s*[☰≡]\s*$/.test(sp.textContent)) { sp.innerHTML = svg('lineas').replace('2.2', '2'); sp.classList.add('cfx-ico'); } });
     if (mas) {
       mas.classList.add('cfx-mas');
       const i = mas.querySelector('.ico, .i, .cfx-ico, span:not(.badge):not(.punto)');

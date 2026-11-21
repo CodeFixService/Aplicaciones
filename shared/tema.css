@@ -3,11 +3,19 @@
    Cada app conserva SU color de marca (--brand / --marca), y el que elige el negocio en la app sigue mandando
    (se aplica en línea sobre <html> y le gana a este archivo). Se carga DESPUÉS del CSS propio de cada app.
    Las variables tienen los nombres de todas las apps (brand/bg/card/text… y marca/fondo/tarjeta/texto…). */
+/* G143 🔤 UNA letra para las 7 apps (alojada aquí: sin Google, funciona sin internet). Variables: todos los grosores en 1 archivo,
+   así Delgada/Normal/Gruesa se notan (la letra del sistema de Android solo trae 400/500/700). Se elige en Mi perfil → 🎨 Personalizar → 🔤 Letra. */
+@font-face { font-family: "CFX Inter"; font-style: normal; font-weight: 100 900; font-display: swap; src: url(vendor/letras/inter.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "CFX Roboto"; font-style: normal; font-weight: 100 900; font-display: swap; src: url(vendor/letras/roboto.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "CFX Open Sans"; font-style: normal; font-weight: 300 800; font-display: swap; src: url(vendor/letras/open-sans.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "CFX Montserrat"; font-style: normal; font-weight: 100 900; font-display: swap; src: url(vendor/letras/montserrat.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "CFX Nunito"; font-style: normal; font-weight: 200 1000; font-display: swap; src: url(vendor/letras/nunito.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 :root {
   --cfx-fondo: #f3f5f7; --cfx-tarjeta: #ffffff; --cfx-campo: #f7f9fb; --cfx-texto: #111827; --cfx-texto-2: #5b6472;
   --cfx-borde: #dce3ea; --cfx-sombra: 0 1px 2px rgba(15, 23, 42, .07), 0 6px 18px -6px rgba(15, 23, 42, .14);
   --cfx-radio: 14px; --cfx-radio-chico: 12px;
-  --cfx-letra: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --cfx-letra-sis: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --cfx-letra: "CFX Inter", var(--cfx-letra-sis);
   --cfx-ok: #16a34a; --cfx-mal: #dc2626; --cfx-aviso: #ea580c;
 }
 :root, :root[data-theme="light"] {
@@ -65,9 +73,12 @@ pre, code, kbd { white-space: pre-wrap; overflow-wrap: anywhere; }
   nav.cfx-barra > a > small, nav.cfx-barra > button > small { font: inherit !important; margin: 0 !important; }
   nav.cfx-barra > a > span:first-child, nav.cfx-barra > button > span:first-child, nav.cfx-barra .cfx-ico {
     display: grid !important; place-items: center !important; width: 26px !important; height: 26px !important; margin: 0 auto !important; padding: 0 !important;
-    font-size: 21px !important; line-height: 1 !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; color: inherit !important;
+    font-size: 21px !important; line-height: 1 !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; color: inherit !important; transform: none !important; filter: none !important;
   }
   nav.cfx-barra svg { width: 23px !important; height: 23px !important; display: block; margin: 0 auto; }
+  /* G143: el ícono que viene de un emoji (iconos.js .ic-e) traía margen a la derecha: se aplastaba (18 px) y quedaba corrido. */
+  nav.cfx-barra .ic-e { display: grid !important; place-items: center !important; margin: 0 !important; width: auto !important; height: auto !important; }
+  nav.cfx-barra svg { flex: none !important; }
   nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current="page"], nav.cfx-barra > .cfx-mas-on { color: var(--brand, var(--marca, #2563eb)) !important; }
   nav.cfx-barra > .on::before, nav.cfx-barra > .activo::before, nav.cfx-barra > .cfx-mas-on::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: currentColor; }
   /* El + grande, con color, un poco más arriba que el resto */
@@ -158,6 +169,7 @@ pre, code, kbd { white-space: pre-wrap; overflow-wrap: anywhere; }
     font-size: 19px !important; line-height: 1 !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; color: inherit !important;
   }
   nav.cfx-barra svg { width: 20px !important; height: 20px !important; display: block; margin: 0 !important; padding: 0 !important; }
+  nav.cfx-barra .ic-e { margin: 0 !important; } nav.cfx-barra svg { flex: none !important; }
   nav.cfx-barra > .on, nav.cfx-barra > .activo, nav.cfx-barra > [aria-current="page"] {
     color: var(--brand, var(--marca, #2563eb)) !important; background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 12%, transparent) !important;
   }
