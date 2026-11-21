@@ -573,7 +573,9 @@
     const base = l.reduce((a, x) => a + Number(x.subtotal), 0), total = base + extra;
     const al = o.entrega === 'despacho' ? 'recibir' : 'retirar';
     if (!o.medios) return [{ k: 'retiro', txt: '💰 Pagas al ' + al, nota: 'La tienda aún no recibe pagos en línea.', monto: 0, resto: total }];
-    const ops = [{ k: 'ahora', txt: '⚡ Pagar todo ahora', monto: total, resto: 0 }];
+    // G139: sin ⚡ MP/Webpay (o.mp === false) no es "en línea": es 🏦 transferencia + comprobante.
+    const tr = o.mp === false;
+    const ops = [{ k: 'ahora', txt: tr ? '🏦 Pagar todo ahora' : '⚡ Pagar todo ahora', monto: total, resto: 0, det: tr ? plata(total) + ' por transferencia · subes el comprobante' : null }];
     if (l.some((x) => x.cobro === 'abono' && x.tipo !== 'digital')) {
       const ya = l.reduce((a, x) => a + (x.cobro === 'abono' && x.tipo !== 'digital' ? Number(x.subtotal) * (Number(x.abono) || 50) / 100 : x.cobro === 'retiro' && x.tipo !== 'digital' ? 0 : Number(x.subtotal)), 0);
       const m = Math.max(1, Math.round(ya + extra));
@@ -585,13 +587,36 @@
   function elegir(el, ops, k, cb) {
     if (!el) return;
     if (!ops.some((x) => x.k === k)) k = ops[0] && ops[0].k;
-    const det = (x) => x.k === 'ahora' ? plata(x.monto) + ' en línea' : x.k === 'abono' ? plata(x.monto) + ' ahora · ' + plata(x.resto) + ' después' : x.nota || plata(x.resto) + ' al entregar';
+    const det = (x) => x.det ? x.det : x.k === 'ahora' ? plata(x.monto) + ' en línea' : x.k === 'abono' ? plata(x.monto) + ' ahora · ' + plata(x.resto) + ' después' : x.nota || plata(x.resto) + ' al entregar';
     el.innerHTML = ops.length === 1 ? '<div class="cfx-cobro"><p class="cc-uno"><b>' + esc(ops[0].txt) + '</b> · ' + esc(det(ops[0])) + '</p></div>'
       : '<div class="cfx-cobro" role="radiogroup" aria-label="Cómo pagas">' + ops.map((x) => '<button type="button" role="radio" aria-checked="' + (x.k === k) + '" class="' + (x.k === k ? 'on' : '') +
         '" data-cobro="' + x.k + '"><span><b>' + esc(x.txt) + '</b><small>' + esc(det(x)) + '</small></span></button>').join('') + '</div>';
     el.onclick = (e) => { const b = e.target.closest('[data-cobro]'); if (!b) return; elegir(el, ops, b.dataset.cobro, cb); };
     if (cb) cb(k);
     return k;
+  }
+
+  // G139 🛒 El botón del carrito dice lo que hace: "⚡ Pagar $X" (el pedido llega a la tienda cuando pagas) o "📨 Enviar pedido" (paga al retirar).
+  //   CFX_COBRO.boton(btn, ops, k, { nota: elementoNota }) → pinta el botón y su nota.
+  function boton(btn, ops, k, o) {
+    o = o || {};
+    const x = (ops || []).find((y) => y.k === k) || (ops || [])[0];
+    const paga = x && x.k !== 'retiro' && x.monto > 0;
+    // o.sinMonto: con cupón o despacho el total final lo calcula la base → sin monto en el botón.
+    const txt = !paga ? (o.enviar || '📨 Enviar pedido') : (x.k === 'abono' ? '💵 Pagar abono' : x.det ? '🏦 Pagar' : '⚡ Pagar') + (o.sinMonto ? ' y enviar pedido' : ' ' + plata(x.monto));
+    if (btn) btn.textContent = txt;
+    if (o.nota) o.nota.textContent = paga ? (x.det ? '🧾 Te mostramos los datos para transferir y subes el comprobante: la tienda lo prepara cuando lo aprueba.' : '🔒 Pagas primero: la tienda recibe tu pedido cuando el pago se aprueba.') : '';
+    return { txt, paga };
+  }
+
+  // G139 📲 Mensaje de WhatsApp para avisar el estado al cliente (✅ listo · 🚚 en camino · 👩‍🍳 preparando).
+  function waEstado(tel, p, tienda, url) {
+    p = p || {};
+    const hola = 'Hola' + (p.cliente ? ' ' + p.cliente : '') + ' 👋 ', de = tienda ? ' de ' + tienda : '';
+    const m = { preparando: '👩‍🍳 Recibimos tu pago: estamos preparando tu pedido' + de + '.', listo: '✅ Tu pedido' + de + ' está listo para retirar.',
+      en_camino: '🚚 Tu pedido' + de + ' va en camino.', entregado: '🎉 ¡Gracias por tu compra' + de + '!' }[p.estado];
+    if (!m) return '';
+    return wa(tel, hola + m + (url ? '\n' + url : ''));
   }
 
   // d) Aviso al dueño cuando sus clientes no tienen cómo pagar.
@@ -649,5 +674,5 @@
     vivo = setInterval(() => { if (!document.hidden) cargar(false); }, 20000);
   }
 
-  window.CFX_COBRO = { estado, opciones, elegir, sinMedios, enlace, wa, hilo, plata };
+  window.CFX_COBRO = { estado, opciones, elegir, boton, waEstado, sinMedios, enlace, wa, hilo, plata };
 })();

@@ -3669,6 +3669,9 @@ begin
     perform public.mover_stock(x, -1);
     update public.pedidos set estado = 'preparando', pagado_at = now(), stock_descontado = true, motivo = null, updated_at = now() where id = x.id;
     perform public.aviso_cliente(x, '✅ Tu pedido fue aceptado', 'Pago aprobado: estamos preparando tu pedido');
+    -- G139: con el pago aprobado, el equipo recibe "prepáralo".
+    perform public.notify_user(e.id, '📦 Pedido para preparar', coalesce(x.invitado_nombre, 'Un cliente') || ' · pago aprobado', 'apps/pedidos/')
+      from public.profiles e where e.role = 'equipo' and e.negocio_id = x.negocio_id and not e.suspended and e.id <> auth.uid();
     return jsonb_build_object('ok', true, 'estado', 'preparando');
   end if;
   if x.rechazos + 1 < public.regla('max_rechazos', 3) then
@@ -5451,7 +5454,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.92'::text $$;
+language sql immutable as $$ select '5.93'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -11369,6 +11372,7 @@ language sql stable security definer set search_path = '' as $$
     'vacaciones_hasta', case when public.en_vacaciones(t.id) then t.vacaciones_hasta end,
     'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
     'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
+    'cobra_mp', coalesce((public.link_activo(t.id, 'pedido') ->> 'mp')::boolean, false),
     'desc_premium', t.desc_premium, 'rubro', t.rubro, 'despacho', t.despacho, 'perfil', t.perfil, 'desde', t.created_at::date)
   from public.profiles t cross join lateral (select public.cfx_sellos_cfg_de(t.id) as c) s
   where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
@@ -12000,6 +12004,7 @@ language sql stable security definer set search_path = '' as $$
     'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
     'retencion_min', public.regla('retencion_min', 30), 'pro', public.is_pro(t.id), 'desc_premium', t.desc_premium, 'despacho', t.despacho,
     'perfil', t.perfil, 'rubro', t.rubro, 'desde', t.created_at::date,
+    'cobra_mp', coalesce((public.link_activo(t.id, 'pedido') ->> 'mp')::boolean, false),
     'medicion', case when t.medicion <> '{}'::jsonb and public.pro_o_modulo(t.id, 'medicion') then t.medicion end)
   from public.profiles t where t.slug = lower(trim(coalesce(p_slug, ''))) and t.role = 'user' and not t.suspended
 $$;
@@ -13595,8 +13600,12 @@ begin
   perform public.mover_stock(x, -1);
   update public.pedidos set estado = 'preparando', pagado_at = now(), stock_descontado = true, motivo = null,
     mp_pago = left(p_pago, 40), updated_at = now() where id = x.id;
-  perform public.notify_user(x.negocio_id, '💳 Pagado con ' || p_medio, coalesce(x.invitado_nombre, 'Un cliente') || ' · $' ||
-    to_char(x.total, 'FM999G999G999') || case when x.estado = 'expirado' then ' · llegó tarde: revisa el stock' else '' end, 'apps/pedidos/');
+  -- G139: al pagar recién le llega a la tienda (y al equipo): "prepáralo".
+  perform public.notify_user(x.negocio_id, '💳 Pagado: prepara el pedido de ' || coalesce(x.invitado_nombre, (select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = x.cliente_id), 'un cliente'),
+    case when x.cobro = 'abono' then 'Abono $' || to_char(x.a_pagar, 'FM999G999G999') || ' de $' || to_char(x.total, 'FM999G999G999') else '$' || to_char(x.total, 'FM999G999G999') end ||
+    ' con ' || p_medio || case when x.estado = 'expirado' then ' · llegó tarde: revisa el stock' else '' end, 'apps/pedidos/');
+  perform public.notify_user(e.id, '📦 Pedido para preparar', coalesce(x.invitado_nombre, 'Un cliente') || ' pagó con ' || p_medio, 'apps/pedidos/')
+    from public.profiles e where e.role = 'equipo' and e.negocio_id = x.negocio_id and not e.suspended;
   perform public.aviso_cliente(x, '✅ Pago recibido', p_medio || ' aprobó tu pago: estamos preparando tu pedido');
   return true;
 end $$;
@@ -13829,12 +13838,13 @@ begin
     insert into public.giftcard_usos (giftcard_id, monto, pedido_id, donde) values (gc.id, gm, ped.id, 'pedido');
   end if;
   quien := coalesce(p_nombre, (select coalesce(nullif(empresa, ''), split_part(email, '@', 1)) from public.profiles where id = p_cliente));
+  -- G139: si hay que pagar antes, la tienda NO recibe aviso al apartar: le llega "💳 Pagado: prepáralo" al pagar (o "🧾 Comprobante por revisar").
+  if pagar <= 0 then
   perform public.notify_user(p_negocio, case when prem then '⭐ ' else '' end ||
-    case when pagar > 0 then '⏳ Pedido por pagar de ' when cb = 'retiro' and tot > 0 then '💰 Nuevo pedido (paga al retirar) de ' else '📦 Nuevo pedido de ' end || quien,
+    case when cb = 'retiro' and tot > 0 then '💰 Nuevo pedido (paga al retirar) de ' else '📦 Nuevo pedido de ' end || quien,
     'Total $' || to_char(ped.total, 'FM999G999G999') || case when cb = 'abono' then ' · abono $' || to_char(pagar, 'FM999G999G999') else '' end || ' · ' ||
     case when not fis then 'Sin envío' when ent = 'despacho' then 'Despacho' else 'Retiro en tienda' end ||
     case when prem then ' · Cliente Premium' else '' end, 'apps/pedidos/');
-  if pagar <= 0 then
     perform public.notify_user(e.id, '📦 Pedido para preparar', quien || ' · Total $' || to_char(ped.total, 'FM999G999G999'), 'apps/pedidos/')
     from public.profiles e where e.role = 'equipo' and e.negocio_id = p_negocio and not e.suspended;
   end if;

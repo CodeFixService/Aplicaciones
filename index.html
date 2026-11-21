@@ -751,7 +751,7 @@ try {
       [!!h.link_pago, { ir: '#links', campo: '#cLinks input[type=url]', k: 'cobro', como: 'Pega aquí tu link de pago (Mercado Pago u otro) y guarda: tus clientes pagan al tiro.' }, 'Configura cómo te pagan: 🏦 transferencia, ⚡ Mercado Pago, 💳 Webpay o 🔗 link'],
       [compartio, { ir: '#', campo: '#hoyCompartir', k: 'link', como: 'Toca Compartir y mándalo a tus grupos de WhatsApp o ponlo en tu Instagram. ¡Así llegan tus primeros pedidos!' }, 'Comparte tu tienda por WhatsApp o con el QR']];
     // G128 d) sin ningún medio de pago: aviso al dueño (sus clientes quedan "💰 Pagas al retirar").
-    const sinM = () => { if (window.CFX_COBRO) { if (!t.cobra_online) CFX_COBRO.sinMedios($('hoySinMedio'), { ir: '#links' }); else $('hoySinMedio').innerHTML = ''; } };
+    const sinM = () => { if (window.CFX_COBRO) { if (!t.cobra_online) CFX_COBRO.sinMedios($('hoySinMedio'), { ir: '#links' }); else if ('cobra_mp' in t && !t.cobra_mp) CFX_COBRO.sinMedios($('hoySinMedio'), { ir: '#links', titulo: 'Sin ⚡ Mercado Pago ni 💳 Webpay.', texto: 'Tus clientes pagan por 🏦 transferencia y tú apruebas el comprobante.' }); else $('hoySinMedio').innerHTML = ''; } };
     if (window.CFX_COBRO) sinM(); else addEventListener('load', sinM, { once: true });
     const hechos = pasos.filter((x) => x[0]).length, pct = Math.round(hechos * 100 / pasos.length);
     const verG = !window.CFX_AYUDA || !CFX_AYUDA.guiaEstado || CFX_AYUDA.guiaEstado() === 'ver';

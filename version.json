@@ -1,1 +1,1 @@
-{"version": "6.83", "bd": "5.92", "funcion": "3.8", "notas": "🐞 núcleo 3.34 (G138): 🎙️ micrófono en su esquina · ⌨️ con el teclado la cabecera queda arriba y la barra se esconde · 🧮 Mi Caja sin 'Cuenta y ayuda' · 🐞 Reportar una falla: 1 por minuto, hasta 30 al día"}
+{"version": "6.84", "bd": "5.93", "funcion": "3.8", "notas": "🛒 núcleo 3.35 (G139): el carrito dice ⚡ Pagar $X y lleva directo a pagar · la tienda recibe el aviso cuando el cliente paga · 📲 avisar ✅ listo / 🚚 en camino por WhatsApp · sin Mercado Pago se dice claro (🏦 transferencia + comprobante)"}

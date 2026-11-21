@@ -199,6 +199,8 @@
   const cobroListo = () => (window.CFX_COBRO || document.readyState === 'complete' ? Promise.resolve() : new Promise((ok) => addEventListener('load', ok, { once: true })));
   if (yo.role !== 'equipo') Promise.all([Cuenta.rpc('tienda_info', { p_negocio: yo.id }), cobroListo()]).then(([t]) => {
     if (t && !t.cobra_online && window.CFX_COBRO) CFX_COBRO.sinMedios($('sinMedio'), { ir: '../../#links' });
+    // G139: solo 🏦 transferencia → decirlo claro (el cliente transfiere y sube el comprobante; tú lo apruebas).
+    else if (t && 'cobra_mp' in t && !t.cobra_mp && window.CFX_COBRO) CFX_COBRO.sinMedios($('sinMedio'), { ir: '../../#links', titulo: 'Sin ⚡ Mercado Pago ni 💳 Webpay.', texto: 'Tus clientes pagan por 🏦 transferencia y tú apruebas el comprobante. Conéctalos para que se confirme solo.' });
   }).catch(() => {});
   const COMPRADO = ['recibido'].concat(PAGADO);  // G25: 🧾 Detalle de compra apenas se confirma el pago
   const quedan = (t) => { const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 6e4)); return m + ' min'; };
@@ -286,6 +288,9 @@
         (p.cliente_id ? '<button class="small alt" data-hilo="' + p.id + '">💬 Chat del pedido' + (hilos['pedido:' + p.id] ? ' (' + hilos['pedido:' + p.id] + ')' : '') + '</button>' : '') +
         (tel && p.invitado && p.token && window.CFX_COBRO ? '<a class="btn small alt" target="_blank" rel="noopener" href="' + Core.esc(CFX_COBRO.wa(tel, 'Hola ' + (p.cliente || '') + ' 👋 Este es el enlace de tu pedido en ' + ((yo.role === 'equipo' ? yo.negocio : yo.empresa) || 'la tienda') +
           ': ahí ves el estado' + (p.estado === 'pagando' ? ', pagas y subes el comprobante' : '') + '.\n' + Core.rootUrl() + 'r/?t=' + p.token)) + '">📲 Enviar enlace al cliente</a>' : '') +
+        // G139 📲 Avisar el estado por WhatsApp (además del 🔔 que ya le llega al cliente con cuenta).
+        (tel && window.CFX_COBRO && CFX_COBRO.waEstado && ['preparando', 'listo', 'en_camino'].includes(p.estado) ? '<a class="btn small ok" target="_blank" rel="noopener" data-wa-estado="' + p.id + '" href="' +
+          Core.esc(CFX_COBRO.waEstado(tel, p, (yo.role === 'equipo' ? yo.negocio : yo.empresa) || '', p.token ? Core.rootUrl() + 'r/?t=' + p.token : '')) + '">📲 Avisar: ' + ({ preparando: '👩‍🍳 preparando', listo: '✅ listo', en_camino: '🚚 en camino' }[p.estado]) + '</a>' : '') +
         (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div>' +
         (p.cliente_id ? '<div class="hidden" data-hilo-de="' + p.id + '"></div>' : '') +
         (p.estado === 'entregado' && !p.calificado ? '<div class="row" style="align-items:center;margin-top:10px"><span class="muted" style="flex:none">Califica al cliente:</span><span class="califica">' +

@@ -77,6 +77,7 @@
         <div id="facWrap" class="hidden"></div>
         <p class="muted" id="pagoTip" style="font-size:13px"></p>
         <div class="btns"><button id="bPedir" style="flex:1">📨 Enviar pedido</button></div>
+        <p class="muted" id="cobroNota" style="margin:4px 0 0"></p>
         <p class="muted" style="font-size:12.5px;margin:8px 0 0">Al enviar aceptas las <a href="#politicas" id="lPol">políticas de la tienda</a> (cambios, retracto y garantía).</p>
       </div>
     </section>
@@ -248,7 +249,9 @@
     const ls = lineas(), fis = ls.some(({ l }) => ventaDe(l.clave).tipo === 'producto');
     ['entregaL', 'entrega'].forEach((k) => $(k).classList.toggle('hidden', !fis && ls.length > 0));
     if (!fis && ls.length && entrega !== 'retiro') { entrega = 'retiro'; $('rowDir').classList.add('hidden'); $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.e === 'retiro')); }
-    CFX_COBRO.elegir($('cobroOps'), CFX_COBRO.opciones(ls.map(({ l, i }) => Object.assign({ subtotal: i.precio * l.cant }, ventaDe(l.clave))), { medios: !!t.cobra_online, entrega }), cobroSel, (k) => { cobroSel = k; });
+    const ops = CFX_COBRO.opciones(ls.map(({ l, i }) => Object.assign({ subtotal: i.precio * l.cant }, ventaDe(l.clave))), { medios: !!t.cobra_online, mp: 'cobra_mp' in t ? !!t.cobra_mp : undefined, entrega });
+    // G139: "⚡ Pagar $X" cuando se paga antes (el pedido llega a la tienda al pagar).
+    CFX_COBRO.elegir($('cobroOps'), ops, cobroSel, (k) => { cobroSel = k; if (CFX_COBRO.boton) CFX_COBRO.boton($('bPedir'), ops, k, { nota: $('cobroNota'), sinMonto: entrega === 'despacho' }); });
     $('cobroL').classList.toggle('hidden', !ls.length); $('cobroOps').classList.toggle('hidden', !ls.length);
   }
   $('lineas').onclick = (e) => { const { k, d } = e.target.dataset; if (k === undefined) return; const l = lineas()[+k].l; l.cant += +d; pintarCarro(); };
@@ -305,6 +308,12 @@
       tokens.push({ t: r.token, f: Date.now(), total: r.total }); mem.set('tokens', tokens.slice(-20));
       carro = []; mem.set('carro', []);
       Cuenta.sb.functions.invoke('enviar').catch(() => {});
+      // G139: pagar antes → con UN medio en línea (⚡ MP o 💳 Webpay) va directo a pagar; si no, al enlace del pedido (transferencia + comprobante).
+      const md = r.estado === 'pagando' && r.link && r.link.mp ? (r.link.medios || { mp: true }) : null;
+      if (md && (!!md.mp !== !!md.flow)) {
+        const x = await Cuenta.rpc('mp_pagar', { p_ref: r.token, p_volver: location.origin + location.pathname.replace(/t\/[^/]*$/, 'r/') + '?t=' + encodeURIComponent(r.token), ...(md.flow ? { p_medio: 'flow' } : {}) }).catch(() => null);
+        if (x && x.ok && x.url) { location.href = x.url; return; }
+      }
       location.href = '../r/?t=' + r.token + '&nuevo=1';
     } catch (err) { Core.toast(err.message); } finally { $('bPedir').disabled = false; }
   };

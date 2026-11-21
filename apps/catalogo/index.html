@@ -180,6 +180,7 @@
       <div id="facWrap" class="hidden"></div>
       <div class="btns"><button id="bEnviarPed" style="flex:1">📨 Enviar pedido</button>
         <button class="ok hidden" id="bWspPed" style="flex:1">💬 Enviar por WhatsApp</button></div>
+      <p class="muted" id="cobroNota" style="margin:4px 0 0"></p>
       <div class="btns"><button class="alt small" id="bVaciar">Vaciar pedido</button></div>
       <p class="muted">La tienda recibe tu pedido con el detalle y el total, y te avisa cada cambio de estado.</p>
     </div>
@@ -556,14 +557,16 @@
 
   // G128 💳 Cómo paga (solo lo permitido; la base lo vuelve a revisar) y 🛠️/🔑 sin envío.
   let cobroSel = 'ahora';
+  let cupon = null; // G139: antes de pintarCobro (el botón lo usa)
   const ventaDe = (l) => venta[l.clave] || { tipo: 'producto', cobro: 'ahora' };
   function pintarCobro(ls) {
     if (!window.CFX_COBRO) return;
     const fis = ls.some(({ l }) => ventaDe(l).tipo === 'producto');
     ['entregaL', 'entrega'].forEach((k) => $(k).classList.toggle('hidden', !fis));
     if (!fis && entrega !== 'retiro') { entrega = 'retiro'; $('rowDir').classList.add('hidden'); $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.e === 'retiro')); }
-    const ops = CFX_COBRO.opciones(ls.map(({ l, i }) => Object.assign({ subtotal: precioDe(i) * l.cant }, ventaDe(l))), { medios: !!tienda.cobra_online, entrega });
-    CFX_COBRO.elegir($('cobroOps'), ops, cobroSel, (k) => { cobroSel = k; });
+    const ops = CFX_COBRO.opciones(ls.map(({ l, i }) => Object.assign({ subtotal: precioDe(i) * l.cant }, ventaDe(l))), { medios: !!tienda.cobra_online, mp: 'cobra_mp' in tienda ? !!tienda.cobra_mp : undefined, entrega });
+    // G139: el botón dice "⚡ Pagar $X" cuando se paga antes (el pedido llega a la tienda al pagar).
+    CFX_COBRO.elegir($('cobroOps'), ops, cobroSel, (k) => { cobroSel = k; if (CFX_COBRO.boton && !vacaciones) CFX_COBRO.boton($('bEnviarPed'), ops, k, { nota: $('cobroNota'), sinMonto: !!cupon || entrega === 'despacho' }); });
   }
   // Retiro o despacho (el despacho tiene costo adicional según la distancia).
   let entrega = 'retiro';
@@ -578,7 +581,6 @@
   };
 
   // Cupón (lo valida el servidor).
-  let cupon = null;
   $('bCupon').onclick = async () => {
     const c = $('cupon').value.trim();
     if (!c) { cupon = null; $('cuponTxt').textContent = ''; pintarCarro(); return; }
@@ -630,6 +632,13 @@
       Core.toast(r.estado === 'pagando' ? (r.link && r.link.mp ? '⏳ Pedido apartado: págalo con ⚡ Mercado Pago aquí abajo' : '⏳ Pedido apartado: paga ' + precio(r.a_pagar != null ? r.a_pagar : r.total) + ' y sube el comprobante aquí abajo')
         : r.cobro === 'retiro' ? '✅ Pedido enviado (' + precio(r.total) + '). 💰 Pagas al ' + (r.entrega === 'despacho' ? 'recibir.' : 'retirar.') : '✅ Pedido enviado (' + precio(r.total) + '). Te avisaremos cada cambio de estado.');
       cargarStock();
+      // G139: pagar antes → con UN medio en línea (⚡ MP o 💳 Webpay) va directo a pagar; con los dos, elige abajo.
+      const md = r.estado === 'pagando' && r.link && r.link.mp ? (r.link.medios || { mp: true }) : null;
+      if (md && !porWsp && r.token && (!!md.mp !== !!md.flow)) {
+        const x = await Cuenta.rpc('mp_pagar', { p_ref: r.id, p_volver: Core.rootUrl() + 'r/?t=' + r.token, ...(md.flow ? { p_medio: 'flow' } : {}) }).catch((e) => ({ ok: false, error: e.message }));
+        if (x && x.ok && x.url) { location.href = x.url; return; }
+        Core.toast((x && x.error) || 'No se pudo abrir el pago: usa el botón de tu pedido');
+      }
       if (tienda.datos_pago) $('cPago').scrollIntoView({ behavior: 'smooth' });
     } catch (err) { Core.toast(err.message); } finally { btn.disabled = false; }
   }
