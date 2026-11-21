@@ -11362,7 +11362,7 @@ begin
   t := regexp_replace(coalesce(t, ''), '\D', '', 'g');
   if t ~ '^9\d{8}$' then t := '56' || t; end if;
   if t !~ '^\d{10,15}$' then return null; end if;
-  return jsonb_build_object('red', 'whatsapp', 'url', 'https://wa.me/' || t);
+  return jsonb_build_object('red', 'whatsapp', 'url', 'https://wa.me/' || t, 'auto', true);  -- auto: no lo guardó el dueño (la app suma sus redes antiguas)
 exception when others then return null;
 end $$;
 -- Lista guardada + el WhatsApp del registro si no hay uno (y el dueño no lo quitó).

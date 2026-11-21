@@ -70,7 +70,7 @@
     if (t.desde) info.push('<span class="muted">📅 <span>Tienda desde ' + esc(fecha(t.desde, { month: 'long', year: 'numeric' })) + '</span></span>');
     if (info.length) partes.push('<div class="pf-info">' + info.join('') + '</div>');
     // G141 a: redes con ícono (t.redes = las nuevas de 🔗 Mis redes; si no hay, las de antes del perfil). data-pf-redes: la página las refresca con CodeFixVitrina.redes.publico.
-    partes.push('<div class="pf-red" data-pf-redes>' + redes.botones(Array.isArray(t.redes) && t.redes.length ? t.redes : redes.deViejas(p), { titulo: 'Síguenos' }) + '</div>');
+    partes.push('<div class="pf-red" data-pf-redes>' + redes.botones(conViejas(t.redes, redes.deViejas(p)), { titulo: 'Síguenos' }) + '</div>');
     if (t.politicas) partes.push(politicas(t, p, dir));
     const tel = String(t.telefono || '').replace(/\D/g, '');
     const wa = 'https://wa.me/' + tel + (t.wa_texto ? '?text=' + encodeURIComponent(t.wa_texto) : '');
@@ -82,7 +82,7 @@
     // G141 a: la página pasa t.rpc + t.redes_llave (slug/código) → se cambian por las de 🔗 Mis redes si las hay.
     const waViejo = nodo.querySelector('.pf-acc a.btn.ok');  // G144 d: se oculta si las redes ya traen WhatsApp
     unWa(nodo.querySelector('[data-pf-redes]'), waViejo);
-    if (t.rpc && t.redes_llave) redes.publico(nodo.querySelector('[data-pf-redes]'), { rpc: t.rpc, llave: t.redes_llave, viejo: waViejo, respaldo: Array.isArray(t.redes) && t.redes.length ? t.redes : redes.deViejas(p) });
+    if (t.rpc && t.redes_llave) redes.publico(nodo.querySelector('[data-pf-redes]'), { rpc: t.rpc, llave: t.redes_llave, viejo: waViejo, respaldo: conViejas(t.redes, redes.deViejas(p)) });
     nodo.querySelector('[data-pf="compartir"]').onclick = async () => {
       // G33: abierta en workers.dev y con dominio de CodeFix ✅ → se comparte el link del dominio.
       const sd = window.CFX_AYUDA && CFX_AYUDA.sitio ? CFX_AYUDA.sitio() : '';
@@ -439,12 +439,18 @@
     if (a && dig(v) && dig(v) === dig(a.getAttribute('href'))) a.setAttribute('href', v);
     viejo.hidden = !!a; viejo.style.display = a ? 'none' : '';
   }
+  // G144 d: si el dueño aún no guarda redes (solo viene el WhatsApp automático), se suman las de antes (perfil): nada se pierde.
+  function conViejas(L, viejas) {
+    L = limpiar(L); viejas = limpiar(viejas);
+    if (L.some((x) => !x.auto) || !viejas.length) return L;
+    return limpiar(L.filter((x) => !viejas.some((v) => v.red === x.red)).concat(viejas));
+  }
   async function publico(nodo, o) {
     if (!nodo) return; o = o || {};
     const pinta = (L) => { nodo.innerHTML = botones(L, { titulo: o.titulo === undefined ? 'Síguenos' : o.titulo, solo: o.solo }); nodo.hidden = !limpiar(L).length; unWa(nodo, o.viejo); };
     pinta(o.respaldo || []);
     if (!o.rpc || !o.llave) return;
-    try { const L = await o.rpc('cfx_redes_publicas', { p_llave: String(o.llave) }); if (limpiar(L).length) pinta(L); } catch (e) { /* sin red: quedan las de antes */ }
+    try { const L = await o.rpc('cfx_redes_publicas', { p_llave: String(o.llave) }); if (limpiar(L).length) pinta(conViejas(L, o.respaldo)); } catch (e) { /* sin red: quedan las de antes */ }
   }
   async function editorRedes(nodo, o) {
     if (!nodo) return; o = o || {}; estilosR();
@@ -452,9 +458,9 @@
     nodo.innerHTML = '<p class="muted">⏳ Cargando…</p>';
     const P = !!o.persona;  // G142 c: las MÍAS (barbero, mecánico), no las del negocio
     try { D = await o.rpc(P ? 'cfx_redes_persona_mias' : 'cfx_redes_mias') || D; } catch (e) { nodo.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; return; }
-    let L = limpiar(D.lista); const viejas = limpiar(o.viejas);
-    if (!L.length && viejas.length) L = viejas.slice();
-    let pend = null, cambio = !limpiar(D.lista).length && viejas.length > 0;
+    const viejas = limpiar(o.viejas), guardada = limpiar(D.lista).some((x) => !x.auto);
+    let L = conViejas(D.lista, viejas);
+    let pend = null, cambio = !guardada && L.length > 0;  // G144 d: WhatsApp del registro / redes de antes → listo para guardar
     const toast = (t) => (window.CFX_AVISO ? CFX_AVISO(t) : window.Core && Core.toast ? Core.toast(t) : null);
     const pintar = () => {
       const fila = (x, i) => '<div class="cfx-re-fila" style="--cfx-red-c:' + RED[x.red][1] + '"><i>' + RED[x.red][2] + '</i><b>' + esc(RED[x.red][0]) + '<br><span class="muted" style="font-weight:600">' + esc(nombreDe(x)) + '</span></b>' +
@@ -503,7 +509,7 @@
     let M = {}; try { M = (await o.rpc('cfx_redes_equipo', { p_llave: String(o.llave) })) || {}; } catch (e) { return; }
     raiz.querySelectorAll('[data-redes-p]').forEach((n) => { const L = limpiar(M[n.dataset.redesP]); n.innerHTML = L.length ? botones(L, { solo: true }) : ''; n.hidden = !L.length; });
   }
-  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo, unWa };
+  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo, unWa, conViejas };
 
   window.CodeFixVitrina = { redes, montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, rutOk, BANCOS };
 })();
