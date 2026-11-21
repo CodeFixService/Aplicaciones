@@ -636,7 +636,7 @@
     invitar: 'regalo', terminos: 'documento', privacidad: 'candado', misdatos: 'carpeta', salir: 'puerta', respaldo: 'bajar', equipo: 'usuarios', qr: 'qr', link: 'enlace', pagos: 'tarjeta', avisos: 'campana', empresa: 'tienda',
     agregar: 'mas', tienda: 'tienda', reglas: 'balanza', socios: 'conexion', registro: 'portapapeles', calificaciones: 'corazon', panel: 'escudo', horario: 'reloj', limpieza: 'escoba',
     instalar: 'celular', compartir: 'compartir', imprimir: 'impresora', reparar: 'herramienta', animo: 'cara', datos: 'bajar', textos: 'lapiz', versiones: 'cohete', servidor: 'servidor' };
-  const ICO_TITULO = [[/^mi perfil|^foto y nombre/, 'perfil'], [/^mi cuenta$|^cuenta$|^datos de (la )?cuenta/, 'cuenta'], [/^color y modo|^apariencia|^estilo/, 'estilo'], [/^avanzado/, 'avanzado'],
+  const ICO_TITULO = [[/^mi perfil|^foto y nombre/, 'perfil'], [/^mi cuenta$|^cuenta$|^datos de (la )?cuenta/, 'cuenta'], [/^color y modo|^personalizar|^apariencia|^estilo/, 'estilo'], [/^avanzado/, 'avanzado'],
     [/^gu[ií]a/, 'guia'], [/^chat con soporte|^soporte/, 'chat'], [/^mi plan|^pasar a pro|^premium\b|^plan\b/, 'plan'], [/^invita/, 'invitar'], [/^t[ée]rminos/, 'terminos'], [/^pol[ií]tica de privacidad|^privacidad/, 'privacidad'], [/^mis datos/, 'misdatos'],
     [/^cerrar sesi[oó]n/, 'salir'], [/^respaldo/, 'respaldo'], [/^(mi )?equipo\b|^trabajadores/, 'equipo'], [/^enlace y qr|^qr\b|^c[oó]digo qr|^mi qr/, 'qr'], [/^links? de pago/, 'pagos'],
     [/^notificaciones|^avisos/, 'avisos'], [/^otra empresa|^agregar|^nueva empresa/, 'agregar'], [/^(mi )?empresa/, 'empresa'], [/^(mi )?tienda/, 'tienda'], [/^reglas/, 'reglas'],
@@ -1530,7 +1530,7 @@
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
     if (primera) R('cfx_sitio').then((s) => { try { if (s && typeof s === 'object') localStorage.setItem('cfx:sitio', JSON.stringify({ dominio: s.dominio || '', url: s.url || '', activo: !!s.activo })); } catch (e) { /* nada */ } }).catch(() => { /* base sin la función todavía */ });
-    if (primera) { pinRevisar(); pushAbri(); if (window.CFX_PAGOS && window.CFX_PAGOS.mpVolver) window.CFX_PAGOS.mpVolver(R);  // G85 vuelta de Mercado Pago
+    if (primera) { pinRevisar(); pushAbri(); setTimeout(peTraer, 0); if (window.CFX_PAGOS && window.CFX_PAGOS.mpVolver) window.CFX_PAGOS.mpVolver(R);  // G85 vuelta de Mercado Pago
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pushAbri(); }); }
     Object.assign(CFG, o);
     // G34 · 🧭 Panel universal: las apps con su panel ya en el Centro de Mando no se usan como administrador (public.admin_email()):
@@ -2070,7 +2070,7 @@
   };
   const colLlave = (m) => 'cfx-col:' + location.pathname.replace(/index\.html$/, '') + ':' + colQuien() + ':' + m;
   const colLeer = (m) => { try { const g = JSON.parse(localStorage.getItem(colLlave(m)) || '{}') || {}; Object.keys(g).forEach((k) => { if (!HEX.test(g[k])) delete g[k]; }); return g; } catch (e) { return {}; } };
-  const colGuardar = (m, g) => { try { if (Object.keys(g).length) localStorage.setItem(colLlave(m), JSON.stringify(g)); else localStorage.removeItem(colLlave(m)); } catch (e) { /* lleno */ } };
+  const colGuardar = (m, g, quieto) => { try { if (Object.keys(g).length) localStorage.setItem(colLlave(m), JSON.stringify(g)); else localStorage.removeItem(colLlave(m)); } catch (e) { /* lleno */ } if (!quieto) peCambio(); };
   let colFirma = '';
   // Pinta los colores guardados del modo que se ve (o los de prueba mientras se elige). Devuelve true si alguno se ajustó para que se lea.
   function pintarCols(prueba) {
@@ -2133,7 +2133,7 @@
   const LT_TAM = [90, 95, 100, 106, 112], LT_GROS = [['delgada', 'Aa', 'Delgada'], ['normal', 'Aa', 'Normal'], ['gruesa', 'Aa', 'Gruesa']];
   const ltLlave = () => 'cfx-letra:' + location.pathname.replace(/index\.html$/, '') + ':' + colQuien();
   const ltLeer = () => { let g; try { g = JSON.parse(localStorage.getItem(ltLlave()) || '{}') || {}; } catch (e) { g = {}; } return { t: LT_TAM.includes(+g.t) ? +g.t : 100, g: ['normal', 'gruesa'].includes(g.g) ? g.g : 'delgada', s: g.s || 0 }; };
-  const ltGuardar = (n) => { try { localStorage.setItem(ltLlave(), JSON.stringify(n)); } catch (e) { /* lleno */ } };
+  const ltGuardar = (n, quieto) => { try { localStorage.setItem(ltLlave(), JSON.stringify(n)); } catch (e) { /* lleno */ } if (!quieto) peCambio(); };
   let ltFirma = '';
   function ltPeso(w, g) {
     const n = w === 'bold' ? 700 : w === 'normal' ? 400 : parseInt(w, 10); if (!n) return 0;
@@ -2181,17 +2181,71 @@
     if (vv) vv.addEventListener('resize', () => {
       if (visto || vv.scale < 1.25) return; visto = true;
       const L = ltLeer(); if (L.s < 0 || L.t >= 112) return;
-      L.s = (L.s || 0) + 1; ltGuardar(L);
+      L.s = (L.s || 0) + 1; ltGuardar(L, true);
       if (L.s >= 3) {
-        L.s = -1; ltGuardar(L);
+        L.s = -1; ltGuardar(L, true);
         setTimeout(async () => {
-          const si = window.CFX_DIALOGO && await window.CFX_DIALOGO.confirmar('🔤 Vi que agrandas la pantalla con los dedos. ¿Subo un poco la letra? (se cambia en Mi perfil → Color y modo)', { si: 'Sí, más grande', no: 'No, gracias' });
+          const si = window.CFX_DIALOGO && await window.CFX_DIALOGO.confirmar('🔤 Vi que agrandas la pantalla con los dedos. ¿Subo un poco la letra? (se cambia en Mi perfil → 🎨 Personalizar)', { si: 'Sí, más grande', no: 'No, gracias' });
           if (si) { const n = ltLeer(); n.t = LT_TAM[Math.min(LT_TAM.length - 1, LT_TAM.indexOf(n.t) + 1)]; ltGuardar(n); pintarLetra(); aviso('🔤 Letra más grande'); }
         }, 900);
       }
     });
   } catch (e) { /* sin visualViewport */ }
   window.CFX_LETRA = { leer: ltLeer, guardar: ltGuardar, pintar: pintarLetra, TAM: LT_TAM };
+  // ---------- G140 🎨 Personalizar: barra de abajo (tipo, tamaño, nombres), temas listos y guardado en la base ----------
+  // Todo es por usuario y por app. Se guarda en este celular (se ve al tiro, sin internet) y en la base (cfx_personal): en otro celular queda igual.
+  const BAR = () => (window.CodeFixBarra || {}).personal;
+  const btLlave = () => 'cfx-barra:' + location.pathname.replace(/index\.html$/, '') + ':' + colQuien();
+  const peLlaveV = () => 'cfx-pe-v:' + location.pathname.replace(/index\.html$/, '') + ':' + colQuien();
+  const BT_TIPOS = ['clasica', 'flotante', 'iconos', 'etiquetas', 'pildora'], BT_TAMS = ['chica', 'normal', 'grande'];
+  function btLimpio(g) {
+    g = g && typeof g === 'object' ? g : {};
+    const tx = {}; Object.keys(g.textos || {}).slice(0, 12).forEach((k) => { const t = String(g.textos[k] || '').replace(/[<>]/g, '').trim().slice(0, 14); if (t && /^[\w+-]{1,40}$/.test(k)) tx[k] = t; });
+    return { tipo: BT_TIPOS.includes(g.tipo) ? g.tipo : 'clasica', tam: BT_TAMS.includes(g.tam) ? g.tam : 'normal', textos: tx };
+  }
+  const btLeer = () => { try { return btLimpio(JSON.parse(localStorage.getItem(btLlave()) || '{}')); } catch (e) { return btLimpio({}); } };
+  const btGuardar = (g, quieto) => { g = btLimpio(g); try { if (g.tipo === 'clasica' && g.tam === 'normal' && !Object.keys(g.textos).length) localStorage.removeItem(btLlave()); else localStorage.setItem(btLlave(), JSON.stringify(g)); } catch (e) { /* lleno */ } if (BAR()) BAR().pintar(g); if (!quieto) peCambio(); };
+  const peV = () => { try { return +localStorage.getItem(peLlaveV()) || 0; } catch (e) { return 0; } };
+  const colLimpio = (g) => { const o = {}; if (g && typeof g === 'object') Object.keys(g).forEach((k) => { if (/^(fondo|tarjeta|texto|icono|barra|marca2)$/.test(k) && HEX.test(g[k])) o[k] = g[k].toLowerCase(); }); return o; };
+  const peFoto = () => { const L = ltLeer(); return { v: peV(), col: { claro: colLeer('claro'), oscuro: colLeer('oscuro') }, letra: { t: L.t, g: L.g }, barra: btLeer() }; };
+  let peT = 0;
+  function peSubir() { if (!R) return; R('cfx_personal_guardar', { p_datos: peFoto() }).catch(() => { /* base sin cfx_personal todavía: queda en este celular */ }); }
+  function peCambio() { try { localStorage.setItem(peLlaveV(), String(Date.now())); } catch (e) { /* lleno */ } clearTimeout(peT); peT = setTimeout(peSubir, 1200); }
+  // Lo de la base manda si es más nuevo que lo de este celular; si este celular tiene algo más nuevo (p. ej. sin internet), se sube.
+  function peTraer() {
+    if (!R) return;
+    R('cfx_personal').then((d) => {
+      if (!d || typeof d !== 'object' || !(+d.v > 0)) { if (peV()) peSubir(); return; }
+      if (+d.v <= peV()) { if (peV() > +d.v) peSubir(); return; }
+      const c = d.col || {};
+      colGuardar('claro', colLimpio(c.claro), true); colGuardar('oscuro', colLimpio(c.oscuro), true);
+      const L = ltLeer(), l = d.letra || {}; L.t = LT_TAM.includes(+l.t) ? +l.t : 100; L.g = ['normal', 'gruesa'].includes(l.g) ? l.g : 'delgada'; ltGuardar(L, true);
+      btGuardar(d.barra, true);
+      try { localStorage.setItem(peLlaveV(), String(+d.v)); } catch (e) { /* lleno */ }
+      colFirma = ''; ltFirma = ''; pintarCols(); pintarLetra();
+    }).catch(() => { /* base sin cfx_personal todavía */ });
+  }
+  // Temas listos: fondo, tarjetas, texto y barra para claro y oscuro (el color de la app y los íconos no cambian). 'contraste' es libre (se lee mejor).
+  const TEMAS = [
+    ['fabrica', 'De fábrica', null],
+    ['contraste', 'Alto contraste', { claro: { fondo: '#ffffff', tarjeta: '#ffffff', texto: '#000000', barra: '#ffffff' }, oscuro: { fondo: '#000000', tarjeta: '#0d0d0d', texto: '#ffffff', barra: '#000000' } }],
+    ['oceano', 'Océano', { claro: { fondo: '#eaf4fb', tarjeta: '#ffffff', texto: '#0c2a3e', barra: '#ffffff' }, oscuro: { fondo: '#071824', tarjeta: '#0f2536', texto: '#e2f0fa', barra: '#0f2536' } }],
+    ['bosque', 'Bosque', { claro: { fondo: '#edf6ef', tarjeta: '#ffffff', texto: '#12301c', barra: '#f7fbf8' }, oscuro: { fondo: '#0a1a10', tarjeta: '#13261a', texto: '#e3f3e8', barra: '#13261a' } }],
+    ['arena', 'Arena', { claro: { fondo: '#f7f1e6', tarjeta: '#fffdf8', texto: '#3a2a14', barra: '#fffdf8' }, oscuro: { fondo: '#1c160d', tarjeta: '#2a2114', texto: '#f4ead8', barra: '#2a2114' } }],
+    ['rosa', 'Rosa', { claro: { fondo: '#fbeff4', tarjeta: '#ffffff', texto: '#3d1027', barra: '#ffffff' }, oscuro: { fondo: '#1d0d15', tarjeta: '#2b1420', texto: '#f9e6ef', barra: '#2b1420' } }],
+    ['noche', 'Noche', { claro: { fondo: '#eef0fb', tarjeta: '#ffffff', texto: '#161a3a', barra: '#ffffff' }, oscuro: { fondo: '#0b0c1d', tarjeta: '#15172e', texto: '#e6e8fb', barra: '#15172e' } }]
+  ];
+  const TEMA_K = ['fondo', 'tarjeta', 'texto', 'barra'];
+  function temaPoner(k) {
+    const T = (TEMAS.find((x) => x[0] === k) || [])[2];
+    ['claro', 'oscuro'].forEach((mo) => { const g = colLeer(mo); TEMA_K.forEach((c) => { if (T) g[c] = T[mo][c]; else delete g[c]; }); colGuardar(mo, g, true); });
+    peCambio(); colFirma = ''; pintarCols();
+  }
+  const temaActual = () => { const g = colLeer('claro'); const t = TEMAS.find((x) => x[2] && TEMA_K.every((c) => g[c] === x[2].claro[c])); return t ? t[0] : TEMA_K.some((c) => g[c]) ? '' : 'fabrica'; };
+  // ↩️ Todo de fábrica: colores a tu gusto (claro y oscuro), letra y barra. El color y el modo de la app quedan (son de cada app).
+  function peFabrica() { colGuardar('claro', {}, true); colGuardar('oscuro', {}, true); ltGuardar({ t: 100, g: 'delgada', s: ltLeer().s }, true); btGuardar({}, true); peCambio(); colFirma = ''; ltFirma = ''; pintarCols(); pintarLetra(); }
+  window.CFX_PERSONAL = { leer: peFoto, traer: peTraer, subir: peSubir, barra: { leer: btLeer, guardar: btGuardar }, TEMAS, tema: temaPoner, temaActual, fabrica: peFabrica };
+  if (BAR()) BAR().pintar(btLeer());
   pintarLetra();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ltFirma = ''; pintarLetra(); });
   // Lo guardado por BASE se aplica apenas carga (solo existe en las apps que usan BASE).
@@ -2288,14 +2342,56 @@
         '<input type="range" data-lt min="0" max="' + (LT_TAM.length - 1) + '" step="1" value="' + LT_TAM.indexOf(L.t) + '" aria-label="Tamaño de letra"><span aria-hidden="true" class="cfx-pf-ltg">A</span></div>' +
         '<label>Grosor de letra</label><div class="cfx-pf-modos cfx-pf-gros">' + LT_GROS.map(([k, i, t]) => '<button type="button" data-lg="' + k + '" aria-pressed="' + (k === L.g) + '" class="' + (k === L.g ? 'on' : '') + '"><span class="cfx-pf-g-' + k + '">' + i + '</span>' + t + '</button>').join('') + '</div>';
     }
+    // G140 🎨 Temas listos (los colores a tu gusto de un toque). Alto contraste y De fábrica, para todos; el resto, como los colores a tu gusto.
+    function temasHtml() {
+      const a = temaActual(), lock = P.bloqueo('libre');
+      return '<label>Temas listos</label><div class="cfx-pe-temas">' + TEMAS.map(([k, t, T]) => {
+        const c = T ? T[esOscuro() ? 'oscuro' : 'claro'] : COL_BASE[esOscuro() ? 'oscuro' : 'claro'];
+        return '<button type="button" data-pe-tema="' + k + '" class="' + (k === a ? 'on' : '') + '" aria-pressed="' + (k === a) + '"><span class="cfx-pe-mu" style="background:linear-gradient(90deg,' + esc(c.fondo) + ' 0 55%,' + esc(c.tarjeta) + ' 55% 100%)"></span><b>' +
+          esc(t) + '</b>' + (lock && T && k !== 'contraste' ? ' <i>⭐</i>' : '') + '</button>';
+      }).join('') + '</div>';
+    }
+    // G140 📍 Barra de abajo: vista previa en vivo, tipo, tamaño y el nombre de cada botón (con ↺ para volver al de la app).
+    const BT_NOM = { clasica: ['▁', 'Clásica'], flotante: ['▢', 'Flotante'], iconos: ['◉', 'Solo íconos'], etiquetas: ['Aa', 'Letra grande'], pildora: ['⬭', 'Píldora'] };
+    const BT_TNOM = { chica: 'Chica', normal: 'Normal', grande: 'Grande' };
+    function pintarBarraPe(z) {
+      const c = z.querySelector('[data-pe-barra]'); if (!c) return;
+      const B = BAR(), bs = B ? B.botones() : [];
+      if (!bs.length) { c.innerHTML = ''; return; }  // página sin barra de abajo
+      const g = btLeer();
+      const prev = () => { const L = bs.map((b) => '<span class="' + (b === bs[0] ? 'on' : '') + '"><i>' + b.ico + '</i>' + esc(g.textos[b.k] || b.t0) + '</span>'); L.splice(Math.min(2, L.length), 0, '<b>+</b>');
+        return '<div class="cfx-pe-prev" data-tipo="' + g.tipo + '" data-tam="' + g.tam + '" style="--n:' + L.length + '" aria-hidden="true">' + L.join('') + '</div>'; };
+      c.innerHTML = '<label>Barra de abajo</label>' + prev() +
+        '<div class="cfx-pf-modos cfx-pe-tipos">' + BT_TIPOS.map((k) => '<button type="button" data-pe-tipo="' + k + '" aria-pressed="' + (k === g.tipo) + '" class="' + (k === g.tipo ? 'on' : '') + '"><span>' + BT_NOM[k][0] + '</span>' + BT_NOM[k][1] + '</button>').join('') + '</div>' +
+        '<label>Tamaño de la barra</label><div class="cfx-pf-modos">' + BT_TAMS.map((k) => '<button type="button" data-pe-tam="' + k + '" aria-pressed="' + (k === g.tam) + '" class="' + (k === g.tam ? 'on' : '') + '">' + BT_TNOM[k] + '</button>').join('') + '</div>' +
+        '<details class="cfx-pe-nombres"><summary>✏️ Nombre de cada botón</summary>' + bs.map((b) => '<div class="cfx-pe-txt"><i>' + b.ico + '</i><input data-pe-txt="' + esc(b.k) + '" maxlength="14" placeholder="' + esc(b.t0) + '" value="' + esc(g.textos[b.k] || '') + '" aria-label="Nombre de ' + esc(b.t0) + '">' +
+          '<button type="button" data-pe-r="' + esc(b.k) + '" aria-label="Volver a ' + esc(b.t0) + '" title="Volver al nombre de la app">↺</button></div>').join('') +
+          '<p class="cfx-pf-nota">Máx. 14 letras. Vacío = el nombre de la app. En el computador el menú del lado también los usa.</p></details>';
+      const vivo = (n) => { const nv = document.createElement('div'); g.tipo = n.tipo; g.tam = n.tam; g.textos = n.textos; nv.innerHTML = prev(); c.querySelector('.cfx-pe-prev').replaceWith(nv.firstChild); };
+      c.oninput = (ev) => { const i = ev.target.closest('[data-pe-txt]'); if (!i) return; const n = btLeer(); n.textos[i.dataset.peTxt] = i.value; vivo(btLimpio(n)); };
+      c.onchange = (ev) => { const i = ev.target.closest('[data-pe-txt]'); if (!i) return; const n = btLeer(); n.textos[i.dataset.peTxt] = i.value; btGuardar(n); aviso('✏️ Nombre guardado'); };
+      c.onclick = (ev) => {
+        const t = ev.target.closest('[data-pe-tipo], [data-pe-tam], [data-pe-r]'); if (!t) return;
+        ev.preventDefault(); ev.stopPropagation();
+        const n = btLeer();
+        if (t.dataset.peTipo) n.tipo = t.dataset.peTipo; else if (t.dataset.peTam) n.tam = t.dataset.peTam;
+        else { delete n.textos[t.dataset.peR]; const i = c.querySelector('[data-pe-txt="' + t.dataset.peR + '"]'); if (i) i.value = ''; }
+        btGuardar(n);
+        const sel = t.dataset.peTipo ? '[data-pe-tipo]' : t.dataset.peTam ? '[data-pe-tam]' : '';
+        if (sel) c.querySelectorAll(sel).forEach((x) => { x.classList.toggle('on', x === t); x.setAttribute('aria-pressed', String(x === t)); });
+        vivo(btLeer());
+        aviso(t.dataset.peR ? '↺ Nombre de la app' : '📍 Barra guardada');
+      };
+    }
     function verEstilo(z) {
       zAct = z;
       const cols = (valor(P.colores) || []).map((c) => (Array.isArray(c) ? c : [c, c])), act = String(valor(P.color) || '').toLowerCase(), m = valor(P.modo) || 'auto';
       const libre = valor(P.libre) && P.guardarColor;
-      z.innerHTML = '<div class="cfx-pf">' + (P.guardarColor ? '<label>Color de la app</label><div class="cfx-pf-cols">' + cols.map(([n, c]) => '<button type="button" data-c="' + esc(c) + '" title="' + esc(n) + '" aria-label="' + esc(n) + '" style="background:' + esc(c) + '" class="' +
+      z.innerHTML = '<div class="cfx-pf">' + temasHtml() + (P.guardarColor ? '<label>Color de la app</label><div class="cfx-pf-cols">' + cols.map(([n, c]) => '<button type="button" data-c="' + esc(c) + '" title="' + esc(n) + '" aria-label="' + esc(n) + '" style="background:' + esc(c) + '" class="' +
         (c.toLowerCase() === act ? 'on' : '') + (P.bloqueo('color', c) ? ' cfx-pf-lock' : '') + '"></button>').join('') + '</div>' +
         (libre ? '<label class="cfx-pf-libre"><input type="color" value="' + esc(HEX.test(act) ? act : '#2563eb') + '"><span>🎨 Color a tu gusto' + (P.bloqueo('libre') ? ' <i>⭐</i>' : '') + '</span></label>' : '') : '') +
-        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + letraHtml() + '<div data-pf-mc></div></div>';
+        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + letraHtml() + '<div data-pe-barra></div><div data-pf-mc></div><button type="button" class="cfx-pe-fab" data-pe-fab>↩️ Volver todo a lo de fábrica</button></div>';
+      pintarBarraPe(z);
       // G48 🎨 Colores a tu gusto: fondo, texto e íconos (con el + del centro). Se guardan para el modo que se está viendo.
       const MC = [['fondo', '🖼️', 'Fondo', 'Detrás de todo'], ['tarjeta', '🗂️', 'Tarjetas', 'Cajas y menús'], ['texto', '📝', 'Texto', 'Letras y títulos'], ['icono', '✨', 'Íconos y botón +', 'Menú, ⋯, barra de abajo y el +'],
         ['barra', '📍', 'Barra de abajo', 'Fondo de la barra'], ['marca2', '🌈', 'Degradado', '2º color de botones y el +']];
@@ -2323,7 +2419,14 @@
       pintarMC();
       // Se marca la opción en su lugar (sin volver a dibujar la sección).
       const marcar = (sel, b) => z.querySelectorAll(sel).forEach((x) => x.classList.toggle('on', x === b));
-      z.onclick = (ev) => {
+      z.onclick = async (ev) => {
+        const tm = ev.target.closest('[data-pe-tema]');
+        if (tm) { ev.preventDefault(); const k = tm.dataset.peTema; if (k !== 'fabrica' && k !== 'contraste' && pide('libre')) return; temaPoner(k); marcar('[data-pe-tema]', tm); pintarMC(); aviso('🎨 Tema guardado'); return; }
+        if (ev.target.closest('[data-pe-fab]')) {
+          ev.preventDefault();
+          if (!(await window.CFX_DIALOGO.confirmar('↩️ ¿Volver los colores, la letra y la barra a lo de fábrica? (el color de la app y el modo quedan)', { si: 'Sí, de fábrica', no: 'Cancelar' }))) return;
+          peFabrica(); verEstilo(z); aviso('↩️ Todo de fábrica'); return;
+        }
         const lg = ev.target.closest('[data-lg]');
         if (lg) { ev.preventDefault(); marcar('[data-lg]', lg); const n = ltLeer(); n.g = lg.dataset.lg; ltGuardar(n); ltFirma = ''; pintarLetra(); aviso('🔤 Grosor guardado'); return; }
       const b = ev.target.closest('[data-c], [data-m]'); if (!b) return;
@@ -2391,12 +2494,12 @@
     let pintarCabeza = () => {};
     const conf = op.menu ? 'Configuración' : '';
     const propias = valor(P.secciones) || [];
-    let L = [{ k: 'yo', ico: '👤', t: 'Foto y nombre', d: 'Cómo te ven', abrir: verYo, grupo: conf }, { k: 'estilo', ico: '🎨', t: 'Color y modo', d: 'Claro u oscuro, tamaño y grosor de letra', abrir: verEstilo, grupo: conf },
+    let L = [{ k: 'yo', ico: '👤', t: 'Foto y nombre', d: 'Cómo te ven', abrir: verYo, grupo: conf }, { k: 'estilo', ico: '🎨', t: 'Personalizar', d: 'Temas, colores, letra, barra de abajo y modo', abrir: verEstilo, grupo: conf },
       { k: 'avanzado', ico: '⚙️', t: 'Avanzado', d: 'Contraseña, avisos y cuenta', abrir: verAvanzado, grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
     // Menú: primero las opciones de la app; en Configuración van primero las del perfil y después las propias de la app.
     // Menú: una sola fila "Mi perfil" arriba de Configuración que abre la misma ventana en las 7 apps (foto y nombre, color y modo, avanzado).
-    if (op.menu) L = [{ k: 'perfil', ico: '👤', t: 'Mi perfil', d: 'Foto, nombre, color y contraseña', accion: () => abrirPerfil(), grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
-    const PROPIO = /^(mi perfil|perfil|foto y nombre|color y modo|apariencia|estilo)$/i;
+    if (op.menu) L = [{ k: 'perfil', ico: '👤', t: 'Mi perfil', d: 'Foto, nombre, personalizar y contraseña', accion: () => abrirPerfil(), grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
+    const PROPIO = /^(mi perfil|perfil|foto y nombre|color y modo|personalizar|apariencia|estilo)$/i;
     if (op.menu) op.items = (op.items || []).filter((x) => x && !['perfil', 'yo', 'estilo'].includes(x.k) && !PROPIO.test(String(x.t || '').trim()));
     if (op.menu) { const app = (op.items || []).filter(Boolean), esConf = (x) => x.grupo === 'Configuración'; L = app.filter((x) => !esConf(x)).concat(L, app.filter(esConf), app.some((x) => x.k === 'reparar') ? [] : [{ k: 'reparar', ico: '🛠️', t: 'Reparar la app', d: 'Si algo falla o no se actualiza', accion: reparar, grupo: conf }]); L = L.concat(cuentaItems(L.map((x) => x.k))); }
     el.classList.add('cfx-pf-w');

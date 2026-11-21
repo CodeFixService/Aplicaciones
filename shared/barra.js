@@ -424,7 +424,50 @@
   const pzIniciar = () => { setTimeout(pistas, 2500); setInterval(pistas, 3000); addEventListener('hashchange', () => setTimeout(pistas, 900)); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pzIniciar); else pzIniciar();
 
-  window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra, pasar, pista };
+  // ---------- G140 🎨 Barra a tu gusto: tipo, tamaño y nombre de cada botón (lo guarda ayuda.js → CFX_PERSONAL) ----------
+  // Tipos: clasica (de fábrica) · flotante (tarjeta redondeada) · iconos (sin texto) · etiquetas (texto grande) · pildora (flotante + botón activo en píldora).
+  // Tamaños: chica · normal · grande. Textos: { clave del botón: 'Nombre' } (máx. 14 letras; vacío = el de la app). El + no lleva texto.
+  const BT_TIPOS = ['clasica', 'flotante', 'iconos', 'etiquetas', 'pildora'], BT_TAMS = ['chica', 'normal', 'grande'];
+  let btCfg = { tipo: 'clasica', tam: 'normal', textos: {} };
+  // El texto del botón: su <small> (o .t/.txt/.label) o el texto suelto que va después del ícono.
+  function btEtiqueta(b) {
+    const e = b.querySelector(':scope > small, :scope > .t, :scope > .txt, :scope > .label');
+    if (e) return { leer: () => e.textContent, poner: (t) => { if (e.textContent !== t) e.textContent = t; } };
+    const n = [...b.childNodes].find((x) => x.nodeType === 3 && x.data.trim());
+    if (n) return { leer: () => n.data.trim(), poner: (t) => { if (n.data.trim() !== t) n.data = t; } };
+    return null;
+  }
+  function btBotones() {
+    const n = barraNav(); if (!n) return [];
+    return [...n.children].filter((b) => /^(A|BUTTON)$/.test(b.tagName) && !b.classList.contains('cfx-oculto') && !b.classList.contains('cfx-mas')).map((b) => {
+      const e = btEtiqueta(b); if (e && b.dataset.cfxT0 === undefined) b.dataset.cfxT0 = e.leer();
+      const ico = b.querySelector(':scope > .cfx-ico, :scope > span:first-child, :scope > svg');
+      return { k: b.classList.contains('cfx-menu') ? '_mas' : clave(b), t0: b.dataset.cfxT0 || '', ico: ico ? ico.outerHTML : '', b, e };
+    }).filter((x) => x.k && x.e);
+  }
+  let btPintando = false;
+  function btPintar(c) {
+    if (c) btCfg = c;
+    const r = document.documentElement, C = btCfg;
+    if (C.tipo && C.tipo !== 'clasica') r.dataset.cfxBtipo = C.tipo; else delete r.dataset.cfxBtipo;
+    if (C.tam && C.tam !== 'normal') r.dataset.cfxBtam = C.tam; else delete r.dataset.cfxBtam;
+    btPintando = true;
+    btBotones().forEach(({ k, t0, b, e }) => {
+      const t = String((C.textos || {})[k] || '').slice(0, 14).trim() || t0;
+      e.poner(t);
+      // Solo íconos: el nombre queda para el lector de pantalla.
+      if (b.dataset.cfxAria === undefined) b.dataset.cfxAria = b.getAttribute('aria-label') || '';
+      if (C.tipo === 'iconos' || t !== t0) b.setAttribute('aria-label', t); else if (b.dataset.cfxAria) b.setAttribute('aria-label', b.dataset.cfxAria); else b.removeAttribute('aria-label');
+    });
+    btPintando = false;
+  }
+  // Si la app vuelve a escribir el texto de un botón (p. ej. al traducir o contar), se pone de nuevo el elegido.
+  let btT = 0;
+  new MutationObserver(() => { if (btPintando || !Object.keys(btCfg.textos || {}).length) return; clearTimeout(btT); btT = setTimeout(() => btPintar(), 60); })
+    .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  document.addEventListener('cfx-barra-lista', () => btPintar());
+  const personal = { TIPOS: BT_TIPOS, TAMS: BT_TAMS, pintar: btPintar, botones: () => btBotones().map(({ k, t0, ico }) => ({ k, t0, ico })), cfg: () => btCfg };
+  window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra, pasar, pista, personal };
   const iniciar = () => setTimeout(() => { montar(); setTimeout(() => document.documentElement.classList.add('cfx-barra-lista'), 1200); }, 0);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
   // Barras que la app dibuja después (al iniciar sesión, o llena con botones cuando llegan los datos).

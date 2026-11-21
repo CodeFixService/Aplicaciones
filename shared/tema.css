@@ -85,6 +85,57 @@ pre, code, kbd { white-space: pre-wrap; overflow-wrap: anywhere; }
   nav.cfx-barra .badge, nav.cfx-barra .punto { position: absolute !important; top: 2px !important; left: calc(50% + 6px) !important; right: auto !important; }
   body.cfx-con-barra { padding-bottom: calc(78px + env(safe-area-inset-bottom)) !important; }
 }
+/* G140 🎨 Barra a tu gusto (Mi perfil → 🎨 Personalizar): tipo y tamaño. Solo celular y tablet; en computador queda el menú lateral. */
+@media (max-width: 899px) {
+  :root[data-cfx-btipo="flotante"] nav.cfx-barra, :root[data-cfx-btipo="pildora"] nav.cfx-barra {
+    left: 10px !important; right: 10px !important; bottom: calc(10px + env(safe-area-inset-bottom)) !important; padding: 6px 4px !important;
+    border: 1px solid var(--cfx-borde) !important; border-radius: 24px !important; box-shadow: 0 10px 28px rgba(15, 23, 42, .16) !important;
+  }
+  :root:is([data-cfx-btipo="flotante"], [data-cfx-btipo="pildora"]) body.cfx-con-barra { padding-bottom: calc(92px + env(safe-area-inset-bottom)) !important; }
+  :root[data-cfx-btipo="iconos"] nav.cfx-barra > :is(a, button):not(.cfx-mas):not(.cfx-x) { font-size: 0 !important; gap: 0 !important; justify-content: center !important; min-height: 48px !important; }
+  :root[data-cfx-btipo="iconos"] nav.cfx-barra > :is(a, button) > small { display: none !important; }
+  :root[data-cfx-btipo="iconos"] nav.cfx-barra > :is(a, button):not(.cfx-mas) > :is(span:first-child, .cfx-ico) { width: 30px !important; height: 30px !important; font-size: 25px !important; }
+  :root[data-cfx-btipo="etiquetas"] nav.cfx-barra > :is(a, button):not(.cfx-mas) { font-size: 12.5px !important; font-weight: 700 !important; gap: 4px !important; }
+  :root[data-cfx-btipo="pildora"] nav.cfx-barra > :is(.on, .activo, [aria-current="page"], .cfx-mas-on)::before { display: none !important; }
+  :root[data-cfx-btipo="pildora"] nav.cfx-barra > :is(.on, .activo, [aria-current="page"], .cfx-mas-on):not(.cfx-mas) > :is(span:first-child, .cfx-ico) {
+    width: 52px !important; border-radius: 999px !important; background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 16%, transparent) !important;
+  }
+  :root[data-cfx-btam="chica"] nav.cfx-barra > :is(a, button):not(.cfx-mas) { min-height: 44px !important; font-size: 10px !important; }
+  :root[data-cfx-btam="chica"] nav.cfx-barra > :is(a, button):not(.cfx-mas) > :is(span:first-child, .cfx-ico) { width: 22px !important; height: 22px !important; font-size: 18px !important; }
+  :root[data-cfx-btam="chica"] nav.cfx-barra > :is(a, button):not(.cfx-mas) svg { width: 20px !important; height: 20px !important; }
+  :root[data-cfx-btam="grande"] nav.cfx-barra > :is(a, button):not(.cfx-mas) { min-height: 60px !important; font-size: 13px !important; }
+  :root[data-cfx-btam="grande"] nav.cfx-barra > :is(a, button):not(.cfx-mas) > :is(span:first-child, .cfx-ico) { width: 32px !important; height: 32px !important; font-size: 26px !important; }
+  :root[data-cfx-btam="grande"] nav.cfx-barra > :is(a, button):not(.cfx-mas) svg { width: 28px !important; height: 28px !important; }
+  :root[data-cfx-btam="grande"] nav.cfx-barra > .cfx-mas .cfx-ico, :root[data-cfx-btam="grande"] nav.cfx-barra > .cfx-mas > span:first-child, :root[data-cfx-btam="grande"] nav.cfx-barra > .cfx-mas > svg:first-child { width: 62px !important; height: 62px !important; }
+  :root[data-cfx-btam="grande"] body.cfx-con-barra { padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important; }
+  :root[data-cfx-btam="grande"]:is([data-cfx-btipo="flotante"], [data-cfx-btipo="pildora"]) body.cfx-con-barra { padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important; }
+}
+/* Vista previa de la barra dentro de 🎨 Personalizar (se ve igual en celular y computador). */
+.cfx-pe-prev { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); align-items: end; margin: 6px 0 10px; padding: 6px 4px; border-top: 1px solid var(--cfx-borde);
+  background: var(--cfx-barra, var(--cfx-tarjeta)); color: var(--cfx-barra-ink, var(--cfx-texto-2)); border-radius: 12px; overflow: hidden; }
+.cfx-pe-prev > span { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; font: 600 11px/1.15 var(--cfx-letra); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 2px; }
+.cfx-pe-prev > span > i { font-style: normal; display: grid; place-items: center; width: 26px; height: 26px; font-size: 21px; line-height: 1; }
+.cfx-pe-prev > span > i > * { width: 23px !important; height: 23px !important; font-size: inherit !important; margin: 0 !important; background: none !important; }
+.cfx-pe-prev > span.on { color: var(--cfx-barra-on, var(--brand, var(--marca, #2563eb))); }
+.cfx-pe-prev > b { display: grid; place-items: center; width: 44px; height: 44px; margin: 0 auto; border-radius: 50%; background: var(--brand, var(--marca, #2563eb)); color: var(--cfx-mas-ink, #111827); font-size: 24px; }
+.cfx-pe-prev[data-tipo="flotante"], .cfx-pe-prev[data-tipo="pildora"] { margin: 6px 8px 12px; border: 1px solid var(--cfx-borde); border-radius: 22px; box-shadow: 0 8px 20px rgba(15, 23, 42, .14); }
+.cfx-pe-prev[data-tipo="iconos"] > span { font-size: 0; gap: 0; } .cfx-pe-prev[data-tipo="iconos"] > span > i { font-size: 25px; width: 30px; height: 30px; }
+.cfx-pe-prev[data-tipo="etiquetas"] > span { font-size: 12.5px; font-weight: 700; }
+.cfx-pe-prev[data-tipo="pildora"] > span.on > i { width: 48px; border-radius: 999px; background: color-mix(in srgb, var(--brand, var(--marca, #2563eb)) 16%, transparent); }
+.cfx-pe-prev[data-tam="chica"] > span { font-size: 10px; } .cfx-pe-prev[data-tam="chica"] > span > i { font-size: 18px; width: 22px; height: 22px; }
+.cfx-pe-prev[data-tam="grande"] > span { font-size: 13px; } .cfx-pe-prev[data-tam="grande"] > span > i { font-size: 26px; width: 32px; height: 32px; }
+.cfx-pe-prev[data-tipo="iconos"] > span { font-size: 0 !important; }
+.cfx-pe-tipos { margin-bottom: 10px; }
+.cfx-pe-txt { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 8px; margin: 6px 0; }
+.cfx-pe-txt > i { font-style: normal; display: grid; place-items: center; font-size: 20px; } .cfx-pe-txt > i > * { width: 22px !important; height: 22px !important; margin: 0 !important; background: none !important; }
+.cfx-pe-txt > input { min-width: 0; }
+.cfx-pe-txt > button { min-width: 40px; min-height: 40px; border-radius: 10px; border: 1px solid var(--cfx-borde); background: var(--cfx-campo); color: var(--cfx-texto); cursor: pointer; }
+.cfx-pe-temas { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.cfx-pe-temas > button { display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 12px; border: 2px solid var(--cfx-borde); background: var(--cfx-tarjeta); color: var(--cfx-texto); font: 600 12px var(--cfx-letra); cursor: pointer; }
+.cfx-pe-temas > button.on { border-color: var(--brand, var(--marca, #2563eb)); }
+.cfx-pe-temas > button > .cfx-pe-mu { display: block; width: 100%; height: 26px; border-radius: 8px; border: 1px solid rgba(127, 127, 127, .3); }
+.cfx-pe-temas > button > b { font: inherit; text-align: center; }
+.cfx-pe-fab { width: 100%; margin-top: 14px; min-height: 44px; border-radius: 12px; border: 1px dashed var(--cfx-borde); background: none; color: var(--cfx-texto); font: 700 14px var(--cfx-letra); cursor: pointer; }
 /* Computador (900 px o más): la misma barra pasa a ser un menú lateral. Se ven todos los botones (sin "Más" ni repetidos) y el + arriba. */
 @media (min-width: 900px) {
   nav.cfx-barra {
