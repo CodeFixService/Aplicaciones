@@ -28,6 +28,7 @@
     if (c.entrega) l.push(c.entrega);
     if (c.boleta && c.boleta.folio) l.push((c.boleta.tipo === 33 ? 'Factura' : 'Boleta') + ' electrónica N° ' + c.boleta.folio + (c.boleta.url ? ': ' + c.boleta.url : ''));
     l.push('', 'Gracias por tu compra 🙌');
+    if (siguenos(c).length) l.push('Síguenos: ' + siguenos(c).join(' · '));
     if (!(c.boleta && c.boleta.folio)) l.push('_No es boleta electrónica._');
     return l.join('\n');
   }
@@ -41,7 +42,19 @@
     try { r = (await f(c)) || {}; } catch (_) { return; }
     if (!c.logo && /^(https:|data:image\/)/.test(r.logo || '')) c.logo = r.logo;
     if (!c.firma && !c.cliente_ve && r.firma && (r.firma.rut || r.firma.razon)) c.firma = r.firma;
+    if (!c.redes && Array.isArray(r.redes)) c.redes = r.redes;
   }
+  // G142 c 📱 "Síguenos" en el comprobante: las redes del negocio (el que vende), si la app no las pasó.
+  async function redesDe(c) {
+    if (c.redes || c.cliente_ve) return;
+    const R = (window.CFX_AYUDA_PEND || {}).rpc; if (typeof R !== 'function') return;
+    try { const d = await R('cfx_redes_mias'); if (d && Array.isArray(d.lista)) c.redes = d.lista; } catch (_) { /* sin redes */ }
+  }
+  const usuarioDe = (u) => { try { const x = new URL(u); const p = x.pathname.replace(/^\/+|\/+$/g, '').split('/')[0]; return /wa\.me|whatsapp/.test(x.hostname) ? 'WhatsApp' : p ? (p[0] === '@' ? p : '@' + p) : x.hostname.replace(/^www\./, ''); } catch (_) { return ''; } };
+  const siguenos = (c) => (Array.isArray(c.redes) ? c.redes : []).slice(0, 4).map((x) => {
+    const R = window.CodeFixVitrina && CodeFixVitrina.redes && CodeFixVitrina.redes.RED, n = R && R[x.red] ? R[x.red][0] : x.red;
+    return (x.red === 'web' ? 'Web' : n) + ' ' + usuarioDe(x.url);
+  }).filter(Boolean);
   function copiar(t) {
     const ok = () => (window.Core && Core.toast ? Core.toast('📋 Copiado') : window.App && App.toast ? App.toast('📋 Copiado') : null);
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(ok).catch(() => {});
@@ -70,6 +83,7 @@
       (c.boleta && c.boleta.folio ? '<hr><div class="cb-c"><b>' + (c.boleta.tipo === 33 ? 'Factura' : 'Boleta') + ' electrónica SII N° ' + esc(c.boleta.folio) + '</b></div>' : '') +
       '<div class="cb-firma"><div class="cb-raya">' + esc(fi.razon || c.negocio || 'Mi tienda') + '</div><div class="cb-c">Firma y timbre' + (fi.rut ? ' · RUT ' + esc(rutF(fi.rut)) : '') + '</div></div>' +
       '<div class="cb-c">Gracias por tu compra 🙌</div>' +
+      (siguenos(c).length ? '<div class="cb-c cb-redes">Síguenos: ' + esc(siguenos(c).join(' · ')) + '</div>' : '') +
       (c.boleta && c.boleta.folio ? '' : '<div class="cb-c cb-chico">No es boleta electrónica</div>') + '</div>';
   }
   /* G32 c: lo mismo que papel() en texto plano, para la impresora Bluetooth (shared/impresora.js). */
@@ -120,7 +134,7 @@
       (navigator.share ? '<button type="button" class="alt" data-a="share">📤 Compartir</button>' : '') +
       '<button type="button" class="alt" data-a="copiar">📋 Copiar</button>' +
       '<button type="button" class="small ghost" data-a="x">Cerrar</button></div>';
-    completar(c).then(() => { const p = d.querySelector('.cb-papel'); if (p && (c.logo || c.firma)) p.outerHTML = papel(c); });
+    Promise.all([completar(c), redesDe(c)]).then(() => { const p = d.querySelector('.cb-papel'); if (p && (c.logo || c.firma || siguenos(c).length)) p.outerHTML = papel(c); });
     const fin = () => d.remove();
     d.onclick = (e) => {
       const b = e.target.closest('button');

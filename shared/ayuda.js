@@ -564,6 +564,14 @@
       '<div class="ca-cuerpo">' + (R ? '<button type="button" class="ca-op" data-a="perfil"><span>👤</span><b>Mi perfil</b></button>' : '') +
       '<button type="button" class="ca-op" data-a="salir"><span>🚪</span><b>Cerrar sesión</b></button></div>').onclick = (ev) => { if (ev.target.closest('[data-a=salir]')) confirmarSalir(); if (ev.target.closest('[data-a=perfil]')) abrirPerfil(); };
   }
+  let EQUIPO_REDES = false;
+  // G142 c 📱 Mis redes personales (las de la persona, no las del negocio): salen junto a su nombre en la página pública.
+  function misRedesPersona() {
+    const h = hoja('📱 Mis redes personales');
+    if (!(window.CodeFixVitrina && window.CodeFixVitrina.redes)) { h.zona.innerHTML = '<p class="cfx-av-vacio">Actualiza la app para usar esto.</p>'; return; }
+    h.zona.innerHTML = '<p class="muted" style="margin:0 0 8px">Tu Instagram o TikTok de trabajo: salen junto a tu nombre en la página del negocio (como en Booksy). Las del negocio van en Más → Mis redes.</p><div></div>';
+    window.CodeFixVitrina.redes.editor(h.zona.lastElementChild, { rpc: R, persona: true });
+  }
   function accion(a) {
     if (a === 'cuenta' || a === 'panel') return irA(CFG[a]);
     if (a === 'invitar') return invitar();
@@ -573,6 +581,7 @@
     if (a === 'terminos') return terminos();
     if (a === 'privacidad') return privacidad();
     if (a === 'misdatos') return misDatos();
+    if (a === 'misredes_p') return misRedesPersona();
     if (a === 'premium' && window.CFX_PAGOS) return window.CFX_PAGOS.abrir({ rpc: R });
   }
   // Núcleo 2.53: nunca se pega a <main> si hay una vista abierta (quedaba abajo de TODAS las pantallas, p. ej. Hoy del CM),
@@ -908,6 +917,7 @@
       suelto && { k: 'reparar', ico: '🛠️', t: 'Reparar la app', accion: reparar },
       { k: 'terminos', ico: '📄', t: 'Términos y condiciones', accion: a('terminos') },
       { k: 'privacidad', ico: '🔒', t: 'Política de privacidad', accion: a('privacidad') },
+      !adm && EQUIPO_REDES && { k: 'misredes_p', ico: '📱', t: 'Mis redes personales', accion: a('misredes_p') },
       !adm && { k: 'misdatos', ico: '🗂️', t: 'Mis datos y privacidad', accion: a('misdatos') },
       // G32 d · 🔑 Celular con sesión → aprueba el QR del computador (núcleo qr.js, si la app lo activó).
       window.CFX_QR && CFX_QR.listo() && !matchMedia('(pointer:fine)').matches && { k: 'computador', ico: 'qr', t: 'Entrar en un computador', accion: () => CFX_QR.celular() },
@@ -1529,6 +1539,7 @@
     if (!o || !o.rpc) return;
     const primera = !R;
     R = o.rpc; APP = o.app || APP;
+    if ('equipo_redes' in o) EQUIPO_REDES = !!o.equipo_redes;  // G142 c: la app dice si esta cuenta atiende en un negocio (barbero, mecánico…)
     if (primera) R('cfx_sitio').then((s) => { try { if (s && typeof s === 'object') localStorage.setItem('cfx:sitio', JSON.stringify({ dominio: s.dominio || '', url: s.url || '', activo: !!s.activo })); } catch (e) { /* nada */ } }).catch(() => { /* base sin la función todavía */ });
     if (primera) { pinRevisar(); pushAbri(); setTimeout(peTraer, 0); if (window.CFX_PAGOS && window.CFX_PAGOS.mpVolver) window.CFX_PAGOS.mpVolver(R);  // G85 vuelta de Mercado Pago
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pushAbri(); }); }

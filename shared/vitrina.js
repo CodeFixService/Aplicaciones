@@ -439,7 +439,8 @@
     if (!nodo) return; o = o || {}; estilosR();
     let D = { lista: [], dueno: true };
     nodo.innerHTML = '<p class="muted">⏳ Cargando…</p>';
-    try { D = await o.rpc('cfx_redes_mias') || D; } catch (e) { nodo.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; return; }
+    const P = !!o.persona;  // G142 c: las MÍAS (barbero, mecánico), no las del negocio
+    try { D = await o.rpc(P ? 'cfx_redes_persona_mias' : 'cfx_redes_mias') || D; } catch (e) { nodo.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; return; }
     let L = limpiar(D.lista); const viejas = limpiar(o.viejas);
     if (!L.length && viejas.length) L = viejas.slice();
     let pend = null, cambio = !limpiar(D.lista).length && viejas.length > 0;
@@ -451,7 +452,7 @@
         '<div class="cfx-re-in"><input id="cfxReIn" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="300" placeholder="instagram.com/tutienda o @tutienda"><button type="button" class="ok" data-re="suma">➕ Agregar</button></div>' +
         '<p class="cfx-re-det" id="cfxReDet" aria-live="polite"></p><div class="cfx-re-ch" id="cfxReCh" hidden></div>' : '<p class="muted">Solo el dueño cambia las redes. Así se ven en la página del negocio:</p>') +
         '<div style="margin-top:10px">' + (L.length ? L.map(fila).join('') : '<p class="muted">Aún no agregas redes.</p>') + '</div>' +
-        (L.length ? '<p style="margin:14px 0 6px;font-weight:800">👀 Así se ve en tu página</p>' + botones(L) : '') +
+        (L.length ? '<p style="margin:14px 0 6px;font-weight:800">' + (P ? '👀 Así se ven junto a tu nombre' : '👀 Así se ve en tu página') + '</p>' + botones(L) : '') +
         (D.dueno ? '<button type="button" class="ok" data-re="guarda" style="width:100%;margin-top:12px;min-height:46px"' + (cambio ? '' : ' disabled') + '>💾 Guardar mis redes</button>' : '') + '</div>';
       const inp = nodo.querySelector('#cfxReIn'); if (!inp) return;
       inp.oninput = () => {
@@ -478,13 +479,19 @@
       if (a === 'sube') { L.splice(i - 1, 0, L.splice(i, 1)[0]); cambio = true; return pintar(); }
       if (a === 'guarda') {
         b.disabled = true;
-        try { const r = await o.rpc('cfx_redes_guardar', { p_lista: L }); L = limpiar((r || {}).lista || L); cambio = false; toast('✅ Redes guardadas: ya salen en tu página'); pintar(); if (o.alGuardar) o.alGuardar(L); }
+        try { const r = await o.rpc(P ? 'cfx_redes_persona_guardar' : 'cfx_redes_guardar', { p_lista: L }); L = limpiar((r || {}).lista || L); cambio = false; toast(P ? '✅ Tus redes quedaron junto a tu nombre' : '✅ Redes guardadas: ya salen en tu página'); pintar(); if (o.alGuardar) o.alGuardar(L); }
         catch (er) { b.disabled = false; toast('⚠️ ' + (er.message || er)); }
       }
     };
     pintar();
   }
-  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar };
+  // G142 c: redes de cada persona del equipo en la página pública. Cada nodo [data-redes-p="<id>"] recibe sus íconos (solo, sin título).
+  async function equipo(raiz, o) {
+    o = o || {}; if (!raiz || !o.rpc || !o.llave) return;
+    let M = {}; try { M = (await o.rpc('cfx_redes_equipo', { p_llave: String(o.llave) })) || {}; } catch (e) { return; }
+    raiz.querySelectorAll('[data-redes-p]').forEach((n) => { const L = limpiar(M[n.dataset.redesP]); n.innerHTML = L.length ? botones(L, { solo: true }) : ''; n.hidden = !L.length; });
+  }
+  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo };
 
   window.CodeFixVitrina = { redes, montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, rutOk, BANCOS };
 })();

@@ -5454,7 +5454,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.95'::text $$;
+language sql immutable as $$ select '5.96'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -8249,7 +8249,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_redes', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_catalogo_propio', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_redes', 'public.cfx_redes_persona', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -11352,12 +11352,11 @@ begin
     'dueno', public.cfx_negocio_dueno(n) = auth.uid());
 end $$;
 
-create or replace function public.cfx_redes_guardar(p_lista jsonb) returns jsonb
-language plpgsql security definer set search_path = '' as $$
-declare n uuid := public.cfx_negocio_cuenta(auth.uid()); x jsonb; r text; u text; out jsonb := '[]'::jsonb;
+-- G142 c: validar una lista (la usan las redes del negocio y las de cada persona). Lanza error con el link malo.
+create or replace function public.cfx_redes_limpiar(p_lista jsonb) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare x jsonb; r text; u text; out jsonb := '[]'::jsonb;
 begin
-  if auth.uid() is null then raise exception 'Inicia sesión para guardar.'; end if;
-  if n is null or public.cfx_negocio_dueno(n) is distinct from auth.uid() then raise exception 'Solo el dueño del negocio cambia sus redes.'; end if;
   if p_lista is null or jsonb_typeof(p_lista) <> 'array' then raise exception 'Lista no válida.'; end if;
   if jsonb_array_length(p_lista) > 12 then raise exception 'Máximo 12 redes.'; end if;
   for x in select * from jsonb_array_elements(p_lista) loop
@@ -11367,9 +11366,60 @@ begin
       out := out || jsonb_build_array(jsonb_build_object('red', r, 'url', u));
     end if;
   end loop;
+  return out;
+end $$;
+
+create or replace function public.cfx_redes_guardar(p_lista jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n uuid := public.cfx_negocio_cuenta(auth.uid()); out jsonb;
+begin
+  if auth.uid() is null then raise exception 'Inicia sesión para guardar.'; end if;
+  if n is null or public.cfx_negocio_dueno(n) is distinct from auth.uid() then raise exception 'Solo el dueño del negocio cambia sus redes.'; end if;
+  out := public.cfx_redes_limpiar(p_lista);
   insert into public.cfx_redes (negocio, lista, cambiado) values (n, out, now())
   on conflict (negocio) do update set lista = excluded.lista, cambiado = now();
   return jsonb_build_object('ok', true, 'lista', out);
+end $$;
+
+-- G142 c 📱 Redes POR PERSONA (barbero, mecánico… como Booksy): cada cuenta del equipo de un negocio tiene las suyas.
+--   cfx_redes_persona_mias() / cfx_redes_persona_guardar(lista) → las propias (solo quien es parte de un negocio).
+--   cfx_redes_equipo(llave) → { "<id de la persona>": [redes] } del equipo de ese negocio (pública, nunca error).
+create table if not exists public.cfx_redes_persona (
+  cuenta   uuid primary key references auth.users (id) on delete cascade,
+  lista    jsonb not null default '[]'::jsonb,
+  cambiado timestamptz not null default now()
+);
+alter table public.cfx_redes_persona enable row level security;
+revoke all on public.cfx_redes_persona from anon, authenticated;
+
+create or replace function public.cfx_redes_persona_mias() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('lista', coalesce((select r.lista from public.cfx_redes_persona r where r.cuenta = auth.uid()), '[]'::jsonb), 'dueno', true,
+    'equipo', public.cfx_negocio_cuenta(auth.uid()) is not null)
+$$;
+
+create or replace function public.cfx_redes_persona_guardar(p_lista jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare out jsonb;
+begin
+  if auth.uid() is null then raise exception 'Inicia sesión para guardar.'; end if;
+  if public.cfx_negocio_cuenta(auth.uid()) is null then raise exception 'Tus redes personales son para quienes atienden en un negocio.'; end if;
+  out := public.cfx_redes_limpiar(p_lista);
+  insert into public.cfx_redes_persona (cuenta, lista, cambiado) values (auth.uid(), out, now())
+  on conflict (cuenta) do update set lista = excluded.lista, cambiado = now();
+  return jsonb_build_object('ok', true, 'lista', out);
+end $$;
+
+create or replace function public.cfx_redes_equipo(p_llave text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare n uuid;
+begin
+  if coalesce(p_llave, '') = '' or length(p_llave) > 120 or to_regprocedure('public.cfx_redes_llave_app(text)') is null then return '{}'::jsonb; end if;
+  begin execute 'select public.cfx_redes_llave_app($1)' into n using p_llave; exception when others then return '{}'::jsonb; end;
+  if n is null then return '{}'::jsonb; end if;
+  return coalesce((select jsonb_object_agg(r.cuenta::text, r.lista) from public.cfx_redes_persona r
+    where jsonb_array_length(r.lista) > 0 and public.cfx_negocio_cuenta(r.cuenta) = n), '{}'::jsonb);
+exception when others then return '{}'::jsonb;
 end $$;
 
 -- Pública: nunca lanza error (llave rara, sin gancho o sin redes → []).
@@ -11384,8 +11434,77 @@ begin
 end $$;
 
 revoke all on function public.cfx_red_ok(text, text), public.cfx_redes_mias(), public.cfx_redes_guardar(jsonb), public.cfx_redes_publicas(text) from public, anon, authenticated;
+revoke all on function public.cfx_redes_limpiar(jsonb), public.cfx_redes_persona_mias(), public.cfx_redes_persona_guardar(jsonb), public.cfx_redes_equipo(text) from public, anon, authenticated;
+grant execute on function public.cfx_redes_persona_mias(), public.cfx_redes_persona_guardar(jsonb) to authenticated;
+grant execute on function public.cfx_redes_equipo(text) to anon, authenticated;
 grant execute on function public.cfx_redes_mias(), public.cfx_redes_guardar(jsonb) to authenticated;
 grant execute on function public.cfx_redes_publicas(text) to anon, authenticated;
+-- ---------------------------------------------------------------------
+-- CodeFix · G142 b 📚 Catálogo de texto: lo que cada negocio escribe y no estaba en la lista de fábrica (nucleo/catalogo.js)
+--   queda en SU lista (marcas, modelos, colores…) y le aparece al autocompletar. Igual en las 7 (lo reparte nucleo/sincronizar.py).
+--   cfx_catalogo_mio(lista)          → ['Bici Pepe 3000', …] (las más usadas primero; máx. 300).
+--   cfx_catalogo_sumar(lista, valor) → suma o cuenta 1 uso más (máx. 500 por lista y negocio; nunca molesta: sin negocio no hace nada).
+-- ---------------------------------------------------------------------
+create table if not exists public.cfx_catalogo_propio (
+  negocio uuid not null,
+  lista   text not null check (lista ~ '^[a-z_]{2,20}$'),
+  valor   text not null check (length(valor) between 2 and 60),
+  usos    int not null default 1,
+  creado  timestamptz not null default now()
+);
+create unique index if not exists cfx_catalogo_propio_uq on public.cfx_catalogo_propio (negocio, lista, lower(valor));
+alter table public.cfx_catalogo_propio enable row level security;
+revoke all on public.cfx_catalogo_propio from anon, authenticated;
+
+create or replace function public.cfx_catalogo_mio(p_lista text) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce((select jsonb_agg(valor order by usos desc, creado desc) from (
+    select valor, usos, creado from public.cfx_catalogo_propio
+    where negocio = public.cfx_negocio_cuenta(auth.uid()) and lista = p_lista order by usos desc, creado desc limit 300) x), '[]'::jsonb)
+$$;
+
+create or replace function public.cfx_catalogo_sumar(p_lista text, p_valor text) returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare n uuid := public.cfx_negocio_cuenta(auth.uid()); v text := regexp_replace(trim(coalesce(p_valor, '')), '[[:cntrl:]]|\s+', ' ', 'g');
+begin
+  if n is null or coalesce(p_lista, '') !~ '^[a-z_]{2,20}$' or length(v) not between 2 and 60 then return; end if;
+  update public.cfx_catalogo_propio set usos = usos + 1 where negocio = n and lista = p_lista and lower(valor) = lower(v);
+  if found or (select count(*) from public.cfx_catalogo_propio where negocio = n and lista = p_lista) >= 500 then return; end if;
+  insert into public.cfx_catalogo_propio (negocio, lista, valor) values (n, p_lista, v) on conflict do nothing;
+end $$;
+
+revoke all on function public.cfx_catalogo_mio(text), public.cfx_catalogo_sumar(text, text) from public, anon;
+grant execute on function public.cfx_catalogo_mio(text), public.cfx_catalogo_sumar(text, text) to authenticated;
+-- ---------------------------------------------------------------------
+-- CodeFix · G142 b 👤 Clientes sin cuenta que después se registran: el negocio crea al cliente con su CORREO (y sus bicis, órdenes…);
+--   cuando esa persona CONFIRMA ese correo, cada app le asocia lo suyo con el gancho cfx_reclamar_app(cuenta, correo).
+--   🛡️ Nunca sin correo verificado: el disparador solo corre cuando auth.users.email_confirmed_at pasa a tener fecha.
+--   Si el gancho falla, el registro sigue igual (nunca bloquea la cuenta).
+--   cfx_correo_verificado(correo) → id de la cuenta con ese correo YA confirmado (o null); para asociar al tiro al crear.
+-- ---------------------------------------------------------------------
+create or replace function public.cfx_correo_verificado(p_correo text) returns uuid
+language sql stable security definer set search_path = public, pg_temp as $$
+  select u.id from auth.users u where lower(u.email) = lower(trim(coalesce(p_correo, ''))) and length(trim(coalesce(p_correo, ''))) > 3
+    and u.email_confirmed_at is not null limit 1
+$$;
+revoke all on function public.cfx_correo_verificado(text) from public, anon, authenticated;
+
+create or replace function public.cfx_reclamar_correo() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.email_confirmed_at is not null and new.email is not null and (tg_op = 'INSERT' or old.email_confirmed_at is null or lower(old.email) is distinct from lower(new.email))
+     and to_regprocedure('public.cfx_reclamar_app(uuid, text)') is not null then
+    begin
+      execute 'select public.cfx_reclamar_app($1, $2)' using new.id, lower(new.email);
+    exception when others then null;  -- nunca bloquear el registro
+    end;
+  end if;
+  return new;
+end $$;
+revoke all on function public.cfx_reclamar_correo() from public, anon, authenticated;
+drop trigger if exists zz_cfx_reclamar on auth.users;
+create trigger zz_cfx_reclamar after insert or update of email_confirmed_at, email on auth.users
+  for each row execute function public.cfx_reclamar_correo();
 -- <<< CFX núcleo
 
 -- G95 🎁 Prueba por botón: quien ya tuvo su prueba Pro queda anotado por correo (no se borra) · al probar se marca trial_used.
