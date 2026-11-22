@@ -231,12 +231,21 @@
   const itemDe = (l) => /^pub:/.test(l.clave) ? { nombre: l.nombre, precio: l.precio } : items.find((i) => i.clave === l.clave);
   const lineas = () => carro.map((l) => ({ l, i: window.CFX_FICHA ? CFX_FICHA.con(itemDe(l), l.opcion) : itemDe(l) })).filter((x) => x.i);
   const total = () => lineas().reduce((s, x) => s + x.i.precio * x.l.cant, 0);
+  // G146 🛒 Carrito flotante del núcleo (ui.js CFX_CARRITO): redondo sobre el menú, ✕ → 🛒 chico arriba. Sin núcleo: la barra de siempre.
+  let carroUlt = [0, ''];
+  function carroFlotante(n, tot) {
+    carroUlt = [n, tot];
+    if (!window.CFX_CARRITO) return;
+    CFX_CARRITO.montar({ barra: $('barra'), abrir: () => $('bVer').click() }).poner(n, tot);
+  }
+  addEventListener('load', () => carroFlotante(carroUlt[0], carroUlt[1]));
   function pintarCarro() {
     carro = carro.filter((l) => l.cant > 0 && itemDe(l));
     mem.set('carro', carro);
     const n = carro.reduce((s, l) => s + l.cant, 0);
     $('barra').classList.toggle('hidden', !n || !$('v-pedido').classList.contains('hidden'));
     $('barTxt').textContent = '🛒 Ver pedido (' + n + ')'; $('barTotal').textContent = precio(total());
+    carroFlotante((!$('v-pedido').classList.contains('hidden')) ? 0 : n, precio(total()));  // G146 🛒 flotante del núcleo (la barra vieja quedaba bajo el menú)
     $('lineas').innerHTML = lineas().map(({ l, i }, k) => '<div class="linea"><div class="grow"><b>' + Core.esc(i.nombre) + (l.opcion ? ' (' + Core.esc(l.opcion) + ')' : '') +
       '</b><div class="muted">' + precio(i.precio) + ' c/u</div></div><div class="qty"><button class="alt" data-k="' + k + '" data-d="-1" aria-label="Quitar uno">−</button><b>' + l.cant +
       '</b><button class="alt" data-k="' + k + '" data-d="1" aria-label="Agregar uno">+</button></div></div>').join('') || '<p class="muted">Agrega productos con ➕.</p>';

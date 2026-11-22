@@ -520,6 +520,14 @@
       Cuenta.rpc('guardar_carrito', { p_negocio: negocio, p_items: items }).then(() => { carroEnviado = j; }).catch(() => {});
     }, 1500);
   }
+  // G146 🛒 Carrito flotante del núcleo (ui.js CFX_CARRITO): redondo sobre el menú, ✕ → 🛒 chico arriba. Sin núcleo: la barra de siempre.
+  let carroUlt = [0, ''];
+  function carroFlotante(n, tot) {
+    carroUlt = [n, tot];
+    if (!window.CFX_CARRITO) return;
+    CFX_CARRITO.montar({ barra: $('barra'), abrir: () => $('bVerCarro').click() }).poner(n, tot);
+  }
+  addEventListener('load', () => carroFlotante(carroUlt[0], carroUlt[1]));
   function guardarCarro() {
     carro = carro.filter((l) => l.cant > 0 && itemDe(l));
     db.set('carro', carro);
@@ -528,6 +536,7 @@
     $('barra').classList.toggle('hidden', !n || !comprador || vistaActual === 'pedidos');
     $('barTxt').textContent = '🛒 Ver pedido (' + n + ')';
     $('barTotal').textContent = precio(totalCarro());
+    carroFlotante((!comprador || vistaActual === 'pedidos') ? 0 : n, precio(totalCarro()));  // G146 🛒 flotante del núcleo (la barra vieja quedaba bajo el menú)
     pintarCarro();
   }
   function pintarCarro() {

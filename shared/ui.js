@@ -44,9 +44,7 @@
     const on = max > alto * 0.5 && y > max * 0.3 && !d.querySelector('dialog[open]');
     if (on) {
       if (!btn.isConnected) d.body.appendChild(btn);
-      const b = d.querySelector('nav.cfx-barra');
-      const r = b && b.getClientRects().length ? b.getBoundingClientRect() : null;
-      raiz.style.setProperty('--cfx-subir-b', (r && !caja && r.top < innerHeight ? Math.round(innerHeight - r.top + 12) : 20) + 'px');
+      raiz.style.setProperty('--cfx-subir-b', (caja ? 20 : sobreCarro()) + 'px');  // G146: sobre el menú y sobre el 🛒 (nunca debajo)
     }
     btn.classList.toggle('on', on);
   }
@@ -61,6 +59,117 @@
   btn.addEventListener('click', () => { (caja || pagina()).scrollTo({ top: 0, behavior: quieto() ? 'auto' : 'smooth' }); btn.classList.remove('on'); });
   // Si la ventana que se bajaba se cierra, el botón vuelve a mirar la página.
   new MutationObserver(() => { if (caja && !caja.isConnected) { caja = null; revisar(); } }).observe(raiz, { childList: true, subtree: true });
+
+  // ---------- 🛒 G146 Carrito flotante (CFX_CARRITO) ----------
+  // Antes cada app tenía una barra "Ver pedido" a lo ancho abajo: el menú (que se esconde y vuelve) la tapaba y ↑ tapaba el total.
+  // Ahora: 🛒 redondo y chico abajo a la derecha, SIEMPRE sobre el menú (sube y baja con él), con contador y total; ↑ va encima.
+  // ✕ lo quita de la vista → 🛒 chico con contador en la cabecera (al lado de 🔔). El pedido NO se borra. Tocar cualquiera abre el pedido.
+  //   CFX_CARRITO.montar({ abrir: () => …, barra: elemento viejo (se deja de mostrar), cabecera: elemento (opcional) })
+  //   CFX_CARRITO.poner(cantidad, 'total en texto')   → 0 = sin carrito (no se ve ninguno de los dos)
+  // Barra propia de una app que debe quedar sobre el menú: data-cfx-sobre-menu + bottom:calc(var(--cfx-carro-b,16px) + env(safe-area-inset-bottom)).
+  // (Antes de que ui.js cargue, la barra no tiene la variable: por eso en tema/CSS de la app el valor por defecto alto, ej. 76px.)
+  const SVG_CARRO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.3a1.6 1.6 0 0 0 1.6-1.2l1.6-6.8H6.1"/></svg>';
+  const SVG_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  css.textContent +=
+    '.cfx-carro-f{position:fixed;right:16px;bottom:calc(var(--cfx-carro-b,16px) + env(safe-area-inset-bottom));z-index:44;display:flex;align-items:center;gap:6px;transition:bottom .3s cubic-bezier(.2,.8,.2,1),opacity .2s;pointer-events:none}' +
+    '.cfx-carro-f[hidden]{display:none!important}.cfx-carro-f>*{pointer-events:auto}' +
+    '.cfx-carro-f .cfx-carro-t{font:700 13px/1 inherit;padding:8px 10px;border-radius:999px;background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#0f172a);border:1px solid var(--cfx-borde,#dce3ea);box-shadow:0 6px 16px -6px rgba(15,23,42,.35);white-space:nowrap;cursor:pointer;min-height:0!important;margin:0!important}' +
+    '.cfx-carro-b{position:relative;width:56px!important;height:56px!important;aspect-ratio:1;min-width:0!important;min-height:0!important;padding:0!important;margin:0!important;border-radius:50%!important;display:grid!important;place-items:center;' +
+    'background:var(--ok,var(--cfx-ok,#16a34a))!important;color:#fff!important;border:0!important;box-shadow:0 10px 24px -8px rgba(15,23,42,.5)!important;cursor:pointer}.cfx-carro-b svg{width:26px;height:26px}' +
+    '.cfx-carro-b .cfx-num,.cfx-carro-mini .cfx-num{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;display:grid;place-items:center;font:800 11px/1 inherit;background:#dc2626;color:#fff;box-shadow:0 0 0 2px var(--cfx-tarjeta,#fff)}' +
+    '.cfx-carro-x{position:absolute;top:-8px;left:-8px;width:24px!important;height:24px!important;aspect-ratio:1;min-width:0!important;min-height:0!important;padding:0!important;margin:0!important;border-radius:50%!important;display:grid!important;place-items:center;' +
+    'background:var(--cfx-tarjeta,#fff)!important;color:var(--cfx-texto,#0f172a)!important;border:1px solid var(--cfx-borde,#dce3ea)!important;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer}.cfx-carro-x svg{width:12px;height:12px}' +
+    '.cfx-carro-x::after{content:"";position:absolute;inset:-8px}' +  /* zona de toque más grande sin agrandar el círculo */
+    '.cfx-carro-mini{position:relative;flex:none;width:32px!important;height:32px!important;aspect-ratio:1;min-width:0!important;min-height:0!important;padding:0!important;margin:0 4px!important;border-radius:50%!important;display:grid!important;place-items:center;' +
+    'background:var(--cfx-tarjeta,#fff)!important;color:var(--ok,var(--cfx-ok,#16a34a))!important;border:1px solid var(--cfx-borde,#dce3ea)!important;cursor:pointer}.cfx-carro-mini[hidden]{display:none!important}.cfx-carro-mini svg{width:18px;height:18px}' +
+    'html.cfx-teclado .cfx-carro-f{display:none!important}' +
+    '@media (prefers-reduced-motion:reduce){.cfx-carro-f{transition:none}}';
+  // Altura que ocupa el menú de abajo, SIN su animación (así ↑ y 🛒 se acomodan al tiro, no a medio camino).
+  function altoMenu() {
+    const n = d.querySelector('nav.cfx-barra');
+    if (!n || innerWidth >= 900 || n.classList.contains('cfx-escondida') || raiz.classList.contains('cfx-teclado') || !n.getClientRects().length) return 0;
+    const st = getComputedStyle(n); if (st.display === 'none' || st.visibility === 'hidden') return 0;
+    let ty = 0; try { if (st.transform && st.transform !== 'none') ty = new DOMMatrix(st.transform).m42; } catch (e) { ty = 0; }
+    const top = n.getBoundingClientRect().top - ty;
+    return top < innerHeight && top > innerHeight * 0.4 ? Math.round(innerHeight - top) : 0;
+  }
+  const K = { n: 0, total: '', abrir: null, min: false, f: null, mini: null, cab: null };
+  try { K.min = sessionStorage.getItem('cfx-carro-min') === '1'; } catch (e) { /* sin almacenamiento */ }
+  const tapado = () => !!d.querySelector('dialog[open], .cfx-mv, .cfx-hoja-m');
+  const carroB = () => { const a = altoMenu(); return a ? a + 12 : 16; };
+  function sobreCarro() {
+    const a = altoMenu(), base = a ? a + 12 : 20;
+    let b = K.f && !K.f.hidden ? carroB() + 56 + 12 : base;
+    // Barras propias de una app que también van sobre el menú (Barbería: servicios elegidos + "Vaciar"): ↑ queda encima de ellas.
+    d.querySelectorAll('[data-cfx-sobre-menu]').forEach((x) => { if (!x.getClientRects().length) return; const r = x.getBoundingClientRect(); if (r.height && r.top < innerHeight && r.bottom > innerHeight * 0.6) b = Math.max(b, Math.round(innerHeight - r.top + 12)); });
+    return b;
+  }
+  function lugar() {
+    raiz.style.setProperty('--cfx-carro-b', carroB() + 'px');
+    if (K.f) K.f.hidden = !(K.n > 0 && !K.min) || tapado();
+    if (K.mini) K.mini.hidden = !(K.n > 0 && K.min);
+    if (btn.classList.contains('on') && !caja) raiz.style.setProperty('--cfx-subir-b', sobreCarro() + 'px');
+  }
+  function cabCarro() {
+    if (K.cab && K.cab.isConnected) return K.cab;
+    return d.querySelector('.cfx-cab') || [...d.querySelectorAll('header')].find((x) => { const s = getComputedStyle(x); return /fixed|sticky/.test(s.position) && x.getClientRects().length; }) || d.querySelector('header');
+  }
+  function armar() {
+    if (!K.f) {
+      K.f = d.createElement('div'); K.f.className = 'cfx-carro-f'; K.f.hidden = true;
+      K.f.innerHTML = '<button type="button" class="cfx-carro-t no-ico" data-cfx-queda></button><button type="button" class="cfx-carro-b no-ico" data-cfx-queda>' + SVG_CARRO + '<span class="cfx-num">0</span>' +
+        '<span class="cfx-carro-x" role="button" tabindex="0" aria-label="Quitar el carrito de la vista (el pedido no se borra)">' + SVG_X + '</span></button>';
+      const x = K.f.querySelector('.cfx-carro-x');
+      const quitar = (e) => { e.preventDefault(); e.stopPropagation(); K.min = true; try { sessionStorage.setItem('cfx-carro-min', '1'); } catch (er) { /* nada */ } pintar(); };
+      x.addEventListener('click', quitar); x.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') quitar(e); });
+      K.f.querySelector('.cfx-carro-b').addEventListener('click', (e) => { if (!e.target.closest('.cfx-carro-x')) abrirPedido(); });
+      K.f.querySelector('.cfx-carro-t').addEventListener('click', abrirPedido);
+    }
+    if (!K.f.isConnected && d.body) d.body.appendChild(K.f);
+    const cab = cabCarro();
+    if (!K.mini) {
+      K.mini = d.createElement('button'); K.mini.type = 'button'; K.mini.className = 'cfx-carro-mini no-ico'; K.mini.hidden = true; K.mini.dataset.cfxQueda = '';
+      K.mini.innerHTML = SVG_CARRO + '<span class="cfx-num">0</span>';
+      K.mini.addEventListener('click', abrirPedido);
+    }
+    if (cab && K.mini.parentNode !== cab) {
+      const camp = cab.querySelector('[data-cfx-campana]');
+      if (camp && camp.parentNode === cab) cab.insertBefore(K.mini, camp); else cab.appendChild(K.mini);
+    }
+  }
+  function abrirPedido() { if (typeof K.abrir === 'function') try { K.abrir(); } catch (e) { /* la app sigue */ } }
+  function pintar() {
+    if (!K.n && !K.f) return;
+    armar();
+    const n = K.n > 99 ? '99+' : String(K.n), etq = 'Ver pedido: ' + K.n + (K.n === 1 ? ' producto' : ' productos') + (K.total ? ' · ' + K.total : '');
+    K.f.querySelector('.cfx-carro-b .cfx-num').textContent = n; K.mini.querySelector('.cfx-num').textContent = n;
+    K.f.querySelector('.cfx-carro-b').setAttribute('aria-label', etq); K.mini.setAttribute('aria-label', etq); K.mini.title = etq;
+    const t = K.f.querySelector('.cfx-carro-t'); t.textContent = K.total; t.hidden = !K.total; t.setAttribute('aria-label', etq);
+    lugar(); revisar();
+  }
+  window.CFX_CARRITO = {
+    montar(o) {
+      o = o || {};
+      K.abrir = o.abrir || K.abrir;
+      if (o.cabecera) K.cab = typeof o.cabecera === 'string' ? d.querySelector(o.cabecera) : o.cabecera;
+      const v = typeof o.barra === 'string' ? d.querySelector(o.barra) : o.barra;
+      if (v) v.dataset.cfxCarroViejo = '';  // la barra antigua deja de mostrarse: su botón es ahora el 🛒 (misma acción)
+      return this;
+    },
+    poner(n, total) {
+      K.n = Math.max(0, parseInt(n, 10) || 0); K.total = total == null ? '' : String(total);
+      if (!K.n && K.min) { K.min = false; try { sessionStorage.removeItem('cfx-carro-min'); } catch (e) { /* nada */ } }  // carrito vacío: la próxima vez vuelve el flotante
+      pintar();
+    },
+    mostrar() { K.min = false; try { sessionStorage.removeItem('cfx-carro-min'); } catch (e) { /* nada */ } pintar(); },
+    estado: () => ({ n: K.n, total: K.total, min: K.min })
+  };
+  css.textContent += '[data-cfx-carro-viejo]{display:none!important}';
+  let rafC = 0;
+  const pronto = () => { if (!rafC) rafC = requestAnimationFrame(() => { rafC = 0; lugar(); }); };  // --cfx-carro-b siempre al día (lo usan las barras propias)
+  addEventListener('scroll', pronto, { passive: true, capture: true }); addEventListener('resize', pronto);
+  // El menú se esconde/aparece cambiando su clase (y el teclado o las hojas cambian la página): el 🛒 y ↑ lo siguen al tiro.
+  new MutationObserver(pronto).observe(raiz, { attributes: true, attributeFilter: ['class'], subtree: true, childList: true });
 
   // ---------- 📌 Títulos fijos ----------
   const opaco = (el) => {

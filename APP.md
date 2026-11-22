@@ -38,6 +38,7 @@ core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()`
 ## 🛒 Cobro de pedidos (G128)
 - Ítem: `catalog_items.tipo` (producto/servicio/digital) · `cobro` (ahora/abono/retiro) · `abono_pct` · `acceso` (solo al pagar). Caja → producto → 🛒 Venta online (`catalogo_venta`).
 - Pedido: `cobro`, `a_pagar` (lo que se paga ahora; null = total), `abonado_at`, `accesos`. Sin medio (ni 🏦 datos_pago, ni MP/Flow, ni link) = 💰 paga al retirar. Trigger `pedido_g128`.
+- G146 (6.91): 🛒 la barra "Ver pedido" (#barra) ya no se muestra: catálogo y t/ llaman carroFlotante(n, total) → núcleo ui.js CFX_CARRITO (redondo sobre el menú; ✕ → 🛒 chico en la cabecera; abrir = click de #bVerCarro / #bVer).
 - G139 (6.84 · bd 5.93): el botón del carrito = CFX_COBRO.boton ("⚡ Pagar $X"; nota #cobroNota) · con UN medio en línea va directo a mp_pagar · tienda_info/tienda_publica.cobra_mp · aviso a la tienda SOLO al pagar (guardar_pedido / pedido_pagado_auto / revisar_comprobante → equipo) · Pedidos: 📲 Avisar estado (CFX_COBRO.waEstado, data-wa-estado). Prueba: SaaS/pruebas/g139.js.
 - 💬 Chat del pedido: núcleo `cfx_hilo_*` (ref `pedido:<id>`, solo con cuenta) · ganchos `cfx_hilo_app` / `cfx_hilo_aviso_app`.
 
