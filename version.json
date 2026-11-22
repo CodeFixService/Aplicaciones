@@ -1,5 +1,5 @@
 {
-  "version": "6.93",
+  "version": "6.94",
   "bd": "5.99",
   "funcion": "3.9",
   "notas": "🙂 G148 (núcleo 3.43): los perfiles ya no usan ícono: sale tu foto o, si no tienes, la primera letra de tu nombre. · 📱 G147 (núcleo 3.42): texto \"Síguenos\" con tus redes listo para QR y afiches. · 🛒 G146: el carrito ahora es un botón redondo flotante (con cantidad y total) que va SIEMPRE sobre el menú de abajo; ✕ lo pasa a un 🛒 chico arriba, junto a la 🔔 (el pedido no se borra). El ↑ ya no tapa el total. · 🌐 G145: tu dominio propio se conecta SOLO desde Ajustes → 🌐 Mi dominio (copias el dato, lo pegas en nic.cl y listo; el candado 🔒 se activa solo) · ⚙️ la función del servidor conecta el dominio con Cloudflare"

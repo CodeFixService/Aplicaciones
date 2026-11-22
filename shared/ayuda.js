@@ -1889,7 +1889,7 @@
     const fs = [...document.querySelectorAll('.cfx-aviso-desl:not(.cfx-oc)')].filter((f) => f.offsetParent);
     await Promise.all(fs.map((f, i) => new Promise((ok) => setTimeout(() => irse(f, 1).then(ok), Math.min(i, 8) * 45))));
   }
-  // ---------- Aviso emergente: llega un aviso con la app abierta → baja arriba, encima de todo ----------
+  // ---------- Aviso emergente: llega un aviso con la app abierta → baja justo bajo la barra de arriba (G149), encima del contenido ----------
   let emerg = null;
   function emergente(o) {
     o = o || {};
@@ -1897,6 +1897,11 @@
     const d = document.createElement('div'); d.className = 'cfx-emerg'; d.setAttribute('role', 'status');
     d.innerHTML = '<span class="cfx-emerg-ico">' + SVG_CAMPANA + '</span><div><b></b><small></small></div>';
     d.querySelector('b').textContent = String(o.titulo || 'Nuevo aviso').replace(/^🔔\s*/, ''); d.querySelector('small').textContent = o.cuerpo || '';
+    // G149: baja DEBAJO de la barra de arriba (cabecera + pestañas fijas), no encima de ella.
+    let bajo = 0;
+    try { bajo = window.CFX_FIJO ? window.CFX_FIJO.arriba() : 0; } catch (e) { bajo = 0; }
+    if (!bajo) { const h = document.querySelector('.cfx-cab') ? document.querySelector('.cfx-cab').closest('header') || document.querySelector('.cfx-cab') : document.querySelector('header'); const r = h && h.getClientRects().length ? h.getBoundingClientRect() : null; if (r && r.top < 40 && r.bottom > 0) bajo = Math.round(r.bottom); }
+    if (bajo > 0 && bajo < innerHeight * 0.5) d.style.top = (bajo + 8) + 'px';
     document.body.appendChild(d); emerg = d;
     try { d.setAttribute('popover', 'manual'); d.showPopover(); } catch (e) { /* sin popover: igual queda arriba */ }
     const fuera = (dir) => { if (!d.isConnected) return; d.style.transition = 'transform .2s ease-in, opacity .2s'; d.style.transform = dir ? 'translateX(' + dir * 110 + '%)' : 'translateY(-130%)'; d.style.opacity = '0'; setTimeout(() => { d.remove(); if (emerg === d) emerg = null; }, 210); };
