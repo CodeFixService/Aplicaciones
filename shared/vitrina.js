@@ -509,7 +509,25 @@
     let M = {}; try { M = (await o.rpc('cfx_redes_equipo', { p_llave: String(o.llave) })) || {}; } catch (e) { return; }
     raiz.querySelectorAll('[data-redes-p]').forEach((n) => { const L = limpiar(M[n.dataset.redesP]); n.innerHTML = L.length ? botones(L, { solo: true }) : ''; n.hidden = !L.length; });
   }
-  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo, unWa, conViejas };
+  // G147 📱 "Instagram @x · TikTok @y" (texto corto para QR, afiche y comprobante). WhatsApp nunca muestra el número.
+  const usuarioDe = (u) => { try { const x = new URL(u); const p = x.pathname.replace(/^\/+|\/+$/g, '').split('/')[0]; return /wa\.me|whatsapp/.test(x.hostname) ? '' : p ? (p[0] === '@' ? p : '@' + p) : x.hostname.replace(/^www\./, ''); } catch (_) { return ''; } };
+  function siguenos(L, max) {
+    return limpiar(L).slice(0, max || 4).map((x) => (x.red === 'web' ? 'Web' : RED[x.red][0]) + (usuarioDe(x.url) ? ' ' + usuarioDe(x.url) : '')).join(' · ');
+  }
+  // Redes de quien llama: o.persona = primero las suyas; si no tiene, las del negocio. Nunca lanza error.
+  async function mias(rpc, o) {
+    o = o || {}; if (typeof rpc !== 'function') return [];
+    const leer = async (f) => { try { const d = await rpc(f); return limpiar(d && d.lista); } catch (_) { return []; } };
+    const P = o.persona ? await leer('cfx_redes_persona_mias') : [];
+    return P.length ? P : leer('cfx_redes_mias');
+  }
+  // Llena un nodo con "Síguenos: …" (queda oculto si no hay redes).
+  async function bajoQR(nodo, o) {
+    if (!nodo) return ''; nodo.hidden = true;
+    const t = siguenos(await mias((o || {}).rpc, o));
+    nodo.textContent = t ? 'Síguenos: ' + t : ''; nodo.hidden = !t; return t;
+  }
+  const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo, unWa, conViejas, siguenos, mias, bajoQR };
 
   window.CodeFixVitrina = { redes, montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, rutOk, BANCOS };
 })();
