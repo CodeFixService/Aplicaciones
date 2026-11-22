@@ -4095,6 +4095,7 @@ where codigo = 'negocio_pro' and beneficios = '["Hasta 200 productos y 300 clien
 update public.planes set beneficios = replace(beneficios::text, '60 fichas', '60 diseños')::jsonb where beneficios::text like '%60 fichas%';  -- G33b: Fichas → Diseños
 update public.planes set beneficios = '["⭐ El descuento Premium de tu tienda en cada pedido", "⭐ Tus pedidos aparecen primero en la fila", "🔔 Avísame cuando llegue (productos agotados)", "Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]'::jsonb
 where codigo = 'cliente_pro' and beneficios = '["Tu propia Caja con Finanzas", "Colores e ícono a tu gusto", "Hasta 20 contactos y 5 mensajes seguidos", "Favoritos ilimitados"]'::jsonb;
+update public.planes set beneficios = replace(beneficios::text, 'Colores e ícono a tu gusto', 'Colores a tu gusto')::jsonb where beneficios::text like '%Colores e ícono a tu gusto%';  -- G148: perfiles sin ícono (foto o letra)
 
 -- Permisos 5.1
 revoke all on function public.regalo_nuevo_negocio(), public.es_cliente_premium(uuid), public.recordar_carritos(), public.reporte_semanal(),
@@ -5454,7 +5455,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.98'::text $$;
+language sql immutable as $$ select '5.99'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.

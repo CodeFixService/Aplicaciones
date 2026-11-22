@@ -327,7 +327,7 @@
   }
   const iniciales = () => {
     const n = String(CFG.nombre || CFG.email || '').replace(/@.*/, '').trim().split(/[\s._-]+/).filter(Boolean);
-    return esc(((n[0] || '?')[0] + (n[1] ? n[1][0] : '')).toUpperCase());
+    return esc((n[0] || '?')[0].toUpperCase());  // G148: solo la letra del nombre (sin íconos)
   };
   const esPro = () => !!(CFG.admin || ('pro' in CFG ? CFG.pro : CFG.premium));  // pro: la insignia (p. ej. en prueba Pro); premium: la app dorada
   function pintarBoya() {
@@ -2330,7 +2330,8 @@
       if (btn) btn.disabled = true;
       try { await fn(); if (ok) aviso(ok); if (P.alGuardar) await P.alGuardar(); return true; } catch (e) { aviso('⚠️ ' + errTxt(e)); return false; } finally { if (btn) btn.disabled = false; }
     });
-    const av = (f, ico) => '<span class="cfx-pf-av">' + (f ? '<img src="' + esc(f) + '" alt="">' : ico ? '<b>' + esc(ico) + '</b>' : iniciales()) + '</span>';
+    // G148: el perfil muestra la foto o la letra del nombre; el ícono guardado se conserva, pero ya no se muestra ni se elige.
+    const av = (f) => '<span class="cfx-pf-av">' + (f ? '<img src="' + esc(f) + '" alt="">' : iniciales()) + '</span>';
     const cabeza = () => '<div class="ca-yo cfx-pf-yo">' + av(foto, valor(P.icono)) + '<div><b>' + esc(valor(P.nombre) || 'Mi cuenta') + '</b>' + (valor(P.correo) ? '<small>' + esc(valor(P.correo)) + '</small>' : '') + '<small>' + esc(valor(P.sub) || '') + '</small></div></div>';
     const pide = (que, v) => { const t = P.bloqueo(que, v); if (t) { P.mejorar(t); return true; } return false; };
     const refrescarFoto = async () => { foto = (await valor(P.foto)) || ''; CFG.foto = foto || null; if (boya) pintarBoya(); };
@@ -2338,7 +2339,7 @@
     function verYo(z) {
       zAct = z;
       let nueva, ico = valor(P.icono);
-      const iconos = valor(P.iconos) || [], campos = valor(P.campos) || [];
+      const iconos = [], campos = valor(P.campos) || [];
       z.innerHTML = '<div class="cfx-pf">' + '<div class="cfx-pf-foto"><span data-pf-av>' + av(foto, ico) + '</span><div class="cfx-pf-btns">' +
         (P.guardarFoto ? '<button type="button" data-pf="foto">📷 ' + (foto ? 'Cambiar foto' : 'Poner foto') + '</button>' + (foto ? '<button type="button" data-pf="sinfoto">Quitar foto</button>' : '') + '<input type="file" accept="image/*" hidden>' : '') + '</div></div>' +
         (iconos.length ? '<label>Tu ícono</label><div class="cfx-pf-icos">' + iconos.map((i) => '<button type="button" data-ico="' + esc(i) + '" class="' + (i === ico ? 'on' : '') + '">' + (esc(i) || iniciales()) + '</button>').join('') + '</div>' : '') +

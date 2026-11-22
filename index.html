@@ -591,7 +591,7 @@ try {
       : cliente ? 'Cliente' : 'Versión Free';
     // G42i: el correo en 1 línea con … (nunca partido a mitad); el plan baja por palabra.
     $('estadoPlan').replaceChildren(Object.assign(document.createElement('span'), { className: 'correo', textContent: acc.email || '', title: acc.email || '' }), ' · ' + plan + (cliente && acc.negocio ? ' de ' + acc.negocio : ''));
-    $('avatar').textContent = Cuenta.icono() || (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
+    $('avatar').textContent = (acc.empresa || acc.email || 'C').trim().charAt(0).toUpperCase();
     Cuenta.aplicarLogo(acc);
     // Cliente: logo y nombre de su tienda en la bienvenida.
     $('tiendaChip').classList.toggle('hidden', !cliente || !acc.negocio);
@@ -706,7 +706,7 @@ try {
       ? [
          '⭐ El descuento Premium que da tu tienda en cada pedido', '⭐ Tus pedidos aparecen primero en la fila de la tienda',
          '🔔 "Avísame cuando llegue" para productos agotados', 'Tu propia Caja con 📈 Finanzas: metas, gastos y ganancia real',
-         'Elige el color de tu app y tu ícono', 'Favoritos ilimitados (gratis: 5)']
+         'Elige el color de tu app', 'Favoritos ilimitados (gratis: 5)']
       : ['🛒 Recordatorio de carrito: si un cliente no termina su pedido, le llega un aviso al día siguiente',
          '📣 Vende por WhatsApp en 1 toque: tu tienda con foto y ofertas', '📊 Reporte semanal automático: cuánto vendiste y tu producto top',
          '⚠️ Aviso de stock bajo (quedan 2 o menos)', 'Hasta 200 productos, 300 clientes y 60 diseños publicados (Free: 50, 50 y 10)',
