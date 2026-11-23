@@ -1,10 +1,7 @@
 /* CodeFix · Núcleo · Detalles de pantalla iguales en todas las apps (mismo archivo en cada repositorio; Cerebro no lo usa).
    G42a ⬆️ Subir: al pasar el 30% de lo que se puede bajar (página o ventana) aparece un botón redondo; toca → sube suave.
-   G42k 📌 Títulos fijos: en una tarjeta larga su título (h2 primero) queda pegado bajo la cabecera y solo se mueve lo de adentro;
-        la tarjeta siguiente trae su título y reemplaza al anterior. También los títulos de grupo de los menús (.cfx-aj-g).
-        1 línea con … y fondo opaco (el mismo de la tarjeta). Las tarjetas que se apilan (.cfx-pila) no se tocan.
-        G149: TODOS los títulos (h1/h2/h3, grupos, fila título+botón, pestañas del ☰ Más) se quedan fijos al llegar a la barra, sin correr nada.
-        Fuera: fichas en grilla, títulos tras una foto, ventanas, [data-sin-fijo]. window.CFX_FIJO.arriba() = dónde termina la barra de arriba.
+   G150 📌 Títulos: ya NO se quedan fijos (G42k/G149 retirados): bajan con la página como vienen de fábrica.
+        window.CFX_FIJO.arriba() = dónde termina la barra de arriba (lo usa el aviso emergente).
    G42c ✋ Ordenar a gusto: mantener presionado un elemento de una lista marcada y arrastrarlo arriba o abajo. Se guarda por usuario.
         Marcar:  <div data-cfx-orden="clave"> con hijos directos data-cfx-oi="id" (sin data-cfx-oi usa data-k o el título).
         API: CFX_ORDEN.lista(el, 'clave') marca una lista ya dibujada (ej. las tarjetas de una pantalla). */
@@ -19,11 +16,6 @@
     'display:grid!important;place-items:center;border-radius:50%!important;border:1.5px solid var(--cfx-borde,#dce3ea)!important;background:var(--cfx-tarjeta,#fff)!important;color:var(--brand,var(--marca,#2563eb))!important;' +
     'box-shadow:0 8px 22px -6px rgba(15,23,42,.35)!important;cursor:pointer;opacity:0;transform:translateY(12px) scale(.9);pointer-events:none;transition:opacity .2s,transform .2s}' +
     '.cfx-subir.on{opacity:1;transform:none;pointer-events:auto}.cfx-subir svg{width:22px;height:22px}' +
-    // G149: sin tocar alto ni márgenes (no se corre nada). Pegado queda 8 px bajo la barra y una sombra del mismo fondo tapa ese espacio; la línea va por dentro.
-    '.cfx-fijo{position:sticky!important;top:var(--cfx-fijo-top,0px);z-index:3;' +
-    'margin-left:calc(-1 * var(--cfx-fijo-px,0px))!important;margin-right:calc(-1 * var(--cfx-fijo-px,0px))!important;padding-left:var(--cfx-fijo-px,0px)!important;padding-right:var(--cfx-fijo-px,0px)!important}' +
-    '.cfx-fijo:not(.cfx-fijo-fila){white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}' +
-    '.cfx-fijo:is(h1,h2,h3):not(.cfx-tit-rep):not(.cfx-fijo-fila){display:block!important}.cfx-fijo.cfx-pegado{background:var(--cfx-fijo-bg,var(--cfx-tarjeta,#fff))!important;box-shadow:inset 0 -2px 0 var(--brand,var(--marca,#2563eb)),0 -8px 0 var(--cfx-fijo-bg,var(--cfx-tarjeta,#fff)),0 8px 14px -8px rgba(0,0,0,.45)!important;color:var(--brand,var(--marca,inherit))}' +
     '[data-cfx-orden]>*{-webkit-touch-callout:none}[data-cfx-orden]>.cfx-fila,[data-cfx-orden]>*>:is(h2,h3,.cfx-aj-g){-webkit-user-select:none;user-select:none}' +
     '[data-cfx-orden]>.cfx-aj-sec>.cfx-aj-g{display:flex;align-items:center;gap:8px;cursor:grab}[data-cfx-orden]>.cfx-aj-sec>.cfx-aj-g::after{content:"";margin-left:auto;flex:none;width:14px;height:14px;opacity:.55;background:currentColor;' +
     '-webkit-mask:radial-gradient(circle,#000 1.6px,transparent 1.9px) 0 0/7px 4.7px;mask:radial-gradient(circle,#000 1.6px,transparent 1.9px) 0 0/7px 4.7px}' +
@@ -57,7 +49,7 @@
     const t = ev.target;
     if (t && t.nodeType === 1 && t !== pagina() && !t.closest('.cfx-barra, nav, .tabs, .chips') && t.scrollHeight > t.clientHeight + 40 && t.clientHeight > innerHeight * 0.35) caja = t;
     else if (t === d || t === pagina()) caja = null;
-    if (!raf) raf = requestAnimationFrame(() => { raf = 0; revisar(); pegados(); });
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; revisar(); });
   }, { passive: true, capture: true });
   addEventListener('resize', revisar); addEventListener('hashchange', () => { caja = null; setTimeout(revisar, 300); });
   btn.addEventListener('click', () => { (caja || pagina()).scrollTo({ top: 0, behavior: quieto() ? 'auto' : 'smooth' }); btn.classList.remove('on'); });
@@ -175,14 +167,7 @@
   // El menú se esconde/aparece cambiando su clase (y el teclado o las hojas cambian la página): el 🛒 y ↑ lo siguen al tiro.
   new MutationObserver(pronto).observe(raiz, { attributes: true, attributeFilter: ['class'], subtree: true, childList: true });
 
-  // ---------- 📌 Títulos fijos ----------
-  const opaco = (el) => {
-    for (let x = el; x && x.nodeType === 1; x = x.parentElement) {
-      const c = getComputedStyle(x).backgroundColor, m = /rgba?\(([^)]+)\)/.exec(c);
-      if (m) { const p = m[1].split(/[ ,/]+/).filter(Boolean); if (p.length < 4 || parseFloat(p[3]) >= 0.95) return c; }
-    }
-    return '';
-  };
+  // ---------- 📌 Títulos: G150 ya NO se fijan (bajan con la página, normal). Solo queda saber dónde termina la barra de arriba. ----------
   // Dónde queda pegada (sticky: su "top", aunque todavía no haya llegado; fija: donde está).
   const arriba = (x, st, r) => st.position === 'sticky' && /px$/.test(st.top) ? parseFloat(st.top) : r.top;
   const cabecera = () => {
@@ -196,89 +181,7 @@
     }
     return b;
   };
-  // G149 📌 TODOS los títulos se quedan fijos al llegar a la barra de arriba (antes solo el h2 de tarjetas más altas que la pantalla):
-  // h1/h2/h3 y títulos de grupo; si el título va en una fila corta con botones (título + "Ver todo"), se pega la fila entera.
-  // Se pega dentro de su caja: al terminar la caja se va con ella y el título siguiente toma su lugar. También la fila de pestañas del ☰ Más.
-  const TIT = 'h1, h2, h3, .cfx-aj-sec > .cfx-aj-g, .cfx-mm-cab';
-  const FUERA = 'dialog, header, nav, footer, table, button, a, label, summary, .cfx-pila, [data-sin-fijo], .cfx-emerg, .cfx-carro-f, .cfx-pnl, .cfx-mv, [popover]';
-  const px = (v) => parseFloat(v) || 0;
-  // La fila corta que lleva el título (título + botón): se pega la fila. Si no, el título solo.
-  const quePega = (h) => {
-    const f = h.parentElement;
-    if (!f || h.classList.contains('cfx-mm-cab') || f.children.length > 4 || f.matches('.card, .tarjeta, main, section, article, .cfx-aj-sec, .vista, .view, body') || f.querySelector('img, picture, video, canvas')) return h;
-    const cs = getComputedStyle(f);  // título + botón, o ‹ Noviembre › (el título puede ir al medio)
-    return /flex|grid/.test(cs.display) && f.offsetHeight < 90 && f.offsetHeight < h.offsetHeight + 50 ? f : h;
-  };
-  // Hasta dónde sube: el primer antepasado que corta lo de adentro. Página → bajo la cabecera; caja que se baja → su borde; caja que no se baja → no se puede.
-  const tope = (el, top) => {
-    for (let x = el.parentElement; x && x !== d.body && x !== raiz; x = x.parentElement) {
-      const o = getComputedStyle(x).overflowY;
-      if (o === 'visible' || o === 'clip') continue;
-      if (x.classList.contains('cfx-hm-zona')) return { t: -px(getComputedStyle(x).paddingTop), caja: x };
-      if (x.scrollHeight > x.clientHeight + 1) return { t: Math.max(0, top - Math.round(x.getBoundingClientRect().top)) - px(getComputedStyle(x).paddingTop), caja: x };
-      return null;
-    }
-    return { t: top, caja: null };
-  };
-  // Cajas de lado a lado (fichas en grilla, columnas del tablero): sus títulos no se pegan (taparían las fotos de al lado).
-  const enGrilla = (c) => {
-    const p = c.parentElement; if (!p) return false;
-    const cs = getComputedStyle(p);
-    if (/grid/.test(cs.display)) return cs.gridTemplateColumns.trim().split(/\s+/).length > 1;
-    return /flex/.test(cs.display) && !/column/.test(cs.flexDirection) && c.offsetWidth < p.clientWidth * 0.7;
-  };
-  const PAGINA = 'main, section, article, .vista, .view, .card, .tarjeta, .cfx-aj-sec';
-  const soltarFijo = (s) => { s.classList.remove('cfx-fijo', 'cfx-pegado', 'cfx-fijo-fila'); ['top', 'px', 'bg'].forEach((k) => s.style.removeProperty('--cfx-fijo-' + k)); };
-  function fijar() {
-    const top = cabecera(), vistos = new Set();
-    d.querySelectorAll(TIT).forEach((h) => {
-      if (h.classList.contains('cfx-tit-rep') || h.closest(FUERA) || !h.getClientRects().length || !h.textContent.trim()) return;
-      const s = quePega(h), c = s.parentElement;
-      if (!c || vistos.has(s) || s.closest('.cfx-pila')) return;
-      vistos.add(s);
-      const sec = h.classList.contains('cfx-aj-g') && s === h;
-      // Título al medio de su caja: solo en cajas de página (no en fichas con foto ni en grillas).
-      if (!s.classList.contains('cfx-mm-cab') && (c.firstElementChild !== s && (!c.matches(PAGINA) || s.matches('h3') || [...c.children].slice(0, [...c.children].indexOf(s)).some((x) => x.matches('img, picture, figure, video, canvas'))) || enGrilla(c))) { if (s.classList.contains('cfx-fijo')) soltarFijo(s); return; }
-      // Solo si debajo del título hay algo más (una caja de un solo renglón no lo necesita).
-      const yaFijo = s.classList.contains('cfx-fijo'), alto = s.offsetHeight;
-      if (c.offsetHeight < alto + 40) { if (yaFijo) soltarFijo(s); return; }
-      const tp = tope(s, top);
-      if (tp == null) { if (yaFijo) soltarFijo(s); return; }
-      const t = tp.t; s._cfxCaja = tp.caja;
-      const ccs = getComputedStyle(c);
-      if (!yaFijo) {
-        s.classList.toggle('cfx-fijo-fila', s !== h || h.classList.contains('cfx-mm-cab') || /flex|grid/.test(getComputedStyle(s).display));
-        s.classList.add('cfx-fijo');
-      }
-      s.style.setProperty('--cfx-fijo-top', (t + 8) + 'px');
-      // A lo ancho de su caja (relleno de la caja), para que el fondo tape todo lo que pasa por debajo.
-      s.style.setProperty('--cfx-fijo-px', sec ? '6px' : Math.min(px(ccs.paddingLeft), 24) + 'px');
-      const zona = s.closest('.cfx-hm-zona');
-      const bg = opaco(sec ? (zona || c.parentElement) : c); if (bg) s.style.setProperty('--cfx-fijo-bg', bg);
-      if (s._cfxOff == null || !s.classList.contains('cfx-pegado')) s._cfxOff = s.getBoundingClientRect().top - c.getBoundingClientRect().top;
-    });
-    // Los que ya no están (o cambiaron de forma) vuelven a la normalidad.
-    d.querySelectorAll('.cfx-fijo').forEach((s) => { if (!vistos.has(s) && s.isConnected) soltarFijo(s); });
-    pegados();
-  }
-  // Fondo opaco solo mientras está pegado (sin franja cuando está en su lugar).
-  function pegados() {
-    d.querySelectorAll('.cfx-fijo').forEach((h) => {
-      const r = h.getBoundingClientRect(), t = parseFloat(getComputedStyle(h).top) || 0, z = h._cfxCaja && h._cfxCaja.isConnected ? h._cfxCaja : h.closest('.cfx-hm-zona');
-      const ref = z ? z.getBoundingClientRect().top + t + (parseFloat(getComputedStyle(z).paddingTop) || 0) : t;
-      // G138: pegado = su tarjeta ya empezó más arriba (sirve aunque lo que se baje sea una caja y no la página; antes quedaba sin fondo, encima del texto).
-      const c = h.parentElement, ct = c ? c.getBoundingClientRect().top : r.top;
-      // G149: pegado = está más abajo de su lugar dentro de la caja (su caja ya subió).
-      const corrido = h._cfxOff != null ? r.top - ct > h._cfxOff + 2 : ct < r.top - 2;
-      h.classList.toggle('cfx-pegado', r.height > 0 && Math.abs(r.top - ref) < 1.5 && (z ? z.scrollTop > 0 && corrido : corrido));
-    });
-  }
-  let tFijo = 0;
-  const pedir = () => { clearTimeout(tFijo); tFijo = setTimeout(fijar, 300); };
-  window.CFX_FIJO = { arriba: cabecera, fijar };  // G149: el aviso emergente (ayuda.js) baja justo debajo de la barra de arriba
-  new MutationObserver(pedir).observe(raiz, { childList: true, subtree: true });
-  addEventListener('resize', pedir); addEventListener('hashchange', pedir);
-  addEventListener('click', () => setTimeout(pedir, 50), { passive: true, capture: true });
+  window.CFX_FIJO = { arriba: cabecera, fijar() { /* G150: los títulos ya no se fijan */ } };  // el aviso emergente (ayuda.js) baja justo debajo de la barra de arriba
 
   // ---------- ✋ Ordenar ----------
   const quien = () => {
@@ -390,7 +293,7 @@
     guardar(clave, v) { try { localStorage.setItem(llave(clave), JSON.stringify(v)); } catch (e) { /* lleno */ } }
   };
   window.CFX_SUBIR = { revisar };
-  if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', () => { revisarListas(); fijar(); }); else { revisarListas(); fijar(); }
+  if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', () => { revisarListas(); }); else { revisarListas(); }
 })();
 
 /* G52b 💬 Avisos propios en vez de los de Chrome (confirm / prompt / alert): misma tarjeta, colores y letra de la app; solo cambia el texto.
