@@ -486,16 +486,30 @@
         if (!(await (window.CFX_DIALOGO ? CFX_DIALOGO.confirmar(T, { si: 'Borrar' }) : confirm(T)))) return;
         await salirTodos(); try { await A.limpiar(); avL = []; } catch (e) { aviso((e && e.message) || 'No se pudo borrar.'); } return pintar();
       }
-      const f = ev.target.closest('.cfx-av-f'); if (f) unAviso(+f.dataset.i, pintar);
+      const f = ev.target.closest('.cfx-av-f'); if (f) abrirAviso(+f.dataset.i, pintar);
     };
-    h.zona.onkeydown = (ev) => { const f = ev.target.closest && ev.target.closest('.cfx-av-f'); if (f && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); unAviso(+f.dataset.i, pintar); } };
+    h.zona.onkeydown = (ev) => { const f = ev.target.closest && ev.target.closest('.cfx-av-f'); if (f && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrirAviso(+f.dataset.i, pintar); } };
+  }
+  // G151 🔔 Enlace interno del aviso → URL completa desde la raíz de la app (antes quedaba relativo a la pantalla actual: /apps/x/apps/x/).
+  function urlAviso(u) {
+    u = String(u || ''); if (!u || /^https?:\/\//i.test(u)) return u;
+    const s = document.querySelector('script[src*="ayuda.js"]'), raiz = s ? s.src.replace(/[^/]*\/ayuda\.js.*$/, '') : location.origin + '/';
+    try { return /^[#?]/.test(u) ? new URL(u, location.href).href : new URL(u.replace(/^\//, ''), raiz).href; } catch (e) { return ''; }
+  }
+  // G151 🔔 Tocar un aviso con destino dentro de la app lleva directo a él (lo marca leído); sin destino, muestra el texto completo.
+  function abrirAviso(i, repintar) {
+    const x = avL[i], u = x && String(x.url || '');
+    if (!x || !u || /^https?:\/\//i.test(u) || !/^(\/?[a-z][a-z0-9_-]*\/|\.\/|#|\?)/.test(u)) return unAviso(i, repintar);
+    if (!x.leido) { x.leido = true; if (CFG.avisos.leer) Promise.resolve(CFG.avisos.leer(x.id)).catch(() => {}); }
+    const d = urlAviso(u); if (!d) return unAviso(i, repintar);
+    location.href = d;
   }
   function unAviso(i, repintar) {
     const A = CFG.avisos, h = hoja('<span class="cfx-hm-tx">Aviso</span>', repintar);
     const ver = (j) => {
       i = j; const x = avL[i]; if (!x) return h.cerrar();
       if (!x.leido) { x.leido = true; if (A.leer) Promise.resolve(A.leer(x.id)).catch(() => {}); avN = avL.filter((y) => !y.leido).length; pintarBoya(); }
-      const url = String(x.url || ''), ext = /^https?:\/\//i.test(url), int = /^(apps\/[a-z]+\/|\.\/|#)/.test(url);
+      const url0 = String(x.url || ''), ext = /^https?:\/\//i.test(url0), int = /^(\/?[a-z][a-z0-9_-]*\/|\.\/|#|\?)/.test(url0), url = int ? urlAviso(url0) : url0;
       h.zona.innerHTML = '<h3 class="cfx-av-tit"></h3><p class="cfx-av-de">' + esc([x.de, fechaAv(x.fecha)].filter(Boolean).join(' · ')) + '</p><p class="cfx-av-txt"></p>' +
         (/^https?:\/\//i.test(x.imagen || '') ? '<img class="cfx-av-img" src="' + esc(x.imagen) + '" alt="" loading="lazy">' : '') +
         (ext || int ? '<a class="cfx-av-ir" href="' + esc(url) + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + (ext ? 'Ver más' : 'Abrir') + '</a>' : '') +

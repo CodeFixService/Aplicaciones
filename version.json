@@ -1,6 +1,6 @@
 {
-  "version": "6.95",
+  "version": "6.96",
   "bd": "5.99",
   "funcion": "3.9",
-  "notas": "📌 G150 (núcleo 3.45): los títulos ya no se quedan fijos arriba: bajan con la página, normal."
+  "notas": "🔔 G151 (núcleo 3.46): al tocar un aviso (en la 🔔 o en la notificación del teléfono) te lleva directo a donde corresponde: el pedido, el chat o el pago. Antes, en algunas pantallas, abría una dirección equivocada o no abría nada."
 }

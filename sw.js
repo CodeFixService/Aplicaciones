@@ -153,11 +153,12 @@ self.addEventListener('push', (e) => {
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || './';
+  // G151 🔔 URL completa desde la raíz (un enlace relativo no se duplica) y, si la app ya está abierta, la lleva al destino.
+  const url = new URL(((e.notification.data && e.notification.data.url) || './').replace(/^\//, ''), self.registration.scope).href;
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const c of list) {
-        if (c.url.includes(url) && 'focus' in c) return c.focus();
+        if ('focus' in c && c.url.startsWith(self.registration.scope)) { if (c.url !== url) c.navigate(url).catch(() => {}); return c.focus(); }
       }
       return self.clients.openWindow(url);
     })
