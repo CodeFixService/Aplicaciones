@@ -1,6 +1,6 @@
 {
-  "version": "6.96",
+  "version": "6.97",
   "bd": "5.99",
   "funcion": "3.9",
-  "notas": "🔔 G151 (núcleo 3.46): al tocar un aviso (en la 🔔 o en la notificación del teléfono) te lleva directo a donde corresponde: el pedido, el chat o el pago. Antes, en algunas pantallas, abría una dirección equivocada o no abría nada."
+  "notas": "📣 G152 (núcleo 3.47): la tarjeta \"Activa los avisos\" ahora aparece debajo de la cabecera, dentro de la pantalla, y ya no encima del título."
 }

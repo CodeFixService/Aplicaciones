@@ -138,8 +138,16 @@
   let tarj = null;
   function lugarTarjeta() {
     const vis = (e) => e && e.offsetParent !== null && e.getBoundingClientRect().height > 40;
-    const L = [...document.querySelectorAll('main .view.on, main .view.activa, main .vista.on, main section.on, main > section:not([hidden]), main, #app, .app')].filter(vis);
-    return L.find((e) => !e.closest('dialog, .cfx-hoja-m, header, nav')) || null;
+    // G152: por prioridad (no en orden del documento): primero la vista de main y main; el contenedor .app/#app (que envuelve la cabecera) al final.
+    for (const sel of ['main .view.on', 'main .view.activa', 'main .vista.on', 'main section.on', 'main > section:not([hidden])', 'main', '#app', '.app']) {
+      const e = [...document.querySelectorAll(sel)].find((x) => vis(x) && !x.closest('dialog, .cfx-hoja-m, header, nav'));
+      if (e) return e;
+    }
+    return null;
+  }
+  function ponerTarjeta(donde, t) { // si el contenedor trae su cabecera adentro, la tarjeta va justo debajo de ella (nunca arriba)
+    const cab = [...donde.children].filter((c) => c.matches('header, nav, .barra-sup, .topbar, .cabecera') && c.offsetParent !== null && getComputedStyle(c).position !== 'fixed').pop();
+    if (cab) cab.after(t); else donde.prepend(t);
   }
   function pedirAvisos(ad) {
     const bloq = Notification.permission === 'denied', donde = lugarTarjeta(); if (!donde) return;
@@ -158,7 +166,7 @@
         tarj.querySelector('small').textContent = (e && e.message) || 'No se pudo activar. Intenta de nuevo.'; si.disabled = false; si.textContent = 'Reintentar';
       }
     };
-    donde.prepend(tarj);
+    ponerTarjeta(donde, tarj);
   }
 
   async function revisar() {
