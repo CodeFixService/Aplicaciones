@@ -1,6 +1,6 @@
 {
-  "version": "6.97",
+  "version": "6.98",
   "bd": "5.99",
   "funcion": "3.9",
-  "notas": "📣 G152 (núcleo 3.47): la tarjeta \"Activa los avisos\" ahora aparece debajo de la cabecera, dentro de la pantalla, y ya no encima del título."
+  "notas": "📣 G152 (núcleo 3.48): la tarjeta \"Activa los avisos\" queda debajo del menú de arriba (en Barbería ya no se mete a la altura de tu foto y el ☰)."
 }

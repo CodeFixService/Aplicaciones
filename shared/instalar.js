@@ -148,10 +148,20 @@
   function ponerTarjeta(donde, t) { // si el contenedor trae su cabecera adentro, la tarjeta va justo debajo de ella (nunca arriba)
     const cab = [...donde.children].filter((c) => c.matches('header, nav, .barra-sup, .topbar, .cabecera') && c.offsetParent !== null && getComputedStyle(c).position !== 'fixed').pop();
     if (cab) cab.after(t); else donde.prepend(t);
+    bajarDeMenu(t);
+  }
+  function bajarDeMenu(t) {
+    // Sin cabecera (p. ej. Barbería): el menú del núcleo (foto + ☰) queda fijo arriba; la tarjeta va debajo de él, no a su altura.
+    const fija = document.querySelector('.cfx-cab.cfx-fija');
+    if (fija && fija.getClientRects().length && t.getClientRects().length) {
+      t.style.marginTop = '';
+      const bajo = fija.getBoundingClientRect().bottom + 8, arriba = t.getBoundingClientRect().top + scrollY;
+      if (arriba < bajo) t.style.marginTop = Math.round(bajo - arriba) + 'px';
+    }
   }
   function pedirAvisos(ad) {
     const bloq = Notification.permission === 'denied', donde = lugarTarjeta(); if (!donde) return;
-    if (tarj && tarj.isConnected) return;
+    if (tarj && tarj.isConnected) { bajarDeMenu(tarj); return; }
     tarj = document.createElement('div'); tarj.className = 'cfx-av-tarj no-ico'; tarj.setAttribute('role', 'region'); tarj.setAttribute('aria-label', 'Notificaciones'); tarj.style.setProperty('--cfx-color', color);
     tarj.innerHTML = '<span class="cfx-av-ic">' + SVG.campana + '</span><div><b></b><small></small></div>' + (bloq ? '' : '<button type="button" class="cfx-av-si">Activar</button>') + '<button type="button" class="cfx-av-x" aria-label="Ahora no">' + SVG.x + '</button>';
     tarj.querySelector('b').textContent = bloq ? 'Tus avisos están bloqueados' : 'Activa los avisos';
