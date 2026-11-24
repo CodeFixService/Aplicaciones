@@ -1,6 +1,6 @@
 {
-  "version": "7.01",
+  "version": "7.02",
   "bd": "6.02",
   "funcion": "3.9",
-  "notas": "🐞 G156 (núcleo 3.51): arreglos de las fallas reportadas: un contador en 0 ya no se ve, ↩️ 'de fábrica' con aire, aviso de notificaciones con margen, planilla con botones redondeados y datos de transferencia para copiar uno por uno (RUT sin puntos). Despega: 🎨 diseños y Caja vuelven solos si limpias la app, avisos solo en la 🔔, el cliente ve su perfil primero, 🛠️ servicios sin envío y pestañas que caben."
+  "notas": "🔎 G157 (núcleo 3.52): barra 🔎 Buscar + filtros universales (fecha, tipo, orden) en el núcleo, lista para usarse donde haya que buscar."
 }
