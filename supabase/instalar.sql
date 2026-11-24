@@ -7902,6 +7902,15 @@ begin
   return jsonb_build_object('id', f.id, 'estado', f.estado);
 end $$;
 
+-- Admin: 📥 Descargar fallas (CM) → fotos de varias fallas de una vez, SIN cambiar su estado (bajarlas no es revisarlas).
+create or replace function public.cfx_fallas_fotos(p_ids bigint[]) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.cfx_es_admin();
+  if coalesce(cardinality(p_ids), 0) > 200 then raise exception 'Máximo 200 fallas'; end if;
+  return (select coalesce(jsonb_object_agg(f.id::text, f.foto), '{}') from public.cfx_fallas f where f.id = any (p_ids) and f.foto is not null);
+end $$;
+
 -- Josué: ↩️ Sigue fallando → vuelve a 'revisando' con su nota (Claude la ve en el túnel).
 create or replace function public.cfx_falla_reabrir(p_id bigint, p_nota text default '') returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -7916,8 +7925,8 @@ begin
   return jsonb_build_object('id', f.id, 'estado', f.estado);
 end $$;
 revoke all on function public.cfx_tunel_ok(), public.cfx_tunel_fijar(text), public.cfx_tunel_estado(), public.cfx_tunel_fallas(boolean), public.cfx_tunel_foto(bigint),
-  public.cfx_tunel_listo(bigint, text), public.cfx_falla_reabrir(bigint, text) from public, anon, authenticated;
-grant execute on function public.cfx_tunel_fijar(text), public.cfx_tunel_estado(), public.cfx_falla_reabrir(bigint, text) to authenticated;
+  public.cfx_tunel_listo(bigint, text), public.cfx_falla_reabrir(bigint, text), public.cfx_fallas_fotos(bigint[]) from public, anon, authenticated;
+grant execute on function public.cfx_tunel_fijar(text), public.cfx_tunel_estado(), public.cfx_falla_reabrir(bigint, text), public.cfx_fallas_fotos(bigint[]) to authenticated;
 grant execute on function public.cfx_tunel_fallas(boolean), public.cfx_tunel_foto(bigint), public.cfx_tunel_listo(bigint, text) to anon, authenticated;
 
 revoke all on function public.cfx_falla_enviar(text, text, jsonb), public.cfx_fallas_mias(), public.cfx_fallas_lista(text), public.cfx_falla_ver(bigint),
