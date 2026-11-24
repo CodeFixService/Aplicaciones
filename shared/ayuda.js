@@ -1973,11 +1973,14 @@
       const t = o0.text.replace(/…\s*$/, '').trim();
       b.innerHTML = '<span></span>' + CHEV; b.querySelector('span').textContent = t; b.setAttribute('aria-label', t);
       sel.after(b);
+      // G159: si lo elegido queda puesto (campo de un formulario), el botón lo muestra; si la app lo vuelve a "…", vuelve el título.
+      const rotular = () => setTimeout(() => { const o = sel.selectedOptions[0]; b.querySelector('span').textContent = sel.value && o ? o.text : t; b.classList.toggle('on', !!sel.value); }, 0);
+      sel.addEventListener('change', rotular);
       b.onclick = () => {
         const caja = dialogo('<h2></h2><div class="ca-cuerpo">' + [...sel.options].slice(1).map((o, i) => '<button type="button" class="ca-op' + (/quitar|eliminar|borrar|suspend/i.test(o.text) ? ' ca-mal' : '') + '" data-i="' + (i + 1) + '"><b></b></button>').join('') +
           '</div><div class="ca-pie"><button type="button" data-cerrar>Cancelar</button></div>');
         caja.querySelector('h2').textContent = t;
-        caja.querySelectorAll('[data-i]').forEach((x) => { x.querySelector('b').textContent = sel.options[+x.dataset.i].text; x.onclick = () => { cerrar(); sel.value = sel.options[+x.dataset.i].value; sel.dispatchEvent(new Event('change', { bubbles: true })); }; });
+        caja.querySelectorAll('[data-i]').forEach((x) => { x.querySelector('b').textContent = sel.options[+x.dataset.i].text; x.onclick = () => { cerrar(); sel.value = sel.options[+x.dataset.i].value; sel.dispatchEvent(new Event('change', { bubbles: true })); rotular(); }; });
       };
     });
   }

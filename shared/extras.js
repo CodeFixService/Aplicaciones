@@ -94,12 +94,16 @@
   async function recurrentes(z, o) {
     if (!puede('suscripciones')) return candado(z, 'suscripciones', 'Arma el pedido fijo de un cliente (ej. 1 kg de café cada 15 días): el pedido se crea solo ese día y al cliente le llega el aviso para pagar.', o);
     let L, cli, prods;
-    try { [L, cli, prods] = await Promise.all([R('suscripciones_lista'), R('my_clients'), R('catalog_of', { p_negocio: Cuenta.account.id })]); } catch (e) { return error(z, e); }
+    let vt = [];
+    try { [L, cli, prods, vt] = await Promise.all([R('suscripciones_lista'), R('my_clients'), R('catalog_of', { p_negocio: Cuenta.account.id }), R('catalogo_venta_negocio', { p_negocio: Cuenta.account.id }).catch(() => [])]); } catch (e) { return error(z, e); }
     prods = (prods || []).filter((p) => p.client_key || p.clave);
     const clave = (p) => p.client_key || p.clave;
+    // G159 🐞 Despega #6: 🛠️ servicio o 🔑 activación digital (o categoría "Servicio…") no lleva retiro ni despacho.
+    const tipoDe = {}; (vt || []).forEach((x) => { tipoDe[x.clave] = x.tipo; });
+    const sinEnvio = (k) => { const p = prods.find((y) => clave(y) === k); return (tipoDe[k] && tipoDe[k] !== 'producto') || !!(p && /servic/i.test(p.categoria || '')); };
     const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
     const optP = '<option value="">Producto…</option>' + prods.map((p) => '<option value="' + esc(clave(p)) + '">' + esc(p.nombre) + ' · ' + $$(p.precio) + '</option>').join('');
-    const linea = () => '<div class="gx-row gx-l"><select class="gxP">' + optP + '</select><input class="gxC" type="number" min="1" max="99" value="1" style="max-width:80px;min-width:64px" aria-label="Cantidad"></div>';
+    const linea = () => '<div class="gx-row gx-l"><select class="gxP" name="producto" aria-label="Producto">' + optP + '</select><input class="gxC" type="number" min="1" max="99" value="1" style="max-width:80px;min-width:64px" aria-label="Cantidad"></div>';
     const fila = (x) => '<div class="gx-f"><div><b>' + esc(x.nombre) + '</b> · cada ' + x.cada + ' días<br><small class="muted">' +
       esc((x.lineas || []).map((l) => l.cant + ' × ' + l.nombre).join(', ')) + (x.total != null ? ' · ' + $$(x.total) : '') + '<br>' +
       (x.activa ? '📅 Próximo: ' + fecha(x.proxima) : '⏸️ Pausada') + ' · ' + x.pedidos + ' pedido(s)</small>' + (x.error ? '<br><small class="gx-err">⚠️ ' + esc(x.error) + '</small>' : '') + '</div>' +
@@ -111,12 +115,16 @@
         '<label>Productos</label><div id="gxLs">' + linea() + '</div><button type="button" class="small alt" data-gx="mas">+ Otro producto</button>' +
         '<div class="gx-row"><div><label for="gxCada">Cada</label><select id="gxCada"><option value="7">7 días</option><option value="14">14 días</option><option value="30" selected>30 días</option></select></div>' +
         '<div><label for="gxDesde">Primer pedido</label><input id="gxDesde" type="date" min="' + hoy + '" value="' + hoy + '"></div></div>' +
-        '<label for="gxEnt">Entrega</label><select id="gxEnt"><option value="retiro">🏪 Retiro en tienda</option><option value="despacho">🚚 Despacho</option></select>' +
-        '<input id="gxDir" class="hidden" maxlength="200" placeholder="Dirección y comuna" aria-label="Dirección de despacho">' +
+        '<div id="gxEntW"><label for="gxEnt">Entrega</label><select id="gxEnt"><option value="retiro">🏪 Retiro en tienda</option><option value="despacho">🚚 Despacho</option></select>' +
+        '<input id="gxDir" class="hidden" maxlength="200" placeholder="Dirección y comuna" aria-label="Dirección de despacho"></div><p id="gxSinEnv" class="muted hidden">🛠️ Servicio o 🔑 acceso digital: sin retiro ni despacho.</p>' +
         '<button type="button" class="ok" data-gx="guardar" style="width:100%;margin-top:8px">🔁 Guardar</button>'
         : '<p>' + (cli.length ? 'Publica tus productos primero.' : 'Primero invita a tus clientes (Más → Clientes).') + '</p>') +
       '<h3>Activas</h3>' + (L.length ? L.map(fila).join('') : '<p class="muted">Aún no tienes compras recurrentes.</p>'));
     const ent = c.querySelector('#gxEnt'); if (ent) ent.onchange = () => c.querySelector('#gxDir').classList.toggle('hidden', ent.value !== 'despacho');
+    // Solo servicios / digitales elegidos → se esconde la Entrega (va como retiro, sin dirección).
+    const verEnvio = () => { if (!ent) return; const ks = [...c.querySelectorAll('.gxP')].map((s) => s.value).filter(Boolean), no = ks.length > 0 && ks.every(sinEnvio);
+      c.querySelector('#gxEntW').classList.toggle('hidden', no); c.querySelector('#gxSinEnv').classList.toggle('hidden', !no); if (no) { ent.value = 'retiro'; c.querySelector('#gxDir').classList.add('hidden'); } };
+    c.addEventListener('change', (ev) => { if (ev.target.classList && ev.target.classList.contains('gxP')) verEnvio(); });
     c.onclick = async (ev) => {
       const b = ev.target.closest('button'); if (!b) return;
       if (b.dataset.gx === 'mas') { c.querySelector('#gxLs').insertAdjacentHTML('beforeend', linea()); return; }

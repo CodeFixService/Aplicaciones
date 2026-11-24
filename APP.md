@@ -35,6 +35,9 @@ profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, bo
 core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql (~l.5453). Ahora: 7.01 · bd 6.02 · enviar 3.9.
 - G145 a 🌐 Mi dominio: la tienda lo conecta SOLA (Guardar/🔄 Revisar → función enviar acción 'dominio' → `enviar/dominio_tienda.ts` crea/borra el Custom Hostname www.<dominio> en la zona de CodeFix con el token 'cf_token' que el CM copia aquí; datos SIEMPRE de la base: `dominio_cf_datos(uid, antes)` solo servidor). Prueba: SaaS/pruebas/g145a.js.
 
+## 🐞 G159 (7.04 · núcleo 3.54)
+🔁 Compras recurrentes: el select de producto lleva name="producto" (si no, CFX_AYUDA lo vuelve botón de acción). Solo 🛠️/🔑/categoría Servicio → sin Entrega (catalogo_venta_negocio). Prueba g159.js.
+
 ## 🐞 G156 (7.01 · bd 6.02)
 - 🎨 Diseños: publicar_ficha + `ficha_datos_guardar(key, datos)` (publicaciones.datos jsonb) · al abrir, `mis_fichas()` repone en la Galería lo que el celular no tiene (recuperarFichas) · Caja vacía → baja sola `respaldos/<id>/caja.json` (1 vez por sesión).
 - Avisos SOLO en la 🔔 (#cInbox oculta; #avisos abre CFX_AYUDA.ventanaAvisos) · sin número en Más · cliente: miPerfilCli primero + "Tu tienda: X" y Mi Caja en el menú (grupo Tu tienda).
