@@ -5455,7 +5455,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '5.99'::text $$;
+language sql immutable as $$ select '6.00'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -11656,7 +11656,8 @@ language sql stable security definer set search_path = '' as $$
     'vacaciones_msg', case when public.en_vacaciones(t.id) then t.vacaciones_msg end,
     'estrellas', public.estrellas_tienda(t.id), 'cobra_online', public.link_activo(t.id, 'pedido') is not null,
     'cobra_mp', coalesce((public.link_activo(t.id, 'pedido') ->> 'mp')::boolean, false),
-    'desc_premium', t.desc_premium, 'rubro', t.rubro, 'despacho', t.despacho, 'perfil', t.perfil, 'desde', t.created_at::date)
+    'desc_premium', t.desc_premium, 'rubro', t.rubro, 'despacho', t.despacho, 'perfil', t.perfil, 'desde', t.created_at::date,
+    'verificado', exists (select 1 from public.cfx_verificaciones v where v.cuenta = t.id and v.estado = 'aprobada'))  -- G154 ✓ tienda verificada
   from public.profiles t cross join lateral (select public.cfx_sellos_cfg_de(t.id) as c) s
   where t.id = p_negocio and (public.puede_comprar(auth.uid(), t.id) or public.negocio_de(auth.uid()) = t.id or public.is_admin())
 $$;
@@ -12289,7 +12290,8 @@ language sql stable security definer set search_path = '' as $$
     'retencion_min', public.regla('retencion_min', 30), 'pro', public.is_pro(t.id), 'desc_premium', t.desc_premium, 'despacho', t.despacho,
     'perfil', t.perfil, 'rubro', t.rubro, 'desde', t.created_at::date,
     'cobra_mp', coalesce((public.link_activo(t.id, 'pedido') ->> 'mp')::boolean, false),
-    'medicion', case when t.medicion <> '{}'::jsonb and public.pro_o_modulo(t.id, 'medicion') then t.medicion end)
+    'medicion', case when t.medicion <> '{}'::jsonb and public.pro_o_modulo(t.id, 'medicion') then t.medicion end,
+    'verificado', exists (select 1 from public.cfx_verificaciones v where v.cuenta = t.id and v.estado = 'aprobada'))  -- G154 ✓ tienda verificada
   from public.profiles t where t.slug = lower(trim(coalesce(p_slug, ''))) and t.role = 'user' and not t.suspended
 $$;
 

@@ -35,6 +35,9 @@ profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, bo
 core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql (~l.5453). Ahora: 6.90 · bd 5.98 · enviar 3.9.
 - G145 a 🌐 Mi dominio: la tienda lo conecta SOLA (Guardar/🔄 Revisar → función enviar acción 'dominio' → `enviar/dominio_tienda.ts` crea/borra el Custom Hostname www.<dominio> en la zona de CodeFix con el token 'cf_token' que el CM copia aquí; datos SIEMPRE de la base: `dominio_cf_datos(uid, antes)` solo servidor). Prueba: SaaS/pruebas/g145a.js.
 
+## ✓ Tienda verificada (G154, 6.99 · bd 6.00)
+- tienda_publica / tienda_info traen `verificado` = existe cfx_verificaciones aprobada de la tienda (CM → Control → 🪪). Núcleo vitrina.js pinta ✓ azul junto al nombre + "Identidad verificada" (t/ y apps/catalogo/). cfx_marcar_verificado sigue vacío (no hace falta columna).
+
 ## 🛒 Cobro de pedidos (G128)
 - Ítem: `catalog_items.tipo` (producto/servicio/digital) · `cobro` (ahora/abono/retiro) · `abono_pct` · `acceso` (solo al pagar). Caja → producto → 🛒 Venta online (`catalogo_venta`).
 - Pedido: `cobro`, `a_pagar` (lo que se paga ahora; null = total), `abonado_at`, `accesos`. Sin medio (ni 🏦 datos_pago, ni MP/Flow, ni link) = 💰 paga al retirar. Trigger `pedido_g128`.

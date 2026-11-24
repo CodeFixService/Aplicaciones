@@ -24,6 +24,8 @@
       font-size:30px;font-weight:800;line-height:1;color:var(--brand-ink,#fff);box-shadow:0 4px 14px rgba(0,0,0,.15)}
     .pf-nom{min-width:0;padding-top:44px}
     .pf-nom h2{margin:0;font-size:22px;line-height:1.15;overflow-wrap:anywhere}
+    .pf-nom h2 .pf-verif{display:inline-flex;width:20px;height:20px;margin-left:6px;vertical-align:-3px;color:var(--cfx-verif,#1d9bf0)}
+    .pf-nom h2 .pf-verif svg{width:100%;height:100%}
     .pf-nom .muted{font-size:13px}
     .pf-cuerpo{padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px}
     .pf-pills{display:flex;flex-wrap:wrap;gap:6px}
@@ -59,6 +61,8 @@
     else if (t.abierto === false) pills.push('<span class="pf-pill no">🔴 Cerrado ahora · puedes pedir igual</span>');
     else if (t.abierto) pills.push('<span class="pf-pill ok">🟢 Abierto</span>');
     if (t.estrellas && t.estrellas.total) pills.push('<span class="pf-pill">⭐ ' + Number(t.estrellas.promedio).toLocaleString('es-CL') + ' · ' + t.estrellas.total + ' calificaciones</span>');
+    // G154 ✓ Negocio verificado (CM → Control → 🪪 aprobó su cédula): check azul junto al nombre + píldora, para que el cliente confíe.
+    if (t.verificado) pills.unshift('<span class="pf-pill ok pf-verif-p">✅ Identidad verificada</span>');
     partes.push('<div class="pf-pills">' + pills.join('') + '</div>');
     if (t.vacaciones_hasta && t.vacaciones_msg) partes.push('<p class="pf-desc muted">' + esc(t.vacaciones_msg) + '</p>');
     if (p.descripcion) partes.push('<p class="pf-desc">' + esc(p.descripcion) + '</p>');
@@ -77,7 +81,7 @@
     partes.push('<div class="pf-acc">' + (tel ? '<a class="btn ok" href="' + esc(wa) + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '') +
       '<button type="button" class="alt" data-pf="compartir">🔗 Compartir tienda</button></div>');
     nodo.innerHTML = '<section class="pf"><div class="pf-ban"></div><div class="pf-cab"><div class="pf-logo"' + logo + '>' + (logo ? '' : esc((t.empresa || '?').charAt(0).toUpperCase())) +
-      '</div><div class="pf-nom"><h2>' + esc(t.empresa || 'Tienda') + '</h2>' + (t.rubro ? '<div class="muted">' + esc(t.rubro) + '</div>' : '') + '</div></div>' +
+      '</div><div class="pf-nom"><h2>' + esc(t.empresa || 'Tienda') + (t.verificado ? '<span class="pf-verif" role="img" aria-label="Negocio verificado" title="Negocio verificado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16.5 9.5"/></svg></span>' : '') + '</h2>' + (t.rubro ? '<div class="muted">' + esc(t.rubro) + '</div>' : '') + '</div></div>' +
       '<div class="pf-cuerpo">' + partes.join('') + '</div></section>';
     // G141 a: la página pasa t.rpc + t.redes_llave (slug/código) → se cambian por las de 🔗 Mis redes si las hay.
     const waViejo = nodo.querySelector('.pf-acc a.btn.ok');  // G144 d: se oculta si las redes ya traen WhatsApp

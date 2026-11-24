@@ -499,23 +499,54 @@
   // G151 🔔 Tocar un aviso con destino dentro de la app lleva directo a él (lo marca leído); sin destino, muestra el texto completo.
   function abrirAviso(i, repintar) {
     const x = avL[i], u = x && String(x.url || '');
+    if (x && tipoAviso(x)) { if (!x.leido) { x.leido = true; if (CFG.avisos.leer) Promise.resolve(CFG.avisos.leer(x.id)).catch(() => {}); } return avisoEspecial(x, () => unAviso(i, repintar)); }
     if (!x || !u || /^https?:\/\//i.test(u) || !/^(\/?[a-z][a-z0-9_-]*\/|\.\/|#|\?)/.test(u)) return unAviso(i, repintar);
+    const d = urlAviso(u); if (!d || esInicio(d)) return unAviso(i, repintar);  // G154: destino genérico (el inicio) → se lee aquí, no recarga
     if (!x.leido) { x.leido = true; if (CFG.avisos.leer) Promise.resolve(CFG.avisos.leer(x.id)).catch(() => {}); }
-    const d = urlAviso(u); if (!d) return unAviso(i, repintar);
     location.href = d;
   }
+  // G154 🔔 Cada aviso lleva a SU lugar según de qué es, aunque la base le haya puesto un destino genérico (el inicio, Mi plan…):
+  //   🔄 versión → ventana con la versión · 💬 soporte → el chat de soporte · ⭐/🔑 plan activado → Mi plan.
+  function tipoAviso(x) {
+    const t = String((x && x.titulo) || '');
+    if (/nueva versión|versión nueva|versión [0-9][0-9.]* lista/i.test(t)) return 'version';
+    if (/soporte te (respondió|escribió)/i.test(t)) return 'soporte';
+    if (!CFG.admin && /(premium|pro) activado|^\W*🔑 .* activado/i.test(t)) return 'plan';
+    return '';
+  }
+  function avisoEspecial(x, texto) {
+    const k = tipoAviso(x);
+    if (k === 'soporte' && R) { cerrarPanel(); return chat({ rpc: R }); }
+    if (k === 'plan' && window.CFX_PAGOS && R) return window.CFX_PAGOS.abrir({ rpc: R });
+    return texto();
+  }
+  function esInicio(d) {
+    try { const a = new URL(d, location.href), r = new URL(RAIZ, location.href); return !a.hash.replace('#', '') && !a.search && a.pathname.replace(/index\.html$/, '') === r.pathname.replace(/index\.html$/, ''); } catch (e) { return false; }
+  }
+  // G154: para las apps con campana propia (CM, Billetera, BiciTaller, Estaciona): CFX_AYUDA.tocarAviso({ titulo, cuerpo, fecha, url })
+  //   → true si el núcleo lo abrió (versión/soporte/plan, o sin destino propio: muestra el texto). false = la app sigue a su url.
+  function tocarAviso(x) {
+    if (!x) return false;
+    const u = String(x.url || ''), d = /^https?:\/\//i.test(u) ? '' : u && urlAviso(u.replace(/^#?\/?$/, ''));
+    if (!tipoAviso(x) && u && !/^#?\/?$/.test(u) && !(d && esInicio(d))) return false;
+    const ver = () => { avL = [Object.assign({ leido: true }, x, { url: tipoAviso(x) || (d && esInicio(d)) ? '' : u })]; unAviso(0, null); };
+    avisoEspecial(x, ver); return true;
+  }
   function unAviso(i, repintar) {
-    const A = CFG.avisos, h = hoja('<span class="cfx-hm-tx">Aviso</span>', repintar);
+    const A = CFG.avisos || {}, h = hoja('<span class="cfx-hm-tx">Aviso</span>', repintar);
     const ver = (j) => {
       i = j; const x = avL[i]; if (!x) return h.cerrar();
       if (!x.leido) { x.leido = true; if (A.leer) Promise.resolve(A.leer(x.id)).catch(() => {}); avN = avL.filter((y) => !y.leido).length; pintarBoya(); }
-      const url0 = String(x.url || ''), ext = /^https?:\/\//i.test(url0), int = /^(\/?[a-z][a-z0-9_-]*\/|\.\/|#|\?)/.test(url0), url = int ? urlAviso(url0) : url0;
+      const url0 = String(x.url || ''), ext = /^https?:\/\//i.test(url0), url = /^(\/?[a-z][a-z0-9_-]*\/|\.\/|#|\?)/.test(url0) ? urlAviso(url0) : url0;
+      const int = !ext && !!url && url !== url0 && !tipoAviso(x) && !esInicio(url);  // G154: sin "Abrir" que solo recargaría el inicio
       h.zona.innerHTML = '<h3 class="cfx-av-tit"></h3><p class="cfx-av-de">' + esc([x.de, fechaAv(x.fecha)].filter(Boolean).join(' · ')) + '</p><p class="cfx-av-txt"></p>' +
         (/^https?:\/\//i.test(x.imagen || '') ? '<img class="cfx-av-img" src="' + esc(x.imagen) + '" alt="" loading="lazy">' : '') +
         (ext || int ? '<a class="cfx-av-ir" href="' + esc(url) + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + (ext ? 'Ver más' : 'Abrir') + '</a>' : '') +
         (avL.length > 1 ? '<div class="cfx-av-nav"><button type="button" data-n="-1" aria-label="Aviso anterior"' + (i ? '' : ' disabled') + '>‹ Anterior</button><small>' + (i + 1) + ' de ' + avL.length + '</small>' +
           '<button type="button" data-n="1" aria-label="Aviso siguiente"' + (i < avL.length - 1 ? '' : ' disabled') + '>Siguiente ›</button></div>' : '');
       h.zona.querySelector('.cfx-av-txt').textContent = x.cuerpo || '';
+      // G154 🔄 Aviso de versión: dice cuál tienes ahora (se actualiza sola al abrir la app).
+      if (tipoAviso(x) === 'version' && version()) { const v = document.createElement('p'); v.className = 'cfx-av-de cfx-av-ver'; v.textContent = 'Tu versión ahora: v' + version().replace(/^v/i, ''); h.zona.querySelector('.cfx-av-txt').after(v); }
       h.zona.querySelector('.cfx-av-tit').textContent = x.titulo || 'Aviso';
     };
     h.zona.onclick = (ev) => { const b = ev.target.closest('[data-n]'); if (b) ver(i + +b.dataset.n); else if (ev.target.closest('.cfx-av-ir')) h.cerrar(); };
@@ -1174,7 +1205,7 @@
   anotarPaso(); addEventListener('hashchange', anotarPaso);
   function version() {
     try { for (const k of Object.keys(window)) if (/_CONFIG$/.test(k) && window[k] && window[k].VERSION) return String(window[k].VERSION); } catch (e) { /* nada */ }
-    return String(window.APP_VERSION || (window.Core && (window.Core.version || window.Core.APP_VERSION)) || '');
+    return String(window.APP_VERSION || (window.Core && (window.Core.version || window.Core.APP_VERSION)) || (window.LC && window.LC.VERSION) || '');  // G154: LC = Billetera
   }
   const ESTADO_FALLA = { nuevo: '⏳ Recibido', revisando: '🔎 Revisando', real: '✅ Era real', no: '💬 Respondido' };
   async function falla() {
@@ -1795,7 +1826,7 @@
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } else if (boya && boya.parentNode && boya.parentNode !== document.body) marcarExtras(boya.parentNode); }, 1500);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, ir, guiaEstado, guiaOcultar, menu, web, panelCM, sitio, avisos: contarAvisos, ventanaAvisos, esAdmin: () => !!CFG.admin, app: () => APP };  // G141: app → Estudio (ideas de fábrica por rubro)  // G36: esAdmin lo usa auto.js
+  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, ir, guiaEstado, guiaOcultar, menu, web, panelCM, sitio, avisos: contarAvisos, ventanaAvisos, tocarAviso, esAdmin: () => !!CFG.admin, app: () => APP };  // G141: app → Estudio (ideas de fábrica por rubro)  // G36: esAdmin lo usa auto.js
   window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad, misDatos };
   // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
   function marcarTira(x) {

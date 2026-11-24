@@ -1,6 +1,6 @@
 {
-  "version": "6.98",
-  "bd": "5.99",
+  "version": "6.99",
+  "bd": "6.00",
   "funcion": "3.9",
-  "notas": "📣 G152 (núcleo 3.48): la tarjeta \"Activa los avisos\" queda debajo del menú de arriba (en Barbería ya no se mete a la altura de tu foto y el ☰)."
+  "notas": "🔔 G154 (núcleo 3.49): tocar un aviso de la campana te lleva a su lugar (🔄 versión → ventana con la versión, 💬 soporte → el chat, ⭐ plan → Mi plan; ya no recarga el inicio). Despega: ✓ tienda verificada a la vista de sus clientes."
 }
