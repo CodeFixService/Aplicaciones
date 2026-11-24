@@ -1826,7 +1826,7 @@
   // La cabecera se vuelve a poner si la app redibuja su encabezado.
   setInterval(() => { if (R && (!boya || !boya.isConnected || (boya.classList.contains('cfx-fija') && encabezado()))) { if (boya && boya.classList.contains('cfx-fija')) boya.remove(); pintarBoya(); } else if (boya && boya.parentNode && boya.parentNode !== document.body) marcarExtras(boya.parentNode); }, 1500);
 
-  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, ir, guiaEstado, guiaOcultar, menu, web, panelCM, sitio, avisos: contarAvisos, ventanaAvisos, tocarAviso, esAdmin: () => !!CFG.admin, app: () => APP };  // G141: app → Estudio (ideas de fábrica por rubro)  // G36: esAdmin lo usa auto.js
+  window.CFX_AYUDA = { iniciar, chat, terminos, privacidad, guia, revisar, ir, guiaEstado, guiaOcultar, menu, web, panelCM, sitio, avisos: contarAvisos, ventanaAvisos, tocarAviso, falla, reparar, salir: confirmarSalir, esAdmin: () => !!CFG.admin, app: () => APP };  // G141: app → Estudio (ideas de fábrica por rubro)  // G36: esAdmin lo usa auto.js
   window.CFX_LEGAL = { version: LEGAL.version, desde: LEGAL.desde, revisar: legal, terminos, privacidad, misDatos };
   // ---------- Tiras de filtros/pestañas que no caben: se deslizan de lado y se desvanecen en la orilla ----------
   function marcarTira(x) {

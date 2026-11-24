@@ -1,6 +1,6 @@
 {
-  "version": "7.02",
+  "version": "7.03",
   "bd": "6.02",
   "funcion": "3.9",
-  "notas": "🔎 G157 (núcleo 3.52): barra 🔎 Buscar + filtros universales (fecha, tipo, orden) en el núcleo, lista para usarse donde haya que buscar."
+  "notas": "🐞 G158 (núcleo 3.53): el Centro de Mando también puede reportar fallas y su ⚙️ Ajustes quedó ordenado como el de las apps. 🔎 G157: barra Buscar + filtros (fecha, tipo, orden) en el núcleo."
 }
