@@ -1,6 +1,6 @@
 {
-  "version": "6.99",
-  "bd": "6.00",
+  "version": "7.00",
+  "bd": "6.01",
   "funcion": "3.9",
-  "notas": "🔔 G154 (núcleo 3.49): tocar un aviso de la campana te lleva a su lugar (🔄 versión → ventana con la versión, 💬 soporte → el chat, ⭐ plan → Mi plan; ya no recarga el inicio). Despega: ✓ tienda verificada a la vista de sus clientes."
+  "notas": "🔧 G155 (núcleo 3.50): túnel de fallas para Claude. Las 🐞 fallas pueden quedar 🔧 Lista para revisar (Claude la arregló) y solo el admin las cierra ✅ Revisada o las devuelve ↩️ Sigue fallando."
 }

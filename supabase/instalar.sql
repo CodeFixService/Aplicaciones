@@ -5455,7 +5455,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '6.00'::text $$;
+language sql immutable as $$ select '6.01'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -7720,12 +7720,17 @@ create table if not exists public.cfx_fallas (
   texto     text not null check (length(texto) between 5 and 1500),
   foto      text check (foto is null or (foto ~ '^data:image/(webp|jpeg|png);base64,' and length(foto) <= 400000)),
   datos     jsonb not null default '{}',
-  estado    text not null default 'nuevo' check (estado in ('nuevo', 'revisando', 'real', 'no')),
+  estado    text not null default 'nuevo' check (estado in ('nuevo', 'revisando', 'listo', 'real', 'no')),
   respuesta text not null default '',
   dias      int not null default 0,
   creado    timestamptz not null default now(),
   resuelto  timestamptz
 );
+-- G155 🔧 'listo' = Claude lo arregló (nota en 'arreglo'); queda abierta hasta que Josué la marca ✅ Revisada en el CM. Nunca se cierra sola.
+alter table public.cfx_fallas add column if not exists arreglo text not null default '';
+alter table public.cfx_fallas add column if not exists listo timestamptz;
+alter table public.cfx_fallas drop constraint if exists cfx_fallas_estado_check;
+alter table public.cfx_fallas add constraint cfx_fallas_estado_check check (estado in ('nuevo', 'revisando', 'listo', 'real', 'no'));
 create index if not exists cfx_fallas_cuenta_idx on public.cfx_fallas (cuenta, creado);
 create index if not exists cfx_fallas_estado_idx on public.cfx_fallas (estado, id);
 alter table public.cfx_fallas enable row level security;
@@ -7767,8 +7772,9 @@ begin
   perform public.cfx_es_admin();
   return (select coalesce(jsonb_agg(jsonb_build_object('id', f.id, 'cuenta', f.cuenta, 'email', f.email, 'nombre', f.nombre, 'rol', f.rol, 'texto', f.texto,
       'con_foto', f.foto is not null, 'datos', f.datos, 'estado', f.estado, 'respuesta', f.respuesta, 'dias', f.dias, 'creado', f.creado, 'resuelto', f.resuelto,
+      'arreglo', f.arreglo, 'listo', f.listo,
       'premiados', (select count(*) from public.cfx_fallas g where g.cuenta = f.cuenta and g.estado = 'real')) order by f.id desc), '[]')
-    from (select * from public.cfx_fallas where case coalesce(p_estado, 'abiertos') when 'abiertos' then estado in ('nuevo', 'revisando') when 'todos' then true else estado = p_estado end
+    from (select * from public.cfx_fallas where case coalesce(p_estado, 'abiertos') when 'abiertos' then estado in ('nuevo', 'revisando', 'listo') when 'todos' then true else estado = p_estado end
           order by id desc limit 200) f);
 end $$;
 
@@ -7810,6 +7816,110 @@ begin
   perform public.cfx_anotar('falla', case when p_real then 'real' || case when n > 0 then ' (+' || n || ' días Premium)' else '' end else 'no es falla' end || ' · #' || f.id || ' ' || f.email);
   return jsonb_build_object('estado', case when p_real then 'real' else 'no' end, 'dias', n, 'hasta', h);
 end $$;
+-- ---------- G155 🔧 Túnel de fallas para Claude ----------
+-- Josué crea la llave en CM → Mensajes → 🐞 Fallas → 🔧 Túnel para Claude (el CM la fija en las 6 bases). La base guarda SOLO su huella sha256.
+-- Con la llave (cabecera x-tunel-key) se puede: ver las fallas abiertas (sin correo, nombre ni cuenta) y marcarlas 🔧 Lista para revisar.
+-- NO se puede responder, premiar, borrar ni cerrar: eso lo hace solo Josué (✅ Revisada / ❌ No es falla / ↩️ Sigue fallando).
+create table if not exists public.cfx_tunel (
+  id     int primary key default 1 check (id = 1),
+  hash   text not null check (hash ~ '^[0-9a-f]{64}$'),
+  creado timestamptz not null default now(),
+  usado  timestamptz
+);
+alter table public.cfx_tunel enable row level security;
+revoke all on public.cfx_tunel from anon, authenticated;
+
+create or replace function public.cfx_tunel_ok() returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare k text; h text;
+begin
+  begin k := (nullif(current_setting('request.headers', true), '')::jsonb) ->> 'x-tunel-key'; exception when others then k := null; end;
+  if k is null or length(k) < 32 or length(k) > 200 then return false; end if;
+  select t.hash into h from public.cfx_tunel t where t.id = 1;
+  if h is null or encode(pg_catalog.sha256(convert_to(k, 'UTF8')), 'hex') <> h then return false; end if;
+  update public.cfx_tunel set usado = now() where id = 1 and (usado is null or usado < now() - interval '1 minute');
+  return true;
+end $$;
+
+-- Admin: crear/cambiar (p_hash = sha256 en hex de la llave) o cerrar (null) el túnel; y ver su estado.
+create or replace function public.cfx_tunel_fijar(p_hash text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare h text := lower(trim(coalesce(p_hash, '')));
+begin
+  perform public.cfx_es_admin();
+  if h = '' then
+    delete from public.cfx_tunel where id = 1;
+    perform public.cfx_anotar('tunel', '🔧 túnel de fallas cerrado');
+    return jsonb_build_object('activo', false);
+  end if;
+  if h !~ '^[0-9a-f]{64}$' then raise exception 'Llave inválida'; end if;
+  insert into public.cfx_tunel (id, hash) values (1, h) on conflict (id) do update set hash = excluded.hash, creado = now(), usado = null;
+  perform public.cfx_anotar('tunel', '🔧 llave nueva del túnel de fallas');
+  return jsonb_build_object('activo', true);
+end $$;
+
+create or replace function public.cfx_tunel_estado() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare t public.cfx_tunel;
+begin
+  perform public.cfx_es_admin();
+  select * into t from public.cfx_tunel where id = 1;
+  return jsonb_build_object('activo', t.id is not null, 'creado', t.creado, 'usado', t.usado);
+end $$;
+
+-- Claude (con la llave): fallas abiertas (o todas), sin datos de la persona.
+create or replace function public.cfx_tunel_fallas(p_todas boolean default false) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.cfx_tunel_ok() then raise exception 'Sin permiso'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', f.id, 'rol', f.rol, 'texto', f.texto, 'con_foto', f.foto is not null, 'datos', f.datos,
+      'estado', f.estado, 'arreglo', f.arreglo, 'respuesta', f.respuesta, 'creado', f.creado, 'listo', f.listo, 'resuelto', f.resuelto) order by f.id), '[]')
+    from (select * from public.cfx_fallas where coalesce(p_todas, false) or estado in ('nuevo', 'revisando', 'listo') order by id desc limit 200) f);
+end $$;
+
+create or replace function public.cfx_tunel_foto(p_id bigint) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare f text;
+begin
+  if not public.cfx_tunel_ok() then raise exception 'Sin permiso'; end if;
+  select foto into f from public.cfx_fallas where id = p_id;
+  return jsonb_build_object('id', p_id, 'foto', f);
+end $$;
+
+-- Claude marca 🔧 Lista para revisar (con nota de qué arregló y en qué versión). Josué la revisa y la cierra en el CM.
+create or replace function public.cfx_tunel_listo(p_id bigint, p_nota text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n text := left(trim(coalesce(p_nota, '')), 500); f public.cfx_fallas;
+begin
+  if not public.cfx_tunel_ok() then raise exception 'Sin permiso'; end if;
+  if length(n) < 3 then raise exception 'Escribe qué se arregló'; end if;
+  update public.cfx_fallas set estado = 'listo', listo = now(),
+    arreglo = left(case when arreglo = '' then '' else arreglo || E'\n' end || '🔧 ' || to_char(now() at time zone 'America/Santiago', 'DD-MM HH24:MI') || ' · ' || n, 2000)
+    where id = p_id and estado in ('nuevo', 'revisando') returning * into f;
+  if f.id is null then raise exception 'Solo se marca una falla abierta (nueva o revisando)'; end if;
+  perform public.cfx_anotar('falla', '🔧 lista para revisar · #' || f.id);
+  perform public.cfx_al_cm('🔧 Falla #' || f.id || ' lista para revisar', left(n, 200), 'falla');
+  return jsonb_build_object('id', f.id, 'estado', f.estado);
+end $$;
+
+-- Josué: ↩️ Sigue fallando → vuelve a 'revisando' con su nota (Claude la ve en el túnel).
+create or replace function public.cfx_falla_reabrir(p_id bigint, p_nota text default '') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare n text := left(trim(coalesce(p_nota, '')), 500); f public.cfx_fallas;
+begin
+  perform public.cfx_es_admin();
+  update public.cfx_fallas set estado = 'revisando', listo = null,
+    arreglo = left(arreglo || E'\n' || '↩️ ' || to_char(now() at time zone 'America/Santiago', 'DD-MM HH24:MI') || ' · Sigue fallando' || case when n = '' then '' else ': ' || n end, 2000)
+    where id = p_id and estado = 'listo' returning * into f;
+  if f.id is null then raise exception 'Solo se devuelve una falla marcada 🔧 Lista'; end if;
+  perform public.cfx_anotar('falla', '↩️ sigue fallando · #' || f.id);
+  return jsonb_build_object('id', f.id, 'estado', f.estado);
+end $$;
+revoke all on function public.cfx_tunel_ok(), public.cfx_tunel_fijar(text), public.cfx_tunel_estado(), public.cfx_tunel_fallas(boolean), public.cfx_tunel_foto(bigint),
+  public.cfx_tunel_listo(bigint, text), public.cfx_falla_reabrir(bigint, text) from public, anon, authenticated;
+grant execute on function public.cfx_tunel_fijar(text), public.cfx_tunel_estado(), public.cfx_falla_reabrir(bigint, text) to authenticated;
+grant execute on function public.cfx_tunel_fallas(boolean), public.cfx_tunel_foto(bigint), public.cfx_tunel_listo(bigint, text) to anon, authenticated;
+
 revoke all on function public.cfx_falla_enviar(text, text, jsonb), public.cfx_fallas_mias(), public.cfx_fallas_lista(text), public.cfx_falla_ver(bigint),
   public.cfx_falla_resolver(bigint, boolean, text, int) from public, anon;
 grant execute on function public.cfx_falla_enviar(text, text, jsonb), public.cfx_fallas_mias(), public.cfx_fallas_lista(text), public.cfx_falla_ver(bigint),
@@ -8256,7 +8366,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_catalogo_propio', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_redes', 'public.cfx_redes_persona', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_catalogo_propio', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_redes', 'public.cfx_redes_persona', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_tunel', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
