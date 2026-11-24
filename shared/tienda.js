@@ -57,7 +57,7 @@
   #grid.v3 .opc-chips{gap:4px} #grid.v3 .opc-ch{min-height:22px;min-width:22px;font-size:10.5px;padding:1px 6px} #grid.v3 .opc-ch.sw{width:22px;height:22px;padding:2px}
   #grid.v3 .item .acc{padding:2px 8px 0;gap:4px} #grid.v3 .item .acc .btn,#grid.v3 .item .acc button{min-height:32px;font-size:0;padding:0;border-radius:10px}
   #grid.v3 .item .acc>:first-child::before{content:"＋ Agregar";font-size:12px;font-weight:700}#grid.v3 .item .acc>[disabled]:first-child::before{content:"Agotado"}
-  #grid.v3 .item .acc>:not(:first-child){display:none} #grid.v3 .fav{width:28px;height:28px;font-size:14px;top:5px;right:5px}
+  #grid.v3 .item .acc>:not(:first-child){display:none} #grid.v3 .fav{display:none!important} /* G156: en la vista chica (3 por fila) el ❤️ tapaba el nombre: solo en 1 y 2 por fila */
   /* G144 b: ❤️ favorito = círculo perfecto (nada estirado) y, marcado, el corazón ROJO sin óvalo rojo detrás. */
   #grid .fav{aspect-ratio:1;min-height:0!important;min-width:0;flex:none;padding:0;display:grid;place-items:center;line-height:1}
   #grid .fav.on{background:color-mix(in srgb,var(--card,#fff) 75%,transparent)!important;color:#ef4444}

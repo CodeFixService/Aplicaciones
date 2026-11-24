@@ -51,6 +51,17 @@
       db.set('productos', productos);
     } catch (e) { /* sin red: usa la copia */ }
   }
+  // G156: celular vacío (app limpiada u otro celular) → vuelve solo el último respaldo en la nube de tu Caja (ventas, gastos, productos).
+  if (!equipo && !productos.length && !db.get('ventas', []).length && !db.get('gastos', []).length) {
+    let ya = false; try { ya = !!sessionStorage.getItem('cajaNube'); sessionStorage.setItem('cajaNube', '1'); } catch (e) { /* sin almacenamiento */ }
+    if (!ya) {
+      try {
+        const { data, error } = await Cuenta.sb.storage.from('respaldos').download(cuenta.id + '/caja.json');
+        const o = !error && data ? JSON.parse(await data.text()) : null;
+        if (o && o.datos && Object.keys(o.datos).length) { db.load(o.datos); Core.toast('♻️ Recuperamos tu Caja de la nube'); location.reload(); return; }
+      } catch (e) { /* sin respaldo o sin red: sigue normal */ }
+    }
+  }
   // G87 E: lo publicado en la vitrina que este teléfono no tiene (caché borrada u otro teléfono) vuelve a aparecer aquí, para editarlo o borrarlo.
   if (!equipo && !esCliente) {
     try {
@@ -692,6 +703,10 @@
     v = v || {}; $('p-tipo').value = v.tipo || 'producto'; $('p-cobro').value = v.cobro || 'ahora'; $('p-abono').value = v.abono || ''; $('p-acceso').value = v.acceso || ''; pintarVenta();
   }
   ['p-tipo', 'p-cobro', 'p-abono'].forEach((k) => $(k).addEventListener('input', pintarVenta));
+  // G156: categoría "Servicio…" → el ítem pasa solo a 🛠️ Servicio (sin stock ni envío; se coordina por mensaje). Se puede cambiar en 🛒 Venta online.
+  $('p-cat').addEventListener('change', () => {
+    if (!esCliente && /servic/i.test($('p-cat').value) && $('p-tipo').value === 'producto') { $('p-tipo').value = 'servicio'; pintarVenta(); Core.toast('🛠️ Lo marcamos como Servicio: sin stock ni envío'); }
+  });
   $('pVentaW').classList.toggle('hidden', esCliente);
   const leerVenta = () => ({ tipo: $('p-tipo').value, cobro: $('p-cobro').value, abono: $('p-cobro').value === 'abono' ? parseInt($('p-abono').value || '50', 10) : null, acceso: $('p-acceso').value.trim() });
   const ventaFabrica = (v) => v.tipo === 'producto' && v.cobro === 'ahora';

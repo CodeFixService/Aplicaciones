@@ -1,6 +1,6 @@
 {
-  "version": "7.00",
-  "bd": "6.01",
+  "version": "7.01",
+  "bd": "6.02",
   "funcion": "3.9",
-  "notas": "🔧 G155 (núcleo 3.50): túnel de fallas para Claude. Las 🐞 fallas pueden quedar 🔧 Lista para revisar (Claude la arregló) y solo el admin las cierra ✅ Revisada o las devuelve ↩️ Sigue fallando."
+  "notas": "🐞 G156 (núcleo 3.51): arreglos de las fallas reportadas: un contador en 0 ya no se ve, ↩️ 'de fábrica' con aire, aviso de notificaciones con margen, planilla con botones redondeados y datos de transferencia para copiar uno por uno (RUT sin puntos). Despega: 🎨 diseños y Caja vuelven solos si limpias la app, avisos solo en la 🔔, el cliente ve su perfil primero, 🛠️ servicios sin envío y pestañas que caben."
 }

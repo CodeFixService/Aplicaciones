@@ -455,13 +455,15 @@
     if (!sb || !account) return;
     try {
       const { data: m } = await sb.rpc('cfx_msg_sin_leer');
-      document.querySelectorAll('nav.tabs.abajo [data-k=chat] .badge, nav.tabs.abajo [data-k=mas] .badge').forEach((b) => { b.textContent = m; b.hidden = !m; });
+      // G156: el número rojo va en Chat (cliente) y Pedidos; NO en Más/Ajustes (los avisos están en la 🔔).
+      document.querySelectorAll('nav.tabs.abajo [data-k=chat] .badge').forEach((b) => { b.textContent = m || ''; b.hidden = !m; });
+      document.querySelectorAll('nav.tabs.abajo [data-k=mas] .badge').forEach((b) => { b.textContent = ''; b.hidden = true; });
     } catch (e) { /* sin red */ }
     if (account.role !== 'client') {
       try {
         const { data } = await sb.rpc('hoy_negocio');
         const p = data ? data.revisar + data.activos : 0;
-        document.querySelectorAll('nav.tabs.abajo [data-k=pedidos] .badge').forEach((b) => { b.textContent = p; b.hidden = !p; });
+        document.querySelectorAll('nav.tabs.abajo [data-k=pedidos] .badge').forEach((b) => { b.textContent = p || ''; b.hidden = !p; });
       } catch (e) { /* base anterior */ }
     }
   }

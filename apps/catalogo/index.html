@@ -186,8 +186,8 @@
     </div>
     <div class="card hidden" id="cPago">
       <h2>💳 Datos para transferir</h2>
-      <pre id="pagoTxt"></pre>
-      <div class="btns"><button class="small" id="bCopiarPago">📋 Copiar datos</button></div>
+      <div id="pagoTxt"></div>
+      <div class="btns"><button class="small" id="bCopiarPago">📋 Copiar todo</button></div>
       <p class="muted">Envía el comprobante por Mensajes. Los comprobantes de la app no reemplazan la boleta de la tienda.</p>
     </div>
     <div class="card hidden" id="cSellos">
@@ -571,7 +571,9 @@
   const ventaDe = (l) => venta[l.clave] || { tipo: 'producto', cobro: 'ahora' };
   function pintarCobro(ls) {
     if (!window.CFX_COBRO) return;
-    const fis = ls.some(({ l }) => ventaDe(l).tipo === 'producto');
+    // G156: un ítem de la categoría "Servicio…" no pide retiro ni despacho (se coordina por mensaje), aunque la tienda no haya marcado 🛠️ Servicio.
+    const fis = ls.some(({ l }) => ventaDe(l).tipo === 'producto' && !esServ(l));
+    sinEnvio = !fis;
     ['entregaL', 'entrega'].forEach((k) => $(k).classList.toggle('hidden', !fis));
     if (!fis && entrega !== 'retiro') { entrega = 'retiro'; $('rowDir').classList.add('hidden'); $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.e === 'retiro')); }
     const ops = CFX_COBRO.opciones(ls.map(({ l, i }) => Object.assign({ subtotal: precioDe(i) * l.cant }, ventaDe(l))), { medios: !!tienda.cobra_online, mp: 'cobra_mp' in tienda ? !!tienda.cobra_mp : undefined, entrega });
@@ -579,7 +581,8 @@
     CFX_COBRO.elegir($('cobroOps'), ops, cobroSel, (k) => { cobroSel = k; if (CFX_COBRO.boton && !vacaciones) CFX_COBRO.boton($('bEnviarPed'), ops, k, { nota: $('cobroNota'), sinMonto: !!cupon || entrega === 'despacho' }); });
   }
   // Retiro o despacho (el despacho tiene costo adicional según la distancia).
-  let entrega = 'retiro';
+  let entrega = 'retiro', sinEnvio = false;
+  function esServ(l) { const i = itemDe(l); return !!(i && /servic/i.test(i.categoria || '')); }
   $('entrega').onclick = (e) => {
     const b = e.target.closest('[data-e]');
     if (!b) return;
@@ -617,7 +620,7 @@
     return '🛒 Pedido\n' + lineasCarro().map(({ l, i }) => '• ' + l.cant + ' × ' + i.nombre + (l.opcion ? ' (' + l.opcion + ')' : '') + ' — ' + precio(precioDe(i) * l.cant)).join('\n') +
       (r && r.descuento > 0 ? '\nDescuento: −' + precio(r.descuento) : '') +
       '\nTotal: ' + precio(r ? r.total : totalCarro()) + (r && r.desc_premium > 0 ? ' (con descuento Premium)' : '') +
-      '\nEntrega: ' + (entrega === 'despacho' ? '🚚 Despacho a ' + $('dir').value.trim() + (r && r.despacho > 0 ? ' (' + precio(r.despacho) + ', incluido en el total)' : '') : '🏪 Retiro en tienda') +
+      '\nEntrega: ' + (sinEnvio ? '🛠️ Servicio (lo coordinamos por mensaje)' : entrega === 'despacho' ? '🚚 Despacho a ' + $('dir').value.trim() + (r && r.despacho > 0 ? ' (' + precio(r.despacho) + ', incluido en el total)' : '') : '🏪 Retiro en tienda') +
       ($('nota').value.trim() ? '\nNota: ' + $('nota').value.trim() : '');
   }
   async function enviarPedido(porWsp) {
@@ -662,7 +665,9 @@
   // Datos de transferencia de la tienda.
   if (tienda.datos_pago && comprador) {
     $('cPago').classList.remove('hidden');
-    $('pagoTxt').textContent = tienda.datos_pago;
+    // G156: cada dato con su 📋 (el RUT se copia sin puntos); "Copiar datos" sigue copiando todo.
+    if (window.CodeFixVitrina && CodeFixVitrina.transfCopiable) { $('pagoTxt').style.whiteSpace = 'normal'; CodeFixVitrina.transfCopiable($('pagoTxt'), tienda.datos_pago, { avisar: Core.toast }); }
+    else $('pagoTxt').textContent = tienda.datos_pago;
   }
   // Despacho por comuna (lo configura la tienda en Ajustes → Despacho).
   Despacho.montar({ cfg: tienda.despacho, monto: () => totalCarro(), alCambiar: pintarCarro,

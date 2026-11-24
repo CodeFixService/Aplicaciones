@@ -184,7 +184,7 @@
       <label for="p-desc">Descripción (opcional)</label><input id="p-desc" maxlength="300" placeholder="Ej: vaso plástico de 300 ml">
       <label for="p-ops">Colores, tallas u opciones (separadas por coma)</label><input id="p-ops" maxlength="300" placeholder="Rojo, Azul, Verde, Amarillo">
       <details id="pVentaW" class="card" style="padding:10px 12px;margin:10px 0"><summary><b>🛒 Venta online</b> <span class="muted" id="pVentaRes">📦 Producto · ⚡ Pagar ahora</span></summary>
-        <label for="p-tipo">¿Qué es?</label><select id="p-tipo"><option value="producto">📦 Producto (con stock y envío)</option><option value="servicio">🛠️ Servicio (sin stock ni envío)</option><option value="digital">🔑 Acceso digital (llega al aprobar el pago)</option></select>
+        <label for="p-tipo">¿Qué es?</label><select id="p-tipo"><option value="producto">📦 Producto (con stock y envío)</option><option value="servicio">🛠️ Servicio o asesoría (sin stock ni envío; se coordina por mensaje)</option><option value="digital">🔑 Activación digital (link o código: llega al validar el pago)</option></select>
         <label for="p-cobro">¿Cómo te paga el cliente?</label><select id="p-cobro"><option value="ahora">⚡ Pagar ahora (todo)</option><option value="abono">💵 Abono % ahora y el resto al entregar</option><option value="retiro">💰 Pagar al retirar</option></select>
         <div id="rowAbono" class="hidden"><label for="p-abono">Abono (%)</label><input id="p-abono" inputmode="numeric" maxlength="2" placeholder="50"></div>
         <div id="rowAcceso" class="hidden"><label for="p-acceso">Lo que recibe al pagar (link, código o instrucciones)</label><textarea id="p-acceso" maxlength="500" placeholder="https://… o el código de acceso"></textarea>

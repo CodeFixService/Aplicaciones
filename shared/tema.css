@@ -146,7 +146,7 @@ pre, code, kbd { white-space: pre-wrap; overflow-wrap: anywhere; }
 .cfx-pe-temas > button.on { border-color: var(--brand, var(--marca, #2563eb)); }
 .cfx-pe-temas > button > .cfx-pe-mu { display: block; width: 100%; height: 26px; border-radius: 8px; border: 1px solid rgba(127, 127, 127, .3); }
 .cfx-pe-temas > button > b { font: inherit; text-align: center; }
-.cfx-pe-fab { width: 100%; margin-top: 14px; min-height: 44px; border-radius: 12px; border: 1px dashed var(--cfx-borde); background: none; color: var(--cfx-texto); font: 700 14px var(--cfx-letra); cursor: pointer; }
+.cfx-pe-fab { width: 100%; margin: 24px 0 12px !important; /* G156: con aire arriba (estaba pegado) */ min-height: 44px; border-radius: 12px; border: 1px dashed var(--cfx-borde); background: none; color: var(--cfx-texto); font: 700 14px var(--cfx-letra); cursor: pointer; }
 /* Computador (900 px o más): la misma barra pasa a ser un menú lateral. Se ven todos los botones (sin "Más" ni repetidos) y el + arriba. */
 @media (min-width: 900px) {
   nav.cfx-barra {
@@ -241,6 +241,8 @@ nav.cfx-barra > .cfx-mas .cfx-ico svg { width: 28px !important; height: 28px !im
 .icono, .icon-btn, .btn-icono, .cfx-aj-volver, .icono-top {
   display: inline-grid; place-items: center; line-height: 1 !important; text-align: center; }
 .icono[hidden], .icon-btn[hidden], .btn-icono[hidden], .icono-top[hidden] { display: none !important; }
+/* G156: un contador con hidden (0 avisos) NUNCA se ve, aunque la app le ponga display. */
+.badge[hidden], .num[hidden], .punto[hidden] { display: none !important; }
 .icono > svg, .icon-btn > svg, .btn-icono > svg, .cfx-aj-volver > svg { display: block; margin: 0 !important; }
 /* Los textos siempre caben en su cuadro (palabras largas, correos y links se cortan bien) */
 .card, .tarjeta, .item, .cfx-grilla > *, .kpi, .stats > *, dialog, .modal-caja, .sheet, .hoja { overflow-wrap: anywhere; min-width: 0; }

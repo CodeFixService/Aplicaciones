@@ -533,5 +533,24 @@
   }
   const redes = { RED, detectar, botones, editor: editorRedes, publico, deViejas, limpiar, equipo, unWa, conViejas, siguenos, mias, bajoQR };
 
-  window.CodeFixVitrina = { redes, montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, rutOk, BANCOS };
+  // G156: datos para transferir → cada línea con su botón 📋 (copia SOLO el dato; el RUT sin puntos, como lo piden los bancos).
+  //   CodeFixVitrina.transfCopiable(nodo, texto, { avisar(msg) }) · el texto es el de la tienda ("Banco: …" por línea o libre).
+  function transfCopiable(nodo, texto, o) {
+    o = o || {}; const txt = String(texto || '').trim(); nodo.textContent = ''; if (!txt) return;
+    const sinPuntos = (v) => v.replace(/\b(\d{1,2})\.?(\d{3})\.?(\d{3})\s*-\s*([\dkK])\b/g, '$1$2$3-$4');
+    txt.split('\n').map((x) => x.trim()).filter(Boolean).forEach((x) => {
+      const i = x.indexOf(': '), l = i > 0 && i < 30 ? x.slice(0, i) : '', v0 = l ? x.slice(i + 2).trim() : x;
+      const v = /rut/i.test(l) || /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/.test(v0) ? sinPuntos(v0) : v0;
+      const f = document.createElement('div'); f.className = 'cfx-tc-f';
+      f.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--cfx-borde,#8883)';
+      const t = document.createElement('div'); t.style.cssText = 'flex:1;min-width:0;overflow-wrap:anywhere';
+      if (l) { const e = document.createElement('small'); e.style.cssText = 'display:block;opacity:.7'; e.textContent = l; t.appendChild(e); }
+      t.appendChild(document.createTextNode(v));
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'small alt cfx-tc-b'; b.textContent = '📋';
+      b.setAttribute('aria-label', 'Copiar ' + (l || 'dato')); b.style.cssText = 'flex:none;min-width:44px';
+      b.onclick = () => { const ok = () => (o.avisar || (() => {}))('📋 ' + (l || 'Dato') + ' copiado'); try { navigator.clipboard.writeText(v).then(ok, ok); } catch (e) { ok(); } };
+      f.append(t, b); nodo.appendChild(f);
+    });
+  }
+  window.CodeFixVitrina = { redes, montar, editor, leer, horario, transferencia, horarioTexto, horarioLeer, transfTexto, transfLeer, transfCopiable, rutOk, BANCOS };
 })();

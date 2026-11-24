@@ -493,6 +493,24 @@
       p_tipo: tipo, p_vip: false, p_precio_num: tipo !== 'lista' && !isNaN(pn) ? pn : null
     });
     f.pubAt = Date.now();
+    // G156: los datos del diseño quedan también en tu cuenta (si limpias la app o cambias de celular, vuelven solos).
+    try {
+      const d = Object.assign({}, f); delete d.thumb;
+      for (const k of ['foto', 'logo']) if (typeof d[k] === 'string' && d[k].startsWith('data:')) { d[k] = await alaNube(d[k]); if (d[k].startsWith('data:') && d[k].length > 200000) d[k] = null; }
+      await Cuenta.rpc('ficha_datos_guardar', { p_key: f.id, p_datos: d });
+    } catch (e) { /* base vieja o sin red: queda en este celular */ }
+  }
+  // G156: diseños de tu cuenta que este celular no tiene (app limpiada u otro celular) vuelven a la Galería.
+  async function recuperarFichas() {
+    let l; try { l = await Cuenta.rpc('mis_fichas'); } catch (e) { return; }
+    const faltan = (l || []).filter((x) => x && x.key && !fichas.some((f) => f.id === x.key));
+    if (!faltan.length) return;
+    faltan.forEach((x) => fichas.push(Object.assign({}, DEFAULT, { titulo: x.titulo, subtitulo: x.detalle, precio: Core.precioNum(x.precio) || '', antes: '', plantilla: x.tipo || 'oferta' },
+      x.datos || {}, { id: x.key, thumb: x.imagen || null, fecha: x.fecha || Date.now(), pubAt: x.fecha || Date.now() })));
+    for (const f of fichas) if (!f.thumb) { try { await draw(f); f.thumb = thumbnail(); } catch (e) { /* queda el cuadro neutro */ } }
+    await draw(ficha);
+    db.set('fichas', fichas); renderGaleria();
+    Core.toast('♻️ ' + faltan.length + ' diseño(s) recuperados de tu cuenta');
   }
   // Fichas que aún no están publicadas (o cambiaron): se publican al abrir Órbita.
   async function publicarFichasPendientes() {
@@ -513,7 +531,7 @@
     const g = $('gal');
     if (!fichas.length) { g.innerHTML = '<p class="empty">Aún no guardas diseños. Crea uno y toca 💾.</p>'; return; }
     g.innerHTML = fichas.map((f) =>
-      '<figure><img src="' + f.thumb + '" alt=""><figcaption><b style="flex-basis:100%">' + Core.esc(f.titulo) + '</b>' +
+      '<figure>' + (f.thumb ? '<img src="' + Core.esc(f.thumb) + '" alt="">' : '<div style="aspect-ratio:4/5;background:var(--cfx-borde,#8884);border-radius:10px"></div>') + '<figcaption><b style="flex-basis:100%">' + Core.esc(f.titulo) + '</b>' +
       '<button class="small" data-a="edit" data-id="' + f.id + '">Editar</button>' +
       '<button class="small alt" data-a="dup" data-id="' + f.id + '">Copiar</button>' +
       '<button class="small danger" data-a="del" data-id="' + f.id + '">✕</button></figcaption></figure>'
@@ -1019,7 +1037,7 @@
   if (ajustes.logo && !cuenta.logo) subirLogo();
   else if (!ajustes.logo && cuenta.logo) { ajustes.logo = cuenta.logo; db.set('ajustes', ajustes); }
   fillForm(); fillAjustes(); draw(ficha); revisar(); cargarAppClientes();
-  publicarFichasPendientes().then(publicarPendientes).then(respaldoAuto).catch(() => {});
+  recuperarFichas().then(publicarFichasPendientes).then(publicarPendientes).then(respaldoAuto).catch(() => {});
   const m = location.hash.match(/camp=([\w]+)/);
   if (m) { show('campanas'); abrirEnvio(m[1]); }
   else if (location.hash === '#clientes') show('clientes');

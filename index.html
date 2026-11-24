@@ -212,7 +212,8 @@
       <div class="btns"><button id="bPush">Activar notificaciones</button></div>
     </div>
 
-    <div class="card">
+    <!-- G156: los avisos viven SOLO en la 🔔 campana (misma lista: my_inbox). Esta tarjeta queda oculta para el aviso emergente. -->
+    <div class="card hidden" id="cInbox">
       <span id="avisos"></span><div class="row" style="align-items:center;margin-bottom:6px"><h2 id="inboxTitulo" style="flex:2;margin:0">🔔 Avisos</h2>
         <button class="alt small hidden" id="bLimpiarAvisos" style="flex:none">🧹 Limpiar</button></div>
       <ul class="list inbox" id="inbox"></ul>
@@ -422,7 +423,7 @@ try {
     showView(enAjustes() && !cli ? 'v-ajustes' : 'v-home');
     const k = /^#(plan|premium)$/.test(location.hash) ? 'premium' : /^#(tienda|links|equipo|despacho|boleta|redes|dominio|modulos|giftcards|carritos|recurrentes|proveedores|sucursales|promos|mercadolibre|courier|estudio|misredes)$/.test(location.hash) ? (location.hash === '#modulos' ? 'premium' : location.hash.slice(1)) : null;
     if (k && MENU_O) setTimeout(() => MENU_O.abrir(k), 150);
-    else if (location.hash === '#avisos') setTimeout(() => $('avisos').scrollIntoView({ behavior: 'smooth' }), 250);
+    else if (location.hash === '#avisos') setTimeout(() => { if (window.CFX_AYUDA && CFX_AYUDA.ventanaAvisos) CFX_AYUDA.ventanaAvisos(); }, 250);
     else scrollTo(0, 0);
   }
   addEventListener('hashchange', irAVista);
@@ -613,7 +614,9 @@ try {
     if (dueno && !$('despachoBody').dataset.listo) { $('despachoBody').dataset.listo = '1'; Despacho.editor($('despachoBody'), (f, x) => Cuenta.rpc(f, x), { courier: true }); }
     $('cPlan').classList.toggle('hidden', acc.role === 'equipo');
     $('cProMini').classList.toggle('hidden', true);
-    $('cMiCaja').classList.toggle('hidden', !cliente);
+    $('cMiCaja').classList.toggle('hidden', true); // G156: el cliente la tiene en su menú (Tu tienda)
+    // G156: cliente → su perfil y menú PRIMERO; "Tu tienda" va dentro del menú.
+    if (cliente) { document.querySelector('#v-home .card.hola').classList.add('hidden'); const v = $('v-home'), m = $('miPerfilCli'); if (v.firstElementChild !== m) v.prepend(m); }
     if (cliente && !acc.is_pro) $('cMiCaja').href = '#plan';
 
 
@@ -650,6 +653,9 @@ try {
           CodeFixVitrina.redes.editor(z, { rpc: (f, x) => Cuenta.rpc(f, x), viejas: CodeFixVitrina.redes.deViejas(p) }); } },
         dueno && { k: 'redes', ico: '📲', t: 'Vender en redes', d: 'WhatsApp, Google, Instagram y medir anuncios', grupo: 'Vender más', nodo: $('cRedes') },
         !equipo && { k: 'premium', ico: '⭐', t: dueno && acc.mods ? 'Mi plan y módulos' : 'Mi plan', dato: acc.is_admin ? 'Admin' : acc.is_pro ? 'PRO' : 'Free', grupo: 'Tu plan', nodo: $('cPlan') },
+        // G156: cliente → su tienda y Mi Caja van en el menú (bajo su perfil), no en tarjetas sueltas arriba.
+        cliente && acc.negocio && { k: 'mitienda', ico: Core.ico('bolsa'), t: 'Tu tienda: ' + acc.negocio, d: 'Ofertas, productos y tus pedidos', grupo: 'Tu tienda', ir: 'apps/catalogo/?v=ofertas' },
+        cliente && { k: 'cajaCli', ico: Core.ico('caja'), t: 'Mi Caja', d: 'Tus ventas, productos y finanzas', dato: acc.is_pro ? '' : 'PRO', grupo: 'Tu tienda', ir: acc.is_pro ? 'apps/caja/' : '#plan' },
         cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
         dueno && { k: 'respaldo', ico: '💾', t: 'Respaldo de mi tienda', d: 'Excel con todo', grupo: 'Configuración', nodo: $('cRespaldo') }
       ];

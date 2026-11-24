@@ -32,8 +32,13 @@ Tienda online + caja + pedidos para pymes chilenas. Free / Pro / 🧩 módulos (
 profiles, catalog_items, variantes, pedidos, cupones, links_pago, mp_cuentas, boleta_cuentas, boletas_caja, calificaciones, sellos, avisos_stock, publicaciones, publicacion_vistas, subscribers, user_invites, requests, conexiones, webhooks, webhook_envios, negocio_correo, notifications, notification_reads, push_subscriptions, planes, textos, app_settings, app_secrets, actividad_dia.
 
 ## Versiones
-core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql (~l.5453). Ahora: 6.90 · bd 5.98 · enviar 3.9.
+core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()` en instalar.sql (~l.5453). Ahora: 7.01 · bd 6.02 · enviar 3.9.
 - G145 a 🌐 Mi dominio: la tienda lo conecta SOLA (Guardar/🔄 Revisar → función enviar acción 'dominio' → `enviar/dominio_tienda.ts` crea/borra el Custom Hostname www.<dominio> en la zona de CodeFix con el token 'cf_token' que el CM copia aquí; datos SIEMPRE de la base: `dominio_cf_datos(uid, antes)` solo servidor). Prueba: SaaS/pruebas/g145a.js.
+
+## 🐞 G156 (7.01 · bd 6.02)
+- 🎨 Diseños: publicar_ficha + `ficha_datos_guardar(key, datos)` (publicaciones.datos jsonb) · al abrir, `mis_fichas()` repone en la Galería lo que el celular no tiene (recuperarFichas) · Caja vacía → baja sola `respaldos/<id>/caja.json` (1 vez por sesión).
+- Avisos SOLO en la 🔔 (#cInbox oculta; #avisos abre CFX_AYUDA.ventanaAvisos) · sin número en Más · cliente: miPerfilCli primero + "Tu tienda: X" y Mi Caja en el menú (grupo Tu tienda).
+- Pedido: categoría /servic/i → sin retiro/despacho (esServ) · Caja: esa categoría pasa a 🛠️ Servicio · datos de transferencia con CodeFixVitrina.transfCopiable · nav.tabs.sub ≤4 sin scroll (core.css). Prueba: SaaS/pruebas/g156.js.
 
 ## ✓ Tienda verificada (G154, 6.99 · bd 6.00)
 - tienda_publica / tienda_info traen `verificado` = existe cfx_verificaciones aprobada de la tienda (CM → Control → 🪪). Núcleo vitrina.js pinta ✓ azul junto al nombre + "Identidad verificada" (t/ y apps/catalogo/). cfx_marcar_verificado sigue vacío (no hace falta columna).

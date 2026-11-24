@@ -69,7 +69,7 @@
     '.cfx-hoja-velo{position:fixed;inset:0;z-index:2147482999;background:rgba(15,23,42,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);animation:cfxVelo .2s ease}@keyframes cfxVelo{from{opacity:0}}' +
     '.cfx-hoja .cfx-x{position:absolute;top:8px;right:8px;width:36px;height:36px;min-height:0;flex:none;padding:0;display:grid;place-items:center;border-radius:10px;background:transparent;color:#64748b}' +
     '.cfx-hoja{padding-right:44px}.cfx-hoja .cfx-btns{margin-right:-28px}' +
-    '.cfx-av-tarj{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 12px 12px 14px;border-radius:16px;border:1px solid color-mix(in srgb,var(--cfx-color) 30%,var(--cfx-borde,#e2e7ec));' +
+    '.cfx-av-tarj{display:flex;align-items:center;gap:12px;margin:12px 0 16px;padding:12px 12px 12px 14px;border-radius:16px;border:1px solid color-mix(in srgb,var(--cfx-color) 30%,var(--cfx-borde,#e2e7ec));' +
     'background:color-mix(in srgb,var(--cfx-color) 8%,var(--cfx-tarjeta,#fff));color:var(--cfx-texto,#0f172a);font:14px/1.35 var(--cfx-letra,system-ui,sans-serif);animation:cfxSube .3s ease}' +
     '.cfx-av-tarj .cfx-av-ic{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--cfx-color);color:#fff}.cfx-av-tarj .cfx-av-ic svg{width:18px;height:18px}' +
     '.cfx-av-tarj div{flex:1;min-width:0}.cfx-av-tarj b{display:block;font-size:14.5px}.cfx-av-tarj small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:12.5px}' +

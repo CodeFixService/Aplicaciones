@@ -5455,7 +5455,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '6.01'::text $$;
+language sql immutable as $$ select '6.02'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -14460,3 +14460,23 @@ begin
     'antes', a, 'antes_libre', a is not null and not exists (select 1 from public.profiles x where x.dominio = a));
 end $$;
 revoke all on function public.dominio_cf_datos(uuid, text) from public, anon, authenticated;
+
+-- ---------- VERSIÓN 6.02 · G156 🎨 Los diseños vuelven solos (se puede volver a correr) ----------
+-- Antes vivían solo en el celular: al limpiar la app "desaparecían". Ahora cada diseño publicado guarda también sus datos para editarlo.
+alter table public.publicaciones add column if not exists datos jsonb;
+create or replace function public.ficha_datos_guardar(p_key text, p_datos jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inicia sesión'; end if;
+  if p_datos is not null and (jsonb_typeof(p_datos) <> 'object' or length(p_datos::text) > 300000) then raise exception 'Diseño muy pesado'; end if;
+  update public.publicaciones set datos = p_datos where owner_id = auth.uid() and client_key = left(coalesce(p_key, ''), 60);
+end $$;
+create or replace function public.mis_fichas() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('key', client_key, 'titulo', titulo, 'detalle', detalle, 'precio', precio, 'tipo', tipo,
+    'imagen', case when imagen like 'https://%' then imagen end, 'datos', datos, 'fecha', (extract(epoch from updated_at) * 1000)::bigint)
+    order by updated_at desc), '[]'::jsonb)
+  from public.publicaciones where owner_id = auth.uid();
+$$;
+revoke all on function public.ficha_datos_guardar(text, jsonb), public.mis_fichas() from public, anon;
+grant execute on function public.ficha_datos_guardar(text, jsonb), public.mis_fichas() to authenticated;
