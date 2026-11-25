@@ -155,7 +155,7 @@
   asignar('🏪 🏢 🏬', 'tienda'); asignar('🔗', 'enlace'); asignar('🧹', 'escoba'); asignar('📤 ⬆', 'subir'); asignar('📥 ⬇', 'bajar');
   asignar('🎉 ✨ 🎊', 'chispa'); asignar('🔧 🛠 🔩', 'herramienta'); asignar('🔥', 'fuego'); asignar('🏦', 'banco'); asignar('📊', 'grafico');
   asignar('📈', 'tendencia'); asignar('📉', 'baja'); asignar('➕', 'mas'); asignar('🚀', 'cohete'); asignar('⚙', 'ajustes'); asignar('⚡', 'rayo');
-  asignar('🕐 🕒 ⏰ ⏱ 🕑 🕓 🕔 🕕', 'reloj'); asignar('🎯', 'diana'); asignar('👁 👀', 'ojo'); asignar('💎', 'diamante'); asignar('📍', 'pin');
+  asignar('🕐 🕒 ⏰ ⏱ 🕑 🕓 🕔 🕕 🔜', 'reloj'); asignar('🎯', 'diana'); asignar('👁 👀', 'ojo'); asignar('💎', 'diamante'); asignar('📍', 'pin');
   asignar('🔳', 'qr'); asignar('⚖', 'balanza'); asignar('🏠 🏡', 'casa'); asignar('🚚', 'camion'); asignar('📦', 'caja'); asignar('🚪', 'puerta');
   asignar('💡', 'ampolleta'); asignar('🔎 🔍', 'lupa'); asignar('📜 📄 📃 📑', 'documento'); asignar('📒 📗 📚 📖 📓', 'libro'); asignar('❤ 💚 🤍 💙 💛 🧡 💜', 'corazon', 'rojo');
   asignar('🗺', 'mapa'); asignar('🧭', 'brujula'); asignar('🛡', 'escudo'); asignar('🏆 🥇', 'trofeo', 'oro'); asignar('🚩 🏁', 'bandera');

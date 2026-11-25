@@ -1,6 +1,6 @@
 {
-  "version": "7.06",
-  "bd": "6.04",
+  "version": "7.07",
+  "bd": "6.05",
   "funcion": "3.9",
-  "notas": "🔁 G162 (núcleo 3.56): Compras recurrentes en todas las apps: cada semana, mes o año (7 a 365 días), 🔔 aviso antes, se crea sola y se cobra (⚡ automático con tarjeta, link de pago o ✅ a mano) + resumen de $ al mes y próximas fechas."
+  "notas": "🧩 G163 (núcleo 3.57): en 🧩 Módulos, lo que todavía no funciona se ve 🔜 deshabilitado con su nota (no se compra ni se prueba). Lo que ya tienes sigue a la vista."
 }

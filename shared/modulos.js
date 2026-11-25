@@ -26,7 +26,9 @@
     try { const r = await rpc('cfx_modulo_probar', { p_item: clave }); aviso('🎁 ¡Listo! Gratis hasta el ' + fecha(r.hasta)); return true; }
     catch (x) { if (b) b.disabled = false; if (window.CFX_DIALOGO) window.CFX_DIALOGO.avisar((x && x.message) || String(x)); return false; }
   }
-  const puedePrueba = (D, x, pack) => !!(D && D.dueno && D.prueba_dias > 0 && (pack ? !D.prueba_pack : !x.prueba_usada && !x.plan && !(x.regalo && D.campana)));
+  const puedePrueba = (D, x, pack) => !!(D && D.dueno && D.prueba_dias > 0 && !(x && x.nota) && (pack ? !D.prueba_pack : !x.prueba_usada && !x.plan && !(x.regalo && D.campana)));
+  // G163 🔜 módulo que todavía no funciona en esta app: se ve deshabilitado con su nota (no se compra ni se prueba).
+  const PRONTO = (x) => '<p class="cfxm-pronto">🔜 Todavía no disponible: ' + esc(x.nota) + '</p>';
   const USADA = '⌛ Ya usaste tu prueba gratis de este módulo con este correo (es 1 vez por correo). Tus datos quedan guardados: cómpralo y sigues.';
   // G142 a: 🎁 en cualquier hoja de la app (p. ej. el candado ⭐ Premium de Barbería): pone el botón si se puede probar, o el aviso si ya lo usó.
   // CFX_MODULOS_TIENDA.prueba(el, clave, { rpc, alCambiar }) → true si puso algo.
@@ -34,7 +36,7 @@
     o = o || {}; let D = null;
     try { D = await o.rpc('cfx_modulos_tienda'); } catch (x) { return false; }
     const m = D && D.activo && (D.modulos || []).find((x) => x.clave === clave && x.vende);
-    if (!el || !m || m.activo || !D.dueno) return false;
+    if (!el || !m || m.activo || !D.dueno || m.nota) return false;
     if (!puedePrueba(D, m)) { if (!m.prueba_usada) return false; el.innerHTML = '<p class="cfxd-usada">' + USADA + '</p>'; return true; }
     el.innerHTML = '<button type="button" class="si" data-gratis style="width:100%">🎁 Probar ' + esc(m.nombre) + ' ' + D.prueba_dias + ' días gratis</button>';
     const g = el.querySelector('[data-gratis]');
@@ -62,6 +64,8 @@
     '.cfxm-fila{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}.cfxm-fila b{white-space:nowrap}' +
     '.cfxm-key{margin:12px 0 0}.cfxm-key summary{cursor:pointer;font-weight:600}.cfxm-key .cfxm-fila{margin-top:8px;align-items:center}.cfxm-key input{flex:1;min-width:0}' +
     '.cfxm-aviso{border-radius:12px;padding:10px 12px;background:rgba(217,162,27,.14);font-size:14px}.cfxm-camp{background:rgba(22,163,74,.14);font-weight:600}' +
+    '.cfxm-pronto{border-radius:10px;padding:8px 10px;margin:8px 0 0;background:var(--cfx-fondo-2,rgba(100,116,139,.12));color:var(--cfx-texto-2,#5b6472);font-size:13px;font-weight:600}' +
+    '.cfxm-chips span.cfxm-chip-pronto{opacity:.65}' +
     '.cfxm-gratis{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border-radius:99px;background:#15803d;color:#fff;margin:4px 0}.cfxm-err{color:#b91c1c;font-size:13px;min-height:1em}';
   document.head.appendChild(css);
 
@@ -90,19 +94,20 @@
           '<h3>' + esc(p.nombre) + '</h3><p class="cfxm-sub">' + esc(p.detalle) + '</p>' +
           '<p class="cfxm-precio">' + pesos(precio(p)) + '<small>' + per() + '</small>' + (D.descuento ? '<span class="cfxm-antes">' + pesos(anual ? p.lista * D.anual_meses : p.lista) + '</span>' : '') + '</p>' +
           (ahorro ? '<p class="cfxm-sub">Sueltos costarían ' + pesos(anual ? p.suelto * D.anual_meses : p.suelto) + ': ahorras ' + ahorro + '%</p>' : '') +
-          '<div class="cfxm-chips">' + p.modulos.map((k) => '<span>' + esc(nombreDe(k)) + '</span>').join('') + '</div>' +
+          '<div class="cfxm-chips">' + p.modulos.map((k) => (p.pronto || []).includes(k) ? '<span class="cfxm-chip-pronto">🔜 ' + esc(nombreDe(k)) + '</span>' : '<span>' + esc(nombreDe(k)) + '</span>').join('') + '</div>' +
+          ((p.pronto || []).length && !p.nota ? '<p class="cfxm-sub">🔜 = todavía no disponible; se activa solo cuando esté listo.</p>' : '') + (p.nota && !activo ? PRONTO(p) : '') +
           (activo ? '<span class="cfxm-ok">✅ Lo tienes activo</span>' : '') +
           (D.dueno ? '<div class="cfxm-btns">' + (!activo ? '<button type="button" data-probar="' + esc(p.clave) + '">▶️ Ver demo</button>' + (puedePrueba(D, p, true) ? btnPrueba(D, p.clave) : '') : '') +
-            '<button type="button" class="si" data-comprar="' + esc(p.clave) + '">' + (activo ? '🔁 Renovar' : 'Comprar') + '</button></div>' : '') + '</div>';
+            (p.nota ? '<button type="button" class="si" disabled>🔜 Pronto</button>' : '<button type="button" class="si" data-comprar="' + esc(p.clave) + '">' + (activo ? '🔁 Renovar' : 'Comprar') + '</button>') + '</div>' : '') + '</div>';
       }).join('');
       const sueltos = mods.map((m) => '<div class="cfxm-mod"><div class="cfxm-fila"><h3>' + esc(m.nombre) + '</h3><b>' + pesos(precio(m)) + per() + '</b></div>' +
-        (m.regalo && D.campana ? '<span class="cfxm-gratis">🎁 GRATIS ' + D.campana.meses + (D.campana.meses === 1 ? ' mes' : ' meses') + '</span>' : '') +
-        '<p class="cfxm-sub">' + esc(m.detalle) + '</p>' + estado(m) +
+        (m.regalo && D.campana && !m.nota ? '<span class="cfxm-gratis">🎁 GRATIS ' + D.campana.meses + (D.campana.meses === 1 ? ' mes' : ' meses') + '</span>' : '') +
+        '<p class="cfxm-sub">' + esc(m.detalle) + '</p>' + estado(m) + (m.nota ? PRONTO(m) : '') +
         (D.dueno && !m.plan ? '<div class="cfxm-btns">' + (!m.activo ? '<button type="button" data-probar="' + esc(m.clave) + '">▶️ Ver demo</button>' + (puedePrueba(D, m) ? btnPrueba(D, m.clave) : '') : '') +
-          (m.regalo && D.campana ? '<button type="button" class="si" data-regalo="' + esc(m.clave) + '">🎁 Activar gratis</button>'
+          (m.nota ? '<button type="button" class="si" disabled>🔜 Pronto</button>' : m.regalo && D.campana ? '<button type="button" class="si" data-regalo="' + esc(m.clave) + '">🎁 Activar gratis</button>'
             : '<button type="button" class="si" data-comprar="' + esc(m.clave) + '">' + (m.activo && m.origen !== 'prueba' ? '🔁 Renovar' : 'Comprar') + '</button>') + '</div>' : '') + '</div>').join('');
       const incluidos = D.modulos.filter((m) => !m.vende);
-      const nReg = mods.filter((m) => m.regalo).length;
+      const nReg = mods.filter((m) => m.regalo && !m.nota).length;
       el.innerHTML = '<div class="cfxm">' +
         (D.campana && nReg ? '<div class="cfxm-aviso cfxm-camp">🎁 Lanzamiento: ' + (nReg === 1 ? '1 módulo GRATIS' : nReg + ' módulos GRATIS') + ' por ' + D.campana.meses + (D.campana.meses === 1 ? ' mes' : ' meses') +
           '. Toca 🎁 Activar gratis y lo tienes al tiro. Solo hasta el ' + fecha(D.campana.hasta) + '.</div>' : '') +
@@ -274,7 +279,7 @@
       '<div class="cfxd-esc" aria-live="polite"></div><p class="cfxd-ej">▶️ Ejemplo con datos inventados: no usa ni cambia nada de tu negocio. <a href="#" data-otra>Ver otra vez</a></p>' +
       (x.precio ? '<p class="cfxd-precio">' + pesos(x.precio) + '<small>/mes</small></p>' : '') +
       '<div class="cfxd-btns">' +
-      (activo ? '' : D.dueno && !pack && mod.regalo && D.campana ? '<button type="button" class="si" data-regalo>🎁 Activar gratis ' + D.campana.meses + (D.campana.meses === 1 ? ' mes' : ' meses') + '</button>'
+      (x.nota && !activo ? PRONTO(x) + '<button type="button" class="si" disabled>🔜 Pronto</button>' : activo ? '' : D.dueno && !pack && mod.regalo && D.campana ? '<button type="button" class="si" data-regalo>🎁 Activar gratis ' + D.campana.meses + (D.campana.meses === 1 ? ' mes' : ' meses') + '</button>'
         : D.dueno ? '<button type="button" class="' + (puedeProbar ? '' : 'si') + '" data-comprar>Comprar</button>' : '<p class="cfxd-sub" style="text-align:center">Pídele al dueño del negocio que lo active en 🧩 Módulos.</p>') +
       '<button type="button" class="cerrar" data-x>Cerrar</button></div><p class="cfxd-err"></p></div>';
     document.body.appendChild(d);
@@ -319,8 +324,8 @@
     const m = D && D.activo && (D.modulos || []).find((x) => x.clave === clave && x.vende);
     if (!m || m.activo) return false;
     el.innerHTML = '<div class="cfxk"><div class="ico">🧩</div><h2>' + esc(m.nombre) + '</h2><p>' + esc(m.detalle) + '</p>' +
-      '<p><b>Este módulo no está activo en tu negocio.</b></p>' + (m.prueba_usada && D.dueno ? '<p class="cfxd-usada">' + USADA + '</p>' : '') +
-      (puedePrueba(D, m) ? '<button type="button" data-gratis>🎁 Probar ' + D.prueba_dias + ' días gratis</button> ' : '') + '<button type="button" data-demo>▶️ ' + (m.prueba_usada ? 'Ver y comprar' : 'Ver demo') + '</button></div>';
+      '<p><b>Este módulo no está activo en tu negocio.</b></p>' + (m.nota ? PRONTO(m) : '') + (m.prueba_usada && D.dueno ? '<p class="cfxd-usada">' + USADA + '</p>' : '') +
+      (puedePrueba(D, m) ? '<button type="button" data-gratis>🎁 Probar ' + D.prueba_dias + ' días gratis</button> ' : '') + '<button type="button" data-demo>▶️ ' + (m.prueba_usada && !m.nota ? 'Ver y comprar' : 'Ver demo') + '</button></div>';
     el.querySelector('[data-demo]').onclick = () => probar(clave, Object.assign({}, o, { datos: D }));
     const g = el.querySelector('[data-gratis]');
     if (g) g.onclick = async () => { if (await activarPrueba(o.rpc, clave, g)) { if (o.alCambiar) o.alCambiar(); else location.reload(); } };
