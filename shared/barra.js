@@ -46,11 +46,14 @@
     const nav = cfg.nav ? document.querySelector(cfg.nav) : buscarNav();
     if (!nav || nav.dataset.cfx === '1') return;
     nav.dataset.cfx = '1';
+    nav.cfxCfg = cfg;
+    // G168 · Despega #10: al volver a armarla (accesos directos nuevos) se sacan los ⋯ y huecos que puso la vez anterior.
+    nav.querySelectorAll(':scope > .cfx-vacio, :scope > button.cfx-menu').forEach((x) => x.remove());
     nav.classList.add('cfx-barra');
     document.body.classList.add('cfx-con-barra');
     let botones = Array.from(nav.children).filter((b) => /^(A|BUTTON)$/.test(b.tagName));
     // El + : el que la app ya marca como principal, o uno nuevo con la acción indicada.
-    let mas = (cfg.plus && botones.find((b) => clave(b) === cfg.plus)) || botones.find((b) => b.matches('.mas-grande, .nav-mas, .nuevo, [data-cfx-nuevo]'));
+    let mas = (cfg.plus && botones.find((b) => clave(b) === cfg.plus)) || botones.find((b) => b.matches('.mas-grande, .nav-mas, .nuevo, [data-cfx-nuevo], .cfx-mas'));
     if (!mas && cfg.nuevo) {
       mas = document.createElement('button');
       mas.type = 'button';
@@ -87,6 +90,14 @@
       const resto = botones.filter((b) => b !== mas && clave(b) !== kMas).map(clave);
       orden = [resto[0], resto[1], '+', resto[2], kMas || resto[3]].filter((x) => x !== undefined);
     }
+    // G168 · Despega #10: 📌 accesos directos a tu gusto (Personalizar → Barra de abajo): los 3 botones al lado del +.
+    //   El + y el último (Más) no se cambian. Se eligen de TODOS los botones de la app (también los que viven en Más).
+    const fin = orden.length >= (mas ? 5 : 4) ? orden[orden.length - 1] : '';
+    nav.cfxFin = fin; nav.cfxAccPedido = JSON.stringify(btCfg.accesos || []);
+    const acc = btCfg.accesos || [];
+    if (acc.length === 3 && new Set(acc).size === 3 && acc.every((k) => k !== '+' && k !== fin && botones.some((b) => b !== mas && clave(b) === k && !b.hidden))) {
+      orden = (mas ? [acc[0], acc[1], '+', acc[2]] : acc.slice()).concat(fin ? [fin] : []);
+    }
     const usados = new Set();
     const porClave = (k) => k === '+' ? mas : botones.find((b) => clave(b) === k && !usados.has(b));
     const fila0 = orden.map(porClave).filter(Boolean);
@@ -106,6 +117,18 @@
     }
     // G116 · ⋯ Más lleva DIRECTO a los Ajustes de la app (sin ventanita): los botones que no caben aparecen dentro
     //   de ese menú (CFX_MENU los agrega solos, ayuda.js). Solo sin "Más" propio de la app se abre la hoja con ellos.
+    // G168 · Barbería #4: el último botón (el "Más" o Ajustes propio de la app) se ve IGUAL en todas las apps: ⋯ y la palabra "Más".
+    if (bMas) {
+      const ic = bMas.querySelector(':scope > .ico, :scope > .i, :scope > .cfx-ico, :scope > span:not(.badge):not(.punto):not(.t):not(.txt):not(.label), :scope > svg');
+      const pon = '<span class="cfx-ico cfx-ico-mas">' + svg('menu') + '</span>';
+      if (ic) ic.outerHTML = pon; else bMas.insertAdjacentHTML('afterbegin', pon);
+      const et = bMas.querySelector(':scope > small, :scope > .t, :scope > .txt, :scope > .label');
+      if (et) et.textContent = 'Más';
+      let puesto = !!et;
+      [...bMas.childNodes].forEach((n) => { if (n.nodeType === 3 && n.data.trim()) { if (puesto) n.remove(); else { n.data = 'Más'; puesto = true; } } });
+      if (!puesto) bMas.appendChild(document.createTextNode('Más'));
+      bMas.setAttribute('aria-label', 'Más');
+    }
     if (menu && bMas) {
       bMas.classList.add('cfx-menu-app');
       const marcarM = () => { const on = extra.some((b) => b.classList.contains('on') || b.classList.contains('activo')); if (bMas.classList.contains('cfx-mas-on') !== on) bMas.classList.toggle('cfx-mas-on', on); };
@@ -448,8 +471,14 @@
     }).filter((x) => x.k && x.e);
   }
   let btPintando = false;
+  // G168: los botones que se pueden poner de acceso directo (todos menos el + y el Más) y los que están ahora.
+  const btCandidatos = () => { const n = barraNav(); if (!n) return [];
+    return [...n.children].filter((b) => /^(A|BUTTON)$/.test(b.tagName) && !b.hidden && !b.classList.contains('cfx-mas') && !b.classList.contains('cfx-menu') && clave(b) && clave(b) !== n.cfxFin)
+      .map((b) => { const e = btEtiqueta(b), ico = b.querySelector(':scope > .cfx-ico, :scope > span:first-child, :scope > svg');
+        return { k: clave(b), t0: b.dataset.cfxT0 || (e ? e.leer() : clave(b)), ico: ico ? ico.outerHTML : '', on: !b.classList.contains('cfx-oculto') }; }); };
   function btPintar(c) {
     if (c) btCfg = c;
+    { const n = barraNav(); if (n && n.dataset.cfx === '1' && n.cfxAccPedido !== undefined && n.cfxAccPedido !== JSON.stringify(btCfg.accesos || [])) { delete n.dataset.cfx; montar(n.cfxCfg); } }
     const r = document.documentElement, C = btCfg;
     if (C.tipo && C.tipo !== 'clasica') r.dataset.cfxBtipo = C.tipo; else delete r.dataset.cfxBtipo;
     if (C.tam && C.tam !== 'normal') r.dataset.cfxBtam = C.tam; else delete r.dataset.cfxBtam;
@@ -468,7 +497,7 @@
   new MutationObserver(() => { if (btPintando || !Object.keys(btCfg.textos || {}).length) return; clearTimeout(btT); btT = setTimeout(() => btPintar(), 60); })
     .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   document.addEventListener('cfx-barra-lista', () => btPintar());
-  const personal = { TIPOS: BT_TIPOS, TAMS: BT_TAMS, pintar: btPintar, botones: () => btBotones().map(({ k, t0, ico }) => ({ k, t0, ico })), cfg: () => btCfg };
+  const personal = { TIPOS: BT_TIPOS, TAMS: BT_TAMS, pintar: btPintar, botones: () => btBotones().map(({ k, t0, ico }) => ({ k, t0, ico })), cfg: () => btCfg, candidatos: btCandidatos };
   window.CodeFixBarra = { montar, ver: verBarra, ocultar: ocultarBarra, pasar, pista, personal };
   const iniciar = () => setTimeout(() => { montar(); setTimeout(() => document.documentElement.classList.add('cfx-barra-lista'), 1200); }, 0);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();

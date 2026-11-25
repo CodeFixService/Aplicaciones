@@ -2292,10 +2292,12 @@
   function btLimpio(g) {
     g = g && typeof g === 'object' ? g : {};
     const tx = {}; Object.keys(g.textos || {}).slice(0, 12).forEach((k) => { const t = String(g.textos[k] || '').replace(/[<>]/g, '').trim().slice(0, 14); if (t && /^[\w+-]{1,40}$/.test(k)) tx[k] = t; });
-    return { tipo: BT_TIPOS.includes(g.tipo) ? g.tipo : 'clasica', tam: BT_TAMS.includes(g.tam) ? g.tam : 'normal', textos: tx };
+    // G168 · 📌 accesos directos: 3 claves distintas (los botones al lado del +) o ninguno (= los de la app).
+    const ac = Array.isArray(g.accesos) ? g.accesos.filter((k) => typeof k === 'string' && /^[\w+-]{1,40}$/.test(k) && k !== '+').slice(0, 3) : [];
+    return { tipo: BT_TIPOS.includes(g.tipo) ? g.tipo : 'clasica', tam: BT_TAMS.includes(g.tam) ? g.tam : 'normal', textos: tx, accesos: ac.length === 3 && new Set(ac).size === 3 ? ac : [] };
   }
   const btLeer = () => { try { return btLimpio(JSON.parse(localStorage.getItem(btLlave()) || '{}')); } catch (e) { return btLimpio({}); } };
-  const btGuardar = (g, quieto) => { g = btLimpio(g); try { if (g.tipo === 'clasica' && g.tam === 'normal' && !Object.keys(g.textos).length) localStorage.removeItem(btLlave()); else localStorage.setItem(btLlave(), JSON.stringify(g)); } catch (e) { /* lleno */ } if (BAR()) BAR().pintar(g); if (!quieto) peCambio(); };
+  const btGuardar = (g, quieto) => { g = btLimpio(g); try { if (g.tipo === 'clasica' && g.tam === 'normal' && !Object.keys(g.textos).length && !g.accesos.length) localStorage.removeItem(btLlave()); else localStorage.setItem(btLlave(), JSON.stringify(g)); } catch (e) { /* lleno */ } if (BAR()) BAR().pintar(g); if (!quieto) peCambio(); };
   const peV = () => { try { return +localStorage.getItem(peLlaveV()) || 0; } catch (e) { return 0; } };
   const colLimpio = (g) => { const o = {}; if (g && typeof g === 'object') Object.keys(g).forEach((k) => { if (/^(fondo|tarjeta|texto|icono|barra|marca2)$/.test(k) && HEX.test(g[k])) o[k] = g[k].toLowerCase(); }); return o; };
   const peFoto = () => { const L = ltLeer(); return { v: peV(), col: { claro: colLeer('claro'), oscuro: colLeer('oscuro') }, letra: { t: L.t, g: L.g, f: L.f }, barra: btLeer() }; };
@@ -2452,6 +2454,16 @@
       const B = BAR(), bs = B ? B.botones() : [];
       if (!bs.length) { c.innerHTML = ''; return; }  // página sin barra de abajo
       const g = btLeer();
+      // G168 · Despega #10: 📌 Accesos directos: eliges los 3 botones al lado del + (de todos los que tiene la app). El + y el Más quedan fijos.
+      const accHtml = () => {
+        const cs = B.candidatos ? B.candidatos() : []; if (cs.length < 3) return '';
+        const ahora = g.accesos.length === 3 ? g.accesos : cs.filter((x) => x.on).map((x) => x.k).concat(cs.filter((x) => !x.on).map((x) => x.k)).slice(0, 3);
+        const nom = ['1.º (izquierda)', '2.º (junto al +)', '3.º (después del +)'];
+        return '<details class="cfx-pe-nombres cfx-pe-acc"' + (g.accesos.length ? ' open' : '') + '><summary>📌 Accesos directos</summary>' +
+          '<p class="cfx-pf-nota">Elige qué botones van al lado del +. El + y el Más no se cambian.</p>' +
+          ahora.map((k, i) => '<label>' + nom[i] + '</label><select data-pe-acc="' + i + '">' + cs.map((x) => '<option value="' + esc(x.k) + '"' + (x.k === k ? ' selected' : '') + '>' + esc(g.textos[x.k] || x.t0) + '</option>').join('') + '</select>').join('') +
+          (g.accesos.length ? '<button type="button" class="cfx-pe-acc-r" data-pe-acc-r>↺ Los de la app</button>' : '') + '</details>';
+      };
       const prev = () => { const L = bs.map((b) => '<span class="' + (b === bs[0] ? 'on' : '') + '"><i>' + b.ico + '</i>' + esc(g.textos[b.k] || b.t0) + '</span>'); L.splice(Math.min(2, L.length), 0, '<b>+</b>');
         return '<div class="cfx-pe-prev" data-tipo="' + g.tipo + '" data-tam="' + g.tam + '" style="--n:' + L.length + '" aria-hidden="true">' + L.join('') + '</div>'; };
       c.innerHTML = '<label>Barra de abajo</label>' + prev() +
@@ -2459,7 +2471,15 @@
         '<label>Tamaño de la barra</label><div class="cfx-pf-modos">' + BT_TAMS.map((k) => '<button type="button" data-pe-tam="' + k + '" aria-pressed="' + (k === g.tam) + '" class="' + (k === g.tam ? 'on' : '') + '">' + BT_TNOM[k] + '</button>').join('') + '</div>' +
         '<details class="cfx-pe-nombres"><summary>✏️ Nombre de cada botón</summary>' + bs.map((b) => '<div class="cfx-pe-txt"><i>' + b.ico + '</i><input data-pe-txt="' + esc(b.k) + '" maxlength="14" placeholder="' + esc(b.t0) + '" value="' + esc(g.textos[b.k] || '') + '" aria-label="Nombre de ' + esc(b.t0) + '">' +
           '<button type="button" data-pe-r="' + esc(b.k) + '" aria-label="Volver a ' + esc(b.t0) + '" title="Volver al nombre de la app">↺</button></div>').join('') +
-          '<p class="cfx-pf-nota">Máx. 14 letras. Vacío = el nombre de la app. En el computador el menú del lado también los usa.</p></details>';
+          '<p class="cfx-pf-nota">Máx. 14 letras. Vacío = el nombre de la app. En el computador el menú del lado también los usa.</p></details>' + accHtml();
+      c.querySelectorAll('[data-pe-acc]').forEach((x) => { x.onchange = (ev) => {
+        ev.stopPropagation();
+        const v = [...c.querySelectorAll('[data-pe-acc]')].map((y) => y.value);
+        if (new Set(v).size < 3) { aviso('📌 Elige 3 botones distintos'); return; }
+        const n = btLeer(); n.accesos = v; btGuardar(n); aviso('📌 Accesos directos guardados'); pintarBarraPe(z);
+      }; });
+      const accR = c.querySelector('[data-pe-acc-r]');
+      if (accR) accR.onclick = (ev) => { ev.preventDefault(); ev.stopPropagation(); const n = btLeer(); n.accesos = []; btGuardar(n); aviso('↺ Accesos de la app'); pintarBarraPe(z); };
       const vivo = (n) => { const nv = document.createElement('div'); g.tipo = n.tipo; g.tam = n.tam; g.textos = n.textos; nv.innerHTML = prev(); c.querySelector('.cfx-pe-prev').replaceWith(nv.firstChild); };
       c.oninput = (ev) => { const i = ev.target.closest('[data-pe-txt]'); if (!i) return; const n = btLeer(); n.textos[i.dataset.peTxt] = i.value; vivo(btLimpio(n)); };
       c.onchange = (ev) => { const i = ev.target.closest('[data-pe-txt]'); if (!i) return; const n = btLeer(); n.textos[i.dataset.peTxt] = i.value; btGuardar(n); aviso('✏️ Nombre guardado'); };
