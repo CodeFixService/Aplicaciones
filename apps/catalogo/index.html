@@ -568,11 +568,14 @@
   // G128 💳 Cómo paga (solo lo permitido; la base lo vuelve a revisar) y 🛠️/🔑 sin envío.
   let cobroSel = 'ahora';
   let cupon = null; // G139: antes de pintarCobro (el botón lo usa)
-  const ventaDe = (l) => venta[l.clave] || { tipo: 'producto', cobro: 'ahora' };
+  // G167 (Despega #6): si la tienda no marcó el tipo, manda la regla única del núcleo (CFX_TIPO.de = cfx_tipo_adivinar): 🛠️/🔑 no piden retiro ni despacho y pagan en línea.
+  const ventaDe = (l) => { const v = venta[l.clave], i = itemDe(l);
+    const tipo = v && v.tipo !== 'producto' ? v.tipo : window.CFX_TIPO && i ? CFX_TIPO.de(Object.assign({}, i, { tipo: v ? v.tipo : '' })) : 'producto';
+    return Object.assign({ cobro: 'ahora' }, v || {}, { tipo }); };
   function pintarCobro(ls) {
     if (!window.CFX_COBRO) return;
     // G156: un ítem de la categoría "Servicio…" no pide retiro ni despacho (se coordina por mensaje), aunque la tienda no haya marcado 🛠️ Servicio.
-    const fis = ls.some(({ l }) => ventaDe(l).tipo === 'producto' && !esServ(l));
+    const fis = ls.some(({ l }) => ventaDe(l).tipo === 'producto');
     sinEnvio = !fis;
     ['entregaL', 'entrega'].forEach((k) => $(k).classList.toggle('hidden', !fis));
     if (!fis && entrega !== 'retiro') { entrega = 'retiro'; $('rowDir').classList.add('hidden'); $('entrega').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.e === 'retiro')); }
@@ -582,7 +585,6 @@
   }
   // Retiro o despacho (el despacho tiene costo adicional según la distancia).
   let entrega = 'retiro', sinEnvio = false;
-  function esServ(l) { const i = itemDe(l); return !!(i && /servic/i.test(i.categoria || '')); }
   $('entrega').onclick = (e) => {
     const b = e.target.closest('[data-e]');
     if (!b) return;

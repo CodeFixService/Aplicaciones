@@ -161,7 +161,10 @@
   // G128 🛒 tipo y forma de pago de cada ítem (de fábrica: 📦 producto ⚡ pagar ahora; nunca trae el acceso digital).
   const venta = {};
   Cuenta.rpc('catalogo_venta_publica', { p_slug: slug }).then((l) => { (l || []).forEach((x) => { venta[x.clave] = x; }); try { pintar(); pintarCarro(); } catch (e) { /* aún cargando */ } }).catch(() => {});
-  const ventaDe = (k) => venta[k] || { tipo: 'producto', cobro: 'ahora' };
+  // G167 (Despega #6): si la tienda no marcó el tipo, manda la regla única del núcleo (CFX_TIPO.de = cfx_tipo_adivinar): 🛠️/🔑 sin retiro ni despacho.
+  const ventaDe = (k) => { const v = venta[k], i = items.find((x) => x.clave === k);
+    const tipo = v && v.tipo !== 'producto' ? v.tipo : window.CFX_TIPO && i ? CFX_TIPO.de(Object.assign({}, i, { tipo: v ? v.tipo : '' })) : 'producto';
+    return Object.assign({ cobro: 'ahora' }, v || {}, { tipo }); };
   const chipVenta = (k) => { const v = ventaDe(k); return v.tipo === 'servicio' ? '🛠️ Servicio' : v.tipo === 'digital' ? '🔑 Digital: llega al pagar' : v.cobro === 'abono' ? '💵 Abono ' + (v.abono || 50) + '%' : v.cobro === 'retiro' ? '💰 Pagas al retirar' : ''; };
   const fotos = {};
   function pintar() {

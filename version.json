@@ -1,6 +1,6 @@
 {
-  "version": "7.08",
+  "version": "7.09",
   "bd": "6.05",
   "funcion": "3.9",
-  "notas": "🐞 G165 (núcleo 3.58): tienda: nombre completo en 3 por fila y el ❤️ ya no tapa la categoría · un solo botón ↺ de fábrica con aire arriba. 🧩 G163 (núcleo 3.57): en 🧩 Módulos, lo que todavía no funciona se ve 🔜 deshabilitado con su nota (no se compra ni se prueba). Lo que ya tienes sigue a la vista."
+  "notas": "🐞 G167 (núcleo 3.59): en el pedido y en tu tienda, lo 🛠️ servicio o 🔑 digital ya no pide Retiro/Despacho aunque no lo hayas marcado (misma regla del núcleo) y se paga en línea. 🐞 G165 (núcleo 3.58): tienda: nombre completo en 3 por fila y el ❤️ ya no tapa la categoría · un solo botón ↺ de fábrica con aire arriba. 🧩 G163 (núcleo 3.57): en 🧩 Módulos, lo que todavía no funciona se ve 🔜 deshabilitado con su nota (no se compra ni se prueba). Lo que ya tienes sigue a la vista."
 }
