@@ -37,6 +37,7 @@ core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()`
 
 ## 🐞 G159 (7.04 · núcleo 3.54)
 🔁 Compras recurrentes (G162): hoja del NÚCLEO (recurrente.js / sql/recurrente.sql, tabla cfx_recurrentes). Despega pone ganchos: cfx_recurrente_armar_app (armar_pedido + tipo), _cliente_app, _crear_app (guardar_pedido el día que toca), _puede_app (pro_o_modulo), cfx_mp_neg_token_app (mp_cuentas → ⚡ cobro automático). Tabla vieja `suscripciones` = respaldo (copiada con el mismo id por suscripciones_a_nucleo). Pruebas g162.js / g96a.js.
+🧩 G163: cfx_modulo_listo_app(k) (gancho del núcleo cfx_modulo_nota): 🌐 dominio sin cname+cf_token y 🛒 mercadolibre sin ml_client_id → 🔜 deshabilitados con nota (no se venden ni prueban). Prueba g163.js.
 
 ## 🐞 G156 (7.01 · bd 6.02)
 - 🎨 Diseños: publicar_ficha + `ficha_datos_guardar(key, datos)` (publicaciones.datos jsonb) · al abrir, `mis_fichas()` repone en la Galería lo que el celular no tiene (recuperarFichas) · Caja vacía → baja sola `respaldos/<id>/caja.json` (1 vez por sesión).

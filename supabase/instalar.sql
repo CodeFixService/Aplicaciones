@@ -5455,7 +5455,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '6.04'::text $$;
+language sql immutable as $$ select '6.05'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -6039,6 +6039,7 @@ begin
   if p_producto is not null then
     if public.cfx_negocio_cuenta((y ->> 'id')::uuid) is distinct from (y ->> 'id')::uuid then raise exception 'Pide al dueño del negocio que haga el pago'; end if;
     if p_periodo not in ('mensual', 'anual') or not coalesce((public.cfx_venta() ->> 'activo')::boolean, false) or cardinality(public.cfx_venta_modulos(p_producto)) = 0 then raise exception 'Módulo no válido'; end if;
+    if public.cfx_modulo_pronto(p_producto) is not null then raise exception '🔜 Todavía no disponible: %', public.cfx_modulo_pronto(p_producto); end if;  -- G163
   end if;
   if coalesce(p_monto, 0) < 1 then raise exception 'Escribe el monto que pagaste'; end if;
   if coalesce(length(p_comprobante), 0) < 200 then raise exception 'Sube la foto del comprobante'; end if;
@@ -6370,9 +6371,11 @@ begin
   if p_producto is not null and not coalesce(p_regalo, false) then
     if public.cfx_negocio_cuenta((y ->> 'id')::uuid) is distinct from (y ->> 'id')::uuid then raise exception 'Pide al dueño del negocio que haga el pago'; end if;
     if p_periodo not in ('mensual', 'anual') or not coalesce((public.cfx_venta() ->> 'activo')::boolean, false) or cardinality(public.cfx_venta_modulos(p_producto)) = 0 then raise exception 'Módulo no válido'; end if;
+    if public.cfx_modulo_pronto(p_producto) is not null then raise exception '🔜 Todavía no disponible: %', public.cfx_modulo_pronto(p_producto); end if;  -- G163
     cup := null;
   elsif p_producto is not null then
     if p_periodo not in ('mensual', 'anual') or not coalesce((public.cfx_venta() ->> 'activo')::boolean, false) or cardinality(public.cfx_venta_modulos(p_producto)) = 0 then raise exception 'Módulo no válido'; end if;
+    if public.cfx_modulo_pronto(p_producto) is not null then raise exception '🔜 Todavía no disponible: %', public.cfx_modulo_pronto(p_producto); end if;  -- G163
     cup := null;
   end if;
   if exists (select 1 from public.cfx_pagos where cuenta = (y ->> 'id')::uuid and estado = 'pendiente' and medio not in ('mp', 'flow')) then raise exception 'Ya tienes un pago en revisión. Te avisamos apenas se apruebe.'; end if;
@@ -8586,7 +8589,7 @@ language plpgsql stable security definer set search_path = '' as $$
 begin
   perform public.cfx_es_admin();
   return coalesce((select jsonb_agg(jsonb_build_object('clave', k, 'nombre', coalesce(c.nombre, k), 'detalle', coalesce(c.detalle, ''),
-      'activo', public.cfx_modulo(k), 'precio', public.cfx_venta_precio(k),
+      'activo', public.cfx_modulo(k), 'precio', public.cfx_venta_precio(k), 'nota', case when to_regprocedure('public.cfx_modulo_nota(text)') is not null then public.cfx_modulo_nota(k) end,
       'negocios', (select count(*) from public.cfx_modulos_negocio m where m.modulo = k and m.hasta > now())) order by o)
     from unnest(public.cfx_modulos_de_app()) with ordinality u(k, o)
     left join public.cfx_modulos_catalogo() c on c.clave = k), '[]');
@@ -8732,6 +8735,18 @@ create or replace function public.cfx_venta_activa(p_modulo text) returns boolea
 language sql stable security definer set search_path = '' as $$
   select public.cfx_venta_on() and p_modulo = any(public.cfx_modulos_de_app()) and public.cfx_venta_precio(p_modulo) > 0
 $$;
+-- G163 🧩 ¿El módulo FUNCIONA hoy en esta app? Gancho opcional de cada app: cfx_modulo_listo_app(clave) → null = funciona ·
+-- texto = por qué todavía no (ej. falta que CodeFix active algo). Con nota: se ve DESHABILITADO con esa nota, no se vende ni se prueba;
+-- lo que el negocio ya tiene activo sigue a la vista (🛡️ nada se oculta). Nunca lanza error (si el gancho falla, cuenta como que funciona).
+create or replace function public.cfx_modulo_nota(p_modulo text) returns text
+language plpgsql stable security definer set search_path = '' as $$
+declare r text;
+begin
+  if to_regprocedure('public.cfx_modulo_listo_app(text)') is null then return null; end if;
+  execute 'select public.cfx_modulo_listo_app($1)' into r using p_modulo;
+  return nullif(trim(r), '');
+exception when others then return null;
+end $$;
 -- Módulos que trae un pack ('*' = todos los de la app) o el módulo mismo.
 create or replace function public.cfx_venta_modulos(p_item text) returns text[]
 language plpgsql stable security definer set search_path = '' as $$
@@ -8744,6 +8759,12 @@ end $$;
 
 -- G74 b · 🎁 Campaña de lanzamiento: {"modulos": [...], "meses": 3, "hasta": "AAAA-MM-DD"} en cfx_venta() -> 'campana'.
 -- Activa hasta el día "hasta" incluido (hora de Chile): sin cron, se apaga sola al pasar la fecha.
+-- Módulo o pack que NO se puede vender/probar ahora (null = se puede). Un pack se vende si al menos uno de sus módulos funciona.
+create or replace function public.cfx_modulo_pronto(p_item text) returns text
+language sql stable security definer set search_path = '' as $$
+  select case when not exists (select 1 from unnest(public.cfx_venta_modulos(p_item)) k where public.cfx_modulo_nota(k) is null)
+    then (select public.cfx_modulo_nota(k) from unnest(public.cfx_venta_modulos(p_item)) k limit 1) end
+$$;
 create or replace function public.cfx_campana() returns jsonb
 language sql stable security definer set search_path = '' as $$
   select case when public.cfx_venta_on() and jsonb_typeof(c) = 'object' and (c ->> 'hasta') ~ '^\d{4}-\d{2}-\d{2}$'
@@ -8848,7 +8869,7 @@ begin
         'precio', round(public.cfx_venta_precio(k) * (100 - d) / 100.0)::int, 'lista', public.cfx_venta_precio(k),
         'vende', public.cfx_venta_activa(k), 'activo', public.cfx_modulo_de(k, n) or public.cfx_modulo_plan(k, n), 'plan', public.cfx_modulo_plan(k, n),
         'hasta', m.hasta, 'origen', m.origen, 'regalo', public.cfx_campana_puede(k, n), 'prueba_usada', exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item = k) or public.cfx_prueba_usada(dn, k),
-        'links', v #> array['links', k]) order by o)
+        'links', v #> array['links', k], 'nota', public.cfx_modulo_nota(k)) order by o)
       from unnest(public.cfx_modulos_de_app()) with ordinality u(k, o)
       left join public.cfx_modulos_catalogo() c on c.clave = k
       left join public.cfx_modulos_negocio m on m.negocio = n and m.modulo = k
@@ -8857,7 +8878,8 @@ begin
         'destacado', coalesce((p.value ->> 'destacado')::boolean, false), 'modulos', to_jsonb(public.cfx_venta_modulos(p.key)),
         'precio', round(coalesce((p.value ->> 'precio')::int, 0) * (100 - d) / 100.0)::int, 'lista', coalesce((p.value ->> 'precio')::int, 0),
         'suelto', (select coalesce(sum(public.cfx_venta_precio(x)), 0) from unnest(public.cfx_venta_modulos(p.key)) x),
-        'links', v #> array['links', p.key]) order by coalesce((p.value ->> 'precio')::int, 0))
+        'links', v #> array['links', p.key], 'nota', public.cfx_modulo_pronto(p.key),
+        'pronto', (select coalesce(jsonb_agg(x), '[]') from unnest(public.cfx_venta_modulos(p.key)) x where public.cfx_modulo_nota(x) is not null)) order by coalesce((p.value ->> 'precio')::int, 0))
       from jsonb_each(coalesce(v -> 'packs', '{}')) p where cardinality(public.cfx_venta_modulos(p.key)) > 0), '[]'));
 end $$;
 
@@ -8876,11 +8898,12 @@ begin
   if public.cfx_prueba_usada(auth.uid(), case when pack then 'pack' else p_item end) then
     raise exception '%', case when pack then 'Ya usaste la prueba gratis de un pack con este correo' else 'Ya usaste la prueba gratis de este módulo con este correo' end; end if;
   if not pack and public.cfx_modulo_de(p_item, n) then raise exception 'Ya tienes este módulo activo'; end if;
+  if public.cfx_modulo_pronto(p_item) is not null then raise exception '🔜 Todavía no disponible: %', public.cfx_modulo_pronto(p_item); end if;  -- G163
   insert into public.cfx_modulos_pruebas (negocio, item) values (n, case when pack then 'pack:' || p_item else p_item end);
   perform public.cfx_prueba_marcar(auth.uid(), case when pack then 'pack' else p_item end);
   -- La prueba no alarga lo que ya está pagado: solo prende lo que no tiene.
   insert into public.cfx_modulos_negocio as m (negocio, modulo, hasta, origen)
-  select n, k, now() + make_interval(days => dias), 'prueba' from unnest(public.cfx_venta_modulos(p_item)) k
+  select n, k, now() + make_interval(days => dias), 'prueba' from unnest(public.cfx_venta_modulos(p_item)) k where public.cfx_modulo_nota(k) is null
   on conflict (negocio, modulo) do update set hasta = greatest(m.hasta, excluded.hasta), origen = case when m.hasta > now() then m.origen else 'prueba' end, avisado = null;
   select max(hasta) into h from public.cfx_modulos_negocio where negocio = n and modulo = any(public.cfx_venta_modulos(p_item));
   perform public.cfx_anotar('módulo', 'prueba ' || p_item || ' · ' || n);
@@ -8898,6 +8921,7 @@ begin
     raise exception '%', case when exists (select 1 from public.cfx_modulos_pruebas p where p.negocio = n and p.item = 'campana:' || p_modulo)
       then 'Ya activaste este regalo' else 'Este módulo no está en la campaña' end;
   end if;
+  if public.cfx_modulo_nota(p_modulo) is not null then raise exception '🔜 Todavía no disponible: %', public.cfx_modulo_nota(p_modulo); end if;  -- G163
   insert into public.cfx_modulos_pruebas (negocio, item) values (n, 'campana:' || p_modulo);
   insert into public.cfx_modulos_negocio as m (negocio, modulo, hasta, origen)
   values (n, p_modulo, now() + make_interval(months => (c ->> 'meses')::int), 'regalo')
@@ -9011,7 +9035,7 @@ begin
   return public.cfx_venta_admin();
 end $$;
 
-revoke all on function public.cfx_modulos_catalogo(), public.cfx_venta(), public.cfx_venta_on(), public.cfx_venta_precio(text), public.cfx_venta_activa(text), public.cfx_venta_modulos(text),
+revoke all on function public.cfx_modulos_catalogo(), public.cfx_venta(), public.cfx_venta_on(), public.cfx_venta_precio(text), public.cfx_venta_activa(text), public.cfx_venta_modulos(text), public.cfx_modulo_nota(text), public.cfx_modulo_pronto(text),
   public.cfx_negocio_cuenta(uuid), public.cfx_negocio_dueno(uuid), public.cfx_negocio_premium(uuid), public.cfx_modulo_plan(text, uuid), public.cfx_modulo_de(text, uuid), public.cfx_modulo_mio(text),
   public.cfx_modulos_dar(uuid, text, int, text), public.cfx_modulos_avisar(), public.cfx_modulos_borrar(uuid),
   public.cfx_campana(), public.cfx_campana_puede(text, uuid) from public, anon, authenticated;
@@ -15144,3 +15168,17 @@ end $$;
 revoke all on function public.cfx_negocio_nombre_app(uuid), public.cfx_recurrente_puede_app(uuid), public.cfx_recurrente_cliente_app(uuid, uuid),
   public.cfx_mp_neg_token_app(uuid, boolean), public.cfx_recurrente_armar_app(uuid, jsonb), public.cfx_recurrente_crear_app(uuid),
   public.suscripciones_a_nucleo(), public.suscripciones_correr() from public, anon, authenticated;
+
+-- ---------- VERSIÓN 6.05 · G163 🧩 No se ofrece lo que todavía no funciona (se puede volver a correr) ----------
+-- Gancho del núcleo (modulos_venta.sql cfx_modulo_nota): null = el módulo funciona; texto = por qué todavía no (se ve 🔜 deshabilitado).
+create or replace function public.cfx_modulo_listo_app(p_modulo text) returns text
+language sql stable security definer set search_path = '' as $$
+  select case
+    when p_modulo = 'dominio' and (coalesce((select valor ->> 'cname' from public.cfx_config where clave = 'dominio'), '') = ''
+        or not exists (select 1 from public.app_secrets where name = 'cf_token' and coalesce(value, '') <> ''))
+      then 'CodeFix está terminando de activar los dominios propios.'
+    when p_modulo = 'mercadolibre' and not exists (select 1 from public.app_secrets where name = 'ml_client_id' and coalesce(value, '') <> '')
+      then 'CodeFix está terminando de conectar Mercado Libre.'
+  end
+$$;
+revoke all on function public.cfx_modulo_listo_app(text) from public, anon, authenticated;

@@ -1,6 +1,6 @@
 {
-  "version": "7.07",
-  "bd": "6.04",
+  "version": "7.08",
+  "bd": "6.05",
   "funcion": "3.9",
-  "notas": "🐞 Túnel (núcleo 3.57): en la tienda el nombre se ve completo en la vista de 3 por fila y el ❤️ ya no tapa la categoría ni el nombre · un solo botón ↺ de fábrica con aire arriba."
+  "notas": "🐞 G165 (núcleo 3.58): tienda: nombre completo en 3 por fila y el ❤️ ya no tapa la categoría · un solo botón ↺ de fábrica con aire arriba. 🧩 G163 (núcleo 3.57): en 🧩 Módulos, lo que todavía no funciona se ve 🔜 deshabilitado con su nota (no se compra ni se prueba). Lo que ya tienes sigue a la vista."
 }
