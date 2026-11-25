@@ -47,6 +47,7 @@ core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()`
 - tienda_publica / tienda_info traen `verificado` = existe cfx_verificaciones aprobada de la tienda (CM → Control → 🪪). Núcleo vitrina.js pinta ✓ azul junto al nombre + "Identidad verificada" (t/ y apps/catalogo/). cfx_marcar_verificado sigue vacío (no hace falta columna).
 
 ## 🛒 Cobro de pedidos (G128)
+- G160: tipo AUTOMÁTICO en el servidor si `tipo_manual` es false (núcleo `cfx_tipo_adivinar`); Caja = 3 botones (CFX_TIPO.montar). 🔑 Digital pagado → `pedidos.accesos` = [{nombre, clave}] (núcleo `cfx_claves`); el acceso se ve al canjear (CFX_TIPO.acceso). Pedidos → 🔑 Claves (lista + 🔄 Reponer).
 - Ítem: `catalog_items.tipo` (producto/servicio/digital) · `cobro` (ahora/abono/retiro) · `abono_pct` · `acceso` (solo al pagar). Caja → producto → 🛒 Venta online (`catalogo_venta`).
 - Pedido: `cobro`, `a_pagar` (lo que se paga ahora; null = total), `abonado_at`, `accesos`. Sin medio (ni 🏦 datos_pago, ni MP/Flow, ni link) = 💰 paga al retirar. Trigger `pedido_g128`.
 - G146 (6.91): 🛒 la barra "Ver pedido" (#barra) ya no se muestra: catálogo y t/ llaman carroFlotante(n, total) → núcleo ui.js CFX_CARRITO (redondo sobre el menú; ✕ → 🛒 chico en la cabecera; abrir = click de #bVerCarro / #bVer).

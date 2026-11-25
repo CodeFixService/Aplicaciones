@@ -699,17 +699,23 @@
     $('rowAbono').classList.toggle('hidden', $('p-cobro').value !== 'abono'); $('rowAcceso').classList.toggle('hidden', tp !== 'digital');
     $('pVentaRes').textContent = VT[tp] + ' · ' + VC[$('p-cobro').value] + ($('p-cobro').value === 'abono' ? ' ' + ($('p-abono').value || 50) + '%' : '');
   }
+  // G160: el tipo usa CFX_TIPO del núcleo (3 botones grandes; automático por nombre/stock hasta que el dueño toque uno).
+  if (!window.CFX_TIPO && document.readyState !== 'complete') await new Promise((ok) => addEventListener('load', ok, { once: true }));  // pagos.js carga después
+  if (window.CFX_TIPO) CFX_TIPO.montar($('p-tipo'), { auto: () => ({ nombre: $('p-nombre').value, categoria: $('p-cat').value, stock: $('p-stock').value }) });
+  const autoTipo = () => { if (!esCliente && $('p-tipo').cfxAuto) $('p-tipo').cfxAuto(); };
+  ['p-nombre', 'p-cat', 'p-stock'].forEach((k) => $(k).addEventListener('input', autoTipo));
   function ponerVenta(v) {
-    v = v || {}; $('p-tipo').value = v.tipo || 'producto'; $('p-cobro').value = v.cobro || 'ahora'; $('p-abono').value = v.abono || ''; $('p-acceso').value = v.acceso || ''; pintarVenta();
+    v = v || {};
+    if (window.CFX_TIPO) CFX_TIPO.poner($('p-tipo'), v.tipo || 'producto', v.tipo ? v.manual !== false : false); else $('p-tipo').value = v.tipo || 'producto';
+    if (!v.tipo) autoTipo();
+    $('p-cobro').value = v.cobro || 'ahora'; $('p-abono').value = v.abono || ''; $('p-acceso').value = v.acceso || ''; pintarVenta();
   }
   ['p-tipo', 'p-cobro', 'p-abono'].forEach((k) => $(k).addEventListener('input', pintarVenta));
-  // G156: categoría "Servicio…" → el ítem pasa solo a 🛠️ Servicio (sin stock ni envío; se coordina por mensaje). Se puede cambiar en 🛒 Venta online.
-  $('p-cat').addEventListener('change', () => {
-    if (!esCliente && /servic/i.test($('p-cat').value) && $('p-tipo').value === 'producto') { $('p-tipo').value = 'servicio'; pintarVenta(); Core.toast('🛠️ Lo marcamos como Servicio: sin stock ni envío'); }
-  });
+  // G156 → G160: el tipo automático ya mira nombre + categoría + stock (CFX_TIPO.adivinar), no solo "Servicio…".
+  $('p-cat').addEventListener('change', autoTipo);
   $('pVentaW').classList.toggle('hidden', esCliente);
-  const leerVenta = () => ({ tipo: $('p-tipo').value, cobro: $('p-cobro').value, abono: $('p-cobro').value === 'abono' ? parseInt($('p-abono').value || '50', 10) : null, acceso: $('p-acceso').value.trim() });
-  const ventaFabrica = (v) => v.tipo === 'producto' && v.cobro === 'ahora';
+  const leerVenta = () => ({ tipo: $('p-tipo').value, manual: $('p-tipo').dataset.manual === '1', cobro: $('p-cobro').value, abono: $('p-cobro').value === 'abono' ? parseInt($('p-abono').value || '50', 10) : null, acceso: $('p-acceso').value.trim() });
+  const ventaFabrica = (v) => v.tipo === 'producto' && v.cobro === 'ahora' && !v.manual;
 
   function limpiarForm() {
     editId = null;

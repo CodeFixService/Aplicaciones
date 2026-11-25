@@ -285,6 +285,8 @@
         (p.entrega === 'despacho' && ['recibido', 'preparando', 'listo', 'en_camino'].includes(p.estado) ? '<button class="small alt" data-env="' + p.id + '">🚚 ' + (p.envio && p.envio.codigo ? 'Cambiar seguimiento' : 'Seguimiento') + '</button>' : '') +
         (etiq.has(p.id) ? '<button class="small alt" data-etv="' + p.id + '">🖨️ Etiqueta</button>'
           : p.entrega === 'despacho' && Cuenta.puede('courier') && ['recibido', 'preparando', 'listo'].includes(p.estado) ? '<button class="small alt" data-etq="' + p.id + '">🏷️ Etiqueta Chilexpress</button>' : '') +
+        // G160 🔑 claves de un solo uso: a quién se entregó cada una y 🔄 reponer.
+        ((p.lineas || []).some((x) => x.tipo === 'digital') && yo.role !== 'equipo' ? '<button class="small alt" data-claves="' + p.id + '">🔑 Claves</button>' : '') +
         (p.cliente_id ? '<button class="small alt" data-hilo="' + p.id + '">💬 Chat del pedido' + (hilos['pedido:' + p.id] ? ' (' + hilos['pedido:' + p.id] + ')' : '') + '</button>' : '') +
         (tel && p.invitado && p.token && window.CFX_COBRO ? '<a class="btn small alt" target="_blank" rel="noopener" href="' + Core.esc(CFX_COBRO.wa(tel, 'Hola ' + (p.cliente || '') + ' 👋 Este es el enlace de tu pedido en ' + ((yo.role === 'equipo' ? yo.negocio : yo.empresa) || 'la tienda') +
           ': ahí ves el estado' + (p.estado === 'pagando' ? ', pagas y subes el comprobante' : '') + '.\n' + Core.rootUrl() + 'r/?t=' + p.token)) + '">📲 Enviar enlace al cliente</a>' : '') +
@@ -293,6 +295,7 @@
           Core.esc(CFX_COBRO.waEstado(tel, p, (yo.role === 'equipo' ? yo.negocio : yo.empresa) || '', p.token ? Core.rootUrl() + 'r/?t=' + p.token : '')) + '">📲 Avisar: ' + ({ preparando: '👩‍🍳 preparando', listo: '✅ listo', en_camino: '🚚 en camino' }[p.estado]) + '</a>' : '') +
         (tel ? '<a class="btn small alt" target="_blank" rel="noopener" href="https://wa.me/' + tel + '">WhatsApp</a>' : '') + '</div>' +
         (p.cliente_id ? '<div class="hidden" data-hilo-de="' + p.id + '"></div>' : '') +
+        '<div class="hidden" data-claves-de="' + p.id + '"></div>' +
         (p.estado === 'entregado' && !p.calificado ? '<div class="row" style="align-items:center;margin-top:10px"><span class="muted" style="flex:none">Califica al cliente:</span><span class="califica">' +
           [1, 2, 3, 4, 5].map((n) => '<button type="button" data-cal="' + p.id + '" data-n="' + n + '" aria-label="' + n + ' estrellas">★</button>').join('') + '</span></div>' : '') +
         '</div>';
@@ -333,6 +336,20 @@
         const r = await Cuenta.rpc('revisar_comprobante', { p_id: b.dataset.rev, p_aprobar: si, p_motivo: motivo });
         Core.toast(si ? '✅ Pago aprobado: se descontó el stock'
           : r && r.estado === 'pagando' ? '🔁 Rechazado: el pedido sigue apartado para que suba otro comprobante' : 'Comprobante rechazado: pedido cerrado');
+      }
+      if (b.dataset.claves || b.dataset.reponer) {
+        const id = b.dataset.claves || b.dataset.ped, box = document.querySelector('[data-claves-de="' + id + '"]');
+        if (b.dataset.reponer) {
+          if (!await Core.confirmar('¿Anular esta clave y crear una nueva? La vieja deja de servir.')) return;
+          const r = await Cuenta.rpc('cfx_clave_reponer', { p_id: b.dataset.reponer });
+          if (!r.ok) return Core.toast(r.error); Core.toast('🔄 Nueva clave: ' + r.clave);
+        } else if (box && !box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+        const l = await Cuenta.rpc('cfx_clave_lista', { p_negocio: yo.id, p_pedido: id });
+        if (!box) return; box.classList.remove('hidden');
+        box.innerHTML = l.length ? l.map((c) => '<div class="row" style="align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="flex:1;min-width:160px"><b>' + Core.esc(c.nombre) + '</b> · <code>' + Core.esc(c.clave) + '</code><br><small class="muted">' +
+          (c.anulada ? '❌ Anulada' : c.canjeado_at ? '✅ Canjeada por ' + Core.esc(c.quien || '') + ' · ' + new Date(c.canjeado_at).toLocaleString('es-CL') : '⏳ Sin canjear') + '</small></span>' +
+          (c.anulada ? '' : '<button class="small alt" data-reponer="' + c.id + '" data-ped="' + id + '">🔄 Reponer</button>') + '</div>').join('') : '<p class="muted">Aún no hay claves: se crean al aprobar el pago.</p>';
+        return;
       }
       if (b.dataset.e) {
         if (b.dataset.e === 'cancelado' && !await Core.confirmar('¿Cancelar este pedido? Se le avisará al cliente.')) return;

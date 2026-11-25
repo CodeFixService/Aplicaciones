@@ -203,6 +203,8 @@
           (plan.k === 'otro' ? '<label for="cpOtro">Monto a pagar</label><input id="cpOtro" type="number" inputmode="numeric" min="1" placeholder="Ej: 10000">' : '') +
           cajaCupon +
           (medios.length > 1 ? '<div class="cp-tabs">' + medios.map((m) => '<button type="button" data-m="' + m + '" class="' + (m === medio ? 'on' : '') + '">' + NOMBRE_MEDIO[m] + '</button>').join('') + '</div>' : '') +
+          // G161: regla de entrega a la vista (⚡/💳 al tiro · 🔗/🏦 verificación humana).
+          '<small class="cfx-regla">⚡ Mercado Pago o 💳 Webpay: se activa al tiro · 🔗 Link o 🏦 transferencia: ⏳ lo revisa una persona y recién ahí se activa.</small>' +
           (mp ? '<div class="cp-caja"><div id="cpDesglose">' + desglose() + '</div>' +
               (ren ? '<label class="cp-renovar" style="display:flex;gap:8px;align-items:center;margin:8px 0;font-size:14px"><input type="checkbox" id="cpRenovar"' + (o._renovar ? ' checked' : '') + ' style="width:auto;min-height:0"> 🔁 Renovar solo ' + cada(plan.k) + ' (se cobra a tu tarjeta; lo quitas cuando quieras)</label>' +
                 (o._renovar ? '<label for="cpMpCorreo">Correo de tu cuenta de Mercado Pago</label><input id="cpMpCorreo" type="email" inputmode="email" autocomplete="email" value="' + esc(o._mpCorreo || (e.yo && e.yo.email) || '') + '">' : '') : '') +
@@ -528,6 +530,9 @@
     st.textContent = '.cfx-cobro{display:grid;gap:8px;margin:8px 0}.cfx-cobro button{display:flex;gap:8px;align-items:center;text-align:left;width:100%;min-height:48px;padding:10px 12px;border-radius:12px;' +
       'border:2px solid var(--cfx-borde,#e2e7ec);background:var(--cfx-tarjeta,#fff);color:var(--cfx-texto,#111827);font:inherit;cursor:pointer;overflow-wrap:anywhere}' +
       '.cfx-cobro button.on{border-color:var(--cfx-acento,#2563eb);background:color-mix(in srgb,var(--cfx-acento,#2563eb) 10%,var(--cfx-tarjeta,#fff))}' +
+      '.cfx-tipo{display:grid;gap:6px;margin:4px 0 8px}.cfx-tipo button{display:block;width:100%;text-align:left;padding:10px 12px;min-height:44px;border-radius:12px;border:2px solid var(--cfx-borde,#dce3ea);background:var(--cfx-tarjeta,#fff);color:inherit}' +
+      '.cfx-tipo button.on{border-color:var(--cfx-acento,#2563eb);background:color-mix(in srgb,var(--cfx-acento,#2563eb) 10%,var(--cfx-tarjeta,#fff))}.cfx-tipo b{display:block}.cfx-tipo small,.cfx-tipo-auto{display:block;color:var(--cfx-texto-2,#5b6472);font-size:13px}' +
+      '.cfx-tipo-chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--cfx-borde,#dce3ea);white-space:nowrap}.cfx-regla{display:block;font-size:13px;color:var(--cfx-texto-2,#5b6472);margin:6px 0}' +
       '.cfx-cobro small{display:block;color:var(--cfx-texto-2,#5b6472);font-size:13px}.cfx-cobro .cc-uno{margin:0;font-size:14px;color:var(--cfx-texto-2,#5b6472)}' +
       '.cfx-sinmedio{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:12px;margin:0 0 10px;overflow-wrap:anywhere;' +
       'background:color-mix(in srgb,#f59e0b 14%,var(--cfx-tarjeta,#fff));border:1px solid color-mix(in srgb,#f59e0b 45%,transparent);color:var(--cfx-texto,#111827)}' +
@@ -591,6 +596,8 @@
     el.innerHTML = ops.length === 1 ? '<div class="cfx-cobro"><p class="cc-uno"><b>' + esc(ops[0].txt) + '</b> · ' + esc(det(ops[0])) + '</p></div>'
       : '<div class="cfx-cobro" role="radiogroup" aria-label="Cómo pagas">' + ops.map((x) => '<button type="button" role="radio" aria-checked="' + (x.k === k) + '" class="' + (x.k === k ? 'on' : '') +
         '" data-cobro="' + x.k + '"><span><b>' + esc(x.txt) + '</b><small>' + esc(det(x)) + '</small></span></button>').join('') + '</div>';
+    // G161: la regla de entrega a la vista cuando se paga en línea.
+    if (ops.some((x) => x.k === 'ahora' || x.k === 'abono')) el.insertAdjacentHTML('beforeend', '<small class="cfx-regla">' + esc(REGLA) + '</small>');
     el.onclick = (e) => { const b = e.target.closest('[data-cobro]'); if (!b) return; elegir(el, ops, b.dataset.cobro, cb); };
     if (cb) cb(k);
     return k;
@@ -674,5 +681,68 @@
     vivo = setInterval(() => { if (!document.hidden) cargar(false); }, 20000);
   }
 
-  window.CFX_COBRO = { estado, opciones, elegir, boton, waEstado, sinMedios, enlace, wa, hilo, plata };
+  // G161 💳 REGLA DE ENTREGA (a la vista en TODAS): ⚡ MP/Webpay = al tiro · 🔗 link / 🏦 transferencia = ⏳ verificación humana.
+  const REGLA = '⚡ Mercado Pago o 💳 Webpay: se entrega al tiro · 🔗 Link o 🏦 transferencia: ⏳ la tienda revisa tu pago y recién ahí se entrega.';
+  function regla(el) { if (el) { el.className = 'cfx-regla'; el.textContent = REGLA; } return REGLA; }
+
+  window.CFX_COBRO = { estado, opciones, elegir, boton, waEstado, sinMedios, enlace, wa, hilo, plata, regla };
+
+  // ═══ G160 🧩 CFX_TIPO: tipo de venta único para las apps (📦 físico · 🛠️ servicio · 🔑 digital). Misma regla que cfx_tipo_adivinar (servidor). ═══
+  const TIPOS = {
+    producto: { ico: '📦', txt: 'Producto físico', det: 'Con stock · retiro o despacho' },
+    servicio: { ico: '🛠️', txt: 'Servicio', det: 'Sin stock ni envío · en el local, a domicilio o en línea' },
+    digital: { ico: '🔑', txt: 'Digital', det: 'Llega al validar el pago (clave de un solo uso)' }
+  };
+  const RX_DIG = /(licencia|\bkey\b|c[oó]digo de acceso|acceso digital|activaci[oó]n|suscripci|curso online|curso en l[ií]nea|e-?book|descargable|gift ?card digital)/i;
+  const RX_SRV = /(servic|manten|diagn|asesor|clase|corte|reparac|instalaci|consult|visita|revisi[oó]n|limpieza|lavado|afinad|ajuste|taller de|sesi[oó]n|tratamiento|masaje|barba|peinado|tintura)/i;
+  // adivinar({ nombre, categoria, stock }) → con stock (aunque sea 0) siempre 📦 (no se pierde stock); luego nombre + categoría.
+  function adivinar(p) {
+    p = p || {}; const st = p.stock === '' || p.stock == null ? null : Number(p.stock), t = (p.nombre || '') + ' ' + (p.categoria || '');
+    if (st != null && !isNaN(st)) return 'producto';
+    return RX_DIG.test(t) ? 'digital' : RX_SRV.test(t) ? 'servicio' : 'producto';
+  }
+  // de(item): el tipo elegido a mano manda; si no, el automático.
+  function de(p) { p = p || {}; return TIPOS[p.tipo] && (p.tipo_manual || p.tipo !== 'producto') ? p.tipo : adivinar(p); }
+  // entregas(tipos[]) → qué ofrecer: envio (retiro/despacho) solo si hay algún 📦.
+  function entregas(tipos) {
+    const l = (tipos || []).map((t) => (TIPOS[t] ? t : 'producto')), fis = l.includes('producto'), srv = l.includes('servicio'), dig = l.includes('digital');
+    return { envio: fis, servicio: srv, digital: dig,
+      nota: !fis && dig && !srv ? '🔑 Acceso digital al validar el pago: sin retiro ni despacho.' : !fis ? '🛠️ Servicio' + (dig ? ' y 🔑 acceso digital' : '') + ': sin retiro ni despacho (se coordina por mensaje).'
+        : srv || dig ? 'El retiro/despacho es solo para lo 📦 físico.' : '' };
+  }
+  function chip(t) { const x = TIPOS[t] || TIPOS.producto; return '<span class="cfx-tipo-chip" title="' + esc(x.det) + '">' + x.ico + ' ' + esc(x.txt) + '</span>'; }
+  // montar(select, { auto }) → cambia un <select> de tipo por 3 botones grandes (el select queda oculto y sigue siendo el dato).
+  //   select.dataset.manual = '1' cuando el dueño tocó un botón. auto() → { nombre, categoria, stock } para el tipo automático.
+  function montar(sel, o) {
+    if (!sel || sel.dataset.cfxTipo) return; o = o || {}; sel.dataset.cfxTipo = '1'; sel.hidden = true;
+    const w = document.createElement('div'); w.className = 'cfx-tipo'; w.setAttribute('role', 'radiogroup'); w.setAttribute('aria-label', '¿Qué vendes?');
+    sel.insertAdjacentElement('afterend', w);
+    const pintar = () => { w.innerHTML = Object.keys(TIPOS).map((k) => '<button type="button" role="radio" data-tipo="' + k + '" aria-checked="' + (sel.value === k) + '" class="' + (sel.value === k ? 'on' : '') + '"><b>' + TIPOS[k].ico + ' ' + esc(TIPOS[k].txt) + '</b><small>' + esc(TIPOS[k].det) + '</small></button>').join('') +
+      (sel.dataset.manual === '1' ? '' : '<small class="cfx-tipo-auto">✨ Elegido solo según el nombre y el stock · tócalo para cambiarlo</small>'); };
+    w.onclick = (e) => { const b = e.target.closest('[data-tipo]'); if (!b) return; sel.value = b.dataset.tipo; sel.dataset.manual = '1'; pintar(); sel.dispatchEvent(new Event('input', { bubbles: true })); };
+    sel.cfxPintar = pintar;
+    sel.cfxAuto = () => { if (sel.dataset.manual === '1' || !o.auto) return; const t = adivinar(o.auto()); if (t !== sel.value) { sel.value = t; sel.dispatchEvent(new Event('input', { bubbles: true })); } pintar(); };
+    pintar();
+  }
+  // poner(select, tipo, manual) → fija el valor desde lo guardado.
+  function poner(sel, t, manual) { if (!sel) return; sel.value = TIPOS[t] ? t : 'producto'; sel.dataset.manual = manual ? '1' : ''; if (sel.cfxPintar) sel.cfxPintar(); }
+  // 🔑 acceso(a, ref) → lo que ve el cliente: clave de un solo uso + "🔓 Ver mi acceso" (canjea en el servidor). Lo viejo (a.acceso) se ve igual que antes.
+  //   La app pone CFX_TIPO.rpc = (funcion, args) => promesa. ref = token del pedido (comprador sin cuenta).
+  function acceso(a, ref) {
+    if (!a) return '';
+    if (!a.clave) return '<div style="margin-top:4px"><b>' + esc(a.nombre) + ':</b> <span style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(a.acceso) + '</span> <button type="button" class="small alt" data-cfx-copiar="' + esc(a.acceso) + '">📋 Copiar</button></div>';
+    return '<div style="margin-top:6px"><b>' + esc(a.nombre) + '</b> · clave <code>' + esc(a.clave) + '</code><br><small>Sirve para UNA sola cuenta: al verla queda amarrada a la tuya.</small><br>' +
+      '<button type="button" class="small" data-cfx-canjear="' + esc(a.clave) + '" data-ref="' + esc(ref || '') + '">🔓 Ver mi acceso</button><div data-cfx-acc></div></div>';
+  }
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest && e.target.closest('[data-cfx-canjear]'); if (!b || !window.CFX_TIPO.rpc) return;
+    b.disabled = true;
+    try {
+      const r = await window.CFX_TIPO.rpc('cfx_clave_canjear', { p_clave: b.dataset.cfxCanjear, p_ref: b.dataset.ref || null });
+      const box = b.parentElement.querySelector('[data-cfx-acc]');
+      if (!r || !r.ok) { avisar((r && r.error) || 'No se pudo canjear'); return; }
+      b.remove(); box.innerHTML = '<span style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(r.acceso) + '</span> <button type="button" class="small alt" data-cfx-copiar="' + esc(r.acceso) + '">📋 Copiar</button>';
+    } catch (err) { avisar(err.message || String(err)); } finally { b.disabled = false; }
+  });
+  window.CFX_TIPO = { TIPOS, adivinar, de, entregas, chip, montar, poner, acceso, rpc: null };
 })();

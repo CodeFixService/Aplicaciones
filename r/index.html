@@ -97,7 +97,9 @@
        p.cobro === 'retiro' ? '\n💰 Pagas ' + precio(p.total) + ' al ' + (p.entrega === 'despacho' ? 'recibir' : 'retirar') + (p.pagado ? ' ✅ pagado' : '') : '');
     // 🔑 Accesos digitales: aparecen cuando la tienda aprueba el pago.
     $('cAcceso').classList.toggle('hidden', !(p.accesos && p.accesos.length));
-    $('accesos').innerHTML = (p.accesos || []).map((a) => '<p style="margin:0 0 8px"><b>' + Core.esc(a.nombre) + '</b></p><pre>' + Core.esc(a.acceso) + '</pre>' +
+    // G160: con clave de un solo uso → CFX_TIPO.acceso (canjea en el servidor, amarrada al token de este pedido o a la cuenta).
+    if (window.CFX_TIPO) CFX_TIPO.rpc = (f, a) => Cuenta.rpc(f, a);
+    $('accesos').innerHTML = (p.accesos || []).map((a) => a.clave && window.CFX_TIPO ? CFX_TIPO.acceso(a, tk) : '<p style="margin:0 0 8px"><b>' + Core.esc(a.nombre) + '</b></p><pre>' + Core.esc(a.acceso) + '</pre>' +
       (/^https:\/\/\S+$/.test(a.acceso) ? '<a class="btn ok" target="_blank" rel="noopener" href="' + Core.esc(CFX_URL(a.acceso)) + '">🔑 Abrir</a> ' : '') +
       '<button type="button" class="small alt" data-cfx-copiar="' + Core.esc(a.acceso) + '">📋 Copiar</button>').join('<hr>');
     // 🔗 Sin cuenta: guarda el enlace (📋 / 📲) · Con cuenta: el chat del pedido está en su app.

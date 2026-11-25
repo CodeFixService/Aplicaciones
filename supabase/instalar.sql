@@ -5455,7 +5455,7 @@ end $$;
 --  VERSIÓN 5.26 · 🛡️ Seguridad (núcleo 2.44): anon sin funciones de admin, buckets con límite y Turnstile en compras sin cuenta.
 -- =====================================================================
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '6.02'::text $$;
+language sql immutable as $$ select '6.03'::text $$;
 
 -- =====================================================================
 --  VERSIÓN 5.28 · ✅ Qué hacer hoy: el inicio del negocio arma su lista de tareas del día.
@@ -8375,7 +8375,7 @@ grant execute on function public.cfx_es_socio(), public.cfx_socios_lista(), publ
 --   Nada se borra solo: las vacías se borran con un toque; las que tienen datos piden descargar el respaldo y escribir "sí".
 --   cfx_tablas() = las tablas que crea este archivo (la revisa pruebas/inventario.py --verificar).
 -- ---------------------------------------------------------------------
-create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_catalogo_propio', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_redes', 'public.cfx_redes_persona', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_tunel', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
+create or replace function public.cfx_tablas() returns text[] language sql immutable as $$ select array['public.actividad_dia', 'public.app_secrets', 'public.app_settings', 'public.avisos_stock', 'public.bodegas', 'public.boleta_cuentas', 'public.boletas_caja', 'public.calificaciones', 'public.catalog_items', 'public.cfx_analisis', 'public.cfx_anuncio_vistos', 'public.cfx_anuncios', 'public.cfx_bloqueos', 'public.cfx_boleta_cuentas', 'public.cfx_boletas', 'public.cfx_brechas', 'public.cfx_calificaciones', 'public.cfx_cargas', 'public.cfx_carritos', 'public.cfx_catalogo_propio', 'public.cfx_chat', 'public.cfx_clave_temporal', 'public.cfx_claves', 'public.cfx_config', 'public.cfx_consent', 'public.cfx_consent_hist', 'public.cfx_cupones', 'public.cfx_derechos', 'public.cfx_descuentos', 'public.cfx_errores', 'public.cfx_estudio', 'public.cfx_exentos', 'public.cfx_fallas', 'public.cfx_flow_negocio', 'public.cfx_hilos', 'public.cfx_keys', 'public.cfx_legal', 'public.cfx_login_fallos', 'public.cfx_login_qr', 'public.cfx_mensajes', 'public.cfx_modulos_negocio', 'public.cfx_modulos_pruebas', 'public.cfx_mp_avisos', 'public.cfx_mp_neg_cobros', 'public.cfx_mp_neg_sub_pagos', 'public.cfx_mp_neg_subs', 'public.cfx_mp_negocio', 'public.cfx_mp_sub_cobros', 'public.cfx_mp_subs', 'public.cfx_pagos', 'public.cfx_personal', 'public.cfx_pin', 'public.cfx_pruebas_usadas', 'public.cfx_push_entrega', 'public.cfx_redes', 'public.cfx_redes_persona', 'public.cfx_ref_codigos', 'public.cfx_referidos', 'public.cfx_registro', 'public.cfx_reportes', 'public.cfx_salud', 'public.cfx_secretos', 'public.cfx_sellos', 'public.cfx_sellos_cfg', 'public.cfx_socios', 'public.cfx_tunel', 'public.cfx_verificaciones', 'public.cfx_versiones', 'public.chx_comunas', 'public.chx_tarifas', 'public.conexiones', 'public.courier_cuentas', 'public.courier_envios', 'public.cupones', 'public.giftcard_usos', 'public.giftcards', 'public.links_pago', 'public.ml_cuentas', 'public.ml_estados', 'public.ml_ventas', 'public.ml_vinculos', 'public.mp_cuentas', 'public.negocio_correo', 'public.notification_reads', 'public.notifications', 'public.pedidos', 'public.planes', 'public.profiles', 'public.proveedores', 'public.publicacion_vistas', 'public.publicaciones', 'public.push_subscriptions', 'public.requests', 'public.sellos', 'public.stock_bodega', 'public.subscribers', 'public.suscripciones', 'public.textos', 'public.user_invites', 'public.variantes', 'public.webhook_envios', 'public.webhooks'] $$;
 create or replace function public.cfx_inventario() returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare r record; n bigint; out jsonb := '[]'::jsonb;
@@ -11666,6 +11666,123 @@ revoke all on function public.cfx_reclamar_correo() from public, anon, authentic
 drop trigger if exists zz_cfx_reclamar on auth.users;
 create trigger zz_cfx_reclamar after insert or update of email_confirmed_at, email on auth.users
   for each row execute function public.cfx_reclamar_correo();
+
+-- ═══ G160 🧩 TIPO DE VENTA (núcleo) ═══
+-- 📦 producto (stock + retiro/despacho) · 🛠️ servicio (local/domicilio/en línea) · 🔑 digital (llega al validar el pago).
+-- Tipo automático si el dueño no lo eligió: con stock (aunque sea 0) → 📦 (nunca se pierde un stock) · nombre/categoría → 🛠️ o 🔑 · resto → 📦.
+-- NO depende solo de la categoría: el nombre también cuenta y el dueño siempre puede cambiarlo (tipo_manual).
+create or replace function public.cfx_tipo_adivinar(p_nombre text, p_categoria text default '', p_stock numeric default null) returns text
+language sql immutable set search_path = '' as $$
+  select case
+    when p_stock is not null then 'producto'
+    when lower(coalesce(p_nombre, '') || ' ' || coalesce(p_categoria, '')) ~ '(licencia|\mkey\M|c[oó]digo de acceso|acceso digital|activaci[oó]n|suscripci|curso online|curso en l[ií]nea|e-?book|descargable|gift ?card digital)' then 'digital'
+    when lower(coalesce(p_nombre, '') || ' ' || coalesce(p_categoria, '')) ~ '(servic|manten|diagn|asesor|clase|corte|reparac|instalaci|consult|visita|revisi[oó]n|limpieza|lavado|afinad|ajuste|taller de|sesi[oó]n|tratamiento|masaje|barba|peinado|tintura)' then 'servicio'
+    else 'producto' end
+$$;
+grant execute on function public.cfx_tipo_adivinar(text, text, numeric) to anon, authenticated;
+
+-- 🔑 CLAVES DE UN SOLO USO: cada acceso digital entregado lleva una clave que se amarra a UNA cuenta al canjearla.
+--   ref = identificador secreto del comprador sin cuenta (token del pedido) · pedido = referencia visible para el dueño.
+create table if not exists public.cfx_claves (
+  id           uuid primary key default gen_random_uuid(),
+  negocio      uuid not null,
+  item         text not null default '',
+  nombre       text not null default '',
+  pedido       text not null default '',
+  ref          text,
+  acceso       text not null default '',
+  clave        text not null unique,
+  canjeado_por uuid,
+  canjeado_ref text,
+  canjeado_at  timestamptz,
+  anulada_at   timestamptz,
+  reemplaza    uuid,
+  created_at   timestamptz not null default now()
+);
+create index if not exists cfx_claves_negocio on public.cfx_claves (negocio, created_at desc);
+alter table public.cfx_claves enable row level security;
+revoke all on public.cfx_claves from anon, authenticated;
+
+-- Clave legible al azar: XXXX-XXXX-XXXX (sin 0/O/1/I para dictarla sin errores).
+create or replace function public.cfx_clave_nueva() returns text
+language plpgsql volatile set search_path = '' as $$
+declare a text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; s text := ''; i int;
+begin
+  for i in 1..12 loop
+    s := s || substr(a, 1 + (get_byte(extensions.gen_random_bytes(1), 0) % 32), 1);
+    if i in (4, 8) then s := s || '-'; end if;
+  end loop;
+  return s;
+end $$;
+
+-- Interna (la llama el servidor de cada app al liberar el pago). Nunca la llama la pantalla.
+create or replace function public.cfx_clave_emitir(p_negocio uuid, p_item text, p_nombre text, p_pedido text, p_ref text, p_acceso text, p_reemplaza uuid default null) returns text
+language plpgsql security definer set search_path = '' as $$
+declare k text; n int := 0;
+begin
+  loop
+    k := public.cfx_clave_nueva(); n := n + 1;
+    begin
+      insert into public.cfx_claves (negocio, item, nombre, pedido, ref, acceso, clave, reemplaza)
+      values (p_negocio, left(coalesce(p_item, ''), 80), left(coalesce(p_nombre, ''), 120), left(coalesce(p_pedido, ''), 80), p_ref, left(coalesce(p_acceso, ''), 500), k, p_reemplaza);
+      return k;
+    exception when unique_violation then if n > 5 then raise; end if;
+    end;
+  end loop;
+end $$;
+revoke all on function public.cfx_clave_nueva(), public.cfx_clave_emitir(uuid, text, text, text, text, text, uuid) from public, anon, authenticated;
+
+-- El cliente canjea: queda amarrada a su cuenta (o, sin cuenta, al token secreto de su pedido). Otra cuenta → "ya fue usada".
+create or replace function public.cfx_clave_canjear(p_clave text, p_ref text default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c public.cfx_claves; u uuid := auth.uid(); k text := upper(regexp_replace(coalesce(p_clave, ''), '[^A-Za-z0-9]', '', 'g'));
+begin
+  if char_length(k) <> 12 then return jsonb_build_object('ok', false, 'error', 'Revisa la clave (12 letras y números)'); end if;
+  k := substr(k, 1, 4) || '-' || substr(k, 5, 4) || '-' || substr(k, 9, 4);
+  select * into c from public.cfx_claves where clave = k for update;
+  if c.id is null then return jsonb_build_object('ok', false, 'error', 'Clave no encontrada'); end if;
+  if c.anulada_at is not null then return jsonb_build_object('ok', false, 'error', 'Esta clave fue anulada: pide la nueva a la tienda'); end if;
+  if c.canjeado_at is not null then
+    if (u is not null and c.canjeado_por = u) or (u is null and c.canjeado_por is null and p_ref is not null and c.canjeado_ref = p_ref) then
+      return jsonb_build_object('ok', true, 'nombre', c.nombre, 'acceso', c.acceso, 'ya', true);
+    end if;
+    return jsonb_build_object('ok', false, 'error', 'Esta clave ya fue usada');
+  end if;
+  if u is null and (p_ref is null or c.ref is null or p_ref <> c.ref) then return jsonb_build_object('ok', false, 'error', 'Entra a tu cuenta para canjear la clave'); end if;
+  update public.cfx_claves set canjeado_por = u, canjeado_ref = case when u is null then p_ref end, canjeado_at = now() where id = c.id;
+  return jsonb_build_object('ok', true, 'nombre', c.nombre, 'acceso', c.acceso);
+end $$;
+grant execute on function public.cfx_clave_canjear(text, text) to anon, authenticated;
+
+-- El dueño ve a quién se entregó cada clave (p_pedido opcional).
+create or replace function public.cfx_clave_lista(p_negocio uuid, p_pedido text default null) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null or public.cfx_negocio_dueno(p_negocio) is distinct from auth.uid() then return '[]'::jsonb; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'nombre', c.nombre, 'pedido', c.pedido, 'clave', c.clave, 'fecha', c.created_at,
+      'canjeado_at', c.canjeado_at, 'anulada', c.anulada_at is not null,
+      'quien', case when c.canjeado_por is not null then (select coalesce(nullif(u.raw_user_meta_data ->> 'nombre', ''), u.email) from auth.users u where u.id = c.canjeado_por)
+                    when c.canjeado_at is not null then 'Comprador sin cuenta' end) order by c.created_at desc)
+    from (select * from public.cfx_claves where negocio = p_negocio and (p_pedido is null or pedido = p_pedido) order by created_at desc limit 200) c), '[]'::jsonb);
+end $$;
+grant execute on function public.cfx_clave_lista(uuid, text) to authenticated;
+
+-- 🔄 Reponer: la vieja queda ANULADA (no se borra) y nace una nueva con el mismo acceso. Gancho opcional por app: cfx_clave_repuesta_app(vieja, nueva).
+create or replace function public.cfx_clave_reponer(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare c public.cfx_claves; k text;
+begin
+  select * into c from public.cfx_claves where id = p_id for update;
+  if c.id is null or auth.uid() is null or public.cfx_negocio_dueno(c.negocio) is distinct from auth.uid() then return jsonb_build_object('ok', false, 'error', 'Clave no encontrada'); end if;
+  if c.anulada_at is not null then return jsonb_build_object('ok', false, 'error', 'Esa clave ya fue anulada'); end if;
+  update public.cfx_claves set anulada_at = now() where id = c.id;
+  k := public.cfx_clave_emitir(c.negocio, c.item, c.nombre, c.pedido, c.ref, c.acceso, c.id);
+  if to_regprocedure('public.cfx_clave_repuesta_app(text, text)') is not null then
+    execute 'select public.cfx_clave_repuesta_app($1, $2)' using c.clave, k;
+  end if;
+  return jsonb_build_object('ok', true, 'clave', k);
+end $$;
+grant execute on function public.cfx_clave_reponer(uuid) to authenticated;
 -- <<< CFX núcleo
 
 -- G95 🎁 Prueba por botón: quien ya tuvo su prueba Pro queda anotado por correo (no se borra) · al probar se marca trial_used.
@@ -14078,6 +14195,10 @@ grant execute on function public.mp_pagar(text, text, text), public.mp_revisar(t
 --  núcleo cfx_hilo_*). Pedidos viejos: cobro null = ⚡ pagar ahora; a_pagar null = total. La BASE calcula todo.
 -- =====================================================================
 alter table public.catalog_items add column if not exists tipo text not null default 'producto';
+-- G160: tipo_manual = el dueño lo eligió (lo ya marcado como 🛠️/🔑 cuenta como elegido; nada se pierde). Una sola vez: solo los null.
+alter table public.catalog_items add column if not exists tipo_manual boolean;
+update public.catalog_items set tipo_manual = (tipo <> 'producto') where tipo_manual is null;
+alter table public.catalog_items alter column tipo_manual set default false;
 alter table public.catalog_items add column if not exists cobro text not null default 'ahora';
 alter table public.catalog_items add column if not exists abono_pct int;
 alter table public.catalog_items add column if not exists acceso text;
@@ -14095,6 +14216,8 @@ alter table public.pedidos add constraint pedidos_cobro_check check (cobro is nu
 create or replace function public.catalog_venta_fija() returns trigger
 language plpgsql set search_path = '' as $$
 begin
+  -- G160: si el dueño no eligió el tipo a mano, lo pone el núcleo (nombre + categoría + stock); con stock queda 📦.
+  if not coalesce(new.tipo_manual, false) then new.tipo := public.cfx_tipo_adivinar(new.nombre, new.categoria, new.stock); end if;
   if new.tipo is null or new.tipo not in ('producto', 'servicio', 'digital') then new.tipo := 'producto'; end if;
   if new.cobro is null or new.cobro not in ('ahora', 'abono', 'retiro') then new.cobro := 'ahora'; end if;
   if new.tipo = 'digital' then new.cobro := 'ahora'; end if;
@@ -14106,11 +14229,14 @@ end $$;
 revoke all on function public.catalog_venta_fija() from public, anon, authenticated;
 drop trigger if exists catalog_venta_fija on public.catalog_items;
 create trigger catalog_venta_fija before insert or update on public.catalog_items for each row execute function public.catalog_venta_fija();
+-- G160: lo no elegido a mano toma el tipo automático (Despega #6: "Diagnóstico" ya no ofrece despacho).
+update public.catalog_items set tipo = tipo where not coalesce(tipo_manual, false);
 
 -- El dueño elige tipo y forma de pago de un producto publicado. p = { tipo, cobro, abono, acceso }.
 create or replace function public.catalogo_venta(p_key text, p jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare tp text := coalesce(nullif(p ->> 'tipo', ''), 'producto'); cb text := coalesce(nullif(p ->> 'cobro', ''), 'ahora'); pc int; ac text := nullif(trim(coalesce(p ->> 'acceso', '')), ''); r public.catalog_items;
+  man boolean := coalesce(nullif(p ->> 'manual', '')::boolean, true);  -- G160: false = que lo ponga el núcleo
 begin
   if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
   if tp not in ('producto', 'servicio', 'digital') then raise exception 'Tipo no válido'; end if;
@@ -14120,16 +14246,16 @@ begin
     if coalesce(p ->> 'abono', '') !~ '^\d{1,2}$' or (p ->> 'abono')::int not between 10 and 90 then raise exception 'El abono va de 10 a 90 %%'; end if;
     pc := (p ->> 'abono')::int;
   end if;
-  if tp = 'digital' and ac is null then raise exception 'Escribe lo que recibe el cliente al pagar (link, código o instrucciones)'; end if;
+  if man and tp = 'digital' and ac is null then raise exception 'Escribe lo que recibe el cliente al pagar (link, código o instrucciones)'; end if;
   if char_length(coalesce(ac, '')) > 500 then raise exception 'El acceso tiene máximo 500 caracteres'; end if;
-  update public.catalog_items set tipo = tp, cobro = cb, abono_pct = pc, acceso = ac, updated_at = now()
+  update public.catalog_items set tipo = tp, tipo_manual = man, cobro = cb, abono_pct = pc, acceso = ac, updated_at = now()
   where owner_id = auth.uid() and client_key = left(coalesce(p_key, ''), 80) returning * into r;
   if r.id is null then raise exception 'Primero marca "Mostrar en mi catálogo" y guarda el producto'; end if;
-  return jsonb_build_object('tipo', r.tipo, 'cobro', r.cobro, 'abono', r.abono_pct, 'acceso', r.acceso);
+  return jsonb_build_object('tipo', r.tipo, 'manual', r.tipo_manual, 'cobro', r.cobro, 'abono', r.abono_pct, 'acceso', r.acceso);
 end $$;
 create or replace function public.catalogo_venta_ver(p_key text) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object('tipo', c.tipo, 'cobro', c.cobro, 'abono', c.abono_pct, 'acceso', c.acceso)
+  select jsonb_build_object('tipo', c.tipo, 'manual', c.tipo_manual, 'cobro', c.cobro, 'abono', c.abono_pct, 'acceso', c.acceso)
   from public.catalog_items c where c.owner_id = auth.uid() and c.client_key = p_key
 $$;
 -- Lo que el carrito necesita saber (nunca el acceso digital): solo los ítems que no son "📦 producto ⚡ pagar ahora".
@@ -14311,8 +14437,10 @@ begin
   if new.cobro in ('abono', 'retiro') and new.estado = 'entregado' and old.estado <> 'entregado' and new.pagado_at is null then new.pagado_at := now(); end if;
   if new.accesos is null and new.estado in ('preparando', 'listo', 'en_camino', 'entregado')
      and (new.pagado_at is not null or new.abonado_at is not null or new.estado = 'entregado' or new.total <= 0) then
-    select jsonb_agg(jsonb_build_object('nombre', l ->> 'nombre', 'acceso', c.acceso)) into ac
+    -- G160 🔑: cada unidad lleva una CLAVE de un solo uso (núcleo cfx_clave_*); el acceso se ve recién al canjearla y queda amarrado a esa cuenta.
+    select jsonb_agg(jsonb_build_object('nombre', l ->> 'nombre', 'clave', public.cfx_clave_emitir(new.negocio_id, l ->> 'clave', l ->> 'nombre', new.id::text, new.token, c.acceso))) into ac
     from jsonb_array_elements(new.lineas) l join public.catalog_items c on c.owner_id = new.negocio_id and c.client_key = l ->> 'clave'
+    cross join generate_series(1, least(20, greatest(1, coalesce((l ->> 'cant')::int, 1)))) u
     where l ->> 'tipo' = 'digital' and c.tipo = 'digital' and c.acceso is not null;
     if ac is not null then
       new.accesos := ac;
@@ -14333,6 +14461,12 @@ begin
   return null;
 end $$;
 revoke all on function public.pedido_g128(), public.pedido_g128_aviso() from public, anon, authenticated;
+-- G160 🔄 gancho del núcleo: al reponer una clave, el pedido muestra la nueva.
+create or replace function public.cfx_clave_repuesta_app(p_vieja text, p_nueva text) returns void
+language sql security definer set search_path = '' as $$
+  update public.pedidos set accesos = replace(accesos::text, p_vieja, p_nueva)::jsonb where accesos is not null and accesos::text like '%' || p_vieja || '%'
+$$;
+revoke all on function public.cfx_clave_repuesta_app(text, text) from public, anon, authenticated;
 drop trigger if exists pedido_g128 on public.pedidos;
 create trigger pedido_g128 before update on public.pedidos for each row execute function public.pedido_g128();
 drop trigger if exists pedido_g128_aviso on public.pedidos;

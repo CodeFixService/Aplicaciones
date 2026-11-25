@@ -1,6 +1,6 @@
 {
-  "version": "7.04",
-  "bd": "6.02",
+  "version": "7.05",
+  "bd": "6.03",
   "funcion": "3.9",
   "notas": "🐞 G159 (núcleo 3.54): un selector tipo \"Producto…\" ahora muestra lo que elegiste (antes parecía que no se agregaba). 🔁 Compras recurrentes: el producto elegido queda puesto y un 🛠️ servicio o 🔑 acceso digital ya no pide retiro ni despacho."
 }

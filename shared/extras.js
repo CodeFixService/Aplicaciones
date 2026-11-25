@@ -100,7 +100,9 @@
     const clave = (p) => p.client_key || p.clave;
     // G159 🐞 Despega #6: 🛠️ servicio o 🔑 activación digital (o categoría "Servicio…") no lleva retiro ni despacho.
     const tipoDe = {}; (vt || []).forEach((x) => { tipoDe[x.clave] = x.tipo; });
-    const sinEnvio = (k) => { const p = prods.find((y) => clave(y) === k); return (tipoDe[k] && tipoDe[k] !== 'producto') || !!(p && /servic/i.test(p.categoria || '')); };
+    // G160: una sola fuente (servidor tipo automático/manual + CFX_TIPO.adivinar del núcleo para lo que aún no se sincronizó).
+    const tipoItem = (k) => { const p = prods.find((y) => clave(y) === k); return tipoDe[k] || (window.CFX_TIPO && p ? CFX_TIPO.de(p) : p && /servic/i.test(p.categoria || '') ? 'servicio' : 'producto'); };
+    const sinEnvio = (k) => tipoItem(k) !== 'producto';
     const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
     const optP = '<option value="">Producto…</option>' + prods.map((p) => '<option value="' + esc(clave(p)) + '">' + esc(p.nombre) + ' · ' + $$(p.precio) + '</option>').join('');
     const linea = () => '<div class="gx-row gx-l"><select class="gxP" name="producto" aria-label="Producto">' + optP + '</select><input class="gxC" type="number" min="1" max="99" value="1" style="max-width:80px;min-width:64px" aria-label="Cantidad"></div>';
