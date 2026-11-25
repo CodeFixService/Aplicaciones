@@ -693,6 +693,8 @@
     servicio: { ico: '🛠️', txt: 'Servicio', det: 'Sin stock ni envío · en el local, a domicilio o en línea' },
     digital: { ico: '🔑', txt: 'Digital', det: 'Llega al validar el pago (clave de un solo uso)' }
   };
+  // G160 b: 🔑 digital por período → días de la clave (mensual 30 · anual 365 · único sin vencer).
+  const PERIODOS = { unico: { txt: 'Pago único', dias: null }, mensual: { txt: 'Mensual', dias: 30 }, anual: { txt: 'Anual', dias: 365 } };
   const RX_DIG = /(licencia|\bkey\b|c[oó]digo de acceso|acceso digital|activaci[oó]n|suscripci|curso online|curso en l[ií]nea|e-?book|descargable|gift ?card digital)/i;
   const RX_SRV = /(servic|manten|diagn|asesor|clase|corte|reparac|instalaci|consult|visita|revisi[oó]n|limpieza|lavado|afinad|ajuste|taller de|sesi[oó]n|tratamiento|masaje|barba|peinado|tintura)/i;
   // adivinar({ nombre, categoria, stock }) → con stock (aunque sea 0) siempre 📦 (no se pierde stock); luego nombre + categoría.
@@ -731,7 +733,7 @@
   function acceso(a, ref) {
     if (!a) return '';
     if (!a.clave) return '<div style="margin-top:4px"><b>' + esc(a.nombre) + ':</b> <span style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(a.acceso) + '</span> <button type="button" class="small alt" data-cfx-copiar="' + esc(a.acceso) + '">📋 Copiar</button></div>';
-    return '<div style="margin-top:6px"><b>' + esc(a.nombre) + '</b> · clave <code>' + esc(a.clave) + '</code><br><small>Sirve para UNA sola cuenta: al verla queda amarrada a la tuya.</small><br>' +
+    return '<div style="margin-top:6px"><b>' + esc(a.nombre) + '</b> · clave <code>' + esc(a.clave) + '</code><br><small>Sirve para UNA sola cuenta: al verla queda amarrada a la tuya.' + (a.dias ? ' Dura ' + (a.dias >= 365 ? '1 año' : a.dias + ' días') + ' desde que la canjeas.' : '') + '</small><br>' +
       '<button type="button" class="small" data-cfx-canjear="' + esc(a.clave) + '" data-ref="' + esc(ref || '') + '">🔓 Ver mi acceso</button><div data-cfx-acc></div></div>';
   }
   document.addEventListener('click', async (e) => {
@@ -741,8 +743,8 @@
       const r = await window.CFX_TIPO.rpc('cfx_clave_canjear', { p_clave: b.dataset.cfxCanjear, p_ref: b.dataset.ref || null });
       const box = b.parentElement.querySelector('[data-cfx-acc]');
       if (!r || !r.ok) { avisar((r && r.error) || 'No se pudo canjear'); return; }
-      b.remove(); box.innerHTML = '<span style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(r.acceso) + '</span> <button type="button" class="small alt" data-cfx-copiar="' + esc(r.acceso) + '">📋 Copiar</button>';
+      b.remove(); box.innerHTML = (r.vence ? '<small>📅 Vale hasta el ' + esc(new Date(r.vence).toLocaleDateString('es-CL')) + '</small><br>' : '') + '<span style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(r.acceso) + '</span> <button type="button" class="small alt" data-cfx-copiar="' + esc(r.acceso) + '">📋 Copiar</button>';
     } catch (err) { avisar(err.message || String(err)); } finally { b.disabled = false; }
   });
-  window.CFX_TIPO = { TIPOS, adivinar, de, entregas, chip, montar, poner, acceso, rpc: null };
+  window.CFX_TIPO = { TIPOS, PERIODOS, adivinar, de, entregas, chip, montar, poner, acceso, rpc: null };
 })();

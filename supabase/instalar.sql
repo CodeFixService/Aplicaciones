@@ -11699,6 +11699,9 @@ create table if not exists public.cfx_claves (
   reemplaza    uuid,
   created_at   timestamptz not null default now()
 );
+-- G160 b: 🔑 por período (pago mensual 30 días / anual 365; null = sin vencer). Vence contando desde que se canjea.
+alter table public.cfx_claves add column if not exists dias int;
+alter table public.cfx_claves add column if not exists vence_at timestamptz;
 create index if not exists cfx_claves_negocio on public.cfx_claves (negocio, created_at desc);
 alter table public.cfx_claves enable row level security;
 revoke all on public.cfx_claves from anon, authenticated;
@@ -11716,21 +11719,23 @@ begin
 end $$;
 
 -- Interna (la llama el servidor de cada app al liberar el pago). Nunca la llama la pantalla.
-create or replace function public.cfx_clave_emitir(p_negocio uuid, p_item text, p_nombre text, p_pedido text, p_ref text, p_acceso text, p_reemplaza uuid default null) returns text
+drop function if exists public.cfx_clave_emitir(uuid, text, text, text, text, text, uuid);
+create or replace function public.cfx_clave_emitir(p_negocio uuid, p_item text, p_nombre text, p_pedido text, p_ref text, p_acceso text, p_reemplaza uuid default null, p_dias int default null) returns text
 language plpgsql security definer set search_path = '' as $$
 declare k text; n int := 0;
 begin
   loop
     k := public.cfx_clave_nueva(); n := n + 1;
     begin
-      insert into public.cfx_claves (negocio, item, nombre, pedido, ref, acceso, clave, reemplaza)
-      values (p_negocio, left(coalesce(p_item, ''), 80), left(coalesce(p_nombre, ''), 120), left(coalesce(p_pedido, ''), 80), p_ref, left(coalesce(p_acceso, ''), 500), k, p_reemplaza);
+      insert into public.cfx_claves (negocio, item, nombre, pedido, ref, acceso, clave, reemplaza, dias)
+      values (p_negocio, left(coalesce(p_item, ''), 80), left(coalesce(p_nombre, ''), 120), left(coalesce(p_pedido, ''), 80), p_ref, left(coalesce(p_acceso, ''), 500), k, p_reemplaza,
+              case when p_dias between 1 and 3660 then p_dias end);
       return k;
     exception when unique_violation then if n > 5 then raise; end if;
     end;
   end loop;
 end $$;
-revoke all on function public.cfx_clave_nueva(), public.cfx_clave_emitir(uuid, text, text, text, text, text, uuid) from public, anon, authenticated;
+revoke all on function public.cfx_clave_nueva(), public.cfx_clave_emitir(uuid, text, text, text, text, text, uuid, int) from public, anon, authenticated;
 
 -- El cliente canjea: queda amarrada a su cuenta (o, sin cuenta, al token secreto de su pedido). Otra cuenta → "ya fue usada".
 create or replace function public.cfx_clave_canjear(p_clave text, p_ref text default null) returns jsonb
@@ -11744,13 +11749,15 @@ begin
   if c.anulada_at is not null then return jsonb_build_object('ok', false, 'error', 'Esta clave fue anulada: pide la nueva a la tienda'); end if;
   if c.canjeado_at is not null then
     if (u is not null and c.canjeado_por = u) or (u is null and c.canjeado_por is null and p_ref is not null and c.canjeado_ref = p_ref) then
-      return jsonb_build_object('ok', true, 'nombre', c.nombre, 'acceso', c.acceso, 'ya', true);
+      if c.vence_at is not null and c.vence_at < now() then return jsonb_build_object('ok', false, 'error', 'Tu acceso venció el ' || to_char(c.vence_at at time zone 'America/Santiago', 'DD-MM-YYYY') || ': renueva tu pago'); end if;
+      return jsonb_build_object('ok', true, 'nombre', c.nombre, 'acceso', c.acceso, 'ya', true, 'vence', c.vence_at);
     end if;
     return jsonb_build_object('ok', false, 'error', 'Esta clave ya fue usada');
   end if;
   if u is null and (p_ref is null or c.ref is null or p_ref <> c.ref) then return jsonb_build_object('ok', false, 'error', 'Entra a tu cuenta para canjear la clave'); end if;
-  update public.cfx_claves set canjeado_por = u, canjeado_ref = case when u is null then p_ref end, canjeado_at = now() where id = c.id;
-  return jsonb_build_object('ok', true, 'nombre', c.nombre, 'acceso', c.acceso);
+  update public.cfx_claves set canjeado_por = u, canjeado_ref = case when u is null then p_ref end, canjeado_at = now(),
+    vence_at = case when c.dias is not null then now() + make_interval(days => c.dias) end where id = c.id returning * into c;
+  return jsonb_build_object('ok', true, 'nombre', c.nombre, 'acceso', c.acceso, 'vence', c.vence_at);
 end $$;
 grant execute on function public.cfx_clave_canjear(text, text) to anon, authenticated;
 
@@ -11760,7 +11767,7 @@ language plpgsql stable security definer set search_path = '' as $$
 begin
   if auth.uid() is null or public.cfx_negocio_dueno(p_negocio) is distinct from auth.uid() then return '[]'::jsonb; end if;
   return coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'nombre', c.nombre, 'pedido', c.pedido, 'clave', c.clave, 'fecha', c.created_at,
-      'canjeado_at', c.canjeado_at, 'anulada', c.anulada_at is not null,
+      'canjeado_at', c.canjeado_at, 'anulada', c.anulada_at is not null, 'dias', c.dias, 'vence', c.vence_at,
       'quien', case when c.canjeado_por is not null then (select coalesce(nullif(u.raw_user_meta_data ->> 'nombre', ''), u.email) from auth.users u where u.id = c.canjeado_por)
                     when c.canjeado_at is not null then 'Comprador sin cuenta' end) order by c.created_at desc)
     from (select * from public.cfx_claves where negocio = p_negocio and (p_pedido is null or pedido = p_pedido) order by created_at desc limit 200) c), '[]'::jsonb);
@@ -11776,7 +11783,7 @@ begin
   if c.id is null or auth.uid() is null or public.cfx_negocio_dueno(c.negocio) is distinct from auth.uid() then return jsonb_build_object('ok', false, 'error', 'Clave no encontrada'); end if;
   if c.anulada_at is not null then return jsonb_build_object('ok', false, 'error', 'Esa clave ya fue anulada'); end if;
   update public.cfx_claves set anulada_at = now() where id = c.id;
-  k := public.cfx_clave_emitir(c.negocio, c.item, c.nombre, c.pedido, c.ref, c.acceso, c.id);
+  k := public.cfx_clave_emitir(c.negocio, c.item, c.nombre, c.pedido, c.ref, c.acceso, c.id, c.dias);
   if to_regprocedure('public.cfx_clave_repuesta_app(text, text)') is not null then
     execute 'select public.cfx_clave_repuesta_app($1, $2)' using c.clave, k;
   end if;
@@ -14199,6 +14206,8 @@ alter table public.catalog_items add column if not exists tipo text not null def
 alter table public.catalog_items add column if not exists tipo_manual boolean;
 update public.catalog_items set tipo_manual = (tipo <> 'producto') where tipo_manual is null;
 alter table public.catalog_items alter column tipo_manual set default false;
+-- G160 b: 🔑 digital por período (único / mensual / anual): la clave dura 30 o 365 días desde que se canjea.
+alter table public.catalog_items add column if not exists periodo text not null default 'unico';
 alter table public.catalog_items add column if not exists cobro text not null default 'ahora';
 alter table public.catalog_items add column if not exists abono_pct int;
 alter table public.catalog_items add column if not exists acceso text;
@@ -14224,6 +14233,7 @@ begin
   if new.tipo <> 'producto' then new.stock := null; end if;
   new.abono_pct := case when new.cobro = 'abono' then least(90, greatest(10, coalesce(new.abono_pct, 50))) end;
   new.acceso := case when new.tipo = 'digital' then nullif(left(trim(coalesce(new.acceso, '')), 500), '') end;
+  new.periodo := case when new.tipo = 'digital' and new.periodo in ('mensual', 'anual') then new.periodo else 'unico' end;
   return new;
 end $$;
 revoke all on function public.catalog_venta_fija() from public, anon, authenticated;
@@ -14237,6 +14247,7 @@ create or replace function public.catalogo_venta(p_key text, p jsonb) returns js
 language plpgsql security definer set search_path = '' as $$
 declare tp text := coalesce(nullif(p ->> 'tipo', ''), 'producto'); cb text := coalesce(nullif(p ->> 'cobro', ''), 'ahora'); pc int; ac text := nullif(trim(coalesce(p ->> 'acceso', '')), ''); r public.catalog_items;
   man boolean := coalesce(nullif(p ->> 'manual', '')::boolean, true);  -- G160: false = que lo ponga el núcleo
+  pe text := coalesce(nullif(p ->> 'periodo', ''), 'unico');
 begin
   if not public.is_business(auth.uid()) then raise exception 'Solo las empresas'; end if;
   if tp not in ('producto', 'servicio', 'digital') then raise exception 'Tipo no válido'; end if;
@@ -14248,26 +14259,27 @@ begin
   end if;
   if man and tp = 'digital' and ac is null then raise exception 'Escribe lo que recibe el cliente al pagar (link, código o instrucciones)'; end if;
   if char_length(coalesce(ac, '')) > 500 then raise exception 'El acceso tiene máximo 500 caracteres'; end if;
-  update public.catalog_items set tipo = tp, tipo_manual = man, cobro = cb, abono_pct = pc, acceso = ac, updated_at = now()
+  if pe not in ('unico', 'mensual', 'anual') then raise exception 'Período no válido: único, mensual o anual'; end if;
+  update public.catalog_items set tipo = tp, tipo_manual = man, periodo = pe, cobro = cb, abono_pct = pc, acceso = ac, updated_at = now()
   where owner_id = auth.uid() and client_key = left(coalesce(p_key, ''), 80) returning * into r;
   if r.id is null then raise exception 'Primero marca "Mostrar en mi catálogo" y guarda el producto'; end if;
-  return jsonb_build_object('tipo', r.tipo, 'manual', r.tipo_manual, 'cobro', r.cobro, 'abono', r.abono_pct, 'acceso', r.acceso);
+  return jsonb_build_object('tipo', r.tipo, 'manual', r.tipo_manual, 'periodo', r.periodo, 'cobro', r.cobro, 'abono', r.abono_pct, 'acceso', r.acceso);
 end $$;
 create or replace function public.catalogo_venta_ver(p_key text) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object('tipo', c.tipo, 'manual', c.tipo_manual, 'cobro', c.cobro, 'abono', c.abono_pct, 'acceso', c.acceso)
+  select jsonb_build_object('tipo', c.tipo, 'manual', c.tipo_manual, 'periodo', c.periodo, 'cobro', c.cobro, 'abono', c.abono_pct, 'acceso', c.acceso)
   from public.catalog_items c where c.owner_id = auth.uid() and c.client_key = p_key
 $$;
 -- Lo que el carrito necesita saber (nunca el acceso digital): solo los ítems que no son "📦 producto ⚡ pagar ahora".
 create or replace function public.catalogo_venta_publica(p_slug text) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select coalesce(jsonb_agg(jsonb_build_object('clave', c.client_key, 'tipo', c.tipo, 'cobro', c.cobro, 'abono', c.abono_pct)), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('clave', c.client_key, 'tipo', c.tipo, 'periodo', c.periodo, 'cobro', c.cobro, 'abono', c.abono_pct)), '[]'::jsonb)
   from public.catalog_items c join public.profiles t on t.id = c.owner_id
   where t.slug = lower(trim(coalesce(p_slug, ''))) and t.role = 'user' and not t.suspended and (c.tipo <> 'producto' or c.cobro <> 'ahora')
 $$;
 create or replace function public.catalogo_venta_negocio(p_negocio uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select coalesce(jsonb_agg(jsonb_build_object('clave', c.client_key, 'tipo', c.tipo, 'cobro', c.cobro, 'abono', c.abono_pct)), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('clave', c.client_key, 'tipo', c.tipo, 'periodo', c.periodo, 'cobro', c.cobro, 'abono', c.abono_pct)), '[]'::jsonb)
   from public.catalog_items c join public.profiles t on t.id = c.owner_id
   where c.owner_id = p_negocio and t.role = 'user' and not t.suspended and (c.tipo <> 'producto' or c.cobro <> 'ahora')
 $$;
@@ -14438,9 +14450,10 @@ begin
   if new.accesos is null and new.estado in ('preparando', 'listo', 'en_camino', 'entregado')
      and (new.pagado_at is not null or new.abonado_at is not null or new.estado = 'entregado' or new.total <= 0) then
     -- G160 🔑: cada unidad lleva una CLAVE de un solo uso (núcleo cfx_clave_*); el acceso se ve recién al canjearla y queda amarrado a esa cuenta.
-    select jsonb_agg(jsonb_build_object('nombre', l ->> 'nombre', 'clave', public.cfx_clave_emitir(new.negocio_id, l ->> 'clave', l ->> 'nombre', new.id::text, new.token, c.acceso))) into ac
+    select jsonb_agg(jsonb_build_object('nombre', l ->> 'nombre', 'dias', d.dias, 'clave', public.cfx_clave_emitir(new.negocio_id, l ->> 'clave', l ->> 'nombre', new.id::text, new.token, c.acceso, null, d.dias))) into ac
     from jsonb_array_elements(new.lineas) l join public.catalog_items c on c.owner_id = new.negocio_id and c.client_key = l ->> 'clave'
     cross join generate_series(1, least(20, greatest(1, coalesce((l ->> 'cant')::int, 1)))) u
+    cross join lateral (select case c.periodo when 'mensual' then 30 when 'anual' then 365 end as dias) d
     where l ->> 'tipo' = 'digital' and c.tipo = 'digital' and c.acceso is not null;
     if ac is not null then
       new.accesos := ac;

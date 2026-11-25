@@ -587,13 +587,18 @@
     let rubro = ''; try { rubro = (await Cuenta.rpc('tienda_info', { p_negocio: cuenta.id }) || {}).rubro || ''; } catch (e) { /* sin red: ejemplo general */ }
     let ej = []; try { ej = (Core.plantilla(rubro) || []).slice(0, 3); } catch (e) { /* nada */ }
     if (!ej.length) ej = [{ nombre: 'Polera básica', precio: 9990, categoria: 'Poleras' }, { nombre: 'Jeans clásico', precio: 19990, categoria: 'Pantalones' }];
-    ej = ej.map((x, i) => Object.assign({ stock: 10, costo: Math.round((x.precio || 0) * 0.5), desc: '', ops: i ? '' : 'S, M, L', pub: 'sí' }, x));
+    ej = ej.map((x, i) => Object.assign({ stock: 10, costo: Math.round((x.precio || 0) * 0.5), desc: '', ops: i ? '' : 'S, M, L', pub: 'sí', tipo: '', periodo: '', acceso: '' }, x));
+    if (!esCliente) ej.push({ nombre: 'Curso online de ejemplo', precio: 15000, categoria: 'Cursos', stock: '', costo: 0, desc: '', ops: '', pub: 'sí', tipo: 'digital', periodo: 'mensual', acceso: 'https://tu-link-del-curso' });
     const mismo = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
     CFX_RESPALDO.planilla(w, { que: 'productos', archivo: 'planilla-productos', max: 500, rubro, clave: 'nombre',
       cols: [{ k: 'nombre', t: 'Nombre', req: true, max: 60, al: /^(producto|articulo|item)/ }, { k: 'precio', t: 'Precio', tipo: 'plata', req: true, al: /^(valor|precio venta)/ },
         { k: 'categoria', t: 'Categoría', max: 40, al: /^(tipo|seccion|familia)/ }, { k: 'stock', t: 'Stock', tipo: 'entero', tope: 100000, al: /^(cantidad|existencia|inventario)/ },
         { k: 'costo', t: 'Costo', tipo: 'plata', ayuda: 'lo que te cuesta a ti (no lo ve el cliente)' }, { k: 'desc', t: 'Descripción', max: 300, al: /^detalle/ },
-        { k: 'ops', t: 'Opciones', max: 200, ayuda: 'tallas o colores separados por coma' }].concat(esCliente ? [] : [{ k: 'pub', t: 'En catálogo', tipo: 'si_no', ayuda: 'sí = lo ven tus clientes' }]),
+        { k: 'ops', t: 'Opciones', max: 200, ayuda: 'tallas o colores separados por coma' }].concat(esCliente ? [] : [{ k: 'pub', t: 'En catálogo', tipo: 'si_no', ayuda: 'sí = lo ven tus clientes' },
+        // G160 b: tipo de venta (vacío = automático por nombre y stock) · 🔑 período y acceso de lo digital.
+        { k: 'tipo', t: 'Tipo', tipo: 'lista', ops: ['producto', 'servicio', 'digital'], al: /^(clase|tipo de venta)/, ayuda: 'producto (con stock y envío), servicio (sin stock ni envío) o digital (llega al pagar); vacío = automático' },
+        { k: 'periodo', t: 'Período', tipo: 'lista', ops: ['único', 'mensual', 'anual'], al: /^(pago|cada)/, ayuda: 'solo digital: único (no vence), mensual (30 días) o anual (365 días)' },
+        { k: 'acceso', t: 'Acceso', max: 500, al: /^(link|codigo|clave)/, ayuda: 'solo digital: link, código o instrucciones que recibe al pagar' }]),
       ejemplos: ej,
       existe: (f) => productos.some((p) => mismo(p.nombre, f.nombre)),
       guardar: async (filas) => {
@@ -612,6 +617,11 @@
               if (p.publicado) await Cuenta.rpc('catalog_upsert', { p_key: p.id, p_nombre: p.nombre, p_precio: p.precio, p_premium: p.premium, p_categoria: p.categoria, p_vip: !!p.vip, p_descripcion: p.desc || '', p_opciones: p.ops || '' });
               else { await Cuenta.rpc('catalog_delete', { p_key: p.id }); p.foto = false; }
               if (p.publicado && f.stock != null) await Cuenta.rpc('set_stock', { p_key: p.id, p_stock: f.stock });
+              if (p.publicado && (f.tipo || f.periodo || f.acceso)) {  // G160 b
+                const tp = f.tipo || (f.acceso || f.periodo ? 'digital' : 'producto'), pe = f.periodo === 'mensual' || f.periodo === 'anual' ? f.periodo : 'unico';
+                p.venta = await Cuenta.rpc('catalogo_venta', { p_key: p.id, p: { tipo: tp, manual: true, periodo: tp === 'digital' ? pe : 'unico', cobro: 'ahora', acceso: f.acceso || '' } });
+                if (p.venta.tipo !== 'producto') p.stock = '';
+              }
             } catch (e) { errores.push({ fila: f._fila, msg: e.message }); if (!nuevo) Object.assign(p, JSON.parse(antes)); continue; }
           }
           if (nuevo) { productos.push(p); creados++; } else actualizados++;
@@ -697,7 +707,7 @@
     const tp = $('p-tipo').value; if (tp === 'digital') $('p-cobro').value = 'ahora';
     $('p-cobro').disabled = tp === 'digital';
     $('rowAbono').classList.toggle('hidden', $('p-cobro').value !== 'abono'); $('rowAcceso').classList.toggle('hidden', tp !== 'digital');
-    $('pVentaRes').textContent = VT[tp] + ' · ' + VC[$('p-cobro').value] + ($('p-cobro').value === 'abono' ? ' ' + ($('p-abono').value || 50) + '%' : '');
+    $('pVentaRes').textContent = VT[tp] + (tp === 'digital' && $('p-periodo').value !== 'unico' ? ' ' + ($('p-periodo').value === 'anual' ? 'anual' : 'mensual') : '') + ' · ' + VC[$('p-cobro').value] + ($('p-cobro').value === 'abono' ? ' ' + ($('p-abono').value || 50) + '%' : '');
   }
   // G160: el tipo usa CFX_TIPO del núcleo (3 botones grandes; automático por nombre/stock hasta que el dueño toque uno).
   if (!window.CFX_TIPO && document.readyState !== 'complete') await new Promise((ok) => addEventListener('load', ok, { once: true }));  // pagos.js carga después
@@ -708,13 +718,13 @@
     v = v || {};
     if (window.CFX_TIPO) CFX_TIPO.poner($('p-tipo'), v.tipo || 'producto', v.tipo ? v.manual !== false : false); else $('p-tipo').value = v.tipo || 'producto';
     if (!v.tipo) autoTipo();
-    $('p-cobro').value = v.cobro || 'ahora'; $('p-abono').value = v.abono || ''; $('p-acceso').value = v.acceso || ''; pintarVenta();
+    $('p-cobro').value = v.cobro || 'ahora'; $('p-periodo').value = v.periodo || 'unico'; $('p-abono').value = v.abono || ''; $('p-acceso').value = v.acceso || ''; pintarVenta();
   }
-  ['p-tipo', 'p-cobro', 'p-abono'].forEach((k) => $(k).addEventListener('input', pintarVenta));
+  ['p-tipo', 'p-cobro', 'p-abono', 'p-periodo'].forEach((k) => $(k).addEventListener('input', pintarVenta));
   // G156 → G160: el tipo automático ya mira nombre + categoría + stock (CFX_TIPO.adivinar), no solo "Servicio…".
   $('p-cat').addEventListener('change', autoTipo);
   $('pVentaW').classList.toggle('hidden', esCliente);
-  const leerVenta = () => ({ tipo: $('p-tipo').value, manual: $('p-tipo').dataset.manual === '1', cobro: $('p-cobro').value, abono: $('p-cobro').value === 'abono' ? parseInt($('p-abono').value || '50', 10) : null, acceso: $('p-acceso').value.trim() });
+  const leerVenta = () => ({ tipo: $('p-tipo').value, manual: $('p-tipo').dataset.manual === '1', periodo: $('p-tipo').value === 'digital' ? $('p-periodo').value : 'unico', cobro: $('p-cobro').value, abono: $('p-cobro').value === 'abono' ? parseInt($('p-abono').value || '50', 10) : null, acceso: $('p-acceso').value.trim() });
   const ventaFabrica = (v) => v.tipo === 'producto' && v.cobro === 'ahora' && !v.manual;
 
   function limpiarForm() {

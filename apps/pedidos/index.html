@@ -347,7 +347,7 @@
         const l = await Cuenta.rpc('cfx_clave_lista', { p_negocio: yo.id, p_pedido: id });
         if (!box) return; box.classList.remove('hidden');
         box.innerHTML = l.length ? l.map((c) => '<div class="row" style="align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="flex:1;min-width:160px"><b>' + Core.esc(c.nombre) + '</b> · <code>' + Core.esc(c.clave) + '</code><br><small class="muted">' +
-          (c.anulada ? '❌ Anulada' : c.canjeado_at ? '✅ Canjeada por ' + Core.esc(c.quien || '') + ' · ' + new Date(c.canjeado_at).toLocaleString('es-CL') : '⏳ Sin canjear') + '</small></span>' +
+          (c.anulada ? '❌ Anulada' : c.canjeado_at ? '✅ Canjeada por ' + Core.esc(c.quien || '') + ' · ' + new Date(c.canjeado_at).toLocaleString('es-CL') + (c.vence ? ' · 📅 vale hasta ' + new Date(c.vence).toLocaleDateString('es-CL') : '') : '⏳ Sin canjear' + (c.dias ? ' · dura ' + (c.dias >= 365 ? '1 año' : c.dias + ' días') : '')) + '</small></span>' +
           (c.anulada ? '' : '<button class="small alt" data-reponer="' + c.id + '" data-ped="' + id + '">🔄 Reponer</button>') + '</div>').join('') : '<p class="muted">Aún no hay claves: se crean al aprobar el pago.</p>';
         return;
       }
