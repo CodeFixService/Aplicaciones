@@ -1741,6 +1741,17 @@
       return cargaEst.then(() => window.CFX_ESTUDIO.montar(z, o)).catch((e) => { z.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; });
     }, cargador: true };
   }
+  // G162 🔁 Compras recurrentes (módulo 'suscripciones'): recurrente.js se carga recién al abrirlo (misma carpeta que ayuda.js).
+  // Uso: CFX_RECURRENTE.montar(zona, { rpc, probar, clientes, productos, conClave, despacho }) · CFX_RECURRENTE.mias(zona, { rpc }).
+  if (!window.CFX_RECURRENTE) {
+    let cargaRec = null;
+    const usar = (k) => (z, o) => {
+      cargaRec = cargaRec || new Promise((ok, no) => { const s = document.createElement('script'); s.src = String(yo || '').replace(/[^/]*$/, '') + 'recurrente.js';
+        s.onload = () => (window.CFX_RECURRENTE.cargador ? no(new Error('Actualiza la app')) : ok()); s.onerror = () => { cargaRec = null; no(new Error('No se pudo cargar. Revisa tu conexión.')); }; document.head.appendChild(s); });
+      return cargaRec.then(() => window.CFX_RECURRENTE[k](z, o)).catch((e) => { if (k === 'montar') z.innerHTML = '<p class="muted">⚠️ ' + esc(e.message || e) + '</p>'; });
+    };
+    window.CFX_RECURRENTE = { montar: usar('montar'), mias: usar('mias'), cargador: true };
+  }
 
   // ---------- Flechas siempre al centro de su cuadro ----------
   // Los botones que solo tienen una flecha de texto (‹ › ← →) pasan a un dibujo: así queda centrada en todas las letras y celulares.

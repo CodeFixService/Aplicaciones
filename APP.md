@@ -36,7 +36,7 @@ core.js l.351/l.352 + `version.json` (notas = SOLO categorías) + `db_version()`
 - G145 a 🌐 Mi dominio: la tienda lo conecta SOLA (Guardar/🔄 Revisar → función enviar acción 'dominio' → `enviar/dominio_tienda.ts` crea/borra el Custom Hostname www.<dominio> en la zona de CodeFix con el token 'cf_token' que el CM copia aquí; datos SIEMPRE de la base: `dominio_cf_datos(uid, antes)` solo servidor). Prueba: SaaS/pruebas/g145a.js.
 
 ## 🐞 G159 (7.04 · núcleo 3.54)
-🔁 Compras recurrentes: el select de producto lleva name="producto" (si no, CFX_AYUDA lo vuelve botón de acción). Solo 🛠️/🔑/categoría Servicio → sin Entrega (catalogo_venta_negocio). Prueba g159.js.
+🔁 Compras recurrentes (G162): hoja del NÚCLEO (recurrente.js / sql/recurrente.sql, tabla cfx_recurrentes). Despega pone ganchos: cfx_recurrente_armar_app (armar_pedido + tipo), _cliente_app, _crear_app (guardar_pedido el día que toca), _puede_app (pro_o_modulo), cfx_mp_neg_token_app (mp_cuentas → ⚡ cobro automático). Tabla vieja `suscripciones` = respaldo (copiada con el mismo id por suscripciones_a_nucleo). Pruebas g162.js / g96a.js.
 
 ## 🐞 G156 (7.01 · bd 6.02)
 - 🎨 Diseños: publicar_ficha + `ficha_datos_guardar(key, datos)` (publicaciones.datos jsonb) · al abrir, `mis_fichas()` repone en la Galería lo que el celular no tiene (recuperarFichas) · Caja vacía → baja sola `respaldos/<id>/caja.json` (1 vez por sesión).

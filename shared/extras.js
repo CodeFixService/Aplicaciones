@@ -90,76 +90,25 @@
     };
   }
 
-  /* ---------- 🔁 Compras recurrentes ---------- */
+  /* ---------- 🔁 Compras recurrentes (G162: núcleo recurrente.js; las de antes se copiaron con su mismo id) ---------- */
+  // Despega pone: sus clientes con cuenta, sus productos (el precio real lo pone el servidor el día que toca) y el despacho.
   async function recurrentes(z, o) {
-    if (!puede('suscripciones')) return candado(z, 'suscripciones', 'Arma el pedido fijo de un cliente (ej. 1 kg de café cada 15 días): el pedido se crea solo ese día y al cliente le llega el aviso para pagar.', o);
-    let L, cli, prods;
-    let vt = [];
-    try { [L, cli, prods, vt] = await Promise.all([R('suscripciones_lista'), R('my_clients'), R('catalog_of', { p_negocio: Cuenta.account.id }), R('catalogo_venta_negocio', { p_negocio: Cuenta.account.id }).catch(() => [])]); } catch (e) { return error(z, e); }
-    prods = (prods || []).filter((p) => p.client_key || p.clave);
-    const clave = (p) => p.client_key || p.clave;
-    // G159 🐞 Despega #6: 🛠️ servicio o 🔑 activación digital (o categoría "Servicio…") no lleva retiro ni despacho.
-    const tipoDe = {}; (vt || []).forEach((x) => { tipoDe[x.clave] = x.tipo; });
-    // G160: una sola fuente (servidor tipo automático/manual + CFX_TIPO.adivinar del núcleo para lo que aún no se sincronizó).
-    const tipoItem = (k) => { const p = prods.find((y) => clave(y) === k); return tipoDe[k] || (window.CFX_TIPO && p ? CFX_TIPO.de(p) : p && /servic/i.test(p.categoria || '') ? 'servicio' : 'producto'); };
-    const sinEnvio = (k) => tipoItem(k) !== 'producto';
-    const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
-    const optP = '<option value="">Producto…</option>' + prods.map((p) => '<option value="' + esc(clave(p)) + '">' + esc(p.nombre) + ' · ' + $$(p.precio) + '</option>').join('');
-    const linea = () => '<div class="gx-row gx-l"><select class="gxP" name="producto" aria-label="Producto">' + optP + '</select><input class="gxC" type="number" min="1" max="99" value="1" style="max-width:80px;min-width:64px" aria-label="Cantidad"></div>';
-    const fila = (x) => '<div class="gx-f"><div><b>' + esc(x.nombre) + '</b> · cada ' + x.cada + ' días<br><small class="muted">' +
-      esc((x.lineas || []).map((l) => l.cant + ' × ' + l.nombre).join(', ')) + (x.total != null ? ' · ' + $$(x.total) : '') + '<br>' +
-      (x.activa ? '📅 Próximo: ' + fecha(x.proxima) : '⏸️ Pausada') + ' · ' + x.pedidos + ' pedido(s)</small>' + (x.error ? '<br><small class="gx-err">⚠️ ' + esc(x.error) + '</small>' : '') + '</div>' +
-      '<div class="btns"><button type="button" class="small alt" data-est="' + esc(x.id) + '">' + (x.activa ? '⏸️ Pausar' : '▶️ Seguir') + '</button>' +
-      '<button type="button" class="small alt" data-borrar="' + esc(x.id) + '" aria-label="Borrar">🗑️</button></div></div>';
-    const c = caja(z, '<p class="muted">El pedido se crea solo el día que toca, con los precios del día, y le avisamos al cliente.</p>' +
-      (cli.length && prods.length ? '<h3>Nueva compra recurrente</h3><label for="gxCli">Cliente</label><select id="gxCli"><option value="">Elige…</option>' +
-        cli.map((x) => '<option value="' + esc(x.id) + '">' + esc(x.nombre || x.email) + '</option>').join('') + '</select>' +
-        '<label>Productos</label><div id="gxLs">' + linea() + '</div><button type="button" class="small alt" data-gx="mas">+ Otro producto</button>' +
-        '<div class="gx-row"><div><label for="gxCada">Cada</label><select id="gxCada"><option value="7">7 días</option><option value="14">14 días</option><option value="30" selected>30 días</option></select></div>' +
-        '<div><label for="gxDesde">Primer pedido</label><input id="gxDesde" type="date" min="' + hoy + '" value="' + hoy + '"></div></div>' +
-        '<div id="gxEntW"><label for="gxEnt">Entrega</label><select id="gxEnt"><option value="retiro">🏪 Retiro en tienda</option><option value="despacho">🚚 Despacho</option></select>' +
-        '<input id="gxDir" class="hidden" maxlength="200" placeholder="Dirección y comuna" aria-label="Dirección de despacho"></div><p id="gxSinEnv" class="muted hidden">🛠️ Servicio o 🔑 acceso digital: sin retiro ni despacho.</p>' +
-        '<button type="button" class="ok" data-gx="guardar" style="width:100%;margin-top:8px">🔁 Guardar</button>'
-        : '<p>' + (cli.length ? 'Publica tus productos primero.' : 'Primero invita a tus clientes (Más → Clientes).') + '</p>') +
-      '<h3>Activas</h3>' + (L.length ? L.map(fila).join('') : '<p class="muted">Aún no tienes compras recurrentes.</p>'));
-    const ent = c.querySelector('#gxEnt'); if (ent) ent.onchange = () => c.querySelector('#gxDir').classList.toggle('hidden', ent.value !== 'despacho');
-    // Solo servicios / digitales elegidos → se esconde la Entrega (va como retiro, sin dirección).
-    const verEnvio = () => { if (!ent) return; const ks = [...c.querySelectorAll('.gxP')].map((s) => s.value).filter(Boolean), no = ks.length > 0 && ks.every(sinEnvio);
-      c.querySelector('#gxEntW').classList.toggle('hidden', no); c.querySelector('#gxSinEnv').classList.toggle('hidden', !no); if (no) { ent.value = 'retiro'; c.querySelector('#gxDir').classList.add('hidden'); } };
-    c.addEventListener('change', (ev) => { if (ev.target.classList && ev.target.classList.contains('gxP')) verEnvio(); });
-    c.onclick = async (ev) => {
-      const b = ev.target.closest('button'); if (!b) return;
-      if (b.dataset.gx === 'mas') { c.querySelector('#gxLs').insertAdjacentHTML('beforeend', linea()); return; }
-      if (b.dataset.gx === 'guardar') {
-        const items = [...c.querySelectorAll('.gx-l')].map((l) => ({ clave: l.querySelector('.gxP').value, cant: +l.querySelector('.gxC').value || 1 })).filter((x) => x.clave);
-        b.disabled = true;
-        try {
-          await R('suscripcion_guardar', { p: { cliente: c.querySelector('#gxCli').value, items, cada: +c.querySelector('#gxCada').value, entrega: ent.value,
-            direccion: c.querySelector('#gxDir').value, proxima: c.querySelector('#gxDesde').value } });
-          Core.toast('🔁 Compra recurrente guardada'); recurrentes(z, o);
-        } catch (e) { Core.toast('⚠️ ' + e.message); b.disabled = false; }
-        return;
-      }
-      const x = L.find((y) => y.id === (b.dataset.est || b.dataset.borrar)); if (!x) return;
-      try {
-        if (b.dataset.est) await R('suscripcion_estado', { p_id: x.id, p_activa: !x.activa });
-        else { if (!(await Core.confirmar('¿Borrar la compra recurrente de ' + x.nombre + '?'))) return; await R('suscripcion_borrar', { p_id: x.id }); }
-        recurrentes(z, o);
-      } catch (e) { Core.toast('⚠️ ' + e.message); }
-    };
+    if (!window.CFX_RECURRENTE) return error(z, 'Actualiza la app');
+    const neg = Cuenta.account.id;
+    return CFX_RECURRENTE.montar(z, { rpc: R, probar: o.probar, conClave: true, despacho: true,
+      clientes: async () => ((await R('my_clients')) || []).map((x) => ({ cuenta: x.id, nombre: x.nombre || x.email, whatsapp: x.telefono || '', correo: x.email || '' })),
+      productos: async () => {
+        const [prods, vt] = await Promise.all([R('catalog_of', { p_negocio: neg }), R('catalogo_venta_negocio', { p_negocio: neg }).catch(() => [])]);
+        const tipoDe = {}; (vt || []).forEach((x) => { tipoDe[x.clave] = x.tipo; });
+        return (prods || []).filter((p) => p.client_key || p.clave).map((p) => { const k = p.client_key || p.clave;
+          return { clave: k, nombre: p.nombre, precio: p.precio, tipo: tipoDe[k] || (window.CFX_TIPO ? CFX_TIPO.de(p) : 'producto') }; });
+      } });
   }
-  // El cliente: sus compras recurrentes (pausar / seguir). Sin ninguna, no muestra nada.
+  // El cliente: sus compras recurrentes (pausar / seguir / ⚡ pago automático). Sin ninguna, no muestra nada.
   async function misRecurrentes(z) {
-    let L; try { L = await R('mis_suscripciones'); } catch (e) { L = []; }
-    if (!L.length) { z.innerHTML = ''; z.classList.add('hidden'); return; }
-    z.classList.remove('hidden');
-    const c = caja(z, '<h2>🔁 Tus compras recurrentes</h2>' + L.map((x) => '<div class="gx-f"><div><b>' + esc(x.tienda) + '</b> · cada ' + x.cada + ' días<br><small class="muted">' +
-      esc((x.lineas || []).map((l) => l.cant + ' × ' + l.nombre).join(', ')) + '<br>' + (x.activa ? '📅 Próximo: ' + fecha(x.proxima) : '⏸️ Pausada') + '</small></div>' +
-      '<div class="btns"><button type="button" class="small alt" data-est="' + esc(x.id) + '">' + (x.activa ? '⏸️ Pausar' : '▶️ Seguir') + '</button></div></div>').join(''));
-    c.onclick = async (ev) => {
-      const b = ev.target.closest('[data-est]'); const x = b && L.find((y) => y.id === b.dataset.est); if (!x) return;
-      try { await R('suscripcion_estado', { p_id: x.id, p_activa: !x.activa }); Core.toast(x.activa ? '⏸️ Pausada' : '▶️ Retomada'); misRecurrentes(z); } catch (e) { Core.toast('⚠️ ' + e.message); }
-    };
+    if (!window.CFX_RECURRENTE) { z.innerHTML = ''; z.classList.add('hidden'); return; }
+    await CFX_RECURRENTE.mias(z, { rpc: R });
+    z.classList.toggle('hidden', !!z.hidden); z.hidden = false;
   }
 
   /* ---------- 📦 Stock mínimo y proveedores ---------- */

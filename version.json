@@ -1,6 +1,6 @@
 {
-  "version": "7.05",
-  "bd": "6.03",
+  "version": "7.06",
+  "bd": "6.04",
   "funcion": "3.9",
-  "notas": "🐞 G159 (núcleo 3.54): un selector tipo \"Producto…\" ahora muestra lo que elegiste (antes parecía que no se agregaba). 🔁 Compras recurrentes: el producto elegido queda puesto y un 🛠️ servicio o 🔑 acceso digital ya no pide retiro ni despacho."
+  "notas": "🔁 G162 (núcleo 3.56): Compras recurrentes en todas las apps: cada semana, mes o año (7 a 365 días), 🔔 aviso antes, se crea sola y se cobra (⚡ automático con tarjeta, link de pago o ✅ a mano) + resumen de $ al mes y próximas fechas."
 }
