@@ -1,6 +1,6 @@
 {
-  "version": "7.06",
+  "version": "7.07",
   "bd": "6.04",
   "funcion": "3.9",
-  "notas": "🔁 G162 (núcleo 3.56): Compras recurrentes en todas las apps: cada semana, mes o año (7 a 365 días), 🔔 aviso antes, se crea sola y se cobra (⚡ automático con tarjeta, link de pago o ✅ a mano) + resumen de $ al mes y próximas fechas."
+  "notas": "🐞 Túnel (núcleo 3.57): en la tienda el nombre se ve completo en la vista de 3 por fila y el ❤️ ya no tapa la categoría ni el nombre · un solo botón ↺ de fábrica con aire arriba."
 }

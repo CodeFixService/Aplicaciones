@@ -51,8 +51,8 @@
   #grid.v3 .item{border-radius:14px;padding-bottom:8px!important;gap:3px}
   #grid.v3 .item>:not(.foto):not(.fav):not(.cinta):not(.acc){margin-left:8px;margin-right:8px}
   #grid.v3 .item .desc,#grid.v3 .item .cat,#grid.v3 .item .prem,#grid.v3 .item .nuevo,#grid.v3 .item .cinta{display:none}
-  #grid.v3 .item b{font-size:12px;font-weight:700;line-height:1.3;padding-right:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
-  #grid.v3 .item:not(:has(.foto)) b{padding-right:24px}
+  /* 🐞 Despega #16: en la vista de 3 el nombre se ve COMPLETO (sin "…"), cortando palabras largas con guion. */
+  #grid.v3 .item b{font-size:12px;font-weight:700;line-height:1.3;padding-right:0!important;display:block;overflow:visible;min-height:2.6em;overflow-wrap:break-word;word-break:normal;hyphens:auto;-webkit-hyphens:auto}
   #grid.v3 .item .p{font-size:14px} #grid.v3 .item .p.tachado{font-size:11px}
   #grid.v3 .opc-chips{gap:4px} #grid.v3 .opc-ch{min-height:22px;min-width:22px;font-size:10.5px;padding:1px 6px} #grid.v3 .opc-ch.sw{width:22px;height:22px;padding:2px}
   #grid.v3 .item .acc{padding:2px 8px 0;gap:4px} #grid.v3 .item .acc .btn,#grid.v3 .item .acc button{min-height:32px;font-size:0;padding:0;border-radius:10px}
@@ -62,6 +62,8 @@
   #grid .fav{aspect-ratio:1;min-height:0!important;min-width:0;flex:none;padding:0;display:grid;place-items:center;line-height:1}
   #grid .fav.on{background:color-mix(in srgb,var(--card,#fff) 75%,transparent)!important;color:#ef4444}
   #grid .fav.on svg{fill:#ef4444;stroke:#ef4444}
+  /* 🐞 Despega #8/#17: sin foto, el ❤️ (36 px arriba a la derecha) ya no tapa la categoría ni el nombre: esas líneas dejan su espacio. */
+  #grid:not(.v3) .item:not(:has(.foto,.foto-esq)) .cat,#grid:not(.v3) .item:not(:has(.foto,.foto-esq)):not(:has(.nuevo)) b{padding-right:38px}
   @media (max-width:340px){#grid.v3{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
   #grid.v1 .item .foto{aspect-ratio:4/3}
   .opc-ch.agot{opacity:.4;text-decoration:line-through} .opc-ch.agot.sw i{background:repeating-linear-gradient(135deg,var(--sw) 0 5px,transparent 5px 8px)}

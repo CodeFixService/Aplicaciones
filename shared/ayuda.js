@@ -2483,7 +2483,7 @@
       z.innerHTML = '<div class="cfx-pf">' + temasHtml() + (P.guardarColor ? '<label>Color de la app</label><div class="cfx-pf-cols">' + cols.map(([n, c]) => '<button type="button" data-c="' + esc(c) + '" title="' + esc(n) + '" aria-label="' + esc(n) + '" style="background:' + esc(c) + '" class="' +
         (c.toLowerCase() === act ? 'on' : '') + (P.bloqueo('color', c) ? ' cfx-pf-lock' : '') + '"></button>').join('') + '</div>' +
         (libre ? '<label class="cfx-pf-libre"><input type="color" value="' + esc(HEX.test(act) ? act : '#2563eb') + '"><span>🎨 Color a tu gusto' + (P.bloqueo('libre') ? ' <i>⭐</i>' : '') + '</span></label>' : '') : '') +
-        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + letraHtml() + '<div data-pe-barra></div><div data-pf-mc></div><button type="button" class="cfx-pe-fab" data-pe-fab>↩️ Volver todo a lo de fábrica</button></div>';
+        (P.guardarModo ? '<label>Modo de pantalla</label><div class="cfx-pf-modos">' + MODOS.map(([k, i, t]) => '<button type="button" data-m="' + k + '" aria-pressed="' + (k === m) + '" class="' + (k === m ? 'on' : '') + '"><span>' + i + '</span>' + t + '</button>').join('') + '</div>' : '') + letraHtml() + '<div data-pe-barra></div><div data-pf-mc></div><button type="button" class="cfx-pe-fab" data-pe-fab>↺ Volver todo a lo de fábrica</button></div>';
       pintarBarraPe(z);
       // G48 🎨 Colores a tu gusto: fondo, texto e íconos (con el + del centro). Se guardan para el modo que se está viendo.
       const MC = [['fondo', '🖼️', 'Fondo', 'Detrás de todo'], ['tarjeta', '🗂️', 'Tarjetas', 'Cajas y menús'], ['texto', '📝', 'Texto', 'Letras y títulos'], ['icono', '✨', 'Íconos y botón +', 'Menú, ⋯, barra de abajo y el +'],
@@ -2495,7 +2495,6 @@
         c.innerHTML = '<label>Colores a tu gusto · modo ' + mo + '</label><div class="cfx-pf-mc">' + MC.map(([k, i, t, d]) => '<label class="cfx-pf-mcf"><span class="cfx-pf-mcm"' + (g[k] ? ' style="background:' + esc(g[k]) + '"' : '') + '></span>' +
           '<span><b>' + i + ' ' + t + (lock ? ' <i>⭐</i>' : '') + '</b><small>' + (g[k] ? d : 'Normal · toca para elegir') + '</small></span>' +
           '<input type="color" data-col="' + k + '" value="' + esc(g[k] || MCB(mo, k)) + '" aria-label="' + esc(t) + '"></label>').join('') + '</div>' +
-          (Object.keys(g).length ? '<button type="button" class="cfx-pf-mcr" data-pf-colnormal>↺ Volver a los colores normales</button>' : '') +
           '<p class="cfx-pf-nota">Si un color no se lee, la app lo ajusta sola. El modo ' + (mo === 'oscuro' ? 'claro' : 'oscuro') + ' guarda los suyos.</p>';
         c.querySelectorAll('[data-col]').forEach((i) => {
           i.onclick = (ev) => { if (pide('libre')) ev.preventDefault(); };
@@ -2506,8 +2505,6 @@
             aviso(aj ? '🎨 Guardado (lo ajusté un poco para que se lea)' : '🎨 Color guardado');
           };
         });
-        const r0 = c.querySelector('[data-pf-colnormal]');
-        if (r0) r0.onclick = () => { colGuardar(mo, {}); colFirma = ''; pintarCols(); pintarMC(); aviso('↺ Colores normales'); };
       };
       pintarMC();
       // Se marca la opción en su lugar (sin volver a dibujar la sección).
@@ -2517,8 +2514,8 @@
         if (tm) { ev.preventDefault(); const k = tm.dataset.peTema; if (k !== 'fabrica' && k !== 'contraste' && pide('libre')) return; temaPoner(k); marcar('[data-pe-tema]', tm); pintarMC(); aviso('🎨 Tema guardado'); return; }
         if (ev.target.closest('[data-pe-fab]')) {
           ev.preventDefault();
-          if (!(await window.CFX_DIALOGO.confirmar('↩️ ¿Volver los colores, la letra y la barra a lo de fábrica? (el color de la app y el modo quedan)', { si: 'Sí, de fábrica', no: 'Cancelar' }))) return;
-          peFabrica(); verEstilo(z); aviso('↩️ Todo de fábrica'); return;
+          if (!(await window.CFX_DIALOGO.confirmar('↺ ¿Volver los colores, la letra y la barra a lo de fábrica? (el color de la app y el modo quedan)', { si: 'Sí, de fábrica', no: 'Cancelar' }))) return;
+          peFabrica(); verEstilo(z); aviso('↺ Todo de fábrica'); return;
         }
         const lf = ev.target.closest('[data-lf]');
         if (lf) { ev.preventDefault(); marcar('[data-lf]', lf); const n = ltLeer(); n.f = ltFam(lf.dataset.lf)[0]; ltGuardar(n); pintarLetra(); aviso('🔤 Letra guardada'); return; }
