@@ -2567,6 +2567,7 @@
       z.innerHTML = '<div class="cfx-pf">' +
         '<div class="cfx-pf-caja"><b>🔔 Notificaciones en este celular</b><div class="cfx-pf-fila"><span data-push>Revisando…</span><button type="button" data-pf="push">Activar</button></div>' +
           '<button type="button" data-pf="probar" hidden>🔔 Probar aviso</button></div>' +
+        (R ? '<div class="cfx-pf-caja" data-eq-caja><b>📱 Mis equipos</b><small data-eq-txt>Revisando…</small><div data-eq-l></div></div>' : '') +
         (P.clave ? '<div class="cfx-pf-caja"><b>🔑 Cambiar contraseña</b><input data-c1 type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 6)"><input data-c2 type="password" autocomplete="new-password" placeholder="Repítela">' +
           '<button type="button" data-pf="clave">Cambiar contraseña</button></div>' : '') +
         (R ? '<div class="cfx-pf-caja"><b>🔒 PIN de la app</b><small data-pin-txt>Pide 4 a 6 números al abrir la app.</small><div style="position:relative"><input data-pin type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="PIN nuevo (4 a 6 números)"></div>' +
@@ -2579,8 +2580,20 @@
       const pinEst = () => R && R('cfx_pin_estado').then((t) => { const x = q('[data-pf=sinpin]'); if (x) x.hidden = !t; const m = q('[data-pin-txt]'); if (m) m.textContent = t ? '✅ Activo: se pide al abrir la app.' + (HU.id() ? ' 👆 Con huella.' : '') : 'Pide 4 a 6 números al abrir la app.';
         const h = q('[data-pf=huella]'); if (h) { if (!t) h.hidden = true; else HU.puede().then((si) => { h.hidden = !si; h.textContent = HU.id() ? 'Quitar huella' : '👆 Usar huella'; }); } }).catch(() => {});
       pinEst();
+      // G164 📱 Equipos abiertos con esta cuenta (núcleo equipos.js/.sql): el de ahora primero; los otros se cierran desde aquí.
+      const eqPintar = () => R && Promise.resolve(R('cfx_equipos_mios')).then((r) => {
+        const L = (r && r.equipos) || [], t = q('[data-eq-txt]'), l = q('[data-eq-l]'); if (!t || !l) return;
+        const H = window.CFX_EQUIPOS ? window.CFX_EQUIPOS.hace : () => '';
+        t.textContent = r && r.error ? r.error : (r && r.tope ? L.length + ' de ' + r.tope + ' equipos abiertos. Si no reconoces uno, ciérralo y cambia tu contraseña.' : L.length + ' equipos abiertos (sin tope).');
+        l.innerHTML = L.map((x) => '<div class="cfx-pf-fila"><span><b>' + esc(x.nombre) + '</b><br><small>' + (x.este ? '✅ Este equipo' : 'Último uso: ' + esc(H(x.visto))) + '</small></span>' +
+          (x.este ? '' : '<button type="button" data-pf="eqcerrar" data-s="' + esc(x.sesion) + '">Cerrar</button>') + '</div>').join('');
+      }).catch(() => { const c = q('[data-eq-caja]'); if (c) c.hidden = true; });
+      eqPintar();
       z.onclick = async (ev) => {
         const b = ev.target.closest('[data-pf]'); if (!b) return; const a = b.dataset.pf;
+        if (a === 'eqcerrar') { const nom = b.closest('.cfx-pf-fila').querySelector('b').textContent;
+          if (!(await (window.CFX_DIALOGO ? window.CFX_DIALOGO.confirmar('¿Cerrar la sesión en ' + nom + '? Ese equipo vuelve al ingreso.', { si: 'Cerrar sesión', peligro: true }) : true))) return;
+          if (await listo(async () => { const r = await R('cfx_equipo_cerrar', { p_sesion: b.dataset.s }); if (r && r.error) throw new Error(r.error); }, '📱 Equipo cerrado', b)) eqPintar(); return; }
         if (a === 'pin') { const v = q('[data-pin]').value.trim(); if (!/^\d{4,6}$/.test(v)) return aviso('El PIN debe tener de 4 a 6 números');
           if (await listo(() => R('cfx_pin_guardar', { p_pin: v }), '🔒 PIN guardado', b)) { try { localStorage.setItem('cfx-pin-n', v.length); } catch (x) { /* nada */ } q('[data-pin]').value = ''; pinOk(); pinEst(); } }
         if (a === 'verpin') { const i = q('[data-pin]'); i.type = i.type === 'password' ? 'text' : 'password'; b.textContent = i.type === 'password' ? '👁️' : '🙈'; return; }
@@ -2607,7 +2620,7 @@
     const conf = op.menu ? 'Configuración' : '';
     const propias = valor(P.secciones) || [];
     let L = [{ k: 'yo', ico: '👤', t: 'Foto y nombre', d: 'Cómo te ven', abrir: verYo, grupo: conf }, { k: 'estilo', ico: '🎨', t: 'Personalizar', d: 'Temas, colores, letra, barra de abajo y modo', abrir: verEstilo, grupo: conf },
-      { k: 'avanzado', ico: '⚙️', t: 'Avanzado', d: 'Contraseña, avisos y cuenta', abrir: verAvanzado, grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
+      { k: 'avanzado', ico: '⚙️', t: 'Avanzado', d: 'Contraseña, avisos, equipos y cuenta', abrir: verAvanzado, grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));
     // Menú: primero las opciones de la app; en Configuración van primero las del perfil y después las propias de la app.
     // Menú: una sola fila "Mi perfil" arriba de Configuración que abre la misma ventana en las 7 apps (foto y nombre, color y modo, avanzado).
     if (op.menu) L = [{ k: 'perfil', ico: '👤', t: 'Mi perfil', d: 'Foto, nombre, personalizar y contraseña', accion: () => abrirPerfil(), grupo: conf }].concat(propias.map((x) => Object.assign({ grupo: conf }, x)));

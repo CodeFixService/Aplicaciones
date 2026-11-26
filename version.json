@@ -1,6 +1,6 @@
 {
-  "version": "7.11",
-  "bd": "6.05",
+  "version": "7.12",
+  "bd": "6.06",
   "funcion": "3.9",
-  "notas": "🧮 G169: el cliente tiene «Caja» (Mi Caja) en la barra de abajo; «Contactos» pasó a Cuenta → Tu tienda. G169 (núcleo 3.61): el selector de hora marca el horario del día y parte en la hora de apertura (si la app se lo indica)."
+  "notas": "📱 G164 (núcleo 3.62): tu cuenta se usa en máximo 3 equipos a la vez (el tope lo fija CodeFix). Si entras en uno más, eliges cuál cerrar. Ves y cierras tus equipos en Mi perfil → Avanzado → 📱 Mis equipos."
 }
