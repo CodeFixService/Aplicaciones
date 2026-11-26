@@ -1,6 +1,6 @@
 {
-  "version": "7.10",
+  "version": "7.11",
   "bd": "6.05",
   "funcion": "3.9",
-  "notas": "📌 G168 (núcleo 3.60): en Personalizar → Barra de abajo eliges tus 3 «Accesos directos» (el + y el Más quedan fijos). El último botón de la barra se ve igual en todas las apps: ⋯ y la palabra «Más»."
+  "notas": "🧮 G169: el cliente tiene «Caja» (Mi Caja) en la barra de abajo; «Contactos» pasó a Cuenta → Tu tienda. G169 (núcleo 3.61): el selector de hora marca el horario del día y parte en la hora de apertura (si la app se lo indica)."
 }

@@ -412,9 +412,10 @@
     const a = account;
     if (!a || a.is_admin) return;
     const r = rootUrl();
+    // G169 · Despega #10: el cliente tiene su Caja (Mi Caja) en la barra; Contactos pasó a Cuenta → Tu tienda.
     const items = a.role === 'client'
       ? [['tienda', 'bolsa', 'Tienda', 'apps/catalogo/'], ['pedidos', 'paquete', 'Pedidos', 'apps/catalogo/?v=pedidos'],
-         ['chat', 'chat', 'Chat', 'apps/mensajes/'], ['contactos', 'contactos', 'Contactos', 'apps/contactos/'], ['cuenta', 'usuarios', 'Cuenta', '#cuenta']]
+         ['chat', 'chat', 'Chat', 'apps/mensajes/'], ['caja', 'caja', 'Caja', 'apps/caja/'], ['cuenta', 'usuarios', 'Cuenta', '#cuenta']]
       : a.role === 'equipo'
         ? [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'], ['chat', 'chat', 'Chat', 'apps/mensajes/']]
         : [['hoy', 'grafico', 'Hoy', ''], ['caja', 'caja', 'Caja', 'apps/caja/'], ['pedidos', 'paquete', 'Pedidos', 'apps/pedidos/'],
@@ -425,7 +426,7 @@
     n.innerHTML = items.map(([k, i, t, u]) => '<a href="' + r + u + '" data-k="' + k + '" class="' + (k === activo ? 'on' : '') + '">' + ICO(i) + t +
       (k === 'chat' || k === 'pedidos' || k === 'mas' ? '<span class="badge" hidden></span>' : '') + '</a>').join('');
     // Barra común del núcleo: [principal][principal][ + ][principal][Más]
-    global.CFX_BARRA = a.role === 'client' ? { orden: ['pedidos', 'chat', '+', 'contactos', 'cuenta'], plus: 'tienda' }
+    global.CFX_BARRA = a.role === 'client' ? { orden: ['pedidos', 'chat', '+', 'caja', 'cuenta'], plus: 'tienda' }
       : a.role === 'equipo' ? { orden: ['hoy', 'pedidos', '+', 'chat'], plus: 'caja' } : { orden: ['hoy', 'pedidos', '+', 'fichas', 'mas'], plus: 'caja' };
     if (global.CodeFixBarra) { delete n.dataset.cfx; global.CodeFixBarra.montar(); }
     // Arriba solo la campana (la cabecera común del núcleo la ordena); los mensajes van en la barra o en "Más" (con su número).

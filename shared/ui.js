@@ -537,7 +537,7 @@
     '.cfx-el-bus{width:100%;min-height:44px;margin:0 0 8px;padding:8px 12px;border-radius:12px;border:1px solid var(--cfx-borde,#d0d5dd);background:var(--cfx-campo,transparent);color:inherit;font:inherit}' +
     '.cfx-el-hr{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.cfx-el-mi{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}' +
     '.cfx-el-ch{min-height:40px;border-radius:10px;border:1px solid var(--cfx-borde,#d0d5dd);background:transparent;font-weight:700;font-variant-numeric:tabular-nums;padding:0}' +
-    '.cfx-el-ch.on{background:var(--brand,var(--marca,#2563eb));border-color:transparent;color:var(--cfx-mas-ink,#fff)}.cfx-el-ch:disabled{opacity:.3}' +
+    '.cfx-el-ch.on{background:var(--brand,var(--marca,#2563eb));border-color:transparent;color:var(--cfx-mas-ink,#fff)}.cfx-el-ch:disabled{opacity:.3}.cfx-el-ch.abre:not(.on){border-color:var(--brand,var(--marca,#2563eb));color:var(--brand,var(--marca,#2563eb))}' +
     '.cfx-el-sub{font-size:13px;font-weight:700;opacity:.7;margin:8px 0 6px}.cfx-el-vacio{opacity:.6;padding:12px;text-align:center}';
   (d.head || d.documentElement).appendChild(css);
 
@@ -639,8 +639,12 @@
     const g = hoja(t, '<div class="cfx-el-lista"><p class="cfx-el-sub">Hora</p><div class="cfx-el-hr"></div><p class="cfx-el-sub">Minutos</p><div class="cfx-el-mi"></div></div>' +
       '<div class="cfx-el-pie">' + (!el.required && el.value ? '<button type="button" data-borrar>Borrar</button>' : '') + '<button type="button" class="si" data-listo>Listo</button></div>');
     const fuera = (h, m2) => { const s = p2(h) + ':' + p2(m2); return (mn && s < mn) || (mx && s > mx); };
+    // G169: data-desde/data-hasta (HH:MM, el horario del día) marcan las horas abiertas y el selector parte ahí; las demás se pueden elegir igual.
+    const de = (el.dataset.desde || '').slice(0, 5), ha = (el.dataset.hasta || '').slice(0, 5);
+    const abre = (k) => !!(de && ha && p2(k) + ':59' >= de && p2(k) + ':00' < ha);
+    if (de && ha) g.querySelector('.cfx-el-sub').textContent = 'Hora · abierto ' + de + '–' + ha;
     const pintar = () => {
-      let a = ''; for (let k = 0; k < 24; k++) { const off = fuera(k, 59) && fuera(k, 0); a += '<button type="button" class="cfx-el-ch' + (k === hh ? ' on' : '') + '" data-h="' + k + '"' + (off ? ' disabled' : '') + '>' + p2(k) + '</button>'; }
+      let a = ''; for (let k = 0; k < 24; k++) { const off = fuera(k, 59) && fuera(k, 0); a += '<button type="button" class="cfx-el-ch' + (k === hh ? ' on' : '') + (abre(k) ? ' abre' : '') + '" data-h="' + k + '"' + (off ? ' disabled' : '') + '>' + p2(k) + '</button>'; }
       g.querySelector('.cfx-el-hr').innerHTML = a;
       g.querySelector('.cfx-el-mi').innerHTML = mins.map((k) => '<button type="button" class="cfx-el-ch' + (k === mi ? ' on' : '') + '" data-m="' + k + '"' + (hh != null && fuera(hh, k) ? ' disabled' : '') + '>' + p2(k) + '</button>').join('');
       g.querySelector('[data-listo]').disabled = hh == null;
@@ -654,8 +658,8 @@
       else { g.close(); poner(el, ''); }
     });
     pintar();
-    const on = g.querySelector('.cfx-el-hr .on') || g.querySelector('[data-h="' + (new Date().getHours()) + '"]');
-    if (on) on.scrollIntoView({ block: 'center' });
+    const on = g.querySelector('.cfx-el-hr .on') || g.querySelector('.cfx-el-hr .abre') || g.querySelector('[data-h="' + (new Date().getHours()) + '"]');
+    if (on) on.scrollIntoView({ block: on.classList.contains('on') ? 'center' : 'start' });
   }
   function abrir(el) {
     if (!sirve(el)) return false;

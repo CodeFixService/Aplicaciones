@@ -656,6 +656,7 @@ try {
         // G156: cliente → su tienda y Mi Caja van en el menú (bajo su perfil), no en tarjetas sueltas arriba.
         cliente && acc.negocio && { k: 'mitienda', ico: Core.ico('bolsa'), t: 'Tu tienda: ' + acc.negocio, d: 'Ofertas, productos y tus pedidos', grupo: 'Tu tienda', ir: 'apps/catalogo/?v=ofertas' },
         cliente && { k: 'cajaCli', ico: Core.ico('caja'), t: 'Mi Caja', d: 'Tus ventas, productos y finanzas', dato: acc.is_pro ? '' : 'PRO', grupo: 'Tu tienda', ir: acc.is_pro ? 'apps/caja/' : '#plan' },
+        cliente && { k: 'contactosCli', ico: Core.ico('contactos'), t: 'Contactos', d: 'Conéctate con otros clientes con tu código', grupo: 'Tu tienda', ir: 'apps/contactos/' },
         cliente && { k: 'mute', ico: '🔕', t: 'Ofertas de la tienda', d: 'Silenciar ofertas', grupo: 'Configuración', nodo: $('cMute') },
         dueno && { k: 'respaldo', ico: '💾', t: 'Respaldo de mi tienda', d: 'Excel con todo', grupo: 'Configuración', nodo: $('cRespaldo') }
       ];
