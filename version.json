@@ -1,6 +1,6 @@
 {
-  "version": "7.12",
+  "version": "7.13",
   "bd": "6.06",
   "funcion": "3.9",
-  "notas": "📱 G164 (núcleo 3.62): tu cuenta se usa en máximo 3 equipos a la vez (el tope lo fija CodeFix). Si entras en uno más, eliges cuál cerrar. Ves y cierras tus equipos en Mi perfil → Avanzado → 📱 Mis equipos."
+  "notas": "🎨 G172 (núcleo 3.63): al cambiar tus colores o el modo claro/oscuro, la barra del celular (hora y batería) toma el mismo color de arriba de la pantalla. Ya no quedan franjas de otro color."
 }

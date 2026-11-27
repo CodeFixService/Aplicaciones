@@ -2112,7 +2112,7 @@
     if (!HEX.test(c || '')) return;
     const n = parseInt(c.slice(1), 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255, r = document.documentElement.style;
     r.setProperty('--brand', c); r.setProperty('--marca', c); r.setProperty('--brand-ink', l > 0.62 ? '#0f172a' : '#ffffff');
-    // G61 b: la barra del celular (hora/cámara) NO cambia con el color: queda el theme-color de cada app.
+    // G172: la barra del celular sigue el color real de arriba (pintarBarraCel), no el color de la app.
     pintarCols();  // G48: el + vuelve a quedar legible sobre el color nuevo
   }
   // ---------- G48 🎨 Colores a tu gusto: fondo, texto e íconos (también el + del centro) ----------
@@ -2196,6 +2196,36 @@
       else if (!si && e.dataset.cfxDeg) { delete e.dataset.cfxDeg; e.style.removeProperty('background-image'); }
     });
   }
+  // G172 📱 La barra del celular (hora/batería) toma el color REAL de lo que está arriba en la pantalla (la cabecera o el fondo),
+  // así no queda una franja de otro color al elegir colores o modo. (Reemplaza G61 b: antes quedaba fijo el color de cada app.)
+  const rgbaDe = (t) => {
+    let m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?/.exec(t || '');
+    if (m) return [+m[1], +m[2], +m[3], m[4] == null ? 1 : /%$/.test(m[4]) ? parseFloat(m[4]) / 100 : +m[4]];
+    m = /^color\(srgb\s+([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)(?:\s*\/\s*([\d.]+%?))?/.exec(t || '');
+    if (m) return [m[1] * 255, m[2] * 255, m[3] * 255, m[4] == null ? 1 : /%$/.test(m[4]) ? parseFloat(m[4]) / 100 : +m[4]];
+    return null;
+  };
+  // Color de un elemento ya mezclado con lo que tiene detrás (cabeceras semitransparentes).
+  function colorVisto(e) {
+    const capas = [];
+    for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const c = rgbaDe(getComputedStyle(x).backgroundColor); if (c && c[3] > 0) { capas.push(c); if (c[3] >= 1) break; } }
+    let r = [255, 255, 255];
+    if (!capas.length || capas[capas.length - 1][3] < 1) { const b = rgbaDe(getComputedStyle(document.body || document.documentElement).backgroundColor); if (b && b[3] > 0) r = b.slice(0, 3); else if (esOscuro()) r = [14, 19, 24]; }
+    for (let i = capas.length - 1; i >= 0; i--) { const c = capas[i]; r = r.map((v, j) => v + (c[j] - v) * c[3]); }
+    return hexDe(r);
+  }
+  function pintarBarraCel() {
+    const m = document.querySelector('meta[name="theme-color"]'); if (!m || !document.body) return;
+    const cab = [...document.querySelectorAll('.cfx-cab-h')].find((h) => { if (h.closest('[hidden]')) return false; const q = h.getBoundingClientRect(); return q.height > 0 && q.top <= 4 && q.bottom > 4; });
+    const c = colorVisto(cab || document.body);
+    if (m.content !== c) m.content = c;
+  }
+  let celT = 0;
+  const pedirBarraCel = () => { clearTimeout(celT); celT = setTimeout(pintarBarraCel, 120); };
+  new MutationObserver(pedirBarraCel).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'], childList: true, subtree: true });
+  addEventListener('scroll', pedirBarraCel, { passive: true }); addEventListener('hashchange', pedirBarraCel); addEventListener('pageshow', pedirBarraCel);
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', pedirBarraCel); } catch (e) { /* navegador viejo */ }
+  pedirBarraCel();
   let degT = 0;
   new MutationObserver(() => { if (!document.documentElement.classList.contains('cfx-col-deg')) return; clearTimeout(degT); degT = setTimeout(degradar, 150); }).observe(document.documentElement, { childList: true, subtree: true });
   if (document.body) new MutationObserver(() => pintarCols()).observe(document.body, { attributes: true, attributeFilter: ['class'] });
