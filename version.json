@@ -1,6 +1,6 @@
 {
-  "version": "7.13",
+  "version": "7.14",
   "bd": "6.06",
   "funcion": "3.9",
-  "notas": "🎨 G172 (núcleo 3.63): al cambiar tus colores o el modo claro/oscuro, la barra del celular (hora y batería) toma el mismo color de arriba de la pantalla. Ya no quedan franjas de otro color."
+  "notas": "🎨 G173 (núcleo 3.64): en computador, el botón + del menú (Premium) ya no muestra un cuadrado dentro del círculo."
 }
